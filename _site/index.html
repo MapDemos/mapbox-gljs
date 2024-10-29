@@ -1,0 +1,455 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Home</title>
+  <link href="https://fonts.googleapis.com/css2?family=Raleway&amp;display=swap" rel="stylesheet" />
+  <style>
+* {
+  font-family: Raleway, sans-serif;
+  text-align: center;
+  color: #fff;
+  text-shadow:
+        /* Black border effect */
+        -1px -1px 0 #000,
+        1px -1px 0 #000,
+        -1px 1px 0 #000,
+        1px 1px 0 #000,
+}
+body {
+  background-color: #000;
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.header-icon {
+    height: 32px;
+    width: 32px;
+    background-size: 32px 32px;
+    background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTc5IiBoZWlnaHQ9IjE3OSIgdmlld0JveD0iMCAwIDE3OSAxNzkiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik04OS4xIDAuODAwMDAzQzM5LjkgMC44MDAwMDMgMCA0MC43IDAgODkuOUMwIDEzOS4xIDM5LjkgMTc5IDg5LjEgMTc5QzEzOC4zIDE3OSAxNzguMiAxMzkuMSAxNzguMiA4OS45QzE3OC4yIDQwLjcgMTM4LjMgMC44MDAwMDMgODkuMSAwLjgwMDAwM1pNOTguMyAzNS40QzEwOS43IDM1LjcgMTIxLjIgNDAuMiAxMzAgNDkuMUMxNDcuNyA2Ni44IDE0OC4zIDk0LjggMTMxLjQgMTExLjhDMTAwLjkgMTQyLjMgNDYuNiAxMzIuNSA0Ni42IDEzMi41QzQ2LjYgMTMyLjUgMzYuOCA3OC4yIDY3LjMgNDcuN0M3NS44IDM5LjMgODcgMzUuMiA5OC4zIDM1LjRaTTk5LjMgNTNMOTAuNiA3MUw3Mi43IDc5LjdMOTAuNiA4OC40TDk5LjMgMTA2LjRMMTA4LjEgODguNEwxMjYgNzkuN0wxMDguMSA3MUw5OS4zIDUzWiIgZmlsbD0id2hpdGUiLz4KPC9zdmc+Cg==');
+}
+/* Wrapper for the iframe to ensure it's responsive and scaled */
+.iframe-container {
+  position: relative;
+  width: 100%; /* Full width of the card */
+  height: 200px; /* Set a fixed height for the iframe */
+  overflow: hidden;
+  border: 1px solid #ddd;
+  background-color: #fff;
+}
+
+/* The iframe itself */
+.iframe-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 400%; /* Adjust this to make the iframe content larger */
+  height: 400%;
+  transform: scale(0.25); /* Scale the content down */
+  transform-origin: top left; /* Keep scaling origin at the top-left corner */
+  pointer-events: none; /* Disable interaction inside the iframe */
+}
+
+/* Container to hold multiple cards */
+.card-container {
+  display: flex;
+  flex-wrap: wrap; /* Wrap cards onto new lines */
+  gap: 20px; /* Space between cards */
+  justify-content: flex-start; /* Distribute cards evenly */
+}
+
+/* Card styles */
+.card {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  width: 300px; /* Card width */
+  text-align: center;
+  margin: 10px; /* Margin between cards */
+}
+
+/* Content section of the card */
+.card-content {
+  /*padding: 5px;*/
+  background-color: #fff;
+}
+
+/* Title of the card */
+.card-content h3 {
+  font-size: 18px;
+  margin: 10px 0;
+  color: #000;
+}
+
+/* Button/link style */
+.card-button {
+  display: inline-block;
+  padding: 10px 15px;
+  background-color: #007acc;
+  color: #fff;
+  border-radius: 5px;
+  text-decoration: none;
+  font-weight: bold;
+  margin-top: 10px;
+}
+
+.card-button:hover {
+  background-color: #005fa3;
+}
+
+@media (max-width: 768px) {
+  .card-container {
+    justify-content: center; /* Center cards on smaller screens */
+  }
+}
+</style>
+</head>
+<body>
+  <header>
+    <div class="header-icon"></div>
+    <h1>Mapbox Demos</h1> 
+  </header>
+  <main>
+
+<div class="card-container">
+  
+    
+  
+    
+  
+    
+  
+    
+      <div class="card">
+        <a href="/storytelling.html" target="_blank">
+          <div class="iframe-container">
+            <iframe src="/storytelling.html" frameborder="0"></iframe>
+          </div>
+        </a>
+        <div class="card-content">
+          <h3>Storytelling</h3>
+        </div>
+      </div>
+    
+  
+
+  
+  <div class="card">
+    <a href="https://demos.mapbox.com/japan-real-estate/" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://demos.mapbox.com/japan-real-estate/" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Real Estate (JP)</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://demos.mapbox.com/japan-real-estate/?lng=en" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://demos.mapbox.com/japan-real-estate/?lng=en" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Real Estate (EN)</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://demos.mapbox.com/tokyo-movement/" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://demos.mapbox.com/tokyo-movement/" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Tokyo Movement</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://demos.mapbox.com/japan-optimization-v2/" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://demos.mapbox.com/japan-optimization-v2/" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Optimization</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://demos.mapbox.com/tokyo-weather/" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://demos.mapbox.com/tokyo-weather/" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Tokyo Weather</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://demos.mapbox.com/tokyo-news/" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://demos.mapbox.com/tokyo-news/" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Tokyo News</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://demos.mapbox.com/tokyo-navigate-trace/" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://demos.mapbox.com/tokyo-navigate-trace/" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Navigate Trace</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://demos.mapbox.com/japan-calculate-area/" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://demos.mapbox.com/japan-calculate-area/" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Calculate Area</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://demos.mapbox.com/search-japan/" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://demos.mapbox.com/search-japan/" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Search Japan</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://demos.mapbox.com/auto-search/" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://demos.mapbox.com/auto-search/" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Auto Search</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://demos.mapbox.com/mpl/" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://demos.mapbox.com/mpl/" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>MPL</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://codepen.io/kenji-shima/full/abedGJy" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://codepen.io/kenji-shima/full/abedGJy" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Japan Weather</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://codepen.io/kenji-shima/full/MWxexpK" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://codepen.io/kenji-shima/full/MWxexpK" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Fleet</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://codepen.io/kenji-shima/full/yLWpPRW" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://codepen.io/kenji-shima/full/yLWpPRW" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Nowcast</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://codepen.io/kenji-shima/full/NWVwRQb" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://codepen.io/kenji-shima/full/NWVwRQb" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Global Weather</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://codepen.io/kenji-shima/full/gOJOeNW" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://codepen.io/kenji-shima/full/gOJOeNW" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Typhoon</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://codepen.io/kenji-shima/full/LYvPedE" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://codepen.io/kenji-shima/full/LYvPedE" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Tokushima Movement</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://codepen.io/kenji-shima/full/PoLLBzJ" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://codepen.io/kenji-shima/full/PoLLBzJ" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Nearest vs Bilinear</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://codepen.io/kenji-shima/full/abMwVOj" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://codepen.io/kenji-shima/full/abMwVOj" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Dosha</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://codepen.io/kenji-shima/full/PoLwJor" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://codepen.io/kenji-shima/full/PoLwJor" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Raster vs Vector</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://codepen.io/kenji-shima/full/jOdRyMM" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://codepen.io/kenji-shima/full/jOdRyMM" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>3D Route</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://codepen.io/kenji-shima/full/yLWpPRW" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://codepen.io/kenji-shima/full/yLWpPRW" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Nowcast</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://codepen.io/kenji-shima/full/NWoWyGJ" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://codepen.io/kenji-shima/full/NWoWyGJ" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Precipitation</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://codepen.io/kenji-shima/full/KKbBQjQ" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://codepen.io/kenji-shima/full/KKbBQjQ" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Static Images Boundaries</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://codepen.io/kenji-shima/full/dyggRXM" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://codepen.io/kenji-shima/full/dyggRXM" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Exclude from Directions</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://codepen.io/kenji-shima/full/eYPzLep" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://codepen.io/kenji-shima/full/eYPzLep" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Mapbox POIs to Google Codes</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://demos.mapbox.com/japan-demos" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://demos.mapbox.com/japan-demos" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Demo List for Marketing</h3>
+    </div>
+  </div>
+  
+  <div class="card">
+    <a href="https://codepen.io/kenji-shima/pens/public" target="_blank">
+        <div class="iframe-container">
+            <iframe src="https://codepen.io/kenji-shima/pens/public" class="card-iframe"></iframe>
+        </div>
+    </a>
+    <div class="card-content">
+      <h3>Codepen</h3>
+    </div>
+  </div>
+  
+</div>
+</main>
+<footer>
+  <p>© 2024, Mapbox Demos</p>
+</footer>
+</body>
+</html>
