@@ -29,6 +29,11 @@ const loadMap = () => {
         slider_loaded = true
         sliderAction()
     })
+
+    map.on('click', (event) => {
+        const { lng, lat } = event.lngLat;
+        console.log(`Longitude: ${lng}, Latitude: ${lat}`);
+    })
 }
 
 loadMap()
