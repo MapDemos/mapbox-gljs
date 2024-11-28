@@ -6,6 +6,19 @@
         <select id="tileset-selector" onchange="changeTileset(this.value)">
         </select>
     </div>
+    <div class="title">Projection</div>
+        <div>
+            <select id="projection-selector" onchange="changeProjection(this.value)">
+                <option value="mercator">Mercator</option>
+                <option value="globe">Globe</option>
+                <option value="albers">Albers</option>
+                <option value="equalEarth">Equal Earth</option>
+                <option value="equirectangular">Equirectangular</option>
+                <option value="naturalEarth">Natural Earth</option>
+                <option value="lambertConformalConic">Lambert Conformal Conic</option>
+                <option value="winkelTripel">Winkel Tripel</option>
+            </select>
+        </div>
     <br />
     <div id='raster-array-options'>
         <div>
@@ -35,19 +48,7 @@
                 <option value="8">8</option>
             </select>
         </div>
-        <div class="title">Projection</div>
-        <div>
-            <select id="projection-selector" onchange="changeProjection(this.value)">
-                <option value="mercator">Mercator</option>
-                <option value="globe">Globe</option>
-                <option value="albers">Albers</option>
-                <option value="equalEarth">Equal Earth</option>
-                <option value="equirectangular">Equirectangular</option>
-                <option value="naturalEarth">Natural Earth</option>
-                <option value="lambertConformalConic">Lambert Conformal Conic</option>
-                <option value="winkelTripel">Winkel Tripel</option>
-            </select>
-        </div>
+        
         <br>
         <div id="particles-options-wrapper" class="">
             <div class="title"><input type="checkbox" id="show-particles" onchange="showWind(this)" checked /><label

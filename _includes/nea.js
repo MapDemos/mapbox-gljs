@@ -86,12 +86,60 @@ const tilesets = {
         label: "Satellite Smoke Zoom 12",
         type: 'raster'
     },
+    lightning_z4: {
+        value: "mapbox://kenji-shima.nea-lightning-z4",
+        label: "Lightning Zoom 4-4",
+        type: 'vector',
+        vector_layer_type: 'circle',
+        vector_layer_source: 'lightning',
+        zoom: 4
+    },
+    lightning_z8: {
+        value: "mapbox://kenji-shima.nea-lightning-z8",
+        label: "Lightning Zoom 4-8",
+        type: 'vector',
+        vector_layer_type: 'circle',
+        vector_layer_source: 'lightning',
+        zoom: 4
+    },
+    lightning_z12: {
+        value: "mapbox://kenji-shima.nea-lightning-z12",
+        label: "Lightning Zoom 4-12",
+        type: 'vector',
+        vector_layer_type: 'circle',
+        vector_layer_source: 'lightning',
+        zoom: 4
+    },
     lightning_z16: {
         value: "mapbox://kenji-shima.nied-lightning",
         label: "Lightning Zoom 4-16",
         type: 'vector',
         vector_layer_type: 'circle',
         vector_layer_source: 'lightning',
+        zoom: 4
+    },
+    hotspot_z4: {
+        value: "mapbox://kenji-shima.nea-hotspot-z4",
+        label: "Hotspot Zoom 4-4",
+        type: 'vector',
+        vector_layer_type: 'circle',
+        vector_layer_source: 'hotspot',
+        zoom: 4
+    },
+    hotspot_z8: {
+        value: "mapbox://kenji-shima.nea-hotspot-z8",
+        label: "Hotspot Zoom 4-8",
+        type: 'vector',
+        vector_layer_type: 'circle',
+        vector_layer_source: 'hotspot',
+        zoom: 4
+    },
+    hotspot_z12: {
+        value: "mapbox://kenji-shima.nea-hotspot-z12",
+        label: "Hotspot Zoom 4-12",
+        type: 'vector',
+        vector_layer_type: 'circle',
+        vector_layer_source: 'hotspot',
         zoom: 4
     },
     hotspot_z16: {
