@@ -10,11 +10,13 @@
 <body>
   <div id="map" class="map"></div>
   {{ content }}
+  {% include layers_controller.html %}
   {% include legend.html %}
   {% include slider.html %}
 </body>
 <script>
   {% include {{ page.js }} %}
+  {% include layers_controller.js %}
 </script>
 
 </html>

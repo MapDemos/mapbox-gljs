@@ -1,0 +1,77 @@
+<div class="map-overlay-right">
+    <div>
+        <div class="title">Tileset</div>
+    </div>
+    <div id="layers">
+        <select id="tileset-selector" onchange="changeTileset(this.value)">
+        </select>
+    </div>
+    <br />
+    <div id='raster-array-options'>
+        <div>
+            <div class="title">Layer</div>
+        </div>
+        <div id="layers">
+            <select id="layer-selector">
+            </select>
+        </div>
+        <div>
+            <div class="title">Color Scale</div>
+        </div>
+        <div id="colorscales">
+            <select id="colorscale-selector" onchange="changeColorscaleType(this.value)">
+            </select>
+        </div>
+        <div>
+            <div class="title">Color Steps</div>
+        </div>
+        <div id="colorsteps">
+            <select id="colorsteps-selector" onchange="changeColorSteps(this.value)">
+                <option value="256">256</option>
+                <option value="128">128</option>
+                <option value="64">64</option>
+                <option value="32">32</option>
+                <option value="16">16</option>
+                <option value="8">8</option>
+            </select>
+        </div>
+        <div class="title">Projection</div>
+        <div>
+            <select id="projection-selector" onchange="changeProjection(this.value)">
+                <option value="mercator">Mercator</option>
+                <option value="globe">Globe</option>
+                <option value="albers">Albers</option>
+                <option value="equalEarth">Equal Earth</option>
+                <option value="equirectangular">Equirectangular</option>
+                <option value="naturalEarth">Natural Earth</option>
+                <option value="lambertConformalConic">Lambert Conformal Conic</option>
+                <option value="winkelTripel">Winkel Tripel</option>
+            </select>
+        </div>
+        <br>
+        <div id="particles-options-wrapper" class="">
+            <div class="title"><input type="checkbox" id="show-particles" onchange="showWind(this)" checked /><label
+                    for="show-particles">Show Particles</label></div>
+            <div id="particle-options">
+                <div>
+                    Count<br>
+                    <input id="particle-count-slider" type="range" step="1" min="1" max="30000"
+                        oninput="setParticleCount(this.value)" />
+                    <span id="particle-count" style="vertical-align: top;"></span>
+                </div>
+                <div>
+                    Speed<br>
+                    <input id="particle-speed-slider" type="range" step="0.01" min="0.01" max="1"
+                        onchange="setParticleSpeed(this.value)" />
+                    <span id="particle-speed" style="vertical-align: top;"></span>
+                </div>
+                <div>
+                    Color<br>
+                    <input id="particle-color" type="color" oninput="setParticleColor(this.value)" />
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="title">Zoom Level</div>
+    <div id="zoom"></div>
+</div>
