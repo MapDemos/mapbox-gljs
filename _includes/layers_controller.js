@@ -18,6 +18,7 @@ const init = () => {
         projection: currentprojection
     })
     map.on('load', () => {
+        map.showTileBoundaries = true
         setTimeout(showAllOptions, 200)
         changeProjection(currentprojection)
     })
