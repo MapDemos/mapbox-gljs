@@ -44,12 +44,12 @@ js: random.js
     </div>
     <br />
     <div>
-      <input type="button" value="地図の中央にポリゴン生成" onclick="getIso()" />
+      <input id="iso-button" type="button" value="地図の中央にポリゴン生成" onclick="getIso()" disabled="true" />
     </div>
     <div id="idlist">
     </div>
     <div>
-      <input type="button" value="クリア" onclick="clearIso()" />
+      <input id="clear-button" type="button" value="クリア" onclick="clearIso()" disabled="true" />
     </div>
   </div>
 </body>

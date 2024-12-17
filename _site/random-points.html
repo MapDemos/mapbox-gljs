@@ -382,12 +382,12 @@ button:hover {
     </div>
     <br />
     <div>
-      <input type="button" value="地図の中央にポリゴン生成" onclick="getIso()" />
+      <input id="iso-button" type="button" value="地図の中央にポリゴン生成" onclick="getIso()" disabled="true" />
     </div>
     <div id="idlist">
     </div>
     <div>
-      <input type="button" value="クリア" onclick="clearIso()" />
+      <input id="clear-button" type="button" value="クリア" onclick="clearIso()" disabled="true" />
     </div>
   </div>
 </body>
@@ -396,6 +396,9 @@ button:hover {
 
 let map
 let popup
+
+let geojsonData = null;
+let dataDownloaded = false;
 
 const loadMap = () => {
     map = new mapboxgl.Map({
@@ -456,6 +459,16 @@ const loadMap = () => {
             .catch(error => console.error('Error loading GeoJSON data:', error));
     });*/
     map.on('load', () => {
+
+        fetch('randomPointsInJapan.geojson')
+            .then(response => response.json())
+            .then(data => {
+                geojsonData = data;
+                dataDownloaded = true;
+                document.getElementById('iso-button').disabled = false;
+                document.getElementById('clear-button').disabled = false;
+            })
+            .catch(error => console.error('Error loading GeoJSON data:', error));
 
         map.addSource('random-points', {
             type: 'vector',
@@ -589,69 +602,72 @@ function getIso() {
 window.getIso = getIso
 
 function checkIfInPoly(poly) {
-    fetch('randomPointsInJapan.geojson')
-        .then(response => response.json())
-        .then(data => {
-            const polygon = turf.polygon(poly.geometry.coordinates)
-            const features = []
-            const points = data.features
-            points.forEach(element => {
-                const point = turf.point(element.geometry.coordinates)
-                const isInside = turf.booleanPointInPolygon(point, polygon)
-                if (isInside) {
-                    features.push(element)
+
+    if (!dataDownloaded) {
+        console.error('GeoJSON data not downloaded yet.');
+        return;
+    }
+
+    const polygon = turf.polygon(poly.geometry.coordinates)
+    const features = []
+    const points = geojsonData.features
+    points.forEach(element => {
+        const point = turf.point(element.geometry.coordinates)
+        const isInside = turf.booleanPointInPolygon(point, polygon)
+        if (isInside) {
+            features.push(element)
+        }
+    });
+
+    const ids = features.map(feature => feature.properties.id);
+    map.setFilter('random-points', ['in', 'id', ...ids]);
+
+    const idListDiv = document.getElementById('idlist');
+    idListDiv.innerHTML = '';
+
+    // Create a list of IDs and append it to the div
+    const ul = document.createElement('ul');
+    let currentHighlightedItem = null;
+
+    ids.forEach(id => {
+        const li = document.createElement('li');
+        li.textContent = id;
+        li.addEventListener('click', () => {
+            // Find the corresponding point on the map
+            const feature = features.find(f => f.properties.id === id);
+            if (feature) {
+                // Close the previous popup if it exists
+                if (popup) {
+                    popup.remove();
                 }
-            });
 
-            const ids = features.map(feature => feature.properties.id);
-            map.setFilter('random-points', ['in', 'id', ...ids]);
-
-            const idListDiv = document.getElementById('idlist');
-            idListDiv.innerHTML = '';
-
-            // Create a list of IDs and append it to the div
-            const ul = document.createElement('ul');
-            let currentHighlightedItem = null;
-
-            ids.forEach(id => {
-                const li = document.createElement('li');
-                li.textContent = id;
-                li.addEventListener('click', () => {
-                    // Find the corresponding point on the map
-                    const feature = features.find(f => f.properties.id === id);
-                    if (feature) {
-                        // Close the previous popup if it exists
-                        if (popup) {
-                            popup.remove();
-                        }
-
-                        // Create a popup and set its content to show all properties in a table
-                        let tableContent = '<div style="opacity:1.0!important"><table>';
-                        for (const key in feature.properties) {
-                            if (feature.properties.hasOwnProperty(key)) {
-                                tableContent += `<tr><th>${key}</th><td>${feature.properties[key]}</td></tr>`;
-                            }
-                        }
-                        tableContent += '</table></div>';
-
-                        popup = new mapboxgl.Popup()
-                            .setLngLat(feature.geometry.coordinates)
-                            .setHTML(tableContent)
-                            .addTo(map);
-
-                        // Highlight the selected item in the list
-                        if (currentHighlightedItem) {
-                            currentHighlightedItem.classList.remove('highlighted');
-                        }
-                        li.classList.add('highlighted');
-                        currentHighlightedItem = li;
+                // Create a popup and set its content to show all properties in a table
+                let tableContent = '<div style="opacity:1.0!important"><table>';
+                for (const key in feature.properties) {
+                    if (feature.properties.hasOwnProperty(key)) {
+                        tableContent += `<tr><th>${key}</th><td>${feature.properties[key]}</td></tr>`;
                     }
-                });
-                ul.appendChild(li);
-            });
-            idListDiv.appendChild(ul);
+                }
+                tableContent += '</table></div>';
 
-        })
+                popup = new mapboxgl.Popup()
+                    .setLngLat(feature.geometry.coordinates)
+                    .setHTML(tableContent)
+                    .addTo(map);
+
+                // Highlight the selected item in the list
+                if (currentHighlightedItem) {
+                    currentHighlightedItem.classList.remove('highlighted');
+                }
+                li.classList.add('highlighted');
+                currentHighlightedItem = li;
+            }
+        });
+        ul.appendChild(li);
+    });
+    idListDiv.appendChild(ul);
+
+
 
 }
 
@@ -665,7 +681,7 @@ function clearIso() {
     map.setFilter('random-points', null);
     const idListDiv = document.getElementById('idlist');
     idListDiv.innerHTML = '';
-    if(popup){
+    if (popup) {
         popup.remove()
     }
 }
