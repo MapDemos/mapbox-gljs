@@ -27,6 +27,11 @@ const tilesets = {
         label: "GFS Zoom 8",
         type: 'raster-array'
     },
+    gfs_z12: {
+        value: "mapbox://kenji-shima.nea-gfs-z12",
+        label: "GFS Zoom 12",
+        type: 'raster-array'
+    },
     radar_z4: {
         value: "mapbox://kenji-shima.nea-radar",
         label: "Radar Zoom 4",
