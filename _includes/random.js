@@ -195,11 +195,9 @@ function getIso() {
 window.getIso = getIso
 
 function checkIfInPoly(poly) {
-    fetch('randomPointsInJapan.geojson.gz')
-        .then(response => response.arrayBuffer())
-        .then(buffer => {
-            const decompressed = pako.inflate(buffer, { to: 'string' });
-            const data = JSON.parse(decompressed);
+    fetch('randomPointsInJapan.geojson')
+        .then(response => response.json())
+        .then(data => {
             const polygon = turf.polygon(poly.geometry.coordinates)
             const features = []
             const points = data.features
