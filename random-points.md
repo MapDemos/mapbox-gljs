@@ -8,6 +8,7 @@ js: random.js
 
 <head>
   {% include common_head.html %}
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.4/pako.min.js"></script>
   <style>
     {% include common.css %}
     #idlist {

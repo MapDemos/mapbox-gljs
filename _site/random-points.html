@@ -15,6 +15,7 @@
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
 <script src="https://kenji-shima.github.io/resource-files/polyline.js" type="module"></script>
 <script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.4/pako.min.js"></script>
   <style>
     * {
   box-sizing: border-box;
@@ -588,9 +589,11 @@ function getIso() {
 window.getIso = getIso
 
 function checkIfInPoly(poly) {
-    fetch('randomPointsInJapan.geojson')
-        .then(response => response.json())
-        .then(data => {
+    fetch('randomPointsInJapan.geojson.gz')
+        .then(response => response.arrayBuffer())
+        .then(buffer => {
+            const decompressed = pako.inflate(buffer, { to: 'string' });
+            const data = JSON.parse(decompressed);
             const polygon = turf.polygon(poly.geometry.coordinates)
             const features = []
             const points = data.features
