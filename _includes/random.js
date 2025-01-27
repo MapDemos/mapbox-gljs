@@ -10,6 +10,7 @@ const loadMap = () => {
     map = new mapboxgl.Map({
         container: 'map',
         style: 'mapbox://styles/mapbox/light-v11',
+        //style: 'mapbox://styles/kenji-shima/cm5vzzpmr00p301ra0cz3bizj',
         center: [lng, lat],
         zoom: 6,
         minZoom: 3,
