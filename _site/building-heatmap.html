@@ -1,0 +1,168 @@
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-language/v1.0.0/mapbox-gl-language.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/d3@7.8.5/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.min.js"></script>
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.css" type="text/css" />
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<script src="https://kenji-shima.github.io/resource-files/polyline.js" type="module"></script>
+<script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
+  <style>
+    <!--
+    body {
+        overflow: hidden;
+    }
+
+    body * {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+    }
+
+    .map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+    }
+    -->
+</style>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-compare/v0.4.0/mapbox-gl-compare.js"></script>
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-compare/v0.4.0/mapbox-gl-compare.css" type="text/css" />
+</head>
+
+<body>
+  <div id="comparison-container">
+    <div id="before" class="map"></div>
+    <div id="after" class="map"></div>
+</div>
+</body>
+<script>
+  lng = 139.746173
+lat = 35.650641
+
+let beforeMap
+
+const loadMap = () => {
+    beforeMap = new mapboxgl.Map({
+        container: 'before',
+        style: 'mapbox://styles/mapbox/light-v11',
+        center: [lng, lat],
+        zoom: 15,
+        minZoom: 3,
+        scrollZoom: true,
+        language: 'en'
+    })
+
+    const tiles = [
+        // 'tile_16_58207_25812',
+        // 'tile_16_58207_25813',
+        // 'tile_16_58208_25812',
+        // 'tile_16_58208_25813',
+        'consolidated_buildings'
+    ]
+    beforeMap.on('load', () => {
+        beforeMap.showTileBoundaries = true
+
+        tiles.forEach((tile) => {
+            addLayer(tile)
+        })
+
+    })
+
+    beforeMap.on('click', (event) => {
+        const { lng, lat } = event.lngLat;
+        console.log(`Longitude: ${lng}, Latitude: ${lat}`);
+    })
+}
+
+const addLayer = (filename) => {
+    beforeMap.addSource(
+        `${filename}`,
+        {
+            type: 'geojson',
+            data: `./assets/images/${filename}.geojson`
+        }
+    )
+    beforeMap.addLayer({
+        id: `${filename}`,
+        type: 'fill',
+        source: `${filename}`,
+        paint: {
+            'fill-color': [
+                'interpolate', ['linear'],
+                ['number', ['coalesce', ['get', '6_14'], 0]],
+                0, '#0000FF',
+                //0.005, '#800080',
+                2, '#FF0000'
+            ],
+            // 'fill-color': 'green',
+            'fill-opacity': 1
+        },
+        filter: [
+            "all",
+            ["has", "landmark_name"],
+            [">", "height", 20]
+        ]
+    })
+
+    var popup = new mapboxgl.Popup({
+        closeButton: false,
+        closeOnClick: false
+    });
+
+    beforeMap.on('mouseenter', `${filename}`, function (e) {
+        beforeMap.getCanvas().style.cursor = 'pointer';
+
+        var feature = e.features[0];
+        var properties = feature.properties;
+
+        var html = '<div>';
+        for (var key in properties) {
+            html += '<strong>' + key + '</strong>: ' + properties[key] + '<br />';
+        }
+        html += '</div>';
+
+        popup.setLngLat(e.lngLat)
+            .setHTML(html)
+            .addTo(beforeMap);
+    });
+
+    beforeMap.on('mouseleave', `${filename}`, function () {
+        beforeMap.getCanvas().style.cursor = '';
+        popup.remove();
+    });
+}
+
+loadMap()
+
+const afterMap = new mapboxgl.Map({
+    container: 'after',
+    //style: 'mapbox://styles/mapbox/dark-v11',
+    center: [lng, lat],
+    zoom: 15,
+    minZoom: 3,
+    scrollZoom: true,
+    language: 'en'
+});
+
+// A selector or reference to HTML element
+const container = '#comparison-container';
+
+const map = new mapboxgl.Compare(beforeMap, afterMap, container, {
+    // Set this to enable comparing two maps by mouse movement:
+    // mousemove: true
+});
+</script>
+
+</html>

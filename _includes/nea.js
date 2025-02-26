@@ -155,4 +155,20 @@ const tilesets = {
         vector_layer_source: 'hotspot',
         zoom: 4
     },
+    spactial_reception_z9: {
+        value: "mapbox://kenji-shima.spacial-reception-z9",
+        label: "Spacial Reception Zoom 9",
+        type: 'vector',
+        vector_layer_type: 'fill',
+        vector_layer_source: 'spacial-reception',
+        zoom: 4
+    },
+    spactial_reception_z12: {
+        value: "mapbox://kenji-shima.spacial-reception-z12",
+        label: "Spacial Reception Zoom 12",
+        type: 'vector',
+        vector_layer_type: 'fill',
+        vector_layer_source: 'spacial-reception',
+        zoom: 4
+    },
 }
