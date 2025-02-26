@@ -190,6 +190,8 @@ function showAllOptions() {
         } else if (tilesettype === 'vector') {
             if (tilesetvectortype === 'circle') {
                 addCircleLayer()
+            }else if(tilesetvectortype === 'fill'){
+                addFillLayer()
             }
         }
     }
@@ -399,6 +401,29 @@ const addCircleLayer = () => {
             'circle-stroke-width': 1,
             'circle-stroke-color': 'rgba(0, 0, 0, 1)'
         }
+    })
+}
+
+const addFillLayer = () => {
+    if (map.getLayer('vector')) {
+        map.removeLayer('vector')
+    }
+    if (map.getSource("vectorsource")) {
+        map.removeSource("vectorsource")
+    }
+    map.addSource('vectorsource', {
+        type: 'vector',
+        url: tileset
+    })
+    map.addLayer({
+        id: 'vector',
+        type: 'fill',
+        source: 'vectorsource',
+        'source-layer': tilesetvectorsource,
+        paint: {
+            'fill-color': 'rgba(255, 0, 0, 0.5)',
+            'fill-outline-color': 'rgba(0, 0, 0, 1)'
+        },
     })
 }
 
