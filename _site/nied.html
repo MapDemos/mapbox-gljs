@@ -1,22 +1,21 @@
-<html lang="ja">
-
+<html>
 <head>
-  <meta charset="utf-8" />
-<meta name='viewport' content='width=device-width, initial-scale=1' />
-<link rel="icon" href="data:;base64,iVBORw0KGgo=">
-<script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-language/v1.0.0/mapbox-gl-language.js'></script>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-language/v1.0.0/mapbox-gl-language.js"></script>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
-<script src='https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js'></script>
-<link href='https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css' rel='stylesheet' />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css" rel="stylesheet" />
 <script src="https://unpkg.com/d3@7.8.5/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
-<script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.min.js'></script>
-<link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.css' type='text/css' />
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.min.js"></script>
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.css" type="text/css" />
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
 <script src="https://kenji-shima.github.io/resource-files/polyline.js" type="module"></script>
 <script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
-  <style>
-    * {
+<style>
+* {
   box-sizing: border-box;
 }
 
@@ -251,7 +250,7 @@ a.replay {
   border-radius: 5px;
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
   z-index: 1;
-  width: 50%;
+  width: 400px;
   opacity: 0.8;
 }
 
@@ -295,6 +294,7 @@ a.replay {
 .hidden {
   display: none;
 }
+
 
 .map-overlay-bottom {
   position: absolute;
@@ -348,163 +348,115 @@ button {
 button:hover {
   background-color: #45a049;
 }
+
 </style>
 </head>
-
 <body>
-  <div id="map" class="map"></div>
-  
-
+<div id="map" class="map"></div>
   <div class="map-overlay-right">
+    
     <div>
-        <div class="title">Tileset</div>
+      <div class="title">タイルセット</div>
     </div>
     <div id="layers">
-        <select id="tileset-selector" onchange="changeTileset(this.value)">
-        </select>
+      <select id="tileset-selector" onchange="changeTileset(this.value)">
+      </select>
     </div>
-    <div class="title">Projection</div>
-        <div>
-            <select id="projection-selector" onchange="changeProjection(this.value)">
-                <option value="mercator">Mercator</option>
-                <option value="globe">Globe</option>
-                <option value="albers">Albers</option>
-                <option value="equalEarth">Equal Earth</option>
-                <option value="equirectangular">Equirectangular</option>
-                <option value="naturalEarth">Natural Earth</option>
-                <option value="lambertConformalConic">Lambert Conformal Conic</option>
-                <option value="winkelTripel">Winkel Tripel</option>
-            </select>
-        </div>
+    <div>
+      <div class="title">レイヤー</div>
+    </div>
+    <div id="layers">
+      <select id="layer-selector">
+      </select>
+    </div>
     <br />
-    <div id='raster-array-options'>
-        <div>
-            <div class="title">Layer</div>
-        </div>
-        <div id="layers">
-            <select id="layer-selector">
-            </select>
-        </div>
-        <div>
-            <div class="title">Color Scale</div>
-        </div>
-        <div id="colorscales">
-            <select id="colorscale-selector" onchange="changeColorscaleType(this.value)">
-            </select>
-        </div>
-        <div>
-            <div class="title">Color Steps</div>
-        </div>
-        <div id="colorsteps">
-            <select id="colorsteps-selector" onchange="changeColorSteps(this.value)">
-                <option value="256">256</option>
-                <option value="128">128</option>
-                <option value="64">64</option>
-                <option value="32">32</option>
-                <option value="16">16</option>
-                <option value="8">8</option>
-            </select>
-        </div>
-        
-        <br>
-        <div id="particles-options-wrapper" class="">
-            <div class="title"><input type="checkbox" id="show-particles" onchange="showWind(this)" checked /><label
-                    for="show-particles">Show Particles</label></div>
-            <div id="particle-options">
-                <div>
-                    Count<br>
-                    <input id="particle-count-slider" type="range" step="1" min="1" max="30000"
-                        oninput="setParticleCount(this.value)" />
-                    <span id="particle-count" style="vertical-align: top;"></span>
-                </div>
-                <div>
-                    Speed<br>
-                    <input id="particle-speed-slider" type="range" step="0.01" min="0.01" max="1"
-                        onchange="setParticleSpeed(this.value)" />
-                    <span id="particle-speed" style="vertical-align: top;"></span>
-                </div>
-                <div>
-                    Color<br>
-                    <input id="particle-color" type="color" oninput="setParticleColor(this.value)" />
-                </div>
-            </div>
-        </div>
+    
+    <div>
+      <div class="title">カラー・スケール</div>
     </div>
-    <div class="title">Zoom Level</div>
-    <div id="zoom"></div>
-</div>
-  <div id="legend" class="legend">
-    <div class="legend-scale">
-        <div class="legend-bar"></div>
+    <div id="colorscales">
+      <select id="colorscale-selector" onchange="changeColorscaleType(this.value)">
+      </select>
     </div>
-</div>
-  <div id="map-overlay-bottom" class="map-overlay-bottom">
-    <label id='active-datetime'>　</label>&nbsp;&nbsp;&nbsp;<button id="auto" onclick="play()">Play</button>
+    <!--div>
+      <div class="title">カラー・リサンプリング</div>
+    </div>
+    <div id="colorsampling">
+      <select id="colorsampling-selector" onchange="changeColorSampling(this.value)">
+        <option value="step">nearest + step</option>
+        <option value="interpolate">bilinear + interpolate</option>
+      </select>
+    </div-->
+    <div class="title">プロジェクション</div>
+    <div>
+      <select id="projection-selector" onchange="changeProjection(this.value)">
+        <option value="globe">Globe</option>
+        <option value="mercator">Mercator</option>
+        <option value="albers">Albers</option>
+        <option value="equalEarth">Equal Earth</option>
+        <option value="equirectangular">Equirectangular</option>
+        <option value="naturalEarth">Natural Earth</option>
+        <option value="lambertConformalConic">Lambert Conformal Conic</option>
+        <option value="winkelTripel">Winkel Tripel</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-scale" id="waveheight">
+      <div class="legend-bar">
+      </div>
+    </div>
+  </div>
+
+  <div class="map-overlay-bottom">
+    <label id="active-datetime">　</label>&nbsp;&nbsp;&nbsp;<button id="auto" onclick="play()">再生</button>
     <div class="time" id="timediv">
     </div>
-    <input type="range" min="0" step="1" value="0" max="5" class="slider" id="slider" oninput="changeBand(this.value)" />
+    <input type="range" min="0" step="1" value="0" class="slider" id="slider" onchange="changeBand(this.value)" />
+
 </div>
 </body>
 <script>
   
-lat = 33.038945863053385
-lng = 72.49649380770748
-const tilesets = {
-    walay_z4: {
-        value: "mapbox://kenji-shima.walay-radar-202311092301-z4",
-        label: "Zoom 4",
-        type: 'raster-array',
-        zoom: 7
-    },
-    walay_z6: {
-        value: "mapbox://kenji-shima.walay-z6",
-        label: "Zoom 6",
-        type: 'raster-array',
-        zoom: 7
-    },
-    walay_z8: {
-        value: "mapbox://kenji-shima.walay-z8",
-        label: "Zoom 8",
-        type: 'raster-array',
-        zoom: 7
-    },
-    walay_z12: {
-        value: "mapbox://kenji-shima.walay-z12",
-        label: "Zoom 12",
-        type: 'raster-array',
-        zoom: 7
-    },
-    walay_z16: {
-        value: "mapbox://kenji-shima.walay-z16",
-        label: "Zoom 16",
-        type: 'raster-array',
-        zoom: 7
-    }
+function getParameterByName(name, url = window.location.href) {
+    name = name.replace(/[\[\]]/g, '\\$&');
+    const regex = new RegExp(`[?&]${name}(=([^&#]*)|&|#|$)`, 'i');
+    const results = regex.exec(url);
+    if (!results) return null;
+    if (!results[2]) return '';
+    return decodeURIComponent(results[2].replace(/\+/g, ' '));
+}
+let lang = getParameterByName('lang')
+if (!lang) {
+    lang = 'ja'
 }
 
-  
-const defaultzoom = 3
-let zoom = defaultzoom
-let particlelayerid = null
-let currentprojection = 'mercator'
-let map
+let currentprojection = 'globe'
+function changeProjection(projectionType) {
+    currentprojection = projectionType
+    map.setProjection(projectionType)
+}
+window.changeProjection = changeProjection
 
-const init = () => {
-    particlelayerid = null
+let map
+function init() {
     if (map) map.remove()
     map = new mapboxgl.Map({
         container: 'map',
+        //style: 'mapbox://styles/kenji-shima/clx8j5mmb01wn01q16w4148e6',
         style: 'mapbox://styles/mapbox/light-v11',
-        center: [lng, lat],
-        zoom: zoom,
-        //maxZoom: 12,
-        scrollZoom: true,
-        projection: currentprojection
+        center: [139.759455, 35.682839],
+        zoom: 4,
+        projection: currentprojection,
+        language: lang
     })
+
+    //const language = new MapboxLanguage();
+    //map.addControl(language);
+
     map.on('load', () => {
-        map.showTileBoundaries = true
         setTimeout(showAllOptions, 200)
-        changeProjection(currentprojection)
     })
 
     map.on('style.load', () => {
@@ -520,37 +472,110 @@ const init = () => {
             type: 'raster-array',
             url: tileset + tilesetsuffix
         })
-
-    })
-
-    map.on('zoom', () => {
-        let zoom = map.getZoom()
-        zoom = Math.round((zoom + Number.EPSILON) * 100) / 100
-        document.getElementById('zoom').innerHTML = zoom
-    })
-
-    map.on('click', (e) => {
-        const coordinates = e.lngLat;
-        console.log('Latitude: ' + coordinates.lat + ', Longitude: ' + coordinates.lng);
     })
 }
 
 init()
 
-
-function changeProjection(projectionType) {
-    currentprojection = projectionType
-    map.setProjection(projectionType)
+const tilesets = {
+    nowcast_30: {
+        value: "mapbox://kenji-shima.nowcast-20240620195000-30m-nied",
+        label: "高解像度ナウキャスト ~30m",
+        type: 'raster-array',
+        zoom: 4
+    },
+    nowcast_60: {
+        value: "mapbox://kenji-shima.nowcast-20240620195000-60m-nied",
+        label: "高解像度ナウキャスト ~60m",
+        type: 'raster-array',
+        zoom: 4
+    },
+    forecast_6: {
+        value: "mapbox://kenji-shima.forecast-20240620203000-6h-nied",
+        label: "降水短時間予報 ~6h",
+        type: 'raster-array',
+        zoom: 4
+    },
+    nied_hangen: {
+        value: "mapbox://kenji-shima.hangen-90-202409200000-nied",
+        label: "半減期90分",
+        type: 'raster-array',
+        zoom: 4
+    },
 }
-window.changeProjection = changeProjection
 
+let tileset = tilesets['nowcast_30'].value
 
+const yjRainScale = () => {
+    const domain = [0, 0.1, 1, 5, 10, 20, 30, 50, 80];
+    const range = [
+        "rgba(0, 0, 0, 0.0)",
+        "rgba(240, 240, 254, 0.0)",
+        "rgba(153, 204, 253, 0.0)",
+        "rgba(44, 131, 251, 1.0)",
+        "rgba(27, 65, 250, 1.0)",
+        "rgba(253, 241, 49, 1.0)",
+        "rgba(251, 143, 36, 1.0)",
+        "rgba(250, 46, 28, 1.0)",
+        "rgba(168, 23, 93, 1.0)"
+    ];
 
-const firsttileset = Object.keys(tilesets)[0]
-let tileset = tilesets[firsttileset].value
-let tilesettype = tilesets[firsttileset].type
-let tilesetvectortype = null
-let tilesetvectorsource = null
+    return domain.map((v, i) => [v, range[i]]).flat();
+};
+
+const jmaSedimentScale = () => {
+    const domain = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const range = [
+        "rgba(0, 0, 0, 1.0)",
+        "rgba(0, 0, 0, 1.0)",
+        "rgba(0, 0, 0, 1.0)",
+        "rgba(0, 0, 0, 1.0)",
+        "rgba(242, 231, 0, 1.0)",
+        "rgba(255, 40, 0, 1.0)",
+        "rgba(170, 0, 170, 1.0)",
+        "rgba(12, 0, 12, 1.0)",
+        "rgba(0, 0, 0, 1.0)",
+        "rgba(0, 0, 0, 1.0)",
+        "rgba(0, 0, 0, 1.0)"
+    ];
+
+    return domain.map((v, i) => [v, range[i]]).flat();
+}
+
+const vectorScale = () => {
+    const domain = [0, 1, 4, 8, 12, 16, 24, 32, 40, 48, 56, 64, 80, 200];
+    const range = [
+        "rgba(204, 255, 255, 0.0)",
+        "rgba(102, 255, 255, 0.0)",
+        "rgba(0, 204, 255, 0.0)",
+        "rgba(0, 153, 255, 0.8)",
+        "rgba(51, 102, 255, 0.8)",
+        "rgba(51, 255, 0, 0.8)",
+        "rgba(51, 204, 0, 0.8)",
+        "rgba(25, 153, 0, 0.8)",
+        "rgba(255, 255, 0, 0.8)",
+        "rgba(255, 204, 0, 0.8)",
+        "rgba(255, 153, 0, 0.8)",
+        "rgba(255, 80, 102, 0.8)",
+        "rgba(255, 0, 0, 0.8)",
+        "rgba(183, 0, 16, 0.8)"
+    ];
+
+    return domain.map((v, i) => [v, range[i]]).flat();
+}
+
+const doshaScale = () => {
+    const domain = [3, 3.75, 4.5, 5.5, 6.5];
+    const range = [
+        "rgba(0, 0, 0, 0)",
+        "rgba(245, 237, 99, 1)",
+        "rgba(236, 105, 76, 1)",
+        "rgba(175, 72, 83, 1)",
+        "rgba(66, 60, 70, 1)"
+    ];
+
+    return domain.map((v, i) => [v, range[i]]).flat();
+}
 
 const COLORSCALES = {
     'Turbo': d3.interpolateTurbo,
@@ -563,13 +588,28 @@ const COLORSCALES = {
     'Cividis': d3.interpolateCividis,
     'Warm': d3.interpolateWarm,
     'Cool': d3.interpolateCool,
-    'Cubehelix': d3.interpolateCubehelixDefault
+    'Cubehelix': d3.interpolateCubehelixDefault,
+    'YJRain': {
+        manual: true,
+        value: yjRainScale()
+    },
+    'JMASediment': {
+        manual: true,
+        value: jmaSedimentScale()
+    },
+    'Vector': {
+        manual: true,
+        value: vectorScale()
+    },
+    'Dosha': {
+        manual: true,
+        value: doshaScale()
+    }
 }
 
-let selctedcolorscalename = 'Turbo'
+let selctedcolorscalename = 'YJRain'
 let colorscaletype = COLORSCALES[selctedcolorscalename]
 let colorsteps = 256
-//let colorsteps = 8
 
 const stepexpression = [
     'step',
@@ -582,11 +622,23 @@ const interpolateexpression = [
     ['raster-value']
 ]
 
-//let colorscaleExpressiontemplate = interpolateexpression
 let colorscaleExpressiontemplate = stepexpression
 let tilesetsuffix = ''
-//let tilesetresampling = 'linear'
 let tilesetresampling = 'nearest'
+
+function changeColorSampling(resampling){
+    if(resampling === 'step'){
+        colorscaleExpressiontemplate = stepexpression
+        tilesetsuffix = ''
+        tilesetresampling = 'nearest'
+    }else{
+        colorscaleExpressiontemplate = interpolateexpression
+        tilesetsuffix = '-bi'
+        tilesetresampling = 'linear'
+    }
+    init()
+}
+window.changeColorSampling = changeColorSampling
 
 function getColorScale(colorRange) {
     let colorscale = null
@@ -655,41 +707,16 @@ function updateLegendBar(colorRange) {
     });
 }
 
+
 let initOption
 
 let bandlist = []
 
 function showAllOptions() {
-    if (tilesettype === 'raster-array') {
-        document.getElementById('raster-array-options').style.display = 'block'
-        document.getElementById('legend').style.display = 'block'
-        document.getElementById('map-overlay-bottom').style.display = 'block'
-        showAllRasterArrayOptions()
-    } else {
-        document.getElementById('raster-array-options').style.display = 'none'
-        document.getElementById('legend').style.display = 'none'
-        document.getElementById('map-overlay-bottom').style.display = 'none'
-        if (tilesettype === 'raster') {
-            addRasterLayer()
-        } else if (tilesettype === 'vector') {
-            if (tilesetvectortype === 'circle') {
-                addCircleLayer()
-            }else if(tilesetvectortype === 'fill'){
-                addFillLayer()
-            }
-        }
-    }
-}
-
-function showAllRasterArrayOptions() {
     const source = map.getSource('rastersource')
     layers = {}
-    console.log("source", source)
+    console.log("source",source)
     source.rasterLayers.forEach(l => {
-        if (l.fields.name === 'wind') {
-            particlelayerid = l.fields.name
-            return
-        }
         const f = l.fields
         bandlist = f.bands
         layers[f.name] = {
@@ -711,19 +738,13 @@ function showAllRasterArrayOptions() {
         if (type === selctedcolorscalename) option.selected = true
     }
 
-    if (particlelayerid) {
-        document.getElementById('particles-options-wrapper').style.display = 'block'
-    } else {
-        document.getElementById('particles-options-wrapper').style.display = 'none'
-    }
-
     const tilesetselect = document.getElementById('tileset-selector')
     tilesetselect.innerHTML = ''
     for (let tile in tilesets) {
         const option = tilesetselect.appendChild(document.createElement('option'))
-        option.value = tile
+        option.value = tilesets[tile].value
         option.innerHTML = tilesets[tile].label
-        if (tilesets[tile].value === tileset) option.selected = true
+        if (option.value === tileset) option.selected = true
     }
 
     const timeslider = document.getElementById('slider')
@@ -737,46 +758,33 @@ function showAllRasterArrayOptions() {
 
     const auto = document.getElementById('auto')
 
-    if (bandlist.length > 1) {
+    if (bandlist.length >= 1) {
         timeslider.disabled = false
         auto.disabled = false
         bandlist.forEach(datetime => {
-            const datetimearray = convertTimeValue(datetime).split(" ")
+            const datetimearray = convertUnixToJST(datetime).split(" ")
             const timespan = timediv.appendChild(document.createElement('span'))
             timespan.innerHTML = `${datetimearray[1]}`
             date.innerHTML = datetimearray[0]
         })
-    } else {
-        timeslider.disabled = true
-        if (autoFlag) play()
-        auto.disabled = true
+        colorscaleselect.value = 'YJRain'
+    // } else {
+    //     timeslider.disabled = true
+    //     date.innerHTML = '2024/09/20'
+    //     if (autoFlag) play()
+    //     auto.disabled = true
+    //     colorscaleselect.value = 'YJRain'
     }
-
+    var inputEvent = new Event("change", {
+        bubbles: true,
+        cancelable: true
+    })
+    colorscaleselect.dispatchEvent(inputEvent)
 }
 
-const baseDate = new Date(Date.UTC(1990, 0, 1));
-function convertTimeValue(timeValue) {
-    const millisecondsInDay = 24 * 60 * 60 * 1000;
-    const totalMilliseconds = Math.round(timeValue * millisecondsInDay);
-    const date = new Date(baseDate.getTime() + totalMilliseconds);
-    const options = {
-        timeZone: 'Australia/Sydney',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false, // Use 24-hour format
-    };
-    const formatter = new Intl.DateTimeFormat('en-GB', options);
-    const parts = formatter.formatToParts(date);
-    const dateString = `${parts.find(p => p.type === 'year').value}/` +
-        `${parts.find(p => p.type === 'month').value}/` +
-        `${parts.find(p => p.type === 'day').value} ` +
-        `${parts.find(p => p.type === 'hour').value}:` +
-        `${parts.find(p => p.type === 'minute').value}`;
-
-    return dateString;
+function convertUnixToJST(unixTimestamp) {
+    const date = new Date(unixTimestamp * 1000);
+    return date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
 function changeBand(index) {
@@ -785,17 +793,7 @@ function changeBand(index) {
 window.changeBand = changeBand
 
 function changeTileset(t) {
-    tileset = tilesets[t].value
-    tilesettype = tilesets[t].type
-    if (tilesettype === 'vector') {
-        tilesetvectortype = tilesets[t].vector_layer_type
-        tilesetvectorsource = tilesets[t].vector_layer_source
-    }
-    if (tilesets[t].zoom) {
-        zoom = tilesets[t].zoom
-    } else {
-        zoom = defaultzoom
-    }
+    tileset = t
     init()
 }
 window.changeTileset = changeTileset
@@ -806,12 +804,6 @@ function changeColorscaleType(type) {
     showLayer(currentLayer)
 }
 window.changeColorscaleType = changeColorscaleType
-
-function changeColorSteps(steps) {
-    colorsteps = steps
-    showLayer(currentLayer)
-}
-window.changeColorSteps = changeColorSteps
 
 function oneTwoFive(range, maxSteps = 15) {
     const rng = range[1] - range[0];
@@ -853,87 +845,9 @@ const showLayer = (layer) => {
             map.removeLayer(l)
         }
     }
-    removeParticles()
     if (map.getSource("rastersource")) {
         map.removeSource("rastersource")
     }
-    if (tilesettype === 'raster-array') {
-        addRasterArrayLayer(layer)
-    }
-}
-document.showLayer = showLayer
-
-const addCircleLayer = () => {
-    if (map.getLayer('vector')) {
-        map.removeLayer('vector')
-    }
-    if (map.getSource("vectorsource")) {
-        map.removeSource("vectorsource")
-    }
-    map.addSource('vectorsource', {
-        type: 'vector',
-        url: tileset
-    })
-    map.addLayer({
-        id: 'vector',
-        type: 'circle',
-        source: 'vectorsource',
-        'source-layer': tilesetvectorsource,
-        paint: {
-            'circle-radius': 5,
-            'circle-color': 'rgba(255, 0, 0, 1)',
-            'circle-stroke-width': 1,
-            'circle-stroke-color': 'rgba(0, 0, 0, 1)'
-        }
-    })
-}
-
-const addFillLayer = () => {
-    if (map.getLayer('vector')) {
-        map.removeLayer('vector')
-    }
-    if (map.getSource("vectorsource")) {
-        map.removeSource("vectorsource")
-    }
-    map.addSource('vectorsource', {
-        type: 'vector',
-        url: tileset
-    })
-    map.addLayer({
-        id: 'vector',
-        type: 'fill',
-        source: 'vectorsource',
-        'source-layer': tilesetvectorsource,
-        paint: {
-            'fill-color': 'rgba(255, 0, 0, 0.5)',
-            'fill-outline-color': 'rgba(0, 0, 0, 1)'
-        },
-    })
-}
-
-const addRasterLayer = () => {
-    if (map.getLayer('raster')) {
-        map.removeLayer('raster')
-    }
-    if (map.getSource("rastersource")) {
-        map.removeSource("rastersource")
-    }
-    map.addSource('rastersource', {
-        type: 'raster',
-        url: tileset
-    })
-    const layer_def = {
-        id: 'raster',
-        type: 'raster',
-        source: 'rastersource',
-        paint: {
-            'raster-opacity': 0.8,
-        }
-    }
-    map.addLayer(layer_def)
-}
-
-const addRasterArrayLayer = (layer) => {
     map.addSource('rastersource', {
         type: 'raster-array',
         url: tileset + tilesetsuffix
@@ -957,65 +871,8 @@ const addRasterArrayLayer = (layer) => {
     map.addLayer(layer_def)
     const element = document.getElementById(layer)
     updateLegendBar(layerVals.color_range)
-
-    addParticles()
 }
-
-const removeParticles = () => {
-    if (map.getLayer('particlelayer')) {
-        map.removeLayer('particlelayer')
-    }
-    if (map.getSource('particlesource')) {
-        map.removeSource('particlesource')
-    }
-}
-
-const addParticles = () => {
-    if (particlelayerid) {
-        const particlesource = {
-            id: 'particlesource',
-            type: 'raster-array',
-            url: tileset
-        }
-        map.addSource('particlesource', particlesource)
-        const particlelayer = {
-            'id': 'particlelayer',
-            'type': 'raster-particle',
-            'source': 'particlesource',
-            'source-layer': particlelayerid,
-            'slot': 'top',
-            'layout': {},
-            'paint': {
-                'raster-particle-max-speed': 10,
-                'raster-particle-fade-opacity-factor': 0.90,
-                'raster-particle-reset-rate-factor': 0.4,
-            }
-        }
-        map.addLayer(particlelayer)
-        let particleCount = 1000
-        document.getElementById('particle-count-slider').value = particleCount
-        setParticleCount(particleCount)
-
-        let particleSpeed = 0.08
-        document.getElementById('particle-speed-slider').value = particleSpeed
-        setParticleSpeed(particleSpeed)
-
-        let particleColor = '#ffffff'
-        document.getElementById('particle-color').value = particleColor
-        setParticleColor(particleColor)
-    }
-}
-
-function showWind(elem) {
-    if (elem.checked) {
-        document.getElementById('particle-options').style.display = 'block'
-        addParticles()
-    } else {
-        document.getElementById('particle-options').style.display = 'none'
-        removeParticles()
-    }
-}
-document.showWind = showWind
+document.showLayer = showLayer
 
 let autoFlag = false
 const autoUpdate = () => {
@@ -1040,42 +897,19 @@ const autoUpdate = () => {
 
 function play() {
     const auto = document.getElementById('auto')
-    if (auto.innerHTML === 'Play') {
+    if (auto.innerHTML === '再生') {
         autoFlag = true
         autoUpdate()
-        auto.innerHTML = 'Stop'
+        auto.innerHTML = '停止'
         auto.style.backgroundColor = '#f44336'
     } else {
         autoFlag = false
-        auto.innerHTML = 'Play'
+        auto.innerHTML = '再生'
         auto.style.backgroundColor = '#4CAF50'
     }
 }
 window.play = play
 
-const setParticleCount = (val) => {
-    document.getElementById('particle-count').innerHTML = val
-    map.setPaintProperty('particlelayer', 'raster-particle-count', Number(val))
-}
-document.setParticleCount = setParticleCount
 
-const setParticleSpeed = (val) => {
-    document.getElementById('particle-speed').innerHTML = val
-    map.setPaintProperty('particlelayer', 'raster-particle-speed-factor', Number(val))
-}
-document.setParticleSpeed = setParticleSpeed
-
-const setParticleColor = (val) => {
-    const color = [
-        "interpolate",
-        ["linear"],
-        ["raster-particle-speed"],
-        0, "rgba(0,0,0,0)",
-        10, val
-    ]
-    map.setPaintProperty('particlelayer', 'raster-particle-color', color)
-}
-document.setParticleColor = setParticleColor
 </script>
-
 </html>

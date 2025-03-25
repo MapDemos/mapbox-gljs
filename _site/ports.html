@@ -353,24 +353,10 @@ button:hover {
 
 <body>
   <div id="map" class="map"></div>
-  
-
-  <div id="legend" class="legend">
-    <div class="legend-scale">
-        <div class="legend-bar"></div>
-    </div>
-</div>
-  <div id="map-overlay-bottom" class="map-overlay-bottom">
-    <label id="active-datetime">　</label>&nbsp;&nbsp;&nbsp;<button id="auto" onclick="play()">Play</button>
-    <div class="time" id="timediv">
-    </div>
-    <input type="range" min="0" step="1" value="0" max="5" class="slider" id="slider" oninput="changeBand(this.value)" />
-</div>
 </body>
 <script>
-  let specifiedDate = '2024-05-28'
-lng = 69.3451
-lat = 30.3753
+  
+const defaultCoordinates = [139.76652995236685, 35.67881527736655];
 
 let map
 
@@ -378,181 +364,107 @@ const loadMap = () => {
     map = new mapboxgl.Map({
         container: 'map',
         style: 'mapbox://styles/mapbox/light-v11',
-        center: [lng, lat],
+        center: defaultCoordinates,
         zoom: 6,
         minZoom: 3,
-        maxZoom: 12,
+        //maxZoom: 12,
         scrollZoom: true
     })
     map.on('load', () => {
-        createTimeArray()
-        for (let time of time_array) {
-            addLayer(time)
-        }
-        document.getElementById('slider').addEventListener('input', () => {
-            sliderAction()
-        })
-    })
-    map.on('idle', () => {
-        if (slider_loaded) return
-        loadSlider()
-        slider_loaded = true
-        sliderAction()
-    })
+        map.loadImage('https://docs.mapbox.com/mapbox-gl-js/assets/custom_marker.png', (error, image) => {
+            if (error) throw error;
+            if (!map.hasImage('port')) {
+                map.addImage('port', image);
+            }
+        });
+        map.addSource('ports', {
+            type: 'vector',
+            url: `mapbox://kenji-shima.ports-demo`
+        });
+        map.addLayer({
+            id: "clusters",
+            type: "circle",
+            source: "ports",
+            "source-layer": "ports",
+            filter: ["all", ["has", "count"], [">", ["get", "count"], 1]],
+            paint: {
+                "circle-color": [
+                    "step",
+                    ["get", "count"],
+                    "#51bbd6",
+                    2,
+                    "#f1f075",
+                    100,
+                    "#f28cb1",
+                ],
+                "circle-radius": ["step", ["get", "count"],
+                    20,
+                    100,
+                    30,
+                    750,
+                    40],
+            },
+        });
 
+        map.addLayer({
+            id: "cluster-count",
+            type: "symbol",
+            source: "ports",
+            "source-layer": "ports",
+            filter: ["all", ["has", "count"], [">", ["get", "count"], 1]],
+            layout: {
+                "text-field": "{count}",
+                "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
+                "text-size": 12,
+            },
+        });
+
+        map.addLayer({
+            id: "symbol-port",
+            type: "symbol",
+            source: "ports",
+            "source-layer": "ports",
+            // Only show symbols when count is exactly 1
+            filter: ["all", ["has", "count"], ["==", ["get", "count"], 1]],
+            layout: {
+                "icon-image": "port", // ensure you have added this image beforehand
+                "icon-size": [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    0, 0.1,
+                    10, 0.5,
+                    15, 0.8
+                ],
+                "icon-allow-overlap": true
+            }
+        });
+
+    })
     map.on('click', (event) => {
         const { lng, lat } = event.lngLat;
         console.log(`Longitude: ${lng}, Latitude: ${lat}`);
     })
-}
 
-loadMap()
+    map.on('click', 'clusters', (e) => {
+        const features = map.queryRenderedFeatures(e.point, {
+            layers: ['clusters']
+        });
+        map.easeTo({
+            center: features[0].geometry.coordinates,
+            zoom: map.getZoom() + 2
+        });
+    });
 
-let time_array = []
-const createTimeArray = () => {
-    const timediv = document.getElementById('timediv')
-    timediv.innerHTML = ''
-    for (let i = 23; i <= 23; i++) {
-        let hour = String(i).padStart(2, '0')
-        for (let j = 1; j <= 51; j = j + 10) {
-            let min = String(j).padStart(2, '0')
-            time_array.push(`${hour}${min}`)
-            const timespan = timediv.appendChild(document.createElement('span'))
-            timespan.innerHTML = `${hour}:${String(j-1).padStart(2, '0')}`
-        }
-    }
-}
-
-const sliderAction = () => {
-    const index = document.getElementById('slider').value
-    const layerband = layerbandlist[index]
-    showLayer(layerband)
-}
-
-// let layer
-let currentLayer
-function showLayer(layer) {
-    if (layer) {
-        // hide previous layer
-        if (currentLayer && currentLayer !== layer) {
-            map.setPaintProperty(`${currentLayer}`, 'raster-opacity', 0)
-        }
-        map.setPaintProperty(`${layer}`, 'raster-opacity', 1)
-        currentLayer = layer
-    }
-}
-
-const addLayer = (time) => {
-    const url = `mapbox://kenji-shima.walay-radar-20231109${time}-z4`
-    map.addSource(time, {
-        type: 'raster-array',
-        url: url
-    })
-    map.addLayer({
-        id: time,
-        type: 'raster',
-        source: time,
-        paint: {
-            'raster-color-range': [0, 200],
-            'raster-color': [
-                'step',
-                ['raster-value'],
-                ...colorScale()
-            ],
-            'raster-resampling': 'nearest',
-            'raster-color-range-transition': { duration: 0 },
-            'raster-opacity': 0
-        }
-    })
-}
-
-let slider_loaded = false
-
-let layerbandlist = []
-function loadSlider() {
-    for (let time of time_array) {
-        const source = map.getSource(time)
-        console.log(source)
-        layerbandlist.push(time)
-    }
-    const slider = document.getElementById('slider')
-    slider.max = layerbandlist.length - 1
-}
-
-const domain = [0, 1, 4, 8, 12, 16, 24, 32, 40, 48, 56, 64, 80, 200];
-const range = [
-    "rgba(204, 255, 255, 0.0)",
-    "rgba(102, 255, 255, 0.0)",
-    "rgba(0, 204, 255, 0.8)",
-    "rgba(0, 153, 255, 0.8)",
-    "rgba(51, 102, 255, 0.8)",
-    "rgba(51, 255, 0, 0.8)",
-    "rgba(51, 204, 0, 0.8)",
-    "rgba(25, 153, 0, 0.8)",
-    "rgba(255, 255, 0, 0.8)",
-    "rgba(255, 204, 0, 0.8)",
-    "rgba(255, 153, 0, 0.8)",
-    "rgba(255, 80, 102, 0.8)",
-    "rgba(255, 0, 0, 0.8)",
-    "rgba(183, 0, 16, 0.8)"
-]
-
-const colorScale = () => {
-    let result = domain.map((v, i) => [v, range[i]]).flat();
-    result.unshift("rgba(0, 0, 0, 0)")
-    return result
-}
-
-function updateLegendBar() {
-     const legendBar = document.querySelector('.legend-bar');
-
-    legendBar.style.background = `linear-gradient(to right, ${range.join(',')})`;
-
-    legendBar.innerHTML = ''
-    domain.forEach(element => {
-        const span = legendBar.appendChild(document.createElement('span'))
-        span.className = 'label'
-        span.style = ''
-        span.innerHTML = element
+    map.on('click', 'symbol-port', (e) => {
+        const features = map.queryRenderedFeatures(e.point, {
+            layers: ['symbol-port']
+        });
+        console.log("feature",features[0].properties)
     });
 }
 
-updateLegendBar()
-
-let autoFlag = false
-const autoUpdate = () => {
-    if (!autoFlag) return
-    const slider = document.getElementById('slider')
-    let index = slider.value
-    index++
-    if (index > time_array.length - 1) {
-        index = 0
-    }
-    slider.value = index
-
-    var inputEvent = new Event("input", {
-        bubbles: true,
-        cancelable: true
-    })
-
-    slider.dispatchEvent(inputEvent)
-
-    setTimeout(autoUpdate, 1000)
-}
-function play() {
-    const auto = document.getElementById('auto')
-    if (auto.innerHTML === 'Play') {
-        autoFlag = true
-        autoUpdate()
-        auto.innerHTML = 'Stop'
-        auto.style.backgroundColor = '#f44336'
-    } else {
-        autoFlag = false
-        auto.innerHTML = 'Play'
-        auto.style.backgroundColor = '#4CAF50'
-    }
-}
-window.play = play
+loadMap()
 </script>
 
 </html>
