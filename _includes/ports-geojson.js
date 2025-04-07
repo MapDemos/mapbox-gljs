@@ -48,6 +48,21 @@ const loadMap = () => {
             layers: ['symbol-port']
         });
         console.log("feature", features[0].properties)
+        if (!features.length) return;
+        const feature = features[0];
+
+        let html = '<table>';
+        for (const key in feature.properties) {
+            if (feature.properties.hasOwnProperty(key)) {
+                html += `<tr><th>${key}</th><td>${feature.properties[key]}</td></tr>`;
+            }
+        }
+        html += '</table>';
+
+        new mapboxgl.Popup()
+            .setLngLat(feature.geometry.coordinates)
+            .setHTML(html)
+            .addTo(map);
     });
 }
 
