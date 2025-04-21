@@ -1,0 +1,202 @@
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-language/v1.0.0/mapbox-gl-language.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/d3@7.8.5/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.min.js"></script>
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.css" type="text/css" />
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<script src="https://kenji-shima.github.io/resource-files/polyline.js" type="module"></script>
+<script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
+<script>
+  (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
+    key: "AIzaSyC-RzTEU-ZoG5Tjy-YfB65PQjwzTGjlbiE",
+    v: "weekly",
+  });
+</script>
+  <style>
+    .map-container {
+      display: flex; 
+      width: 100%;
+      height: 100%;
+    }
+    .map {
+      height: 100%; width: 50%;
+    }
+</style>
+</head>
+
+<body>
+  <div class="map-container">
+    <div id="map" class="map"></div>
+    <div id="google-map" class="map"></div>
+  </div>
+  
+</body>
+<script>
+  const defaultCoordinates = [139.76652995236685, 35.67881527736655];
+
+let googleMap;
+
+async function initGoogleMap() {
+    const { Map } = await google.maps.importLibrary("maps");
+
+    googleMap = new Map(document.getElementById("google-map"), {
+        center: { lat: defaultCoordinates[1], lng: defaultCoordinates[0] },
+        zoom: 6,
+    });
+
+    googleMap.data.loadGeoJson("luup_all.geojson"); // Replace with your GeoJSON file path
+
+    // Optional: Add a click listener for the loaded features
+    googleMap.data.addListener("click", function (event) {
+        // Example: Get a property from the clicked feature
+        const name = event.feature.getProperty("name"); // Replace "name" with your property key
+        if (name) {
+            alert("Clicked on: " + name);
+        } else {
+            console.log("Clicked feature properties:", event.feature.getPropertyNames());
+        }
+    });
+}
+
+let map
+
+const loadMap = () => {
+    map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/light-v11',
+        center: defaultCoordinates,
+        zoom: 5,
+        language: 'ja',
+        scrollZoom: true
+    })
+    map.on('load', () => {
+        map.loadImage('https://docs.mapbox.com/mapbox-gl-js/assets/custom_marker.png', (error, image) => {
+            if (error) throw error;
+            if (!map.hasImage('port')) {
+                map.addImage('port', image);
+            }
+        });
+
+        fetch('luup_all.geojson')
+            .then(response => response.json())
+            .then(data => {
+                addAllLayers(data)
+            })
+            .catch(error => console.error('Error loading GeoJSON data:', error));
+    })
+    map.on('click', (event) => {
+        const { lng, lat } = event.lngLat;
+        console.log(`Longitude: ${lng}, Latitude: ${lat}`);
+    })
+
+    /*map.on('click', 'clusters', (e) => {
+        const features = map.queryRenderedFeatures(e.point, {
+            layers: ['clusters']
+        });
+        map.easeTo({
+            center: features[0].geometry.coordinates,
+            zoom: map.getZoom() + 2
+        });
+    });*/
+
+    map.on('click', 'symbol-port', (e) => {
+        const features = map.queryRenderedFeatures(e.point, {
+            layers: ['symbol-port']
+        });
+        console.log("feature", features[0].properties)
+        if (!features.length) return;
+        const feature = features[0];
+
+        let html = '<table>';
+        for (const key in feature.properties) {
+            if (feature.properties.hasOwnProperty(key)) {
+                html += `<tr><th>${key}</th><td>${feature.properties[key]}</td></tr>`;
+            }
+        }
+        html += '</table>';
+
+        new mapboxgl.Popup()
+            .setLngLat(feature.geometry.coordinates)
+            .setHTML(html)
+            .addTo(map);
+    });
+}
+
+const addAllLayers = (data) => {
+    map.addSource('ports', {
+        type: 'geojson',
+        data: data,
+        //cluster: true,
+        //clusterMaxZoom: 14,
+        //clusterRadius: 50
+    });
+    /*map.addLayer({
+        id: "clusters",
+        type: "circle",
+        source: "ports",
+        filter: ['has', 'point_count'],
+        paint: {
+            "circle-color": [
+                "step",
+                ["get", "point_count"],
+                "#51bbd6",
+                2,
+                "#f1f075",
+                100,
+                "#f28cb1",
+            ],
+            "circle-radius": ["step", ["get", "point_count"],
+                20,
+                100,
+                30,
+                750,
+                40],
+        },
+    });
+
+    map.addLayer({
+        id: "cluster-count",
+        type: "symbol",
+        source: "ports",
+        filter: ['has', 'point_count'],
+        layout: {
+            'text-field': ['get', 'point_count_abbreviated'],
+            "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
+            "text-size": 12,
+        },
+    });*/
+
+    map.addLayer({
+        id: "symbol-port",
+        type: "symbol",
+        source: "ports",
+        filter: ['!', ['has', 'point_count']],
+        layout: {
+            "icon-image": "port", // ensure you have added this image beforehand
+            "icon-size": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                0, 0.1,
+                10, 0.5,
+                15, 0.8
+            ],
+            "icon-allow-overlap": true
+        }
+    });
+}
+
+loadMap()
+initGoogleMap()
+</script>
+
+</html>
