@@ -282,7 +282,7 @@ fetch('https://api.mapbox.com/geocoding/v5/mapbox.places/' + 'Jakarta' + '.json?
 
                     // Throttled fetch for reverse geocoding (20 per batch, waits for each batch to finish before starting next)
                     async function throttledFetchAll(urls, maxPerBatch = 20) {
-                        //maxPerBatch = 40;
+                        maxPerBatch = 10;
                         let results = [];
                         for (let i = 0; i < urls.length; i += maxPerBatch) {
                             const batch = urls.slice(i, i + maxPerBatch).map(url =>
