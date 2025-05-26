@@ -1,7 +1,5 @@
-//window.CP.PenTimer.MAX_TIME_IN_LOOP_WO_EXIT = 6000;
 var overpassurl = [];
 var centers = [];
-mapboxgl.accessToken = 'pk.eyJ1IjoibWJ4c29sdXRpb25zIiwiYSI6ImNqeWhpandmazAyYmYzYnBtZzJxM3hlM2EifQ.ZLKIqBxG97_HklFj0_1RBQ';
 fetch('https://api.mapbox.com/geocoding/v5/mapbox.places/' + 'Jakarta' + '.json?limit=1&types=place&country=ID&access_token=' + mapboxgl.accessToken).then(function (response) { return response.json(); })
     .then(function (json) {
         var center = turf.point(json.features[0].center);
@@ -37,6 +35,8 @@ fetch('https://api.mapbox.com/geocoding/v5/mapbox.places/' + 'Jakarta' + '.json?
                 var BuildingCentroids = turf.featureCollection(centers);
                 var ptswithin = turf.pointsWithinPolygon(BuildingCentroids, poly);
                 var buildingsnum = ptswithin.features.length;
+                console.log('Number of buildings in the area: ' + buildingsnum);
+                
                 var options = { units: 'meters' };
                 for (const pts of ptswithin.features) {
                     pts.properties.distance = turf.distance(
@@ -117,16 +117,6 @@ fetch('https://api.mapbox.com/geocoding/v5/mapbox.places/' + 'Jakarta' + '.json?
                     },
                         firstSymbolId);
 
-                    // Commented out firsthundred and lasthundred sources as they are no longer used
-                    // map.addSource('firsthundred', {
-                    //     type: 'geojson',
-                    //     data: firsthundred,
-                    // });
-                    // map.addSource('lasthundred', {
-                    //     type: 'geojson',
-                    //     data: lasthundred,
-                    // });
-
                     map.addSource('gclines', {
                         type: 'geojson',
                         data: {
@@ -163,28 +153,13 @@ fetch('https://api.mapbox.com/geocoding/v5/mapbox.places/' + 'Jakarta' + '.json?
                     },
                         firstSymbolId);
 
-                    // map.addLayer({
-                    //     'id': 'firsthundred',
-                    //     'type': 'circle',
-                    //     'source': 'firsthundred',
-                    //     'layout': {},
-                    //     'paint': {
-                    //         'circle-color': '#FF0000',
-                    //         'circle-radius': 5,
-                    //         'circle-stroke-width': 1,
-                    //         'circle-stroke-color': '#FFFFFF',
+                    // map.addSource('geocoded', {
+                    //     type: 'geojson',
+                    //     data: {
+                    //         type: 'FeatureCollection',
+                    //         features: {}
                     //     }
-                    // },
-                    //     firstSymbolId);
-
-
-                    map.addSource('geocoded', {
-                        type: 'geojson',
-                        data: {
-                            type: 'FeatureCollection',
-                            features: {}
-                        }
-                    });
+                    // });
 
                     map.addSource('directions', {
                         type: 'geojson',
@@ -219,30 +194,16 @@ fetch('https://api.mapbox.com/geocoding/v5/mapbox.places/' + 'Jakarta' + '.json?
                     },
                         firstSymbolId);
 
-                    map.addLayer({
-                        'id': 'geocoded',
-                        'type': 'circle',
-                        'source': 'geocoded',
-                        'layout': {},
-                        'paint': {
-                            'circle-color': '#FFFFFF',
-                            'circle-radius': 5,
-                            'circle-stroke-width': 1,
-                            'circle-stroke-color': '#FF0000',
-                        }
-                    },
-                        firstSymbolId);
-
                     // map.addLayer({
-                    //     'id': 'lasthundred',
+                    //     'id': 'geocoded',
                     //     'type': 'circle',
-                    //     'source': 'lasthundred',
+                    //     'source': 'geocoded',
                     //     'layout': {},
                     //     'paint': {
-                    //         'circle-color': '#0000FF',
+                    //         'circle-color': '#FFFFFF',
                     //         'circle-radius': 5,
                     //         'circle-stroke-width': 1,
-                    //         'circle-stroke-color': '#FFFFFF',
+                    //         'circle-stroke-color': '#FF0000',
                     //     }
                     // },
                     //     firstSymbolId);
@@ -280,9 +241,8 @@ fetch('https://api.mapbox.com/geocoding/v5/mapbox.places/' + 'Jakarta' + '.json?
 
                 map.once('idle', () => {
 
-                    // Throttled fetch for reverse geocoding (20 per batch, waits for each batch to finish before starting next)
-                    async function throttledFetchAll(urls, maxPerBatch = 20) {
-                        maxPerBatch = 10;
+                    // // Throttled fetch for reverse geocoding (dynamic delay per batch to ensure at least 1 second per batch)
+                    async function throttledFetchAll(urls, maxPerBatch = 500) {
                         let results = [];
                         for (let i = 0; i < urls.length; i += maxPerBatch) {
                             const batch = urls.slice(i, i + maxPerBatch).map(url =>
@@ -291,53 +251,57 @@ fetch('https://api.mapbox.com/geocoding/v5/mapbox.places/' + 'Jakarta' + '.json?
                                     return null;
                                 })
                             );
+                            const batchStartTime = Date.now();
                             const batchResults = await Promise.all(batch);
                             results = results.concat(batchResults);
-                            if (i + maxPerBatch < urls.length) {
-                                await new Promise(resolve => setTimeout(resolve, 10)); // Delay between batches
+                    
+                            const elapsed = Date.now() - batchStartTime;
+                            const remaining = 1020 - elapsed;
+                            if (remaining > 0 && i + maxPerBatch < urls.length) {
+                                await new Promise(resolve => setTimeout(resolve, remaining));
                             }
                         }
                         return results;
                     }
-
-                    let geocodeUrls = [];
-                    for (let i = 0; i < allBuildings.features.length; i++) {
-                        let coords = allBuildings.features[i].geometry.coordinates;
-                        let url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords[0]},${coords[1]}.json?routing=true&types=address&limit=1&access_token=${mapboxgl.accessToken}`;
-                        geocodeUrls.push(url);
-                    }
-
-                    let allreverse = throttledFetchAll(geocodeUrls, 20);
-                    allreverse.then(function (response) {
-
-                        const geocodedPoints = response.map((res, idx) => {
-                            return turf.point(res.features[0].geometry.coordinates, {
-                                address: res.features[0].place_name
-                            });
-                        });
-
-                        var collection = turf.featureCollection(geocodedPoints);
-
-                        const gclines = turf.featureCollection(
-                          allBuildings.features.map((feature, i) => {
-                            const start = feature.geometry.coordinates;
-                            const end = response[i].features[0].geometry.coordinates;
-                            return turf.lineString([start, end], {
-                              distance: turf.distance(feature.geometry, response[i].features[0].geometry, options)
-                            });
-                          })
-                        );
-
-                        map.getSource('geocoded').setData(collection);
-                        map.getSource('gclines').setData(gclines);
-                    });
+                    //
+                    // let geocodeUrls = [];
+                    // for (let i = 0; i < allBuildings.features.length; i++) {
+                    //     let coords = allBuildings.features[i].geometry.coordinates;
+                    //     let url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords[0]},${coords[1]}.json?routing=true&types=address&limit=1&access_token=${mapboxgl.accessToken}`;
+                    //     geocodeUrls.push(url);
+                    // }
+                    //
+                    // let allreverse = throttledFetchAll(geocodeUrls);
+                    // allreverse.then(function (response) {
+                    //
+                    //     const geocodedPoints = response.map((res, idx) => {
+                    //         return turf.point(res.features[0].geometry.coordinates, {
+                    //             address: res.features[0].place_name
+                    //         });
+                    //     });
+                    //
+                    //     var collection = turf.featureCollection(geocodedPoints);
+                    //
+                    //     const gclines = turf.featureCollection(
+                    //       allBuildings.features.map((feature, i) => {
+                    //         const start = feature.geometry.coordinates;
+                    //         const end = response[i].features[0].geometry.coordinates;
+                    //         return turf.lineString([start, end], {
+                    //           distance: turf.distance(feature.geometry, response[i].features[0].geometry, options)
+                    //         });
+                    //       })
+                    //     );
+                    //
+                    //     map.getSource('geocoded').setData(collection);
+                    //     map.getSource('gclines').setData(gclines);
+                    // });
 
                     // Throttled fetch for directions (20 per second)
                     let directionUrls = allBuildings.features.map((feature) => {
                       let coords = feature.geometry.coordinates;
-                      return `https://api.mapbox.com/directions/v5/mapbox/driving/${coords[0]},${coords[1]};${center.geometry.coordinates[0]},${center.geometry.coordinates[1]}?overview=full&geometries=geojson&alternatives=false&access_token=${mapboxgl.accessToken}`;
+                      return `https://api.mapbox.com/directions/v5/mapbox/driving/${coords[0]},${coords[1]};${center.geometry.coordinates[0]},${center.geometry.coordinates[1]}?overview=simplified&geometries=geojson&alternatives=false&access_token=${mapboxgl.accessToken}`;
                     });
-                    let alldirections = throttledFetchAll(directionUrls, 20);
+                    let alldirections = throttledFetchAll(directionUrls);
                     alldirections.then(function (res) {
                         const directionscollection = turf.featureCollection(
                           res.map(r =>
@@ -375,20 +339,20 @@ fetch('https://api.mapbox.com/geocoding/v5/mapbox.places/' + 'Jakarta' + '.json?
                             closeOnClick: false
                         });
 
-                        map.on('mouseenter', 'geocoded', (e) => {
-                            map.getCanvas().style.cursor = 'pointer';
-                            const coordinates = e.features[0].geometry.coordinates.slice();
-                            const description = e.features[0].properties.address;
-                            while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
-                                coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
-                            }
-                            popup.setLngLat(coordinates).setHTML(description).addTo(map);
-                        });
-
-                        map.on('mouseleave', 'geocoded', () => {
-                            map.getCanvas().style.cursor = '';
-                            popup.remove();
-                        });
+                        // map.on('mouseenter', 'geocoded', (e) => {
+                        //     map.getCanvas().style.cursor = 'pointer';
+                        //     const coordinates = e.features[0].geometry.coordinates.slice();
+                        //     const description = e.features[0].properties.address;
+                        //     while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+                        //         coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+                        //     }
+                        //     popup.setLngLat(coordinates).setHTML(description).addTo(map);
+                        // });
+                        //
+                        // map.on('mouseleave', 'geocoded', () => {
+                        //     map.getCanvas().style.cursor = '';
+                        //     popup.remove();
+                        // });
 
                         map.on('mouseover', 'directions', function (e) {
                             const duration = e.features[0].properties.duration;
