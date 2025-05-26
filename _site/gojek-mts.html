@@ -44,6 +44,7 @@ var map = new mapboxgl.Map({
 });
 
 map.on('load', () => {
+    map.showTileBoundaries = true;
     const layers = map.getStyle().layers;
     let firstSymbolId;
     for (const layer of layers) {
