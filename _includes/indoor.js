@@ -1,6 +1,7 @@
 const is2D = true; // Set to false to use default Mapbox 3D style
 const originalFilters = {};
-const defaultCoordinates = [139.77342767111224, 35.687530312186524];
+//const defaultCoordinates = [139.77342767111224, 35.687530312186524];
+const defaultCoordinates = [139.35489274456228,35.33636012622242];
 
 async function fetchMapxusToken(appId, secret) {
     const res = await fetch('https://map-api.mapxus.co.jp/accounts/v1/auth/token', {
@@ -106,7 +107,7 @@ function createFloorControl(mergedLevels) {
 
         button.addEventListener('click', () => {
             let elevation = Math.max(level.ordinal * 4, 0);
-            if(is2D) elevation = 0;
+            if (is2D) elevation = 0;
             filterIndoorLayers(level.ids, undefined, elevation);
             const extrusionHeight = elevation * 0.999;
             map.setFilter('mapxus-floor-base', ['in', 'id', ...level.ids]);
@@ -134,8 +135,8 @@ function createFloorControl(mergedLevels) {
 
 function createClipLayer() {
     const venueFeatures = map.queryRenderedFeatures({ layers: ['mapxus-venue-fill'] });
-    const polygons = venueFeatures
-        .filter(f => f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon');
+    const polygons = venueFeatures.filter(f => f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon');
+    console.log('Polygons for eraser:', polygons);
 
     const clipGeoJSON = {
         type: 'FeatureCollection',
@@ -156,6 +157,28 @@ function createClipLayer() {
             'clip-layer-types': ['symbol', 'model']
         },
         minzoom: 16,
+    });
+
+    const centroids = polygons.map(f => turf.centroid(f).geometry.coordinates);
+
+    const tilequeryPromises = centroids.map(async (coord) => {
+        const tilequeryUrl = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${coord[0]},${coord[1]}.json?layers=building&radius=90&access_token=${mapboxgl.accessToken}`;
+        try {
+            const response = await fetch(tilequeryUrl);
+            const data = await response.json();
+            return data.features
+                .filter(f => f.id !== undefined)
+                .map(f => f.id);
+        } catch (error) {
+            console.error('Tilequery error:', error);
+            return [];
+        }
+    });
+
+    Promise.all(tilequeryPromises).then(results => {
+        const buildingIds = results.flat();
+        map.setFilter('building', ['!in', '$id', ...buildingIds]);
+        console.log('Filtered buildings by IDs from Tilequery.');
     });
 }
 
@@ -196,10 +219,10 @@ async function loadMap() {
     map.doubleClickZoom.disable();
     map.touchZoomRotate.disable();
 
-    // map.on('click', async (event) => {
-    //     const coords = event.lngLat;
-    //     console.log(`[${coords.lng},${coords.lat}]`);
-    // })
+    map.on('click', async (event) => {
+        const coords = event.lngLat;
+        console.log(`[${coords.lng},${coords.lat}]`);
+    })
 
     async function loadIcons() {
         const spriteJsonUrl = 'https://map-api.mapxus.co.jp/maps/v1/sprites/mapxus_style_v1/sprite@2x.json';
@@ -315,6 +338,8 @@ async function loadMap() {
                 entry.ids.push(f.properties.id);
                 levelMap.set(ordinal, entry);
             });
+
+            console.log('Merged levels:', Array.from(levelMap.values()));
 
             const mergedLevels = Array.from(levelMap.values());
             mergedLevels.sort((a, b) => a.ordinal - b.ordinal);
