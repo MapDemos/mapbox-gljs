@@ -1,0 +1,168 @@
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-language/v1.0.0/mapbox-gl-language.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.12.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.12.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/d3@7.8.5/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.min.js"></script>
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.css" type="text/css" />
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<script src="https://kenji-shima.github.io/resource-files/polyline.js" type="module"></script>
+<script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
+  <script src="https://unpkg.com/osmtogeojson@2.2.12/osmtogeojson.js"></script>
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+    #places-dropdown {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 999;
+        padding: 5px 10px;
+        font-size: 14px;
+        background-color: white;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    #places-dropdown option {
+        font-size: 14px;
+        padding: 4px 8px;
+    }
+</style>
+</head>
+
+<body>
+  <div id="bottom">
+  <div id="map" class="inner"></div>
+</div>
+</body>
+<script>
+  
+const places = [
+    { name: "Singapore", coordinates: [103.827011, 1.310717], prefix: "singapore" },
+    { name: "London", coordinates: [-0.08724502, 51.50475661], prefix: "london" },
+    { name: "Melbourne", coordinates: [144.9688507, -37.8179982], prefix: "melbourne" },
+    { name: "Sydney", coordinates: [151.20605399, -33.87118693], prefix: "sydney" },
+    { name: "Brisbane", coordinates: [153.02380651, -27.46876352], prefix: "brisbane" },
+]
+
+
+let defaultCoordinates = places[0].coordinates;
+let prefix = places[0].prefix;
+
+// Create dropdown for places
+const dropdown = document.createElement('select');
+dropdown.id = 'places-dropdown';
+places.forEach((place, index) => {
+    const option = document.createElement('option');
+    option.value = index;
+    option.text = place.name;
+    dropdown.appendChild(option);
+});
+document.body.prepend(dropdown);
+
+// Handle selection change
+dropdown.addEventListener('change', (event) => {
+    const selectedIndex = parseInt(event.target.value);
+    defaultCoordinates = places[selectedIndex].coordinates;
+    prefix = places[selectedIndex].prefix;
+
+    loadMap();
+});
+
+function loadMap() {
+
+    var map = new mapboxgl.Map({
+        container: 'map',
+        center: defaultCoordinates,
+        zoom: 12,
+        pitch: 0,
+        interactive: true
+    });
+
+    map.on('load', () => {
+        map.showTileBoundaries = true;
+        const layers = map.getStyle().layers;
+        let firstSymbolId;
+        for (const layer of layers) {
+            if (layer.type === 'symbol') {
+                firstSymbolId = layer.id;
+                break;
+            }
+        }
+
+        // Add vector tile source for buildings
+        map.addSource('buildings', {
+            type: 'vector',
+            url: `mapbox://kenji-shima.${prefix}-buildings`
+        });
+
+        map.addLayer({
+            'id': 'buildings-layer',
+            'type': 'circle',
+            'source': 'buildings',
+            'source-layer': 'buildings', // Replace with actual source-layer name
+            'layout': {},
+            'paint': {
+                'circle-color': '#000000',
+                'circle-radius': 2.5
+            },
+            'minzoom': 12
+        }, firstSymbolId);
+
+        // Add vector tile source for directions/routes
+        map.addSource('routes', {
+            type: 'vector',
+            url: `mapbox://kenji-shima.${prefix}-routes`
+        });
+
+        map.addLayer({
+            'id': 'directions-layer',
+            'type': 'line',
+            'source': 'routes',
+            'source-layer': 'routes', // Replace with actual source-layer name
+            'layout': {},
+            'paint': {
+                'line-color': '#0000FF',
+                'line-width': 3
+            },
+            'minzoom': 12
+        }, firstSymbolId);
+
+        map.addSource('center', {
+            type: 'geojson',
+            data: {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": defaultCoordinates
+                },
+                "properties": {}
+            }
+        });
+        map.addLayer({
+            'id': 'center',
+            'type': 'circle',
+            'source': 'center',
+            'layout': {},
+            'paint': {
+                'circle-color': '#FFFFFF',
+                'circle-radius': 10,
+                'circle-stroke-width': 1,
+                'circle-stroke-color': '#0000FF',
+            }
+        }, firstSymbolId);
+    });
+}
+
+loadMap();
+</script>
+
+</html>
