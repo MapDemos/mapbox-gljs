@@ -349,76 +349,167 @@ button:hover {
   background-color: #45a049;
 }
     #floor-control {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    display: flex;
-    flex-direction: column;
-    background-color: rgba(255, 255, 255, 0.9);
-    border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-    width: 60px;
-    height: 210px;
-    overflow: hidden;
-    align-items: center;
-    color:rgba(0, 0, 0, 1);
-  }
-  
-  #floor-control .scroll-button {
-    all: unset;
-    cursor: pointer;
-    font-size: 14px;
-    width: 40px;
-    height: 24px;
-    margin: 4px 0;
-    background-color: #fff;
-    border-radius: 4px;
-    text-align: center;
-    line-height: 24px;
-    box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
-  }
-  
-  #floor-control .floor-list {
-    flex: 1;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    align-items: center;
-    padding: 4px 0;
-  }
-  
-  #floor-control .floor-button {
-    all: unset;
-    cursor: pointer;
-    font-size: 14px;
-    width: 40px;
-    height: 24px;
-    margin: 2px 0;
-    border-radius: 4px;
-    text-align: center;
-    line-height: 24px;
-    background-color: #fff;
-    box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
-    transition: background-color 0.2s, color 0.2s;
-  }
-  
-  #floor-control .floor-button.selected {
-    background-color: #007aff;
-    color: #fff;
-  }
-</style>
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  width: 60px;
+  height: 210px;
+  overflow: hidden;
+  align-items: center;
+  color: rgba(0, 0, 0, 1);
+}
+
+#floor-control .scroll-button {
+  all: unset;
+  cursor: pointer;
+  font-size: 14px;
+  width: 40px;
+  height: 24px;
+  margin: 4px 0;
+  background-color: #fff;
+  border-radius: 4px;
+  text-align: center;
+  line-height: 24px;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
+}
+
+#floor-control .floor-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  align-items: center;
+  padding: 4px 0;
+}
+
+#floor-control .floor-button {
+  all: unset;
+  cursor: pointer;
+  font-size: 14px;
+  width: 100px;
+  height: 24px;
+  margin: 2px 0;
+  border-radius: 4px;
+  text-align: center;
+  line-height: 24px;
+  background-color: #fff;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+#floor-control .floor-button.selected {
+  background-color: #007aff;
+  color: #fff;
+}
+
+#venue-dropdown {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 999;
+  padding: 5px 10px;
+  font-size: 14px;
+  background-color: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+#venue-dropdown option {
+  font-size: 14px;
+  padding: 4px 8px;
+}
+  </style>
 </head>
 
 <body>
   <div id="map" class="map"></div>
 </body>
 <script>
-  const is2D = true; // Set to false to use default Mapbox 3D style
+  const venues = [
+//   { name: "三井アウトレットパーク マリンピア神戸", coordinates: [135.048538, 34.6261626] },
+//   { name: "LaLa arena TOKYO-BAY", coordinates: [139.9897519, 35.6837911] },
+  { name: "ららテラス HARUMI FLAG", coordinates: [139.7744125, 35.6513492] },
+//   { name: "東京ミッドタウン（六本木）", coordinates: [139.73124, 35.6663925] },
+//   { name: "ららテラスTOKYO-BAY", coordinates: [139.9949369, 35.681543] },
+//   { name: "東京ミッドタウン八重洲", coordinates: [139.769174, 35.6791136] },
+  { name: "ららぽーと門真･三井アウトレットパーク 大阪門真", coordinates: [135.5844238, 34.7319119] },
+  { name: "ららぽーと和泉", coordinates: [135.4481652, 34.4374509] },
+//   { name: "ららぽーと堺", coordinates: [135.5605418, 34.5409695] },
+  { name: "ららぽーと富士見", coordinates: [139.5478683, 35.8600363] },
+//   { name: "ららぽーとEXPOCITY", coordinates: [135.5353341, 34.8052491] },
+//   { name: "淀屋橋 odona", coordinates: [135.5002415, 34.6911195] },
+  { name: "ららぽーと柏の葉", coordinates: [139.951162, 35.8936338] },
+//   { name: "赤れんが テラス", coordinates: [141.3504111, 43.0638781] },
+//   { name: "ららぽーと福岡", coordinates: [130.4401776, 33.5648337] },
+//   { name: "ララガーデン長町", coordinates: [140.8758501, 38.2253153] },
+//   { name: "飯田橋サクラテラス", coordinates: [139.7437512, 35.6988984] },
+//   { name: "新宿中村屋ビル", coordinates: [139.702253, 35.6917389] },
+//   { name: "RAYARD MIYASHITA PARK", coordinates: [139.7017932, 35.6618149] },
+//   { name: "RAYARD Hisaya-odori Park", coordinates: [136.9081578, 35.1740632] },
+//   { name: "コレド室町テラス", coordinates: [139.7725468, 35.6878468] },
+//   { name: "ららぽーと甲子園", coordinates: [135.3638231, 34.7166566] },
+//   { name: "三井アウトレットパーク 札幌北広島", coordinates: [141.471628, 42.9712137] },
+//   { name: "ららぽーとTOKYO-BAY", coordinates: [139.9897425, 35.6862826] },
+//   { name: "ららぽーと横浜", coordinates: [139.5664815, 35.5174874] },
+//   { name: "コレド日本橋", coordinates: [139.7746215, 35.6825564] },
+//   { name: "霞ダイニング", coordinates: [139.7471502, 35.6711508] },
+//   { name: "ららぽーと湘南平塚", coordinates: [139.3549453, 35.3365959] },
+//   { name: "ららぽーと海老名", coordinates: [139.3549453, 35.3365959] },
+//   { name: "赤坂Bizタワー SHOPS & DINING", coordinates: [139.7363227, 35.6730979] },
+//   { name: "三井アウトレットパーク ジャズドリーム長島", coordinates: [136.7253909, 35.0341492] },
+//   { name: "ララガーデン川口", coordinates: [139.6981711, 35.8048189] },
+//   { name: "三宮本通商店街", coordinates: [135.1913168, 34.6905059] },
+//   { name: "アルカキット錦糸町", coordinates: [139.8125093, 35.6973458] },
+//   { name: "ラブラ2", coordinates: [139.0569679, 37.9168662] },
+//   { name: "ラブラ万代", coordinates: [139.0562751, 37.9172472] },
+//   { name: "ららぽーと磐田", coordinates: [137.8418911, 34.750339] },
+//   { name: "ラゾーナ川崎プラザ", coordinates: [139.695846, 35.5332261] },
+//   { name: "ららテラス 武蔵小杉", coordinates: [139.6598829, 35.5751986] },
+//   { name: "銀座ベルビア館", coordinates: [139.7663045, 35.6740175] },
+//   { name: "東京ミッドタウン日比谷", coordinates: [139.7592869, 35.6737121] },
+//   { name: "三井アウトレットパーク 横浜ベイサイド", coordinates: [139.6472272, 35.3810136] },
+//   { name: "三井アウトレットパーク 北陸小矢部", coordinates: [136.8817614, 36.6880722] },
+//   { name: "ららぽーと沼津", coordinates: [138.8409668, 35.1192871] },
+//   { name: "ららぽーと愛知東郷", coordinates: [137.0469571, 35.0992252] },
+//   { name: "御徒町吉池本店ビル", coordinates: [139.7742548, 35.7071864] },
+//   { name: "銀座トレシャス", coordinates: [139.7671817, 35.6737174] },
+//   { name: "交詢ビル", coordinates: [139.7628192, 35.670105] },
+//   { name: "GINZA gCUBE", coordinates: [139.7628222, 35.6687029] },
+//   { name: "ギンザ･グラッセ", coordinates: [139.7646047, 35.6732027] },
+//   { name: "三井アウトレットパーク 木更津", coordinates: [139.934513, 35.4369148] },
+//   { name: "三井アウトレットパーク 滋賀竜王", coordinates: [136.0991803, 35.0581722] },
+//   { name: "三井アウトレットパーク 幕張", coordinates: [140.0416429, 35.6469924] },
+//   { name: "三井アウトレットパーク 多摩南大沢", coordinates: [139.378503, 35.6152571] },
+//   { name: "三井アウトレットパーク 倉敷", coordinates: [133.7616413, 34.6036584] },
+//   { name: "三井アウトレットパーク 入間", coordinates: [139.3805838, 35.8099715] },
+//   { name: "三井アウトレットパーク 仙台港", coordinates: [140.9899204, 38.2752974] },
+//   { name: "ららぽーと新三郷", coordinates: [139.8661491, 35.8595397] },
+//   { name: "ららぽーと立川立飛", coordinates: [139.4178509, 35.7126582] },
+//   { name: "ららぽーと名古屋みなとアクルス", coordinates: [136.8831604, 35.1090927] },
+//   { name: "ララガーデン春日部", coordinates: [139.7552139, 35.9773066] },
+//   { name: "アーバンドック ららぽーと豊洲", coordinates: [139.7930845, 35.6554456] },
+//   { name: "ダイバーシティ東京 プラザ", coordinates: [139.7754865, 35.6252552] },
+//   { name: "銀座並木通りビル", coordinates: [139.7660193, 35.6743944] },
+//   { name: ". (三井二号館/日本橋三井タワー)", coordinates: [139.7731990458, 35.68692988686] },
+//   { name: "コレド室町1", coordinates: [139.7743778, 35.6869054] },
+//   { name: "コレド室町3", coordinates: [139.774446, 35.6861422] },
+//   { name: "コレド室町2", coordinates: [139.7748405, 35.686899] },
+//   { name: "ZOE銀座", coordinates: [139.7657767, 35.6734624] },
+//   { name: "ニッタビル", coordinates: [139.7597311, 35.6700186] },
+  { name: "ららぽーと安城", coordinates: [137.0798505, 34.9653132] }
+];
+const is2D = true; // Set to false to use default Mapbox 3D style
 const originalFilters = {};
 //const defaultCoordinates = [139.77342767111224, 35.687530312186524];
-const defaultCoordinates = [139.35489274456228,35.33636012622242];
+let defaultCoordinates = venues[1].coordinates; 
 
 async function fetchMapxusToken(appId, secret) {
     const res = await fetch('https://map-api.mapxus.co.jp/accounts/v1/auth/token', {
@@ -519,7 +610,7 @@ function createFloorControl(mergedLevels) {
 
     mergedLevels.sort((a, b) => b.ordinal - a.ordinal).forEach(level => {
         const button = document.createElement('button');
-        button.textContent = level.name;
+        button.textContent = `${level.name}`;
         button.classList.add('floor-button');
 
         button.addEventListener('click', () => {
@@ -551,13 +642,12 @@ function createFloorControl(mergedLevels) {
 }
 
 function createClipLayer() {
-    const venueFeatures = map.queryRenderedFeatures({ layers: ['mapxus-venue-fill'] });
-    const polygons = venueFeatures.filter(f => f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon');
-    console.log('Polygons for eraser:', polygons);
+    const venueFeatures = map.queryRenderedFeatures({ layers: ['mapxus-venue-fill'] })
+        .filter(f => f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'));
 
     const clipGeoJSON = {
         type: 'FeatureCollection',
-        features: polygons
+        features: venueFeatures
     };
 
     map.addSource('eraser', {
@@ -576,26 +666,33 @@ function createClipLayer() {
         minzoom: 16,
     });
 
-    const centroids = polygons.map(f => turf.centroid(f).geometry.coordinates);
+    const buildingLayers = map.getStyle().layers.filter(l =>
+        l.id === 'building' && (l.type === 'fill' || l.type === 'fill-extrusion')
+    ).map(l => l.id);
 
-    const tilequeryPromises = centroids.map(async (coord) => {
-        const tilequeryUrl = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${coord[0]},${coord[1]}.json?layers=building&radius=90&access_token=${mapboxgl.accessToken}`;
-        try {
-            const response = await fetch(tilequeryUrl);
-            const data = await response.json();
-            return data.features
-                .filter(f => f.id !== undefined)
-                .map(f => f.id);
-        } catch (error) {
-            console.error('Tilequery error:', error);
-            return [];
+    const buildingFeatures = map.queryRenderedFeatures({
+        layers: buildingLayers
+    }).filter(f => f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'));
+
+    const hiddenBuildingIds = [];
+
+    buildingFeatures.forEach(building => {
+        const buildingGeom = {
+            type: 'Feature',
+            geometry: building.geometry
+        };
+
+        for (const venue of venueFeatures) {
+            if (turf.booleanIntersects(buildingGeom, venue)) {
+                hiddenBuildingIds.push(building.id);
+                break;
+            }
         }
     });
 
-    Promise.all(tilequeryPromises).then(results => {
-        const buildingIds = results.flat();
-        map.setFilter('building', ['!in', '$id', ...buildingIds]);
-        console.log('Filtered buildings by IDs from Tilequery.');
+    // Set filter on building layers
+    buildingLayers.forEach(layerId => {
+        map.setFilter(layerId, ['!in', '$id', ...hiddenBuildingIds]);
     });
 }
 
@@ -728,6 +825,7 @@ async function loadMap() {
                 layer.metadata.category = 'indoor';
                 delayedIndoorLayers.push(layer); // Defer adding other layers
             }
+            createVenueDropdown();
         });
 
         map.once('idle', () => {
@@ -824,6 +922,36 @@ async function loadMap() {
         });
 
     });
+}
+
+
+function createVenueDropdown() {
+    const dropdown = document.createElement('select');
+    dropdown.id = 'venue-dropdown';
+
+    const defaultOption = document.createElement('option');
+    defaultOption.textContent = '建物を選択';
+    defaultOption.value = '';
+    dropdown.appendChild(defaultOption);
+
+    venues.forEach(venue => {
+        const option = document.createElement('option');
+        option.textContent = venue.name;
+        option.value = JSON.stringify(venue.coordinates);
+        // Set as selected if coordinates match defaultCoordinates
+        if (JSON.stringify(venue.coordinates) === JSON.stringify(defaultCoordinates)) {
+            option.selected = true;
+        }
+        dropdown.appendChild(option);
+    });
+
+    dropdown.addEventListener('change', (e) => {
+        const coords = JSON.parse(e.target.value);
+        defaultCoordinates = coords;
+        loadMap();
+    });
+
+    document.body.appendChild(dropdown);
 }
 
 loadMap();
