@@ -11,7 +11,7 @@ js: indoor.js
   <style>
     {% include common.css %}
     {% include indoor.css %}
-</style>
+  </style>
 </head>
 
 <body>
