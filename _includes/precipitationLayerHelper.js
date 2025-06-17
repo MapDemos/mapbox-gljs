@@ -143,7 +143,8 @@ class PrecipitationLayerHelper {
                         'raster-resampling': 'nearest',
                         'raster-color-range-transition': { duration: 0 },
                         'raster-opacity': 0.0,
-                        'raster-array-band': bands[0]
+                        'raster-array-band': bands[0],
+                        'raster-emissive-strength': 1.0
                     },
                     maxzoom: 14.99,
                 });
@@ -253,7 +254,7 @@ class PrecipitationLayerHelper {
             this.currentVisibleLayer = tileset_key;
             this.currentVisibleBand = band;
 
-            console.log(`Visible layer set to: ${tileset_key} with band: ${band}`);
+            // console.log(`Visible layer set to: ${tileset_key} with band: ${band}`);
         }
     }
 

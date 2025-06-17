@@ -28,6 +28,16 @@ const parseDateString = (dateString) => {
     return new Date(Date.UTC(year, month, day, hour, minute, second));
 };
 
+const parseDateStringJST = (dateString) => {
+    const year = parseInt(dateString.slice(0, 4), 10);
+    const month = parseInt(dateString.slice(4, 6), 10) - 1;
+    const day = parseInt(dateString.slice(6, 8), 10);
+    const hour = parseInt(dateString.slice(8, 10), 10);
+    const minute = parseInt(dateString.slice(10, 12), 10);
+    const second = parseInt(dateString.slice(12, 14), 10);
+    return new Date(year, month, day, hour, minute, second);
+};
+
 const convertToJST = (date) => {
     const jstTimestamp = date.getTime() + (9 * 60 * 60 * 1000);
     return new Date(jstTimestamp);
@@ -127,6 +137,7 @@ class TimeManager {
     }
 
     getPastPresentFuture() {
+        return ''
         const timeDiff = this.getMinutesDifference();
         if (timeDiff > 1) return '（予想）';
         else if (timeDiff < -1) return '（時点）';
@@ -148,6 +159,10 @@ class TimeManager {
     getyyyyMMddHHmmSS(offsetMinutes = 0) {
         const date = getTimeWithOffset(this.baseDate, offsetMinutes);
         return `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}${date.getHours().toString().padStart(2, '0')}${date.getMinutes().toString().padStart(2, '0')}${date.getSeconds().toString().padStart(2, '0')}`;
+    }
+
+    getRefyyyyMMddHHmmSS() {
+        return `${this.refDate.getFullYear()}${(this.refDate.getMonth() + 1).toString().padStart(2, '0')}${this.refDate.getDate().toString().padStart(2, '0')}${this.refDate.getHours().toString().padStart(2, '0')}${this.refDate.getMinutes().toString().padStart(2, '0')}${this.refDate.getSeconds().toString().padStart(2, '0')}`;
     }
 
     getHHmm() {

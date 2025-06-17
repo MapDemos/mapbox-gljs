@@ -64,9 +64,39 @@
     z-index: 1000;
 }
 
+.legend {
+  position: absolute;
+  bottom: 35px;
+  right: 5px;
+  background: black;
+  padding: 10px;
+  border-radius: 5px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+  max-width: 50%;
+  width: 250px;
+  opacity: 0.8;
+}
+
+.area-panel {
+  position: absolute;
+  top: 100px;
+  right: 5px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background-color: white;
+  opacity: 0.85;
+  align-items: center;
+  color: #333;
+  font-size: 14px;
+  gap: 8px;
+  z-index: 1000;
+  display: none;
+}
+
 .time-panel {
   position: absolute;
-  bottom: 25px;
+  top: 100px;
   left: 5px;
   right: 5px;
   display: flex;
@@ -83,7 +113,7 @@
   border-radius: 5px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   color: #333;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .map-slider-container {
@@ -172,15 +202,41 @@ input[type=range]:focus {
     outline: none;
 }
 
-.legend {
+.precipitation-chart {
   position: absolute;
-  bottom: 25px;
+  bottom: 35px;
   right: 5px;
-  background: black;
-  padding: 10px;
-  border-radius: 5px;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
-  z-index: 1;
-  width: 50%;
-  opacity: 0.8;
+  width: 600px;
+  max-width: 95%;
+  background-color: white;
+  padding: 2px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  display: none;
+  opacity: 0.7;
+}
+
+.apexcharts-canvas {
+  font-family: Arial, sans-serif !important;
+}
+
+.apexcharts-tooltip {
+  font-size: 12px !important;
+  background: rgba(0, 0, 0, 1) !important;
+  color: white !important;
+  border-radius: 4px !important;
+  padding: 6px 10px !important;
+}
+
+.apexcharts-tooltip-title {
+  background-color: black !important;
+  color: white !important;
+  font-weight: bold;
+}
+
+.apexcharts-xaxis-label,
+.apexcharts-yaxis-label {
+  font-size: 10px;
+  fill: #333;
 }
