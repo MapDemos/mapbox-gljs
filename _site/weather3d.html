@@ -17,6 +17,8 @@
 <script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/jscastro76/threebox@v.2.2.2/dist/threebox.min.js" type="text/javascript"></script>
   <link href="https://cdn.jsdelivr.net/gh/jscastro76/threebox@v.2.2.2/dist/threebox.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  
   <style>
     * {
   box-sizing: border-box;
@@ -416,9 +418,39 @@ button:hover {
     z-index: 1000;
 }
 
+.legend {
+  position: absolute;
+  bottom: 35px;
+  right: 5px;
+  background: black;
+  padding: 10px;
+  border-radius: 5px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+  max-width: 50%;
+  width: 250px;
+  opacity: 0.8;
+}
+
+.area-panel {
+  position: absolute;
+  top: 100px;
+  right: 5px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background-color: white;
+  opacity: 0.85;
+  align-items: center;
+  color: #333;
+  font-size: 14px;
+  gap: 8px;
+  z-index: 1000;
+  display: none;
+}
+
 .time-panel {
   position: absolute;
-  bottom: 25px;
+  top: 100px;
   left: 5px;
   right: 5px;
   display: flex;
@@ -435,7 +467,7 @@ button:hover {
   border-radius: 5px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   color: #333;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .map-slider-container {
@@ -524,17 +556,43 @@ input[type=range]:focus {
     outline: none;
 }
 
-.legend {
+.precipitation-chart {
   position: absolute;
-  bottom: 25px;
+  bottom: 35px;
   right: 5px;
-  background: black;
-  padding: 10px;
-  border-radius: 5px;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
-  z-index: 1;
-  width: 50%;
-  opacity: 0.8;
+  width: 600px;
+  max-width: 95%;
+  background-color: white;
+  padding: 2px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  display: none;
+  opacity: 0.7;
+}
+
+.apexcharts-canvas {
+  font-family: Arial, sans-serif !important;
+}
+
+.apexcharts-tooltip {
+  font-size: 12px !important;
+  background: rgba(0, 0, 0, 1) !important;
+  color: white !important;
+  border-radius: 4px !important;
+  padding: 6px 10px !important;
+}
+
+.apexcharts-tooltip-title {
+  background-color: black !important;
+  color: white !important;
+  font-weight: bold;
+}
+
+.apexcharts-xaxis-label,
+.apexcharts-yaxis-label {
+  font-size: 10px;
+  fill: #333;
 }
 </style>
 </head>
@@ -545,13 +603,17 @@ input[type=range]:focus {
     <div id="mini-map"></div>
     <div id="city-panel" class="city-panel"></div>
   </div>
+  <div id="area-panel" class="area-panel">
+    <div id="geo-name"></div>
+    <div id="geo-weather"></div>
+  </div>
   <div class="time-panel">
     <div id="current-time" class="time-box">--</div>
     <div class="map-slider-container">
-        <input type="range" min="0" step="1" value="0" max="5" class="time-slider" id="slider" oninput="changeBand(this.value)" onchange="addCityPanels()" />
+        <input type="range" min="0" step="1" value="0" max="5" class="time-slider" id="slider" oninput="inputBand(this.value)" onchange="changeBand()" />
     </div>
   </div>
-  
+  <div id="precipitation-chart" class="precipitation-chart"></div>
   <div id="legend" class="legend">
     <div class="legend-scale">
         <div class="legend-bar"></div>
@@ -589,6 +651,16 @@ const parseDateString = (dateString) => {
     const minute = parseInt(dateString.slice(10, 12), 10);
     const second = parseInt(dateString.slice(12, 14), 10);
     return new Date(Date.UTC(year, month, day, hour, minute, second));
+};
+
+const parseDateStringJST = (dateString) => {
+    const year = parseInt(dateString.slice(0, 4), 10);
+    const month = parseInt(dateString.slice(4, 6), 10) - 1;
+    const day = parseInt(dateString.slice(6, 8), 10);
+    const hour = parseInt(dateString.slice(8, 10), 10);
+    const minute = parseInt(dateString.slice(10, 12), 10);
+    const second = parseInt(dateString.slice(12, 14), 10);
+    return new Date(year, month, day, hour, minute, second);
 };
 
 const convertToJST = (date) => {
@@ -690,6 +762,7 @@ class TimeManager {
     }
 
     getPastPresentFuture() {
+        return ''
         const timeDiff = this.getMinutesDifference();
         if (timeDiff > 1) return '（予想）';
         else if (timeDiff < -1) return '（時点）';
@@ -711,6 +784,10 @@ class TimeManager {
     getyyyyMMddHHmmSS(offsetMinutes = 0) {
         const date = getTimeWithOffset(this.baseDate, offsetMinutes);
         return `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}${date.getHours().toString().padStart(2, '0')}${date.getMinutes().toString().padStart(2, '0')}${date.getSeconds().toString().padStart(2, '0')}`;
+    }
+
+    getRefyyyyMMddHHmmSS() {
+        return `${this.refDate.getFullYear()}${(this.refDate.getMonth() + 1).toString().padStart(2, '0')}${this.refDate.getDate().toString().padStart(2, '0')}${this.refDate.getHours().toString().padStart(2, '0')}${this.refDate.getMinutes().toString().padStart(2, '0')}${this.refDate.getSeconds().toString().padStart(2, '0')}`;
     }
 
     getHHmm() {
@@ -895,7 +972,8 @@ class PrecipitationLayerHelper {
                         'raster-resampling': 'nearest',
                         'raster-color-range-transition': { duration: 0 },
                         'raster-opacity': 0.0,
-                        'raster-array-band': bands[0]
+                        'raster-array-band': bands[0],
+                        'raster-emissive-strength': 1.0
                     },
                     maxzoom: 14.99,
                 });
@@ -1005,7 +1083,7 @@ class PrecipitationLayerHelper {
             this.currentVisibleLayer = tileset_key;
             this.currentVisibleBand = band;
 
-            console.log(`Visible layer set to: ${tileset_key} with band: ${band}`);
+            // console.log(`Visible layer set to: ${tileset_key} with band: ${band}`);
         }
     }
 
@@ -1105,7 +1183,7 @@ function updateLegendBar() {
     }
 }
 
-const sliderDomain = [0, 32];
+const sliderDomain = [0, 38];
 const baseDate = "20240621055000";
 const timeManager = new TimeManager(baseDate);
 
@@ -1163,11 +1241,70 @@ const rasterTileQuery = async (coords) => {
     return data
 }
 
+const batchRasterTileQuery = async (coords) => {
+    const tileset_id = []
+    const layers = []
+    const bands = []
+
+    for (const key in preciptationHelper.precipitation_tiles) {
+        const tile = preciptationHelper.precipitation_tiles[key];
+        if (tile.tileset_id) {
+            if (!tileset_id.includes(tile.tileset_id)) {
+                tileset_id.push(tile.tileset_id);
+            }
+            for (const layerid in tile.layers) {
+                if (!layers.includes(layerid)) {
+                    layers.push(layerid);
+                }
+                for (const bandid in tile.layers[layerid].bands) {
+                    const band = tile.layers[layerid].bands[bandid].val;
+                    if (!bands.includes(band)) {
+                        bands.push(band);
+                    }
+                }
+            }
+        }
+    }
+    const layerString = layers.length > 0 ? `&layers=${layers.join(',')}` : ''
+    const bandString = bands.length > 0 ? `&bands=${bands.join(',')}` : ''
+    const response = await fetch(`https://api.mapbox.com/v4/${tileset_id}/tilequery/${coords[0]},${coords[1]}.json?${layerString}${bandString}&access_token=${mapboxgl.accessToken}`)
+    const data = await response.json()
+    return data
+}
+
+const reverseGeocode = async (coords) => {
+    const response = await fetch(`https://api.mapbox.com/search/geocode/v6/reverse?longitude=${coords[0]}&latitude=${coords[1]}&language=ja&country=jp&types=place&access_token=${mapboxgl.accessToken}`)
+    const data = await response.json()
+    return data
+}
+
 // let currentTileset = 'kenji-shima.nowcast-20240620202500-30m';
 // let currentLayer = 'precipitation';
 // let currentBand = '1718915100';
 
+const getLightPreset = () => {
+    const HHmm = timeManager.getHHmm();
+    const hour = parseInt(HHmm.slice(0, 2), 10);
+    lightPreset = 'dawn';
+    if (hour >= 4 && hour < 6) lightPreset = 'dawn';
+    else if (hour >= 6 && hour < 17) lightPreset = 'day';
+    else if (hour >= 17 && hour < 19) lightPreset = 'dusk';
+    else lightPreset = 'night';
+    return lightPreset;
+}
+
 const setLocalEffects = (lng, lat) => {
+
+    reverseGeocode([lng, lat]).then((data) => {
+        if (data.features.length) {
+            const placeName = data.features[0].properties.name;
+            const geoName = document.getElementById('geo-name');
+            if (geoName) {
+                geoName.textContent = placeName;
+                document.getElementById('area-panel').style.display = 'flex';
+            }
+        }
+    });
 
     rasterTileQuery([lng, lat]).then((data) => {
 
@@ -1176,7 +1313,7 @@ const setLocalEffects = (lng, lat) => {
         let intensity = 0.0;
         let highColor = 'rgb(225, 236, 248)';
         let modelLightIntensity = 5.0;
-        let lightPreset = 'day';
+        //let lightPreset = getLightPreset();
         if (data.features.length) {
             precipitation = data.features[0].properties['val'];
             if (precipitation > 1) {
@@ -1189,12 +1326,12 @@ const setLocalEffects = (lng, lat) => {
             if (density > 0.3) {
                 highColor = 'rgb(71, 76, 89)';
                 modelLightIntensity = 1.0;
-                lightPreset = 'dusk';
+                //lightPreset = 'dusk';
             }
-            console.log(`Tilequery value: ${precipitation}`);
-            console.log(`Density: ${density}`);
-            console.log(`Intensity: ${intensity}`);
-            console.log(`High Color: ${highColor}`);
+            // console.log(`Tilequery value: ${precipitation}`);
+            // console.log(`Density: ${density}`);
+            // console.log(`Intensity: ${intensity}`);
+            // console.log(`High Color: ${highColor}`);
         }
 
         map.setRain({
@@ -1228,25 +1365,56 @@ const setLocalEffects = (lng, lat) => {
             moveModel(model.name, [lng, lat], model.height);
         }
 
-        if (weather !== 'sunny') {
-            map.setFog({
-                color: highColor, // Lower atmosphere
-                'high-color': highColor, // Upper atmosphere
-                //'horizon-blend': 0.02, // Atmosphere thickness (default 0.2 at low zooms)
-                'space-color': highColor, // Background color
-                //'star-intensity': 0.6 // Background star brightness (default 0.35 at low zoooms )
-            })
-        } else {
-            const style = map.getStyle();
-            if (style && style.fog) {
-                style.fog = {};
-                map.setStyle(style);
+        const geoWeather = document.getElementById('geo-weather');
+        if (geoWeather) {
+            geoWeather.innerHTML = '';
+            let iconUrl = getWeatherIcon(weather);
+            if (iconUrl) {
+                const img = document.createElement('img');
+                img.src = iconUrl;
+                img.className = 'weather-icon';
+                geoWeather.appendChild(img);
+                document.getElementById('area-panel').style.display = 'flex';
             }
         }
+
+        // if (weather !== 'sunny') {
+        //     map.setFog({
+        //         color: highColor, // Lower atmosphere
+        //         'high-color': highColor, // Upper atmosphere
+        //         //'horizon-blend': 0.02, // Atmosphere thickness (default 0.2 at low zooms)
+        //         'space-color': highColor, // Background color
+        //         //'star-intensity': 0.6 // Background star brightness (default 0.35 at low zoooms )
+        //     })
+        // } else {
+        //     const style = map.getStyle();
+        //     if (style && style.fog) {
+        //         style.fog = {};
+        //         map.setStyle(style);
+        //     }
+        // }
         modelLight.intensity = modelLightIntensity;
-        map.setConfigProperty('basemap', 'lightPreset', lightPreset);
+        // map.setConfigProperty('basemap', 'lightPreset', lightPreset);
+
 
     })
+
+    batchRasterTileQuery([lng, lat]).then((data) => {
+        if (data.features.length > 0) {
+            const deduped = new Map();
+            data.features.forEach((feature) => {
+                const band = feature.properties.tilequery.band;
+                deduped.set(band, {
+                    band_jstyyyyMMddHHmmSS: toJST(band),
+                    band: band,
+                    value: feature.properties.val[0]
+                });
+            });
+            const results = Array.from(deduped.values());
+            results.sort((a, b) => a.band_jstyyyyMMddHHmmSS.localeCompare(b.band_jstyyyyMMddHHmmSS));
+            showPrecipitationChart(results);
+        }
+    });
 }
 
 const SUNNY = { name: "the_sun.glb", size: 40, height: 3000 };
@@ -1265,7 +1433,15 @@ function addPrecipitationLayers(map) {
     const values = Array.from({ length: sliderDomain[1] - sliderDomain[0] + 1 }, (_, i) => sliderDomain[0] + i);
     values.forEach((value) => {
         const offset = getMinutesOffset(value);
-        const yyyyMMddHHmmSS = timeManager.getyyyyMMddHHmmSS(offset);
+        let yyyyMMddHHmmSS = timeManager.getyyyyMMddHHmmSS(offset);
+        if (offset > 30 && offset <= 60) {
+            // yyyyMMddHHmmSS = timeManager.getyyyyMMddHHmmSS(offset);
+            // do nothing, use the same time
+        } else if (offset > 60 && offset <= 360) {
+            tileset_time = getLastHalfOrExactHour(yyyyMMddHHmmSS, false);
+        } else {
+            tileset_time = getLastExactHour(yyyyMMddHHmmSS, false);
+        }
         preciptationHelper.addLayer(yyyyMMddHHmmSS);
     });
 
@@ -1285,28 +1461,30 @@ function addPrecipitationLayers(map) {
         updateLegendBar();
     }
     loadFirstLayer();
-
-
 }
 
-// function getMinutesOffset(value){
-//     if (value < 24) {
-//         return (value - 12) * 5;
-//     } else {
-//         return (value - 23) * 60;
-//     }
-// }
 function setCurrentTime() {
     const currentTimeBox = document.getElementById('current-time');
     if (currentTimeBox) {
         currentTimeBox.textContent = timeManager.getFormattedDateTime();
     }
 }
-function changeBand(val) {
+function inputBand(val) {
     const minutesOffset = getMinutesOffset(val);
     timeManager.updateTimeByOffset(minutesOffset)
     preciptationHelper.visibleLayer(timeManager.getyyyyMMddHHmmSS(minutesOffset));
     setCurrentTime();
+}
+window.inputBand = inputBand;
+
+function changeBand() {
+    addCityPanels();
+    const zoom = map.getZoom();
+    if (zoom > 15) {
+        clearModels();
+        setLocalEffects(map.getCenter().lng, map.getCenter().lat);
+    }
+    map.setConfigProperty('basemap', 'lightPreset', getLightPreset());
 }
 window.changeBand = changeBand;
 
@@ -1361,6 +1539,12 @@ async function loadModel(name, scale) {
     })
 }
 
+function clearModels() {
+    Object.keys(cg_models).forEach(name => {
+        moveModel(name, [0, 0], -1000);
+    });
+}
+
 function moveModel(name, coordinates, height = 400) {
     const model = cg_models[name].model
     window.tb.add(model)
@@ -1381,10 +1565,19 @@ function getWeather(precipitation) {
 }
 
 function getWeatherIcon(weather) {
+    const lightPreset = getLightPreset();
     if (weather === 'sunny') {
-        return './assets/images/sun.png';
+        if (lightPreset === 'dusk' || lightPreset === 'night') {
+            return './assets/images/moon.png';
+        } else{
+            return './assets/images/sun.png';
+        }
     } else if (weather === 'cloudy') {
-        return './assets/images/cloudy.png';
+        if (lightPreset === 'dusk' || lightPreset === 'night') {
+            return './assets/images/cloud-moon.png';
+        } else{
+            return './assets/images/cloudy.png';
+        }
     } else if (weather === 'rainy') {
         return './assets/images/rainy-day.png';
     }
@@ -1478,7 +1671,22 @@ const getMinutesOffset = (value) => {
     if (value < 24) {
         return (value - 12) * 5;
     } else {
-        return (value - 23) * 60;
+        const rawOffset = (value - 23) * 60;
+        const targetTime = timeManager.getyyyyMMddHHmmSS(rawOffset);
+
+        let adjustedTime;
+        if (rawOffset > 30 && rawOffset <= 60) {
+            return rawOffset;
+        } else if (rawOffset > 60 && rawOffset <= 360) {
+            adjustedTime = getLastHalfOrExactHour(targetTime, false);
+        } else if (rawOffset > 360) {
+            adjustedTime = getLastExactHour(targetTime, false);
+        }
+
+        const base = timeManager.baseDate;
+        const adjusted = parseDateStringJST(adjustedTime);
+        // console.log(`Adjusted time for ${value}: ${adjustedTime} (base: ${base}) (adjusted: ${adjusted})`);
+        return Math.floor((adjusted - base) / 60000); // difference in minutes
     }
 }
 
@@ -1498,52 +1706,14 @@ const loadMap = () => {
 
         //map.setConfigProperty('basemap', 'theme', 'faded');
 
-        // map.addSource('rastersource', {
-        //     type: 'raster-array',
-        //     url: `mapbox://${currentTileset}`,
-        // })
-
-        // const layer_def = {
-        //     id: 'rasterlayer',
-        //     type: 'raster',
-        //     slot: 'bottom',
-        //     source: 'rastersource',
-        //     'source-layer': 'precipitation',
-        //     paint: {
-        //         'raster-color-range': [0, 80],
-        //         'raster-color': stepScale,
-        //         'raster-resampling': 'nearest',
-        //         'raster-color-range-transition': { duration: 0 },
-        //         'raster-opacity': 0.8,
-        //         //'raster-array-band': bandlist[0],
-        //     },
-        //     maxzoom: 14.99,
-        // }
-        // map.addLayer(layer_def)
-
         addThreeboxLayer(map);
         loadModel(SUNNY.name, SUNNY.size);
         loadModel(CLOUDY.name, CLOUDY.size);
         loadModel(RAINY.name, RAINY.size);
 
         addPrecipitationLayers(map);
-        // preciptationHelper.addLayer('20240621060000');
 
     });
-
-    // map.on('sourcedata', (e) => {
-    //     if (e.sourceId === 'rastersource') {
-    //         setSlider();
-    //         const source = map.getSource('rastersource');
-    //         if (source && source.rasterLayers) {
-    //             source.rasterLayers.forEach(l => {
-    //                 if (l.fields.name === 'wind') {
-    //                     particlelayerid = l.fields.name;
-    //                 }
-    //             });
-    //         }
-    //     }
-    // });
 
     map.on('moveend', () => {
         const center = map.getCenter();
@@ -1568,13 +1738,21 @@ const loadMap = () => {
         }
 
         if (zoom < 15) {
-            map.setConfigProperty('basemap', 'lightPreset', 'day');
-            const style = map.getStyle();
-            if (style && style.fog) {
-                style.fog = {};
-                map.setStyle(style);
-            }
+            //map.setConfigProperty('basemap', 'lightPreset', 'day');
+            // const style = map.getStyle();
+            // if (style && style.fog) {
+            //     style.fog = {};
+            //     map.setStyle(style);
+            // }
+            document.getElementById('geo-name').textContent = '';
+            document.getElementById('geo-weather').innerHTML = '';
+            clearModels();
+            document.getElementById('area-panel').style.display = 'none';
+            document.getElementById('legend').style.display = 'block';
+            document.getElementById('precipitation-chart').style.display = 'none';
             return;
+        } else {
+            document.getElementById('legend').style.display = 'none';
         }
         if (!isRotating) {
             setLocalEffects(lng, lat);
@@ -1627,88 +1805,96 @@ const loadMap = () => {
 
 loadMap()
 
-
 map.on('click', (e) => {
     console.log('Map clicked at:', [e.lngLat.lng, e.lngLat.lat]);
 });
 
-// const baseDate = new Date(Date.UTC(1990, 0, 1));
-// function convertTimeValue(timeValue) {
-//     console.log("convertTimeValue", toJST(timeValue));
-//     const millisecondsInDay = 24 * 60 * 60 * 1000;
-//     const totalMilliseconds = Math.round(timeValue * millisecondsInDay);
-//     const date = new Date(baseDate.getTime() + totalMilliseconds);
-//     const options = {
-//         timeZone: 'Australia/Sydney',
-//         year: 'numeric',
-//         month: '2-digit',
-//         day: '2-digit',
-//         hour: '2-digit',
-//         minute: '2-digit',
-//         hour12: false, // Use 24-hour format
-//     };
-//     const formatter = new Intl.DateTimeFormat('en-GB', options);
-//     const parts = formatter.formatToParts(date);
-//     const dateString = `${parts.find(p => p.type === 'year').value}/` +
-//         `${parts.find(p => p.type === 'month').value}/` +
-//         `${parts.find(p => p.type === 'day').value} ` +
-//         `${parts.find(p => p.type === 'hour').value}:` +
-//         `${parts.find(p => p.type === 'minute').value}`;
+// Renders a precipitation bar chart using ApexCharts
+function showBarChart(data) {
+    let chartContainer = document.getElementById('precipitation-chart');
+    chartContainer.style.display = 'block';
+    // Destroy previous chart instance if present
+    if (chartContainer._apexChartObj && typeof chartContainer._apexChartObj.destroy === 'function') {
+        chartContainer._apexChartObj.destroy();
+    }
 
-//     return dateString;
-// }
+    const categories = data.map(d => d.time);
+    const options = {
+        annotations: {
+            xaxis: data
+                .map((d, i) => d.now ? { x: d.time, borderColor: '#d00', label: { style: { color: '#d00' } } } : null)
+                .filter(Boolean)
+        },
+        chart: {
+            type: 'bar',
+            height: 200
+        },
+        title: {
+            text: '降雨量の推移',
+            align: 'center',
+            margin: 10,
+            offsetY: 0,
+            style: {
+                fontSize: '14px',
+                fontWeight: 'bold',
+                color: '#333'
+            }
+        },
+        dataLabels: {
+            enabled: false
+        },
+        series: [{
+            name: '降雨量',
+            data: data.map(d => d.val)
+        }],
+        xaxis: {
+            categories: categories,
+            title: {
+                text: '時間'
+            },
+            labels: {
+                rotate: -70,
+                style: {
+                    fontSize: '9px'
+                },
+                formatter: function (val, index) {
+                    if (data[index] && data[index].now) {
+                        // Attempt rich text style for "now" label (ApexCharts supports HTML in some cases)
+                        // fallback: just return val; for advanced, could try: return '<span style="color:#d00">' + val + '</span>';
+                        return val;
+                    }
+                    return val;
+                }
+            }
+        },
+        yaxis: {
+            max: 40,
+            title: {
+                text: '雨量（mm）'
+            }
+        },
+        tooltip: {
+            y: {
+                formatter: val => `${val} mm`
+            },
+        }
+    };
 
-// let bandlist = []
-// function setSlider() {
-//     const source = map.getSource('rastersource')
-//     layers = {}
-//     console.log("source", source)
-//     source.rasterLayers.forEach(l => {
-//         console.log("layer", l)
-//         if (l.fields.name === 'wind') {
-//             particlelayerid = l.fields.name
-//             return
-//         }
-//         const f = l.fields
-//         bandlist = f.bands
-//         layers[f.name] = {
-//             label: f.name,
-//             layer: f.name,
-//             color_range: f.range,
-//         }
-//         initOption = f.name
-//     })
-
-//     const timeslider = document.getElementById('slider')
-//     timeslider.max = bandlist.length - 1
-//     timeslider.value = 0
-
-//     const timediv = document.getElementById('timediv')
-//     timediv.innerHTML = ''
-//     const date = document.getElementById('active-datetime')
-//     date.innerHTML = ''
-
-//     const auto = document.getElementById('auto')
-
-//     if (bandlist.length > 1) {
-//         timeslider.disabled = false
-//         auto.disabled = false
-//         bandlist.forEach(datetime => {
-//             console.log("bandlist", datetime)
-//             // const datetimearray = convertTimeValue(datetime).split(" ")
-//             const timespan = timediv.appendChild(document.createElement('span'))
-//             // timespan.innerHTML = `${datetimearray[1]}`
-//             timespan.innerHTML = formatTimeWithOffset(parseDateString(toJST(datetime)), 0)
-//             // date.innerHTML = datetimearray[0]
-//             date.innerHTML = toJST(datetime)
-//         })
-//     } else {
-//         timeslider.disabled = true
-//         if (autoFlag) play()
-//         auto.disabled = true
-//     }
-
-// }
+    const chart = new ApexCharts(chartContainer, options);
+    chart.render();
+    chartContainer._apexChartObj = chart;
+}
+// Example usage:
+function showPrecipitationChart(data) {
+    const results = [];
+    data.forEach(item => {
+        const time = item.band_jstyyyyMMddHHmmSS.slice(8, 10) + ':' + item.band_jstyyyyMMddHHmmSS.slice(10, 12);
+        const val = parseFloat(item.value.toFixed(2));
+        const isNow = item.band_jstyyyyMMddHHmmSS === timeManager.getRefyyyyMMddHHmmSS();
+        results.push({ time: time, val: val, now: isNow });
+    });
+    showBarChart(results)
+};
 </script>
 
 </html>
