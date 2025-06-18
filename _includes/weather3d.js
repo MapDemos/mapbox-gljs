@@ -292,14 +292,18 @@ const setLocalEffects = (lng, lat) => {
     batchRasterTileQuery([lng, lat]).then((data) => {
         if (data.features.length > 0) {
             const deduped = new Map();
-            data.features.forEach((feature) => {
+            // Iterate in reverse so later entries take precedence
+            for (let i = data.features.length - 1; i >= 0; i--) {
+                const feature = data.features[i];
                 const band = feature.properties.tilequery.band;
-                deduped.set(band, {
-                    band_jstyyyyMMddHHmmSS: toJST(band),
-                    band: band,
-                    value: feature.properties.val[0]
-                });
-            });
+                if (!deduped.has(band)) {
+                    deduped.set(band, {
+                        band_jstyyyyMMddHHmmSS: toJST(band),
+                        band: band,
+                        value: feature.properties.val[0]
+                    });
+                }
+            }
             const results = Array.from(deduped.values());
             results.sort((a, b) => a.band_jstyyyyMMddHHmmSS.localeCompare(b.band_jstyyyyMMddHHmmSS));
             showPrecipitationChart(results);
@@ -337,15 +341,14 @@ function addPrecipitationLayers(map) {
 
     const timeslider = document.getElementById('slider')
     timeslider.max = sliderDomain[sliderDomain.length - 1]
-    timeslider.value = 0
+    timeslider.value = 12
 
     function loadFirstLayer() {
         if (!preciptationHelper.checkAllSourcesLoaded()) {
             setTimeout(loadFirstLayer, 10);
             return;
         }
-        const firstKey = Object.keys(preciptationHelper.precipitation_tiles)[0];
-        preciptationHelper.visibleLayer(firstKey);
+        preciptationHelper.visibleLayer(baseDate);
         addCityPanels();
         setCurrentTime();
         updateLegendBar();
