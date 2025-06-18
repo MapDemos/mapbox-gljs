@@ -15,7 +15,8 @@ const getTimeWithOffset = (baseDate, offsetMinutes) => {
 
 const formatTimeWithOffset = (baseDate, offsetMinutes) => {
     const newDate = getTimeWithOffset(baseDate, offsetMinutes);
-    return `${newDate.getHours().toString().padStart(2, '0')}:${newDate.getMinutes().toString().padStart(2, '0')}`;
+    const jstDate = new Date(newDate.getTime() + 9 * 60 * 60 * 1000);
+    return `${jstDate.getUTCHours().toString().padStart(2, '0')}:${jstDate.getUTCMinutes().toString().padStart(2, '0')}`;
 };
 
 const parseDateString = (dateString) => {
@@ -122,12 +123,12 @@ const datetimeToJapanese = (datetime) => {
 
 class TimeManager {
     constructor(JSTyyyyMMddHHmmSS) {
-        this.baseDate = roundToNearestFive(parseDateString(toUTC(JSTyyyyMMddHHmmSS)));
+        this.baseDate = roundToNearestFive(parseDateStringJST(JSTyyyyMMddHHmmSS));
         this.refDate = new Date(this.baseDate);
     }
 
     setBaseDate(yyyyMMddHHmmSS) {
-        this.baseDate = roundToNearestFive(parseDateString(toUTC(yyyyMMddHHmmSS)));
+        this.baseDate = roundToNearestFive(parseDateStringJST(yyyyMMddHHmmSS));
         this.refDate = new Date(this.baseDate);
     }
 
@@ -149,7 +150,8 @@ class TimeManager {
     }
 
     getFormattedDateTime() {
-        return `${this.refDate.getMonth() + 1}月 ${this.refDate.getDate()}日 ${formatTimeWithOffset(this.refDate, 0)} ${this.getPastPresentFuture()}`;
+        const jstDate = new Date(this.refDate.getTime() + 9 * 60 * 60 * 1000);
+        return `${(jstDate.getUTCMonth() + 1)}月 ${jstDate.getUTCDate()}日 ${formatTimeWithOffset(this.refDate, 0)} ${this.getPastPresentFuture()}`;
     }
 
     getFormattedTime(offsetMinutes = 0) {
@@ -158,11 +160,25 @@ class TimeManager {
 
     getyyyyMMddHHmmSS(offsetMinutes = 0) {
         const date = getTimeWithOffset(this.baseDate, offsetMinutes);
-        return `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}${date.getHours().toString().padStart(2, '0')}${date.getMinutes().toString().padStart(2, '0')}${date.getSeconds().toString().padStart(2, '0')}`;
+        const jstDate = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+        const year = jstDate.getUTCFullYear();
+        const month = (jstDate.getUTCMonth() + 1).toString().padStart(2, '0');
+        const day = jstDate.getUTCDate().toString().padStart(2, '0');
+        const hour = jstDate.getUTCHours().toString().padStart(2, '0');
+        const minute = jstDate.getUTCMinutes().toString().padStart(2, '0');
+        const second = jstDate.getUTCSeconds().toString().padStart(2, '0');
+        return `${year}${month}${day}${hour}${minute}${second}`;
     }
 
     getRefyyyyMMddHHmmSS() {
-        return `${this.refDate.getFullYear()}${(this.refDate.getMonth() + 1).toString().padStart(2, '0')}${this.refDate.getDate().toString().padStart(2, '0')}${this.refDate.getHours().toString().padStart(2, '0')}${this.refDate.getMinutes().toString().padStart(2, '0')}${this.refDate.getSeconds().toString().padStart(2, '0')}`;
+        const jstDate = new Date(this.refDate.getTime() + 9 * 60 * 60 * 1000);
+        const year = jstDate.getUTCFullYear();
+        const month = (jstDate.getUTCMonth() + 1).toString().padStart(2, '0');
+        const day = jstDate.getUTCDate().toString().padStart(2, '0');
+        const hour = jstDate.getUTCHours().toString().padStart(2, '0');
+        const minute = jstDate.getUTCMinutes().toString().padStart(2, '0');
+        const second = jstDate.getUTCSeconds().toString().padStart(2, '0');
+        return `${year}${month}${day}${hour}${minute}${second}`;
     }
 
     getHHmm() {
