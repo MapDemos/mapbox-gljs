@@ -633,9 +633,9 @@ const roundToNearestFive = (date) => {
 };
 
 const getTimeWithOffset = (baseDate, offsetMinutes) => {
-    const newDate = new Date(baseDate);
-    newDate.setMinutes(newDate.getMinutes() + offsetMinutes);
-    return newDate;
+    const utc = baseDate.getTime(); // in ms
+    const adjusted = utc + offsetMinutes * 60 * 1000;
+    return new Date(adjusted);
 };
 
 const formatTimeWithOffset = (baseDate, offsetMinutes) => {
@@ -654,13 +654,13 @@ const parseDateString = (dateString) => {
 };
 
 const parseDateStringJST = (dateString) => {
-    const year = parseInt(dateString.slice(0, 4), 10);
-    const month = parseInt(dateString.slice(4, 6), 10) - 1;
-    const day = parseInt(dateString.slice(6, 8), 10);
-    const hour = parseInt(dateString.slice(8, 10), 10);
-    const minute = parseInt(dateString.slice(10, 12), 10);
-    const second = parseInt(dateString.slice(12, 14), 10);
-    return new Date(year, month, day, hour, minute, second);
+  const year = parseInt(dateString.slice(0, 4), 10);
+  const month = parseInt(dateString.slice(4, 6), 10) - 1;
+  const day = parseInt(dateString.slice(6, 8), 10);
+  const hour = parseInt(dateString.slice(8, 10), 10);
+  const minute = parseInt(dateString.slice(10, 12), 10);
+  const second = parseInt(dateString.slice(12, 14), 10);
+  return new Date(Date.UTC(year, month, day, hour - 9, minute, second));
 };
 
 const convertToJST = (date) => {
@@ -736,7 +736,7 @@ const getLastExactHour = (input, isUTC) => {
 };
 
 const datetimeToJapanese = (datetime) => {
-    const dateObj = new Date(datetime);
+    const dateObj = parseDateStringJST(datetime);
     const year = dateObj.getFullYear();
     const month = dateObj.getMonth() + 1;
     const day = dateObj.getDate();
@@ -807,13 +807,7 @@ class TimeManager {
     }
 
     getOffsetMinutes(yyyyMMddHHmmSS) {
-        const year = parseInt(yyyyMMddHHmmSS.slice(0, 4), 10);
-        const month = parseInt(yyyyMMddHHmmSS.slice(4, 6), 10) - 1;
-        const day = parseInt(yyyyMMddHHmmSS.slice(6, 8), 10);
-        const hour = parseInt(yyyyMMddHHmmSS.slice(8, 10), 10);
-        const minute = parseInt(yyyyMMddHHmmSS.slice(10, 12), 10);
-        const second = parseInt(yyyyMMddHHmmSS.slice(12, 14), 10);
-        const date = new Date(year, month, day, hour, minute, second);
+        const date = parseDateStringJST(yyyyMMddHHmmSS);
         const diffInMilliseconds = date.getTime() - this.baseDate.getTime();
         return Math.floor(diffInMilliseconds / (1000 * 60));
     }
@@ -1402,14 +1396,18 @@ const setLocalEffects = (lng, lat) => {
     batchRasterTileQuery([lng, lat]).then((data) => {
         if (data.features.length > 0) {
             const deduped = new Map();
-            data.features.forEach((feature) => {
+            // Iterate in reverse so later entries take precedence
+            for (let i = data.features.length - 1; i >= 0; i--) {
+                const feature = data.features[i];
                 const band = feature.properties.tilequery.band;
-                deduped.set(band, {
-                    band_jstyyyyMMddHHmmSS: toJST(band),
-                    band: band,
-                    value: feature.properties.val[0]
-                });
-            });
+                if (!deduped.has(band)) {
+                    deduped.set(band, {
+                        band_jstyyyyMMddHHmmSS: toJST(band),
+                        band: band,
+                        value: feature.properties.val[0]
+                    });
+                }
+            }
             const results = Array.from(deduped.values());
             results.sort((a, b) => a.band_jstyyyyMMddHHmmSS.localeCompare(b.band_jstyyyyMMddHHmmSS));
             showPrecipitationChart(results);
@@ -1447,15 +1445,14 @@ function addPrecipitationLayers(map) {
 
     const timeslider = document.getElementById('slider')
     timeslider.max = sliderDomain[sliderDomain.length - 1]
-    timeslider.value = 0
+    timeslider.value = 12
 
     function loadFirstLayer() {
         if (!preciptationHelper.checkAllSourcesLoaded()) {
             setTimeout(loadFirstLayer, 10);
             return;
         }
-        const firstKey = Object.keys(preciptationHelper.precipitation_tiles)[0];
-        preciptationHelper.visibleLayer(firstKey);
+        preciptationHelper.visibleLayer(baseDate);
         addCityPanels();
         setCurrentTime();
         updateLegendBar();
