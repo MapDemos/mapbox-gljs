@@ -244,10 +244,6 @@ const reverseGeocode = async (coords) => {
     return data
 }
 
-// let currentTileset = 'kenji-shima.nowcast-20240620202500-30m';
-// let currentLayer = 'precipitation';
-// let currentBand = '1718915100';
-
 const getLightPreset = () => {
     const HHmm = timeManager.getHHmm();
     const hour = parseInt(HHmm.slice(0, 2), 10);
@@ -359,7 +355,7 @@ const setLocalEffects = (lng, lat) => {
         //         map.setStyle(style);
         //     }
         // }
-        modelLight.intensity = modelLightIntensity;
+        //modelLight.intensity = modelLightIntensity;
         // map.setConfigProperty('basemap', 'lightPreset', lightPreset);
 
 
@@ -453,7 +449,7 @@ function changeBand() {
 }
 window.changeBand = changeBand;
 
-let modelLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 1.0);
+// let modelLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 1.0);
 function addThreeboxLayer(map) {
     map.addLayer({
         id: 'threebox-layer',
