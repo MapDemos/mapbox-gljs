@@ -1447,9 +1447,9 @@ const setLocalEffects = (lng, lat) => {
 
         const weather = getWeather(precipitation);
         const model = getModel(weather);
-        if (model) {
-            moveModel(model.name, [lng, lat], model.height);
-        }
+        // if (model) {
+        //     moveModel(model.name, [lng, lat], model.height);
+        // }
 
         const geoWeather = document.getElementById('geo-weather');
         if (geoWeather) {
@@ -1507,13 +1507,9 @@ const setLocalEffects = (lng, lat) => {
     });
 }
 
-const SUNNY = { name: "the_sun.glb", size: 40, height: 3000 };
-//const SUNNY = { name: 'sun_from_poly_by_google.glb', size: 50, height: 280 };
-//const SUNNY = { name: 'cloud__sun_anim.glb', size: 0.15, height: 280 };
-//const CLOUDY = { name: 'stylized_clouds.glb', size: 40, height: 200 };
-const CLOUDY = { name: 'cloud_ring.glb', size: 140, height: 200 };
-const RAINY = { name: 'cloud_ring.glb', size: 140, height: 200 };
-//const RAINY = { name: '3d_mesh_of_a_cloud.glb', size: 40, height: 250 };
+// const SUNNY = { name: "the_sun.glb", size: 40, height: 3000 };
+// const CLOUDY = { name: 'cloud_ring.glb', size: 140, height: 200 };
+// const RAINY = { name: 'cloud_ring.glb', size: 140, height: 200 };
 
 let preciptationHelper = null;
 function addPrecipitationLayers(map) {
@@ -1570,7 +1566,7 @@ function changeBand() {
     addCityPanels();
     const zoom = map.getZoom();
     if (zoom > 15) {
-        clearModels();
+        // clearModels();
         setLocalEffects(map.getCenter().lng, map.getCenter().lat);
     }
     map.setConfigProperty('basemap', 'lightPreset', getLightPreset());
@@ -1674,13 +1670,11 @@ function getWeatherIcon(weather) {
 }
 
 function getModel(weather) {
-    // if (weather === 'sunny') {
-    //     return SUNNY;
-    if (weather === 'cloudy') {
-        return CLOUDY;
-    } else if (weather === 'rainy') {
-        return RAINY;
-    }
+    // if (weather === 'cloudy') {
+    //     return CLOUDY;
+    // } else if (weather === 'rainy') {
+    //     return RAINY;
+    // }
     return '';
 }
 
@@ -1795,10 +1789,10 @@ const loadMap = () => {
 
         //map.setConfigProperty('basemap', 'theme', 'faded');
 
-        addThreeboxLayer(map);
-        loadModel(SUNNY.name, SUNNY.size);
-        loadModel(CLOUDY.name, CLOUDY.size);
-        loadModel(RAINY.name, RAINY.size);
+        // addThreeboxLayer(map);
+        // loadModel(SUNNY.name, SUNNY.size);
+        // loadModel(CLOUDY.name, CLOUDY.size);
+        // loadModel(RAINY.name, RAINY.size);
 
         addPrecipitationLayers(map);
 
@@ -1835,7 +1829,7 @@ const loadMap = () => {
             // }
             document.getElementById('geo-name').textContent = '';
             document.getElementById('geo-weather').innerHTML = '';
-            clearModels();
+            //clearModels();
             document.getElementById('area-panel').style.display = 'none';
             document.getElementById('legend').style.display = 'block';
             document.getElementById('precipitation-chart').style.display = 'none';
