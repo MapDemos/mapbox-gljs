@@ -1025,6 +1025,7 @@ class PrecipitationLayerHelper {
                 this.map.on('sourcedata', (e) => {
                     if (e.sourceId === tileset_key && e.isSourceLoaded) {
                         this.handlePrecipitationSourceDataLoaded(tileset_key, datetime);
+                        console.log(`Precipitation layer added: ${tileset_key} at ${datetime}`, this.precipitation_tiles);
                     }
                 });
 
