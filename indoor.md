@@ -9,13 +9,15 @@ js: indoor.js
 <head>
   {% include common_head.html %}
   <style>
-    {% include common.css %}
     {% include indoor.css %}
   </style>
 </head>
 
 <body>
-  <div id="map" class="map"></div>
+  <div id="app-container">
+    <div id="ui-panel"></div>
+    <div id="map" class="map"></div>
+  </div>
 </body>
 <script>
   {% include {{ page.js }} %}
