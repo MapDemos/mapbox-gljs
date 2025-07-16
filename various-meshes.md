@@ -1,0 +1,55 @@
+---
+layout: null
+title: Various Meshes
+js: various-meshes.js
+---
+
+<html lang="ja">
+
+<head>
+  {% include common_head.html %}
+  <style>
+    {% include common.css %}
+</style>
+</head>
+
+<body>
+  <div id="map" class="map"></div>
+  {% include layers_controller.html %}
+  {% include legend.html %}
+  {% include slider.html %}
+</body>
+<script>
+  {% include {{ page.js }} %}
+  {% include layers_controller.js %}
+  {% include timeManager.js %}
+function convertTimeValue(timeValue) {
+    const dateString = toJST(timeValue)
+    const year = dateString.substring(0, 4);
+    const month = dateString.substring(4, 6);
+    const day = dateString.substring(6, 8);
+    const hour = dateString.substring(8, 10);
+    const minute = dateString.substring(10, 12);
+    const second = dateString.substring(12, 14);
+    const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}Z`);
+    const options = {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false, // Use 24-hour format
+    };
+    const formatter = new Intl.DateTimeFormat('en-GB', options);
+    const parts = formatter.formatToParts(date);
+    const formattedDate = `${parts.find(p => p.type === 'year').value}/` +
+        `${parts.find(p => p.type === 'month').value}/` +
+        `${parts.find(p => p.type === 'day').value} ` +
+        `${parts.find(p => p.type === 'hour').value}:` +
+        `${parts.find(p => p.type === 'minute').value}`;
+    return formattedDate;
+}
+</script>
+
+</html>
