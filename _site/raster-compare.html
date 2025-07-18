@@ -364,48 +364,49 @@ button:hover {
         </select>
     </div>
     <div class="title">Projection</div>
-        <div>
-            <select id="projection-selector" onchange="changeProjection(this.value)">
-                <option value="mercator">Mercator</option>
-                <option value="globe">Globe</option>
-                <option value="albers">Albers</option>
-                <option value="equalEarth">Equal Earth</option>
-                <option value="equirectangular">Equirectangular</option>
-                <option value="naturalEarth">Natural Earth</option>
-                <option value="lambertConformalConic">Lambert Conformal Conic</option>
-                <option value="winkelTripel">Winkel Tripel</option>
-            </select>
-        </div>
+    <div>
+        <select id="projection-selector" onchange="changeProjection(this.value)">
+            <option value="mercator">Mercator</option>
+            <option value="globe">Globe</option>
+            <option value="albers">Albers</option>
+            <option value="equalEarth">Equal Earth</option>
+            <option value="equirectangular">Equirectangular</option>
+            <option value="naturalEarth">Natural Earth</option>
+            <option value="lambertConformalConic">Lambert Conformal Conic</option>
+            <option value="winkelTripel">Winkel Tripel</option>
+        </select>
+    </div>
     <br />
     <div id='raster-array-options'>
-        <div>
-            <div class="title">Layer</div>
+        <div id='raster-array-coloring-options'>
+            <div>
+                <div class="title">Layer</div>
+            </div>
+            <div id="layers">
+                <select id="layer-selector">
+                </select>
+            </div>
+            <div>
+                <div class="title">Color Scale</div>
+            </div>
+            <div id="colorscales">
+                <select id="colorscale-selector" onchange="changeColorscaleType(this.value)">
+                </select>
+            </div>
+            <div>
+                <div class="title">Color Steps</div>
+            </div>
+            <div id="colorsteps">
+                <select id="colorsteps-selector" onchange="changeColorSteps(this.value)">
+                    <option value="256">256</option>
+                    <option value="128">128</option>
+                    <option value="64">64</option>
+                    <option value="32">32</option>
+                    <option value="16">16</option>
+                    <option value="8">8</option>
+                </select>
+            </div>
         </div>
-        <div id="layers">
-            <select id="layer-selector">
-            </select>
-        </div>
-        <div>
-            <div class="title">Color Scale</div>
-        </div>
-        <div id="colorscales">
-            <select id="colorscale-selector" onchange="changeColorscaleType(this.value)">
-            </select>
-        </div>
-        <div>
-            <div class="title">Color Steps</div>
-        </div>
-        <div id="colorsteps">
-            <select id="colorsteps-selector" onchange="changeColorSteps(this.value)">
-                <option value="256">256</option>
-                <option value="128">128</option>
-                <option value="64">64</option>
-                <option value="32">32</option>
-                <option value="16">16</option>
-                <option value="8">8</option>
-            </select>
-        </div>
-        
         <br>
         <div id="particles-options-wrapper" class="">
             <div class="title"><input type="checkbox" id="show-particles" onchange="showWind(this)" checked /><label
@@ -808,9 +809,16 @@ let bandlist = []
 function showAllOptions() {
     if (tilesettype === 'raster-array') {
         document.getElementById('raster-array-options').style.display = 'block'
+        document.getElementById('raster-array-coloring-options').style.display = 'block'
         document.getElementById('legend').style.display = 'block'
         document.getElementById('map-overlay-bottom').style.display = 'block'
         showAllRasterArrayOptions()
+    } else if (tilesettype === 'raster-array-particle') {
+        showAllRasterArrayOptions()
+        addParticles()
+        document.getElementById('raster-array-coloring-options').style.display = 'none'
+        document.getElementById('legend').style.display = 'none'
+        document.getElementById('map-overlay-bottom').style.display = 'none'
     } else {
         document.getElementById('raster-array-options').style.display = 'none'
         document.getElementById('legend').style.display = 'none'
@@ -822,6 +830,8 @@ function showAllOptions() {
                 addCircleLayer()
             }else if(tilesetvectortype === 'fill'){
                 addFillLayer()
+            }else if(tilesetvectortype === 'line'){
+                addLineLayer()
             }
         }
     }
@@ -832,7 +842,7 @@ function showAllRasterArrayOptions() {
     layers = {}
     console.log("source", source)
     source.rasterLayers.forEach(l => {
-        if (l.fields.name === 'wind') {
+        if (l.fields.name === 'wind' || l.fields.name === 'winds') {
             particlelayerid = l.fields.name
             return
         }
@@ -1054,6 +1064,29 @@ const addFillLayer = () => {
             'fill-color': 'rgba(255, 0, 0, 0.5)',
             'fill-outline-color': 'rgba(0, 0, 0, 1)'
         },
+    })
+}
+
+const addLineLayer = () => {
+    if (map.getLayer('vector')) {
+        map.removeLayer('vector')
+    }
+    if (map.getSource("vectorsource")) {
+        map.removeSource("vectorsource")
+    }
+    map.addSource('vectorsource', {
+        type: 'vector',
+        url: tileset
+    })
+    map.addLayer({
+        id: 'vector',
+        type: 'line',
+        source: 'vectorsource',
+        'source-layer': tilesetvectorsource,
+        paint: {
+            'line-color': 'rgba(255, 0, 0, 1)',
+            'line-width': 2
+        }
     })
 }
 
