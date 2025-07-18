@@ -252,9 +252,16 @@ let bandlist = []
 function showAllOptions() {
     if (tilesettype === 'raster-array') {
         document.getElementById('raster-array-options').style.display = 'block'
+        document.getElementById('raster-array-coloring-options').style.display = 'block'
         document.getElementById('legend').style.display = 'block'
         document.getElementById('map-overlay-bottom').style.display = 'block'
         showAllRasterArrayOptions()
+    } else if (tilesettype === 'raster-array-particle') {
+        showAllRasterArrayOptions()
+        addParticles()
+        document.getElementById('raster-array-coloring-options').style.display = 'none'
+        document.getElementById('legend').style.display = 'none'
+        document.getElementById('map-overlay-bottom').style.display = 'none'
     } else {
         document.getElementById('raster-array-options').style.display = 'none'
         document.getElementById('legend').style.display = 'none'
@@ -266,6 +273,8 @@ function showAllOptions() {
                 addCircleLayer()
             }else if(tilesetvectortype === 'fill'){
                 addFillLayer()
+            }else if(tilesetvectortype === 'line'){
+                addLineLayer()
             }
         }
     }
@@ -276,7 +285,7 @@ function showAllRasterArrayOptions() {
     layers = {}
     console.log("source", source)
     source.rasterLayers.forEach(l => {
-        if (l.fields.name === 'wind') {
+        if (l.fields.name === 'wind' || l.fields.name === 'winds') {
             particlelayerid = l.fields.name
             return
         }
@@ -498,6 +507,29 @@ const addFillLayer = () => {
             'fill-color': 'rgba(255, 0, 0, 0.5)',
             'fill-outline-color': 'rgba(0, 0, 0, 1)'
         },
+    })
+}
+
+const addLineLayer = () => {
+    if (map.getLayer('vector')) {
+        map.removeLayer('vector')
+    }
+    if (map.getSource("vectorsource")) {
+        map.removeSource("vectorsource")
+    }
+    map.addSource('vectorsource', {
+        type: 'vector',
+        url: tileset
+    })
+    map.addLayer({
+        id: 'vector',
+        type: 'line',
+        source: 'vectorsource',
+        'source-layer': tilesetvectorsource,
+        paint: {
+            'line-color': 'rgba(255, 0, 0, 1)',
+            'line-width': 2
+        }
     })
 }
 
