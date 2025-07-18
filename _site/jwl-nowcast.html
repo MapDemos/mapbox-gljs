@@ -446,30 +446,45 @@ button:hover {
 
 </body>
 <script>
-  
-lat = 35.681236;
+  lat = 35.681236;
 lng = 139.767125;
-const stagingToken = 'pk.eyJ1IjoicmFzdGVyLXRlYW0iLCJhIjoiY2xqZzJpbHpmNHJ0NzNxcnQ3ZDJwNXZxYSJ9.ufpjNkQeHYt-3ff81ydlUg&jobid=cmd4qctla000002lbb81k4bkw';
-
-function transformSourceUrl(url, isProduction = false) {
-    if (!url) return url;
-    const MAPBOX_IDENT = 'mapbox://';
-    if (url.startsWith(MAPBOX_IDENT)) {
-        const [account, tileset] = url.slice(MAPBOX_IDENT.length).split("/");
-        const baseURL = isProduction ? 'https://api.mapbox.com' : 'https://api-tilesets-staging.tilestream.net';
-        url = `${baseURL}/v4/${account}.${tileset}.json?access_token=${stagingToken}&secure`;
-    }
-    return url;
-}
 
 const tilesets = {
-    n1d_z4: {
-        value: transformSourceUrl(`mapbox://raster-team/jp_nowc_250m_1km_02`),
-        label: "nowcast 250m 1km",
+    nowcast_30: {
+        value: "mapbox://mapbox.weather-jp-nowcast-30",
+        label: "nowcast 30m",
+        type: 'raster-array'
+    },
+    nowcast_60: {
+        value: "mapbox://mapbox.weather-jp-nowcast-60",
+        label: "nowcast 60m",
         type: 'raster-array'
     },
 }
 
+const showSource = () => {
+
+    // map.once('idle', () => {
+        const source = map.getSource('rastersource')
+        const layers = source.rasterLayerIds;
+        const bands = [];
+        source.raster_layers.forEach((layer) => {
+            bands.push(...layer.fields.bands);
+        });
+        const layerString = layers.join(',');
+        const bandString = bands.join(',');
+        const tileset = source.url.split('/').slice(-1)[0];
+        const tilequery = `https://api.mapbox.com/v4/${tileset}/tilequery/-122.42901,37.80633.json?layers=${layerString}&bands=${bandString}&access_token=${mapboxgl.accessToken}`;
+        console.log('Tile Query URL:', tilequery);
+
+
+    // });
+
+}
+
+setTimeout(() => {
+    showSource();
+}, 1000);
   
 const defaultzoom = 3
 let zoom = defaultzoom

@@ -684,10 +684,12 @@ const formatDateString = (date) => {
     return `${yyyy}${MM}${dd}${HH}${mm}${ss}`;
 };
 
-const toJST = (unixTimestamp) => {
-    const date = new Date(unixTimestamp * 1000);
-    const jstDate = convertToJST(date);
-    return formatDateString(jstDate);
+const toJST = (unixTimestamp, conversion=true) => {
+    let date = new Date(unixTimestamp * 1000);
+    if(conversion) {
+        date = convertToUTC(date);
+    }
+    return formatDateString(date);
 };
 
 const toUTC = (JSTyyyyMMddHHmmSS) => {
