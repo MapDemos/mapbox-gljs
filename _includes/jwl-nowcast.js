@@ -2,16 +2,16 @@ lat = 35.681236;
 lng = 139.767125;
 
 const tilesets = {
-    nowcast_30: {
-        value: "mapbox://mapbox.weather-jp-nowcast-30",
-        label: "nowcast 30m",
+    nowcast: {
+        value: "mapbox://mapbox.weather-jp-nowcast",
+        label: "nowcast",
         type: 'raster-array'
     },
-    nowcast_60: {
-        value: "mapbox://mapbox.weather-jp-nowcast-60",
-        label: "nowcast 60m",
-        type: 'raster-array'
-    },
+    // nowcast_60: {
+    //     value: "mapbox://mapbox.weather-jp-nowcast-60",
+    //     label: "nowcast 60m",
+    //     type: 'raster-array'
+    // },
     rain_6: {
         value: "mapbox://mapbox.weather-jp-rain-1-6",
         label: "rain 1-6",
