@@ -1235,7 +1235,7 @@ const formatDateString = (date) => {
 const toJST = (unixTimestamp, conversion=true) => {
     let date = new Date(unixTimestamp * 1000);
     if(conversion) {
-        date = convertToUTC(date);
+        date = convertToJST(date);
     }
     return formatDateString(date);
 };
