@@ -949,9 +949,14 @@ function showAllRasterArrayOptions() {
         if (tilesets[tile].value === tileset) option.selected = true
     }
 
-    const timeslider = document.getElementById('slider')
+    initTimeSlider(0)
+
+}
+
+function initTimeSlider(val){
+const timeslider = document.getElementById('slider')
     timeslider.max = bandlist.length - 1
-    timeslider.value = 0
+    timeslider.value = val
 
     const timediv = document.getElementById('timediv')
     timediv.innerHTML = ''
@@ -974,7 +979,6 @@ function showAllRasterArrayOptions() {
         if (autoFlag) play()
         auto.disabled = true
     }
-
 }
 
 const baseDate = new Date(Date.UTC(1990, 0, 1));
@@ -1002,8 +1006,47 @@ function convertTimeValue(timeValue) {
     return dateString;
 }
 
+function getCurrentBands(){
+    const tilesetid = tileset.split('/').slice(-1)[0];
+    const tilejsonurl = `https://api.mapbox.com/v4/${tilesetid}.json?access_token=${mapboxgl.accessToken}`;
+    fetch(tilejsonurl).then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    }).then(tilejson => {
+        console.log('Tile JSON:', tilejson);
+        const bands = tilejson.raster_layers[0].fields.bands;
+        tilejson.raster_layers.forEach(layer => {
+            if(layer.id === currentLayer) {
+                bandlist = layer.fields.bands;
+                initTimeSlider(lastBandIndex);
+                map.setPaintProperty(currentLayer, 'raster-array-band', bandlist[lastBandIndex])
+            }
+        });
+    }).catch(error => {
+        console.error('Error fetching tile JSON:', error);
+    });
+}
+
+map.on('movestart', (e) => {
+    if(tilesettype !== 'raster-array') {
+        return;
+    }
+    changeBand(lastBandIndex);
+});
+
+let lastChangeBandTime = 0
+let lastBandIndex = 0
 function changeBand(index) {
-    map.setPaintProperty(currentLayer, 'raster-array-band', bandlist[index])
+    lastBandIndex = index
+    const now = Date.now();
+    if(now - lastChangeBandTime > 60000) {
+        getCurrentBands(index);
+    }else{
+        map.setPaintProperty(currentLayer, 'raster-array-band', bandlist[lastBandIndex])
+    }
+    lastChangeBandTime = Date.now();
 }
 window.changeBand = changeBand
 
