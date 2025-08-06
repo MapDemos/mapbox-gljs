@@ -2,16 +2,21 @@ lat = 35.681236;
 lng = 139.767125;
 
 const tilesets = {
+    // snow_forecast: {
+    //     value: "mapbox://kenji-shima.snow-20250123000000-forecast",
+    //     label: "snow forecast",
+    //     type: 'raster-array'
+    // },
+    // snow_depth: {
+    //     value: "mapbox://kenji-shima.snow-depth-20250123010000",
+    //     label: "snow depth",
+    //     type: 'raster-array'
+    // },
     nowcast: {
         value: "mapbox://mapbox.weather-jp-nowcast",
         label: "nowcast",
         type: 'raster-array'
     },
-    // nowcast_60: {
-    //     value: "mapbox://mapbox.weather-jp-nowcast-60",
-    //     label: "nowcast 60m",
-    //     type: 'raster-array'
-    // },
     rain_6: {
         value: "mapbox://mapbox.weather-jp-rain-1-6",
         label: "rain 1-6",
@@ -92,41 +97,41 @@ const tilesets = {
 
 }
 
-const showSourceDelayed = () => {
-    setTimeout(() => {
-        showSource();
-    }, 1000);
-}
+// const showSourceDelayed = () => {
+//     setTimeout(() => {
+//         showSource();
+//     }, 1000);
+// }
 
-const showSource = () => {
+// const showSource = () => {
 
-    const type = tilesettype;
+//     const type = tilesettype;
 
-    if (type === 'raster-array') {
-        const source = map.getSource('rastersource')
-        console.log('Raster Source:', source);
-        const layers = source.rasterLayerIds;
-        const bands = [];
-        source.raster_layers.forEach((layer) => {
-            bands.push(...layer.fields.bands);
-        });
-        const layerString = layers.join(',');
-        const bandString = bands.join(',');
-        const tileset = source.url.split('/').slice(-1)[0];
-        const tilequery = `https://api.mapbox.com/v4/${tileset}/tilequery/${lng},${lat}.json?layers=${layerString}&bands=${bandString}&access_token=${mapboxgl.accessToken}`;
-        console.log('Tile Query URL:', tilequery);
-    }else{
-        const source = map.getSource('vectorsource');
-        console.log('Vector Source:', source);
-        const layers = source.vectorLayerIds;
-        const layerString = layers.join(',');
-        const tileset = source.url.split('/').slice(-1)[0];
-        const tilequery = `https://api.mapbox.com/v4/${tileset}/tilequery/${lng},${lat}.json?layers=${layerString}&access_token=${mapboxgl.accessToken}`;
-        console.log('Tile Query URL:', tilequery);
-    }
+//     if (type === 'raster-array') {
+//         const source = map.getSource('rastersource')
+//         console.log('Raster Source:', source);
+//         const layers = source.rasterLayerIds;
+//         const bands = [];
+//         source.raster_layers.forEach((layer) => {
+//             bands.push(...layer.fields.bands);
+//         });
+//         const layerString = layers.join(',');
+//         const bandString = bands.join(',');
+//         const tileset = source.url.split('/').slice(-1)[0];
+//         const tilequery = `https://api.mapbox.com/v4/${tileset}/tilequery/${lng},${lat}.json?layers=${layerString}&bands=${bandString}&access_token=${mapboxgl.accessToken}`;
+//         console.log('Tile Query URL:', tilequery);
+//     }else{
+//         const source = map.getSource('vectorsource');
+//         console.log('Vector Source:', source);
+//         const layers = source.vectorLayerIds;
+//         const layerString = layers.join(',');
+//         const tileset = source.url.split('/').slice(-1)[0];
+//         const tilequery = `https://api.mapbox.com/v4/${tileset}/tilequery/${lng},${lat}.json?layers=${layerString}&access_token=${mapboxgl.accessToken}`;
+//         console.log('Tile Query URL:', tilequery);
+//     }
 
-}
+// }
 
-setTimeout(() => {
-    document.getElementById('tileset-selector').addEventListener('change', showSourceDelayed);
-}, 1000);
+// setTimeout(() => {
+//     document.getElementById('tileset-selector').addEventListener('change', showSourceDelayed);
+// }, 1000);
