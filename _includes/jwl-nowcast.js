@@ -79,11 +79,11 @@ const tilesets = {
         label: "temperature 40-78",
         type: 'raster-array'
     },
-    waves: {
-        value: "mapbox://mapbox.weather-jp-waves",
-        label: "waves",
-        type: 'raster-array'
-    },
+    // waves: {
+    //     value: "mapbox://mapbox.weather-jp-waves",
+    //     label: "waves",
+    //     type: 'raster-array'
+    // },
     wind_39: {
         value: "mapbox://mapbox.weather-jp-wind-0-39",
         label: "wind 0-39",
