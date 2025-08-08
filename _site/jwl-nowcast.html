@@ -431,6 +431,7 @@ button:hover {
     </div>
     <div class="title">Zoom Level</div>
     <div id="zoom"></div>
+    <div id="zoom-adjust"></div>
     <div id="load-time"></div>
 </div>
   <div id="legend" class="legend">
@@ -646,21 +647,29 @@ map.on('click', (e) => {
 
 let sourceSetStart = 0
 map.on('sourcedata', (e) => {
+    // console.log('Source data event:', e);
+    // console.log('currenttileset:', tileset);
+    if(e.source.url !== tileset + tilesetsuffix) {
+        return;
+    }
     if(e.isSourceLoaded){
         document.getElementById('load-time').innerHTML = `<div class="title">Layer Load Time</div><div>${Date.now() - sourceSetStart} ms</div>`
+        sourceSetStart = Date.now()
     }
     
 })
 
-
-
-function changeProjection(projectionType) {
-    currentprojection = projectionType
-    map.setProjection(projectionType)
+document.getElementById('zoom-adjust').innerHTML = `<div class="title">Change Zoom</div><div><select id="zoom-selector" onchange="changeZoom(this.value)"></select></div>`
+const zoomSelector = document.getElementById('zoom-selector')
+for (let i = 0; i < 12; i++) {
+    const option = document.createElement('option')
+    option.value = i
+    option.textContent = i
+    zoomSelector.appendChild(option)
 }
-window.changeProjection = changeProjection
-
-
+function changeZoom(value) {
+    map.setZoom(value)
+}
 
 
 
@@ -991,7 +1000,7 @@ async function getCurrentBands() {
         const tilejson = await response.json();
         console.log('Tile JSON:', tilejson);
         currentLayer = tilejson.raster_layers[0].fields.name; // Default to the first layer if none is set
-        console.log('Current layer:', currentLayer);
+        // console.log('Current layer:', currentLayer);
         if(currentLayer === 'wind' || currentLayer === 'winds') {
             particlelayerid = currentLayer;
             return tilejson
@@ -1246,13 +1255,13 @@ const addRasterLayer = () => {
 }
 
 const addRasterArrayLayer = (layer) => {
-    console.log('Adding raster array source:', tileset + tilesetsuffix);
+    // console.log('Adding raster array source:', tileset + tilesetsuffix);
     map.addSource('rastersource', {
         type: 'raster-array',
         url: tileset + tilesetsuffix
     })
     const layerVals = layers[layer]
-    console.log('Layer values:', layerVals);
+    // console.log('Layer values:', layerVals);
     const layer_def = {
         id: layer,
         type: 'raster',
@@ -1267,11 +1276,10 @@ const addRasterArrayLayer = (layer) => {
             'raster-opacity': 0.8,
             'raster-array-band': bandlist[0],
         },
-        minzoom: layerVals.minzoom,
-        maxzoom: layerVals.maxzoom,
+        // minzoom: layerVals.minzoom,
+        // maxzoom: layerVals.maxzoom,
     }
     map.addLayer(layer_def)
-    map.setZoom(defaultzoom)
     const element = document.getElementById(layer)
     updateLegendBar(layerVals.color_range)
 
@@ -1288,7 +1296,7 @@ const removeParticles = () => {
 }
 
 const addParticles = () => {
-    console.log('Adding particles for layer:', particlelayerid);
+    // console.log('Adding particles for layer:', particlelayerid);
     if (particlelayerid) {
         const particlesource = {
             id: 'particlesource',
