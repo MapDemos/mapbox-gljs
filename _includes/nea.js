@@ -2,6 +2,7 @@
 lat = 1.4214734600763848
 lng = 103.87371902395148
 const tilesets = {
+
     n1d_z4: {
         value: "mapbox://kenji-shima.nea-N1D-z4",
         label: "N1D Zoom 4",
@@ -170,5 +171,26 @@ const tilesets = {
         vector_layer_type: 'fill',
         vector_layer_source: 'spacial-reception',
         zoom: 4
+    },
+    sbkk_eq_z8: {
+        value: "mapbox://kenji-shima.sbkk-eq-z8",
+        label: "SBKK Earthquake Zoom 8",
+        type: 'vector',
+        vector_layer_type: 'line',
+        vector_layer_source: 'eq',
+    },
+    sbkk_eq_z12: {
+        value: "mapbox://kenji-shima.sbkk-eq-z12",
+        label: "SBKK Earthquake Zoom 12",
+        type: 'vector',
+        vector_layer_type: 'line',
+        vector_layer_source: 'eq',
+    },
+    sbkk_eq_z16: {
+        value: "mapbox://kenji-shima.sbkk-eq-z16",
+        label: "SBKK Earthquake Zoom 16",
+        type: 'vector',
+        vector_layer_type: 'line',
+        vector_layer_source: 'eq',
     },
 }

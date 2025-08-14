@@ -19,7 +19,7 @@ const init = () => {
     })
     map.on('load', () => {
         map.showTileBoundaries = true
-        showAllOptions()
+        setTimeout(showAllOptions, 200)
         changeProjection(currentprojection)
     })
 
@@ -32,8 +32,10 @@ const init = () => {
             'star-intensity': 0.6 // Background star brightness (default 0.35 at low zoooms )
         })
 
-        // Don't add rastersource here - it will be added after tile JSON is fetched
-        // in showAllRasterArrayOptions() to ensure the correct tileset URL is used
+        map.addSource('rastersource', {
+            type: 'raster-array',
+            url: tileset + tilesetsuffix
+        })
 
     })
 
@@ -245,7 +247,7 @@ function updateLegendBar(colorRange) {
 
 let initOption
 
-//let bandlist = []
+let bandlist = []
 
 function showAllOptions() {
     if (tilesettype === 'raster-array') {
@@ -269,103 +271,63 @@ function showAllOptions() {
         } else if (tilesettype === 'vector') {
             if (tilesetvectortype === 'circle') {
                 addCircleLayer()
-            } else if (tilesetvectortype === 'fill') {
+            }else if(tilesetvectortype === 'fill'){
                 addFillLayer()
-            } else if (tilesetvectortype === 'line') {
+            }else if(tilesetvectortype === 'line'){
                 addLineLayer()
             }
         }
     }
 }
 
-let isTilesetDataReady = false;
-
 function showAllRasterArrayOptions() {
-    const tilesetname = tileset.split('/').slice(-1)[0]
-    fetch(`https://api.mapbox.com/v4/${tilesetname}.json?access_token=${mapboxgl.accessToken}`).then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+    const source = map.getSource('rastersource')
+    layers = {}
+    console.log("source", source)
+    source.rasterLayers.forEach(l => {
+        if (l.fields.name === 'wind' || l.fields.name === 'winds') {
+            particlelayerid = l.fields.name
+            return
         }
-        return response.json();
-    }).then(tilejson => {
-        console.log('Tile JSON:', tilejson);
-        layers = {}
-        tilejson.raster_layers.forEach(l => {
-            if (l.fields.name === 'wind' || l.fields.name === 'winds') {
-                particlelayerid = l.fields.name
-                return
-            }
-            const f = l.fields
-            layers[f.name] = {
-                label: f.name,
-                layer: f.name,
-                color_range: f.range,
-                bands: f.bands // Store bands with the layer
-            }
-            initOption = f.name
-        })
-        setLayerOptions()
-        
-        // Only show the layer after we have the correct tile JSON data
-        if (initOption) {
-            showLayer(initOption)
-            // Initialize time slider AFTER showLayer has updated currentLayer
-            initTimeSlider(0, initOption)
+        const f = l.fields
+        bandlist = f.bands
+        layers[f.name] = {
+            label: f.name,
+            layer: f.name,
+            color_range: f.range,
         }
+        initOption = f.name
+    })
+    setLayerOptions()
+    showLayer(initOption)
 
-        const colorscaleselect = document.getElementById('colorscale-selector')
-        colorscaleselect.innerHTML = ''
-        for (let type in COLORSCALES) {
-            const option = colorscaleselect.appendChild(document.createElement('option'))
-            option.value = type
-            option.innerHTML = type
-            if (type === selctedcolorscalename) option.selected = true
-        }
-
-        if (particlelayerid) {
-            document.getElementById('particles-options-wrapper').style.display = 'block'
-        } else {
-            document.getElementById('particles-options-wrapper').style.display = 'none'
-        }
-
-        const tilesetselect = document.getElementById('tileset-selector')
-        tilesetselect.innerHTML = ''
-        for (let tile in tilesets) {
-            const option = tilesetselect.appendChild(document.createElement('option'))
-            option.value = tile
-            option.innerHTML = tilesets[tile].label
-            if (tilesets[tile].value === tileset) option.selected = true
-        }
-
-        isTilesetDataReady = true;
-    }).catch(error => {
-        console.error('Error fetching tile JSON:', error);
-        isTilesetDataReady = true; // Prevent getting stuck
-    });
-}
-
-function initTimeSlider(val, layerName = null) {
-    // Use the provided layer name or fall back to currentLayer
-    const targetLayer = layerName || currentLayer;
-    
-    // Safety check: ensure the layer exists in the layers object
-    if (!layers[targetLayer]) {
-        console.warn(`Layer ${targetLayer} not found in layers object`);
-        return;
+    const colorscaleselect = document.getElementById('colorscale-selector')
+    colorscaleselect.innerHTML = ''
+    for (let type in COLORSCALES) {
+        const option = colorscaleselect.appendChild(document.createElement('option'))
+        option.value = type
+        option.innerHTML = type
+        if (type === selctedcolorscalename) option.selected = true
     }
-    
-    // Get the correct bands for the specified layer
-    const bands = layers[targetLayer].bands;
-    
+
+    if (particlelayerid) {
+        document.getElementById('particles-options-wrapper').style.display = 'block'
+    } else {
+        document.getElementById('particles-options-wrapper').style.display = 'none'
+    }
+
+    const tilesetselect = document.getElementById('tileset-selector')
+    tilesetselect.innerHTML = ''
+    for (let tile in tilesets) {
+        const option = tilesetselect.appendChild(document.createElement('option'))
+        option.value = tile
+        option.innerHTML = tilesets[tile].label
+        if (tilesets[tile].value === tileset) option.selected = true
+    }
+
     const timeslider = document.getElementById('slider')
-    timeslider.max = bands.length - 1
-    
-    // Temporarily disable the oninput event to prevent triggering changeBand during initialization
-    const originalOnInput = timeslider.oninput;
-    timeslider.oninput = null;
-    timeslider.value = val;
-    // Re-enable the oninput event
-    timeslider.oninput = originalOnInput;
+    timeslider.max = bandlist.length - 1
+    timeslider.value = 0
 
     const timediv = document.getElementById('timediv')
     timediv.innerHTML = ''
@@ -374,10 +336,10 @@ function initTimeSlider(val, layerName = null) {
 
     const auto = document.getElementById('auto')
 
-    if (bands.length > 1) {
+    if (bandlist.length > 1) {
         timeslider.disabled = false
         auto.disabled = false
-        bands.forEach(datetime => {
+        bandlist.forEach(datetime => {
             const datetimearray = convertTimeValue(datetime).split(" ")
             const timespan = timediv.appendChild(document.createElement('span'))
             timespan.innerHTML = `${datetimearray[1]}`
@@ -388,6 +350,7 @@ function initTimeSlider(val, layerName = null) {
         if (autoFlag) play()
         auto.disabled = true
     }
+
 }
 
 const baseDate = new Date(Date.UTC(1990, 0, 1));
@@ -415,96 +378,12 @@ function convertTimeValue(timeValue) {
     return dateString;
 }
 
-function getCurrentBands() {
-    const tilesetid = tileset.split('/').slice(-1)[0];
-    const tilejsonurl = `https://api.mapbox.com/v4/${tilesetid}.json?access_token=${mapboxgl.accessToken}`;
-    
-    // Return the fetch promise
-    return fetch(tilejsonurl).then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-    }).then(tilejson => {
-        console.log('Updating Tile JSON:', tilejson);
-        lastChangeBandTime = Date.now(); // Update time on successful fetch
-
-        // Re-populate the entire layers object to get fresh data
-        const newLayers = {};
-        tilejson.raster_layers.forEach(l => {
-            if (l.fields.name === 'wind' || l.fields.name === 'winds') {
-                particlelayerid = l.fields.name;
-                return;
-            }
-            const f = l.fields;
-            newLayers[f.name] = {
-                label: f.name,
-                layer: f.name,
-                color_range: f.range,
-                bands: f.bands
-            };
-        });
-        layers = newLayers; // Atomically replace the old layers object
-
-        // Re-initialize the slider for the current layer with new band info
-        initTimeSlider(lastBandIndex, currentLayer);
-        // Set the paint property to ensure the map is in sync
-        if (currentLayer && layers[currentLayer] && layers[currentLayer].bands && 
-            layers[currentLayer].bands[lastBandIndex] && map.getLayer(currentLayer)) {
-            map.setPaintProperty(currentLayer, 'raster-array-band', layers[currentLayer].bands[lastBandIndex]);
-        }
-    });
+function changeBand(index) {
+    map.setPaintProperty(currentLayer, 'raster-array-band', bandlist[index])
 }
-
-// Re-enabled with proper guards
-map.on('movestart', (e) => {
-    if (tilesettype !== 'raster-array' || !isTilesetDataReady || !currentLayer || !map.getLayer(currentLayer)) {
-        return;
-    }
-    changeBand(lastBandIndex);
-});
-
-let lastChangeBandTime = 0;
-let lastBandIndex = 0;
-let isFetchingBands = false; // Flag to prevent simultaneous fetches
-
-async function changeBand(index) {
-    if (!isTilesetDataReady) {
-        return;
-    }
-    lastBandIndex = index;
-    const now = Date.now();
-
-    if (now - lastChangeBandTime > 60000) {
-        if (isFetchingBands) return; // Don't start another fetch if one is in progress
-        
-        isFetchingBands = true;
-        try {
-            await getCurrentBands(); // Wait for the fetch and update to complete
-        } catch (error) {
-            console.error('Failed to update bands:', error);
-        } finally {
-            isFetchingBands = false; // Reset the flag
-        }
-    } else {
-        // Safety check: ensure the current layer exists and has bands
-        if (!layers[currentLayer] || !layers[currentLayer].bands) {
-            console.warn(`Layer ${currentLayer} not found or has no bands`);
-            return;
-        }
-        
-        const bands = layers[currentLayer].bands;
-        // Check if the band exists before setting it
-        if (bands && bands[index]) {
-            map.setPaintProperty(currentLayer, 'raster-array-band', bands[index]);
-        }
-    }
-}
-window.changeBand = changeBand;
+window.changeBand = changeBand
 
 function changeTileset(t) {
-    isTilesetDataReady = false; 
-    lastBandIndex = 0; // Reset band index for new tileset
     tileset = tilesets[t].value
     tilesettype = tilesets[t].type
     if (tilesettype === 'vector') {
@@ -565,7 +444,7 @@ function setLayerOptions() {
     })
 }
 
-let currentLayer = null // Initialize as null instead of undefined initOption
+let currentLayer = initOption
 const showLayer = (layer) => {
     currentLayer = layer
     for (let l in layers) {
@@ -654,7 +533,6 @@ const addLineLayer = () => {
     })
 }
 
-let sourceStart = 0
 const addRasterLayer = () => {
     if (map.getLayer('raster')) {
         map.removeLayer('raster')
@@ -662,13 +540,6 @@ const addRasterLayer = () => {
     if (map.getSource("rastersource")) {
         map.removeSource("rastersource")
     }
-    this.map.on('sourcedata', (e) => {
-        if (e.sourceId === 'rastersource' && e.isSourceLoaded) {
-            const now = Date.now();
-            console.log(`Time to load 'rastersource': ${now - sourceStart} ms`);
-        }
-    });
-    sourceStart = Date.now();
     map.addSource('rastersource', {
         type: 'raster',
         url: tileset
@@ -685,31 +556,11 @@ const addRasterLayer = () => {
 }
 
 const addRasterArrayLayer = (layer) => {
-    // Safety check: ensure the layer exists in the layers object
-    if (!layers[layer]) {
-        console.error(`Layer ${layer} not found in layers object`);
-        return;
-    }
-    
-    // Ensure we remove any existing raster source before adding a new one
-    if (map.getSource("rastersource")) {
-        map.removeSource("rastersource")
-    }
-    
     map.addSource('rastersource', {
         type: 'raster-array',
         url: tileset + tilesetsuffix
     })
-    
     const layerVals = layers[layer]
-    const bands = layerVals.bands; // Get bands for this specific layer
-    
-    // Safety check: ensure bands exist
-    if (!bands || bands.length === 0) {
-        console.error(`No bands found for layer ${layer}`);
-        return;
-    }
-    
     const layer_def = {
         id: layer,
         type: 'raster',
@@ -722,10 +573,9 @@ const addRasterArrayLayer = (layer) => {
             'raster-resampling': tilesetresampling,
             'raster-color-range-transition': { duration: 0 },
             'raster-opacity': 0.8,
-            'raster-array-band': bands[0], // Use the correct band list
+            'raster-array-band': bandlist[0],
         }
     }
-    
     map.addLayer(layer_def)
     const element = document.getElementById(layer)
     updateLegendBar(layerVals.color_range)
@@ -744,11 +594,6 @@ const removeParticles = () => {
 
 const addParticles = () => {
     if (particlelayerid) {
-        // Remove existing particle source if it exists
-        if (map.getSource('particlesource')) {
-            map.removeSource('particlesource')
-        }
-        
         const particlesource = {
             id: 'particlesource',
             type: 'raster-array',
@@ -800,12 +645,7 @@ const autoUpdate = () => {
     const slider = document.getElementById('slider')
     let index = slider.value
     index++
-    // Use the actual bands length from the current layer
-    if (layers[currentLayer] && layers[currentLayer].bands) {
-        if (index > layers[currentLayer].bands.length - 1) {
-            index = 0
-        }
-    } else {
+    if (index > bandlist.length - 1) {
         index = 0
     }
     slider.value = index
