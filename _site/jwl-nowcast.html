@@ -620,9 +620,17 @@ map.on('style.load', () => {
         'star-intensity': 0.6 // Background star brightness (default 0.35 at low zoooms )
     })
 
-    // map.addSource('rastersource', {
-    //     type: 'raster-array',
-    //     url: tileset + tilesetsuffix
+    // map.on('mouseover', (e) => {
+    //     const features = map.queryRenderedFeatures(e.point, {
+    //         layers: ['rastersource']
+    //     });
+    //     if (features.length) {
+    //         const feature = features[0];
+    //         const value = feature.properties['raster-value'];
+    //         document.getElementById('hover').innerHTML = `Value: ${value}`;
+    //     } else {
+    //         document.getElementById('hover').innerHTML = '';
+    //     }
     // })
 
 })

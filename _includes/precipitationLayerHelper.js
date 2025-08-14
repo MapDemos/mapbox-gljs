@@ -75,7 +75,7 @@ class PrecipitationLayerHelper {
     getTilesetIdAndUrl(datetime, tileset_time) {
         const offsetMinutes = this.timeManager.getOffsetMinutes(datetime);
         let tileset_suffix = '-30m';
-        let tileset_prefix = 'nowcast';
+        let tileset_prefix = 'nowcast-n';
 
         if (!this.timeManager.isCurrentOrPast(datetime)) {
             if (offsetMinutes > 30 && offsetMinutes <= 60) {
