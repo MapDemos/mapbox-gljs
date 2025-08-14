@@ -4,7 +4,7 @@ lng = 103.87371902395148
 const tilesets = {
 
     n1d_z4: {
-        value: "mapbox://kenji-shima.nea-N1D-z4",
+        value: "mapbox://kenji-shima.nowcast-r-20240620195000-30m",
         label: "N1D Zoom 4",
         type: 'raster-array'
     },
