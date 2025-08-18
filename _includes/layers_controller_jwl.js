@@ -24,26 +24,50 @@ map.on('style.load', () => {
     map.showTileBoundaries = true
     showAllOptions()
 
-    map.setFog({
-        color: 'rgba(61, 70, 79, 1)', // Lower atmosphere
-        'high-color': 'rgb(36, 92, 223)', // Upper atmosphere
-        'horizon-blend': 0.02, // Atmosphere thickness (default 0.2 at low zooms)
-        'space-color': 'rgb(11, 11, 25)', // Background color
-        'star-intensity': 0.6 // Background star brightness (default 0.35 at low zoooms )
-    })
-
-    // map.on('mouseover', (e) => {
-    //     const features = map.queryRenderedFeatures(e.point, {
-    //         layers: ['rastersource']
-    //     });
-    //     if (features.length) {
-    //         const feature = features[0];
-    //         const value = feature.properties['raster-value'];
-    //         document.getElementById('hover').innerHTML = `Value: ${value}`;
-    //     } else {
-    //         document.getElementById('hover').innerHTML = '';
-    //     }
+    // map.setFog({
+    //     color: 'rgba(61, 70, 79, 1)', // Lower atmosphere
+    //     'high-color': 'rgb(36, 92, 223)', // Upper atmosphere
+    //     'horizon-blend': 0.02, // Atmosphere thickness (default 0.2 at low zooms)
+    //     'space-color': 'rgb(11, 11, 25)', // Background color
+    //     'star-intensity': 0.6 // Background star brightness (default 0.35 at low zoooms )
     // })
+
+    let popup = null;
+    map.on('mousemove', async (e) => {
+
+        if (tilesettype === 'raster-array') {
+            if (!popup) {
+                popup = new mapboxgl.Popup({
+                    closeButton: false,
+                    closeOnClick: false,
+                });
+            }
+            try {
+                const result = await map.queryRasterValue('rastersource', e.lngLat, {
+                    layerName: currentLayer,
+                    bands: bandlist.length > 0 ? [bandlist[lastBandIndex].toString()] : undefined
+                });
+
+                if (result && result[currentLayer][bandlist[lastBandIndex].toString()]) {
+                    const value = result[currentLayer][bandlist[lastBandIndex].toString()][0];
+                    popup.setLngLat(e.lngLat)
+                        .setHTML(`<div><strong>Value:</strong> ${value}</div>`)
+                        .addTo(map);
+                }else{
+                    if (popup) {
+                        popup.remove();
+                    }   
+                }
+            } catch (error) {
+                console.error('Error querying raster value:', error);
+            }
+        } else {
+            if (popup) {
+                popup.remove();
+            }
+        }
+
+    })
 
 })
 
@@ -69,14 +93,14 @@ let sourceSetStart = 0
 map.on('sourcedata', (e) => {
     // console.log('Source data event:', e);
     // console.log('currenttileset:', tileset);
-    if(e.source.url !== tileset + tilesetsuffix) {
+    if (e.source.url !== tileset + tilesetsuffix) {
         return;
     }
-    if(e.isSourceLoaded){
+    if (e.isSourceLoaded) {
         document.getElementById('load-time').innerHTML = `<div class="title">Layer Load Time</div><div>${Date.now() - sourceSetStart} ms</div>`
         sourceSetStart = Date.now()
     }
-    
+
 })
 
 document.getElementById('zoom-adjust').innerHTML = `<div class="title">Change Zoom</div><div><select id="zoom-selector" onchange="changeZoom(this.value)"></select></div>`
@@ -421,7 +445,7 @@ async function getCurrentBands() {
         console.log('Tile JSON:', tilejson);
         currentLayer = tilejson.raster_layers[0].fields.name; // Default to the first layer if none is set
         // console.log('Current layer:', currentLayer);
-        if(currentLayer === 'wind' || currentLayer === 'winds') {
+        if (currentLayer === 'wind' || currentLayer === 'winds') {
             particlelayerid = currentLayer;
             return tilejson
         }
