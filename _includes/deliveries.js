@@ -1,0 +1,263 @@
+
+const defaultCoordinates = [139.76652995236685, 35.67881527736655];
+
+let map
+
+const loadMap = () => {
+    map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/light-v11',
+        center: defaultCoordinates,
+        zoom: 12,
+        minZoom: 3,
+        //maxZoom: 12,
+        scrollZoom: true,
+        language: 'ja'
+    })
+    map.on('load', () => {
+        map.loadImage('./assets/images/yamato.png', (error, image) => {
+            if (error) throw error;
+            if (!map.hasImage('yamato')) {
+                map.addImage('yamato', image);
+            }
+        });
+
+        fetch('deliveryCenters.geojson')
+            .then(response => response.json())
+            .then(data => {
+                addDeliveryCenters(data)
+            })
+            .catch(error => console.error('Error loading GeoJSON data:', error));
+
+        fetch('deliveries.geojson')
+            .then(response => response.json())
+            .then(data => {
+                addDeliveries(data)
+            })
+            .catch(error => console.error('Error loading GeoJSON data:', error));
+    })
+    map.on('click', (event) => {
+        const { lng, lat } = event.lngLat;
+        console.log(`Longitude: ${lng}, Latitude: ${lat}`);
+    })
+
+    map.on('click', 'clusters', (e) => {
+        const features = map.queryRenderedFeatures(e.point, {
+            layers: ['clusters']
+        });
+        map.easeTo({
+            center: features[0].geometry.coordinates,
+            zoom: map.getZoom() + 2
+        });
+    });
+
+    let popup
+
+    map.on('mouseover', 'symbol-delivery-centers', async (e) => {
+        const features = map.queryRenderedFeatures(e.point, {
+            layers: ['symbol-delivery-centers']
+        });
+        // console.log("feature", features[0])
+        if (!features.length) {
+            if (popup) popup.remove();
+            return;
+        }
+        const feature = features[0];
+
+        // Call isochrone API for 10 minutes
+        const coordinates = feature.geometry.coordinates;
+        const isochroneData = await fetchIsochrone('mapbox/walking', coordinates, 10, '5A9FD4');
+
+        // console.log('Isochrone result:', isochroneData);
+
+        // Add isochrone to map if it doesn't exist
+        if (!map.getSource('isochrone')) {
+            map.addSource('isochrone', {
+                type: 'geojson',
+                data: {
+                    type: 'FeatureCollection',
+                    features: []
+                }
+            });
+
+            map.addLayer({
+                id: 'isochrone-fill',
+                type: 'fill',
+                source: 'isochrone',
+                paint: {
+                    'fill-color': '#5A9FD4',
+                    'fill-opacity': 0.3
+                }
+            });
+
+            map.addLayer({
+                id: 'isochrone-border',
+                type: 'line',
+                source: 'isochrone',
+                paint: {
+                    'line-color': '#5A9FD4',
+                    'line-width': 2
+                }
+            });
+        }
+
+        let deliveryCount = 0;
+
+        // Update the source with the isochrone data
+        if (isochroneData) {
+            map.getSource('isochrone').setData(isochroneData);
+            
+            // Get all delivery features and filter those within the isochrone polygon
+            const deliverySource = map.getSource('deliveries');
+            if (deliverySource && deliverySource._data) {
+                const deliveryFeatures = deliverySource._data.features;
+                const isochronePolygon = isochroneData.features[0]; // Get the first (and likely only) polygon
+                
+                // Filter delivery points that are within the isochrone polygon
+                const deliveriesWithin = deliveryFeatures.filter(deliveryFeature => {
+                    const point = deliveryFeature.geometry;
+                    return turf.booleanPointInPolygon(point, isochronePolygon);
+                });
+                
+                // console.log(`Found ${deliveriesWithin.length} deliveries within 10-minute walking distance`);
+                
+                // Create a filter expression for Mapbox GL JS
+                const deliveryIds = deliveriesWithin.map(feature => feature.properties.id || feature.id);
+                deliveryCount = deliveriesWithin.length;
+                
+                // Apply filter to show only deliveries within the polygon
+                if (deliveryIds.length > 0) {
+                    map.setFilter('symbol-deliveries', ['in', ['get', 'id'], ['literal', deliveryIds]]);
+                } else {
+                    // If no deliveries within polygon, hide all
+                    map.setFilter('symbol-deliveries', ['==', 'id', 'no-match']);
+                }
+            }
+        }
+
+        let html = '<table>';
+        html += `<tr><th>配達数</th><td>${deliveryCount}</td></tr>`;
+        html += '</table>';
+        if (!popup) popup = new mapboxgl.Popup({
+            closeButton: false,
+            closeOnClick: false
+        });
+
+        popup.setLngLat(feature.geometry.coordinates)
+            .setHTML(html)
+            .addTo(map);
+    });
+
+    map.on('mouseleave', 'symbol-delivery-centers', () => {
+        if (popup) {
+            popup.remove();
+        }
+
+        // Clear isochrone
+        if (map.getSource('isochrone')) {
+            map.getSource('isochrone').setData({
+                type: 'FeatureCollection',
+                features: []
+            });
+        }
+        
+        // Reset delivery filter to show all deliveries
+        if (map.getLayer('symbol-deliveries')) {
+            map.setFilter('symbol-deliveries', null);
+        }
+    });
+}
+
+const addDeliveryCenters = (data) => {
+    map.addSource('delivery-centers', {
+        type: 'geojson',
+        data: data,
+        // cluster: true,
+        // clusterMaxZoom: 14,
+        // clusterRadius: 50
+    });
+    // map.addLayer({
+    //     id: "clusters",
+    //     type: "circle",
+    //     source: "ports",
+    //     filter: ['has', 'point_count'],
+    //     paint: {
+    //         "circle-color": [
+    //             "step",
+    //             ["get", "point_count"],
+    //             "#51bbd6",
+    //             2,
+    //             "#f1f075",
+    //             100,
+    //             "#f28cb1",
+    //         ],
+    //         "circle-radius": ["step", ["get", "point_count"],
+    //             20,
+    //             100,
+    //             30,
+    //             750,
+    //             40],
+    //     },
+    // });
+
+    // map.addLayer({
+    //     id: "cluster-count",
+    //     type: "symbol",
+    //     source: "ports",
+    //     filter: ['has', 'point_count'],
+    //     layout: {
+    //         'text-field': ['get', 'point_count_abbreviated'],
+    //         "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
+    //         "text-size": 12,
+    //     },
+    // });
+
+    map.addLayer({
+        id: "symbol-delivery-centers",
+        type: "symbol",
+        source: "delivery-centers",
+        // filter: ['!', ['has', 'point_count']],
+        layout: {
+            "icon-image": "yamato", // ensure you have added this image beforehand
+            "icon-size": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                0, 0.1,
+                10, 0.3,
+                15, 0.6
+            ],
+            "icon-allow-overlap": true
+        }
+    });
+}
+
+const addDeliveries = (data) => {
+    map.addSource('deliveries', {
+        type: 'geojson',
+        data: data,
+    });
+
+    map.addLayer({
+        id: "symbol-deliveries",
+        type: "circle",
+        source: "deliveries",
+        paint: {
+            "circle-radius": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                0, 2,
+                10, 4,
+                15, 6
+            ],
+            "circle-color": "#FF0000",
+            "circle-opacity": 0.8,
+            "circle-stroke-width": 1,
+            "circle-stroke-color": "#FFFFFF"
+        },
+        minzoom: 10
+    });
+}
+
+loadMap()
