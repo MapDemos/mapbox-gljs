@@ -149,7 +149,9 @@ async function fuzzyGeocode(query) {
     const geocode = async (search_text) => {
         console.log('Geocoding:', search_text);
         attempts.push({ attempt: attempts.length + 1, search_text: search_text });
+        //const delivereasyToken = 'pk.eyJ1IjoiZGVsaXZlcmVhc3kiLCJhIjoiY2xwMGpyYjI1MDdkZDJrczRyeWN3dWRsYyJ9.ZbphbQHHzuYRkvzpV6Qj4A'
         const url = `${baseUrl}${encodeURIComponent(search_text)}&country=nz&types=address&limit=10&access_token=${mapboxgl.accessToken}`;
+        //const url = `${baseUrl}${encodeURIComponent(search_text)}&country=nz&types=address&limit=10&access_token=${delivereasyToken}`;
         console.log('Geocoding URL:', url);
         try {
             const response = await fetch(url);
