@@ -2,6 +2,60 @@
 const defaultCoordinates = [139.76652995236685, 35.67881527736655];
 
 let map
+let mts = false
+
+function getControlValues() {
+    return {
+        useMTS: document.getElementById('use-mts').checked,
+        minutes: parseInt(document.getElementById('isochrone-minutes').value),
+        profile: document.getElementById('travel-profile').value
+    };
+}
+
+function setupControlListeners() {
+    // Listen for MTS toggle
+    document.getElementById('use-mts').addEventListener('change', function () {
+        mts = this.checked;
+        console.log('MTS mode:', mts);
+        // Reload deliveries data when MTS mode changes
+        reloadDeliveries();
+    });
+
+    // Listen for minutes change
+    document.getElementById('isochrone-minutes').addEventListener('change', function () {
+        console.log('Isochrone minutes changed to:', this.value);
+    });
+
+    // Listen for profile change
+    document.getElementById('travel-profile').addEventListener('change', function () {
+        console.log('Travel profile changed to:', this.value);
+    });
+}
+
+function loadDeliveries() {
+    if (mts) {
+        addDeliveries(null);
+    } else {
+        fetch('deliveries.geojson')
+            .then(response => response.json())
+            .then(data => {
+                addDeliveries(data)
+            })
+            .catch(error => console.error('Error loading GeoJSON data:', error));
+    }
+}
+
+function reloadDeliveries() {
+    // Remove existing deliveries layer and source
+    if (map.getLayer('symbol-deliveries')) {
+        map.removeLayer('symbol-deliveries');
+    }
+    if (map.getSource('deliveries')) {
+        map.removeSource('deliveries');
+    }
+
+    loadDeliveries()
+}
 
 const loadMap = () => {
     map = new mapboxgl.Map({
@@ -15,6 +69,8 @@ const loadMap = () => {
         language: 'ja'
     })
     map.on('load', () => {
+        setupControlListeners();
+        mts = document.getElementById('use-mts').checked;
         map.loadImage('./assets/images/yamato.png', (error, image) => {
             if (error) throw error;
             if (!map.hasImage('yamato')) {
@@ -29,16 +85,21 @@ const loadMap = () => {
             })
             .catch(error => console.error('Error loading GeoJSON data:', error));
 
-        fetch('deliveries.geojson')
-            .then(response => response.json())
-            .then(data => {
-                addDeliveries(data)
-            })
-            .catch(error => console.error('Error loading GeoJSON data:', error));
+        loadDeliveries();
     })
     map.on('click', (event) => {
         const { lng, lat } = event.lngLat;
         console.log(`Longitude: ${lng}, Latitude: ${lat}`);
+
+        // Check if there are any delivery centers at the click point
+        const features = map.queryRenderedFeatures(event.point, {
+            layers: ['symbol-delivery-centers']
+        });
+
+        // If no delivery centers were clicked, reset the action
+        if (features.length === 0) {
+            resetClickAction();
+        }
     })
 
     map.on('click', 'clusters', (e) => {
@@ -53,22 +114,23 @@ const loadMap = () => {
 
     let popup
 
-    map.on('mouseover', 'symbol-delivery-centers', async (e) => {
+    map.on('click', 'symbol-delivery-centers', async (e) => {
         const features = map.queryRenderedFeatures(e.point, {
             layers: ['symbol-delivery-centers']
         });
-        // console.log("feature", features[0])
+
         if (!features.length) {
-            if (popup) popup.remove();
+            resetClickAction();
             return;
         }
         const feature = features[0];
 
-        // Call isochrone API for 10 minutes
-        const coordinates = feature.geometry.coordinates;
-        const isochroneData = await fetchIsochrone('mapbox/walking', coordinates, 10, '5A9FD4');
+        // Get values from UI controls
+        const controls = getControlValues();
 
-        // console.log('Isochrone result:', isochroneData);
+        // Call isochrone API using UI values
+        const coordinates = feature.geometry.coordinates;
+        const isochroneData = await fetchIsochrone(controls.profile, coordinates, controls.minutes, '5A9FD4');
 
         // Add isochrone to map if it doesn't exist
         if (!map.getSource('isochrone')) {
@@ -106,25 +168,30 @@ const loadMap = () => {
         // Update the source with the isochrone data
         if (isochroneData) {
             map.getSource('isochrone').setData(isochroneData);
-            
-            // Get all delivery features and filter those within the isochrone polygon
-            const deliverySource = map.getSource('deliveries');
-            if (deliverySource && deliverySource._data) {
-                const deliveryFeatures = deliverySource._data.features;
-                const isochronePolygon = isochroneData.features[0]; // Get the first (and likely only) polygon
-                
+
+            // Get all delivery features using UI MTS setting
+            let deliveryFeatures = null
+            if (controls.useMTS) {
+                deliveryFeatures = map.querySourceFeatures('deliveries', {
+                    sourceLayer: 'deliveries'
+                });
+            } else {
+                deliveryFeatures = map.getSource('deliveries')._data.features;
+            }
+
+            if (deliveryFeatures) {
+                const isochronePolygon = isochroneData.features[0];
+
                 // Filter delivery points that are within the isochrone polygon
                 const deliveriesWithin = deliveryFeatures.filter(deliveryFeature => {
                     const point = deliveryFeature.geometry;
                     return turf.booleanPointInPolygon(point, isochronePolygon);
                 });
-                
-                // console.log(`Found ${deliveriesWithin.length} deliveries within 10-minute walking distance`);
-                
+
                 // Create a filter expression for Mapbox GL JS
                 const deliveryIds = deliveriesWithin.map(feature => feature.properties.id || feature.id);
                 deliveryCount = deliveriesWithin.length;
-                
+
                 // Apply filter to show only deliveries within the polygon
                 if (deliveryIds.length > 0) {
                     map.setFilter('symbol-deliveries', ['in', ['get', 'id'], ['literal', deliveryIds]]);
@@ -138,6 +205,7 @@ const loadMap = () => {
         let html = '<table>';
         html += `<tr><th>配達数</th><td>${deliveryCount}</td></tr>`;
         html += '</table>';
+
         if (!popup) popup = new mapboxgl.Popup({
             closeButton: false,
             closeOnClick: false
@@ -148,7 +216,7 @@ const loadMap = () => {
             .addTo(map);
     });
 
-    map.on('mouseleave', 'symbol-delivery-centers', () => {
+    const resetClickAction = () => {
         if (popup) {
             popup.remove();
         }
@@ -160,57 +228,19 @@ const loadMap = () => {
                 features: []
             });
         }
-        
+
         // Reset delivery filter to show all deliveries
         if (map.getLayer('symbol-deliveries')) {
             map.setFilter('symbol-deliveries', null);
         }
-    });
+    }
 }
 
 const addDeliveryCenters = (data) => {
     map.addSource('delivery-centers', {
         type: 'geojson',
         data: data,
-        // cluster: true,
-        // clusterMaxZoom: 14,
-        // clusterRadius: 50
     });
-    // map.addLayer({
-    //     id: "clusters",
-    //     type: "circle",
-    //     source: "ports",
-    //     filter: ['has', 'point_count'],
-    //     paint: {
-    //         "circle-color": [
-    //             "step",
-    //             ["get", "point_count"],
-    //             "#51bbd6",
-    //             2,
-    //             "#f1f075",
-    //             100,
-    //             "#f28cb1",
-    //         ],
-    //         "circle-radius": ["step", ["get", "point_count"],
-    //             20,
-    //             100,
-    //             30,
-    //             750,
-    //             40],
-    //     },
-    // });
-
-    // map.addLayer({
-    //     id: "cluster-count",
-    //     type: "symbol",
-    //     source: "ports",
-    //     filter: ['has', 'point_count'],
-    //     layout: {
-    //         'text-field': ['get', 'point_count_abbreviated'],
-    //         "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
-    //         "text-size": 12,
-    //     },
-    // });
 
     map.addLayer({
         id: "symbol-delivery-centers",
@@ -233,12 +263,11 @@ const addDeliveryCenters = (data) => {
 }
 
 const addDeliveries = (data) => {
-    map.addSource('deliveries', {
+    const source = {
         type: 'geojson',
-        data: data,
-    });
-
-    map.addLayer({
+        data: data
+    }
+    const layer = {
         id: "symbol-deliveries",
         type: "circle",
         source: "deliveries",
@@ -257,7 +286,15 @@ const addDeliveries = (data) => {
             "circle-stroke-color": "#FFFFFF"
         },
         minzoom: 10
-    });
+    }
+    if (data === null) {
+        source.type = 'vector'
+        source.url = 'mapbox://kenji-shima.deliveries-z16'
+        layer['source-layer'] = 'deliveries'
+    }
+    map.addSource('deliveries', source);
+
+    map.addLayer(layer);
 }
 
 loadMap()
