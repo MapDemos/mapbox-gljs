@@ -24,9 +24,9 @@ js: deliveries.js
       border-radius: 8px;
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
       z-index: 1000;
-      font-family: 'Arial', sans-serif;
+      font-family: 'Hiragino Kaku Gothic Pro', 'Yu Gothic', 'Meiryo', sans-serif;
       font-size: 14px;
-      min-width: 250px;
+      min-width: 280px;
     }
     .control-panel h3 {
       margin: 0 0 15px 0;
@@ -51,17 +51,29 @@ js: deliveries.js
       border-radius: 4px;
       font-size: 14px;
     }
-    .control-group input[type="checkbox"] {
-      width: auto;
-      margin-right: 8px;
-    }
-    .checkbox-group {
-      display: flex;
-      align-items: center;
-    }
-    .checkbox-group label {
-      margin-bottom: 0;
+    .analyze-button {
+      width: 100%;
+      padding: 12px;
+      background-color: #007cbf;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
       cursor: pointer;
+      margin-top: 10px;
+    }
+    .analyze-button:hover {
+      background-color: #005a8b;
+    }
+    .analyze-button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    .loading-indicator {
+      display: none;
+      text-align: center;
+      margin-top: 10px;
+      color: #666;
     }
 </style>
 </head>
@@ -70,12 +82,7 @@ js: deliveries.js
   <div id="map" class="map"></div>
   <div class="control-panel">
     <h3>配達分析</h3>
-    <div class="control-group">
-      <div class="checkbox-group">
-        <input type="checkbox" id="use-mts" />
-        <label for="use-mts">MTS（Mapbox Tiling Service）を使用</label>
-      </div>
-    </div>
+    
     <div class="control-group">
       <label for="isochrone-minutes">到達圏時間:</label>
       <select id="isochrone-minutes">
@@ -86,6 +93,7 @@ js: deliveries.js
         <option value="30">30分</option>
       </select>
     </div>
+    
     <div class="control-group">
       <label for="travel-profile">移動手段:</label>
       <select id="travel-profile">
@@ -95,6 +103,9 @@ js: deliveries.js
         <option value="mapbox/driving-traffic">車（交通情報含む）</option>
       </select>
     </div>
+    
+    <button id="analyze-button" class="analyze-button">分析開始</button>
+    <div id="loading-indicator" class="loading-indicator">処理中...</div>
   </div>
 </body>
 <script>

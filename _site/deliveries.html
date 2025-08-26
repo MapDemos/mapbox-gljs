@@ -31,9 +31,9 @@
       border-radius: 8px;
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
       z-index: 1000;
-      font-family: 'Arial', sans-serif;
+      font-family: 'Hiragino Kaku Gothic Pro', 'Yu Gothic', 'Meiryo', sans-serif;
       font-size: 14px;
-      min-width: 250px;
+      min-width: 280px;
     }
     .control-panel h3 {
       margin: 0 0 15px 0;
@@ -58,17 +58,29 @@
       border-radius: 4px;
       font-size: 14px;
     }
-    .control-group input[type="checkbox"] {
-      width: auto;
-      margin-right: 8px;
-    }
-    .checkbox-group {
-      display: flex;
-      align-items: center;
-    }
-    .checkbox-group label {
-      margin-bottom: 0;
+    .analyze-button {
+      width: 100%;
+      padding: 12px;
+      background-color: #007cbf;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
       cursor: pointer;
+      margin-top: 10px;
+    }
+    .analyze-button:hover {
+      background-color: #005a8b;
+    }
+    .analyze-button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    .loading-indicator {
+      display: none;
+      text-align: center;
+      margin-top: 10px;
+      color: #666;
     }
 </style>
 </head>
@@ -77,12 +89,7 @@
   <div id="map" class="map"></div>
   <div class="control-panel">
     <h3>配達分析</h3>
-    <div class="control-group">
-      <div class="checkbox-group">
-        <input type="checkbox" id="use-mts" />
-        <label for="use-mts">MTS（Mapbox Tiling Service）を使用</label>
-      </div>
-    </div>
+    
     <div class="control-group">
       <label for="isochrone-minutes">到達圏時間:</label>
       <select id="isochrone-minutes">
@@ -93,6 +100,7 @@
         <option value="30">30分</option>
       </select>
     </div>
+    
     <div class="control-group">
       <label for="travel-profile">移動手段:</label>
       <select id="travel-profile">
@@ -102,32 +110,34 @@
         <option value="mapbox/driving-traffic">車（交通情報含む）</option>
       </select>
     </div>
+    
+    <button id="analyze-button" class="analyze-button">分析開始</button>
+    <div id="loading-indicator" class="loading-indicator">処理中...</div>
   </div>
 </body>
 <script>
-  
-const defaultCoordinates = [139.76652995236685, 35.67881527736655];
+  const defaultCoordinates = [139.76652995236685, 35.67881527736655];
 
 let map
-let mts = false
+let analysisResults = null;
+let colorToIndexMap = {}; 
+let colorPalette = [
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+    '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'
+];
+
+// Add throttling variables
+const REQUESTS_PER_SECOND = 300; // 300 per minute = 5 per second
+const REQUEST_DELAY = 1000 / REQUESTS_PER_SECOND; // 200ms between requests
 
 function getControlValues() {
     return {
-        useMTS: document.getElementById('use-mts').checked,
         minutes: parseInt(document.getElementById('isochrone-minutes').value),
         profile: document.getElementById('travel-profile').value
     };
 }
 
 function setupControlListeners() {
-    // Listen for MTS toggle
-    document.getElementById('use-mts').addEventListener('change', function () {
-        mts = this.checked;
-        console.log('MTS mode:', mts);
-        // Reload deliveries data when MTS mode changes
-        reloadDeliveries();
-    });
-
     // Listen for minutes change
     document.getElementById('isochrone-minutes').addEventListener('change', function () {
         console.log('Isochrone minutes changed to:', this.value);
@@ -137,32 +147,486 @@ function setupControlListeners() {
     document.getElementById('travel-profile').addEventListener('change', function () {
         console.log('Travel profile changed to:', this.value);
     });
+
+    // Add analyze button listener
+    document.getElementById('analyze-button').addEventListener('click', function() {
+        runAnalysis();
+    });
 }
 
-function loadDeliveries() {
-    if (mts) {
-        addDeliveries(null);
-    } else {
-        fetch('deliveries.geojson')
-            .then(response => response.json())
-            .then(data => {
-                addDeliveries(data)
-            })
-            .catch(error => console.error('Error loading GeoJSON data:', error));
+async function runAnalysis() {
+    const controls = getControlValues();
+    const button = document.getElementById('analyze-button');
+    const loading = document.getElementById('loading-indicator');
+    
+    // Show loading state
+    button.disabled = true;
+    button.textContent = '処理中...';
+    
+    try {
+        // Get all delivery centers from GeoJSON source
+        const centerFeatures = map.getSource('delivery-centers')._data.features;
+        
+        // Get all delivery points from GeoJSON source
+        const deliveryFeatures = map.getSource('deliveries')._data.features;
+        
+        console.log(`Analyzing ${centerFeatures.length} delivery centers and ${deliveryFeatures.length} delivery points`);
+        
+        // Create all isochrone requests at once but limit concurrency
+        const BATCH_SIZE = 50; // Process 50 requests at a time
+        const validResults = [];
+        
+        for (let i = 0; i < centerFeatures.length; i += BATCH_SIZE) {
+            const batch = centerFeatures.slice(i, i + BATCH_SIZE);
+            
+            console.log(`Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(centerFeatures.length/BATCH_SIZE)} (${batch.length} centers)...`);
+            
+            // Process batch concurrently
+            const batchPromises = batch.map(async (center, batchIndex) => {
+                const globalIndex = i + batchIndex;
+                const coordinates = center.geometry.coordinates;
+                const color = colorPalette[globalIndex % colorPalette.length];
+                
+                try {
+                    const isochroneData = await fetchIsochrone(controls.profile, coordinates, controls.minutes, color.replace('#', ''));
+                    
+                    return {
+                        centerId: center.properties.id || globalIndex,
+                        centerCoords: coordinates,
+                        isochrone: isochroneData,
+                        color: color,
+                        deliveries: []
+                    };
+                } catch (error) {
+                    console.error(`Failed to fetch isochrone for center ${globalIndex}:`, error);
+                    return null;
+                }
+            });
+            
+            const batchResults = await Promise.all(batchPromises);
+            validResults.push(...batchResults.filter(result => result !== null));
+            
+            // Small delay between batches to be extra safe
+            if (i + BATCH_SIZE < centerFeatures.length) {
+                await delay(100); // 100ms between batches
+            }
+        }
+        
+        console.log(`Successfully fetched ${validResults.length}/${centerFeatures.length} isochrones`);
+        
+        // Assign deliveries to nearest delivery center
+        deliveryFeatures.forEach(delivery => {
+            const deliveryPoint = delivery.geometry;
+            let assignedCenter = null;
+            let minDistance = Infinity;
+            
+            // Check which delivery centers this point falls within
+            const candidateCenters = validResults.filter(result => {
+                if (result.isochrone && result.isochrone.features && result.isochrone.features.length > 0) {
+                    return turf.booleanPointInPolygon(deliveryPoint, result.isochrone.features[0]);
+                }
+                return false;
+            });
+            
+            // If multiple centers, find the closest one
+            if (candidateCenters.length > 1) {
+                candidateCenters.forEach(center => {
+                    const distance = turf.distance(deliveryPoint, turf.point(center.centerCoords));
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        assignedCenter = center;
+                    }
+                });
+            } else if (candidateCenters.length === 1) {
+                assignedCenter = candidateCenters[0];
+            }
+            
+            // Add delivery to assigned center
+            if (assignedCenter) {
+                assignedCenter.deliveries.push({
+                    ...delivery,
+                    assignedColor: assignedCenter.color
+                });
+            }
+        });
+        
+        // Store results and update visualization
+        analysisResults = validResults;
+        updateVisualization();
+        hideOriginalDeliveryLayer();
+
+        console.log('Analysis complete:', analysisResults.map(r => ({
+            centerId: r.centerId,
+            deliveryCount: r.deliveries.length,
+            color: r.color
+        })));
+        
+    } catch (error) {
+        console.error('Analysis failed:', error);
+    } finally {
+        // Reset loading state
+        button.disabled = false;
+        button.textContent = '分析開始';
+        // loading.style.display = 'none'; // Remove this line since we're not showing it
     }
 }
 
-function reloadDeliveries() {
-    // Remove existing deliveries layer and source
+// Update the updateVisualization to store the mapping globally:
+function updateVisualization() {
+    if (!analysisResults) return;
+    
+    // Remove existing analysis layers
+    clearAnalysisLayers();
+    
+    // Create consistent color groups mapping and store globally
+    colorToIndexMap = {};
+    analysisResults.forEach((result) => {
+        if (!colorToIndexMap[result.color]) {
+            colorToIndexMap[result.color] = Object.keys(colorToIndexMap).length;
+        }
+    });
+    
+    console.log('Color to index mapping:', colorToIndexMap); // Debug log
+    
+    // Group results by color for both isochrones and deliveries
+    const colorGroups = {};
+    analysisResults.forEach((result, index) => {
+        const color = result.color;
+        if (!colorGroups[color]) {
+            colorGroups[color] = {
+                color: color,
+                isochroneFeatures: [],
+                deliveryFeatures: [],
+                centerIds: []
+            };
+        }
+        
+        // Add isochrone features with centerId property
+        if (result.isochrone && result.isochrone.features) {
+            const featuresWithCenterId = result.isochrone.features.map(feature => ({
+                ...feature,
+                properties: {
+                    ...feature.properties,
+                    centerId: result.centerId
+                }
+            }));
+            colorGroups[color].isochroneFeatures.push(...featuresWithCenterId);
+        }
+        
+        // Add delivery features
+        if (result.deliveries.length > 0) {
+            colorGroups[color].deliveryFeatures.push(...result.deliveries);
+        }
+        
+        colorGroups[color].centerIds.push(result.centerId);
+    });
+    
+    // Create layers by color using consistent indexing
+    Object.keys(colorGroups).forEach((color) => {
+        const group = colorGroups[color];
+        const index = colorToIndexMap[color]; // Use consistent index
+        
+        console.log(`Creating layers for color ${color} with index ${index}`); // Debug log
+        
+        // Create isochrone layers
+        if (group.isochroneFeatures.length > 0) {
+            const isochroneSourceId = `isochrone-color-${index}`;
+            const combinedIsochroneGeoJSON = {
+                type: 'FeatureCollection',
+                features: group.isochroneFeatures
+            };
+            
+            map.addSource(isochroneSourceId, {
+                type: 'geojson',
+                data: combinedIsochroneGeoJSON
+            });
+            
+            map.addLayer({
+                id: `isochrone-fill-color-${index}`,
+                type: 'fill',
+                source: isochroneSourceId,
+                paint: {
+                    'fill-color': color,
+                    'fill-opacity': 0
+                },
+                filter: ['==', 'centerId', ''] // Initial filter to hide all
+            });
+            
+            map.addLayer({
+                id: `isochrone-border-color-${index}`,
+                type: 'line',
+                source: isochroneSourceId,
+                paint: {
+                    'line-color': color,
+                    'line-width': 2,
+                    'line-opacity': 0
+                },
+                filter: ['==', 'centerId', ''] // Initial filter to hide all
+            });
+        }
+        
+        // Create delivery point layers
+        if (group.deliveryFeatures.length > 0) {
+            const deliverySourceId = `deliveries-color-${index}`;
+            const combinedDeliveryGeoJSON = {
+                type: 'FeatureCollection',
+                features: group.deliveryFeatures
+            };
+            
+            map.addSource(deliverySourceId, {
+                type: 'geojson',
+                data: combinedDeliveryGeoJSON
+            });
+            
+            map.addLayer({
+                id: `deliveries-color-${index}`,
+                type: 'circle',
+                source: deliverySourceId,
+                paint: {
+                    "circle-radius": [
+                        "interpolate",
+                        ["linear"],
+                        ["zoom"],
+                        0, 2,
+                        10, 4,
+                        15, 6
+                    ],
+                    "circle-color": color,
+                    "circle-opacity": 0.8,
+                    "circle-stroke-width": 1,
+                    "circle-stroke-color": "#FFFFFF"
+                },
+                minzoom: 10
+            });
+        }
+    });
+    
+    // Create layer for unassigned deliveries
+    createUnassignedDeliveriesLayer();
+    
+    // Add mouseover events for delivery centers
+    addDeliveryCenterHoverEvents();
+}
+
+function createUnassignedDeliveriesLayer() {
+    // Get all assigned delivery IDs
+    const assignedIds = new Set();
+    if (analysisResults) {
+        analysisResults.forEach(result => {
+            result.deliveries.forEach(delivery => {
+                assignedIds.add(delivery.properties.id || delivery.id);
+            });
+        });
+    }
+    
+    // Get all delivery features
+    const allDeliveries = map.getSource('deliveries')._data.features;
+    
+    // Filter unassigned deliveries
+    const unassignedDeliveries = allDeliveries.filter(delivery => {
+        const id = delivery.properties.id || delivery.id;
+        return !assignedIds.has(id);
+    });
+    
+    if (unassignedDeliveries.length > 0) {
+        const unassignedGeoJSON = {
+            type: 'FeatureCollection',
+            features: unassignedDeliveries
+        };
+        
+        map.addSource('deliveries-unassigned', {
+            type: 'geojson',
+            data: unassignedGeoJSON
+        });
+        
+        map.addLayer({
+            id: 'deliveries-unassigned',
+            type: 'circle',
+            source: 'deliveries-unassigned',
+            paint: {
+                "circle-radius": [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    0, 2,
+                    10, 4,
+                    15, 6
+                ],
+                "circle-color": "#CCCCCC",
+                "circle-opacity": 0.8,
+                "circle-stroke-width": 1,
+                "circle-stroke-color": "#FFFFFF"
+            },
+            minzoom: 10
+        });
+    }
+}
+
+// Update the addDeliveryCenterHoverEvents function:
+function addDeliveryCenterHoverEvents() {
+    // Remove existing event listeners to prevent duplicates
+    map.off('mouseenter', 'symbol-delivery-centers');
+    map.off('mouseleave', 'symbol-delivery-centers');
+    
+    let popup = null; // Track popup
+    
+    map.on('mouseenter', 'symbol-delivery-centers', (e) => {
+        const feature = e.features[0];
+        const centerId = feature.properties.id;
+        
+        // Find matching analysis result
+        const result = analysisResults.find(r => r.centerId === centerId);
+        if (result) {
+            const color = result.color;
+            
+            // Use the global color mapping
+            const colorIndex = colorToIndexMap[color];
+            
+            console.log(`Hovering center ${centerId}, color: ${color}, index: ${colorIndex}`); // Debug log
+            
+            const fillLayerId = `isochrone-fill-color-${colorIndex}`;
+            const borderLayerId = `isochrone-border-color-${colorIndex}`;
+            
+            // Check if layers exist before setting properties and filters
+            if (map.getLayer(fillLayerId)) {
+                // Set filter to show only this center's isochrone
+                map.setFilter(fillLayerId, ['==', 'centerId', centerId]);
+                map.setPaintProperty(fillLayerId, 'fill-opacity', 0.3);
+            } else {
+                console.warn(`Layer ${fillLayerId} does not exist`); // Debug log
+            }
+            if (map.getLayer(borderLayerId)) {
+                // Set filter to show only this center's isochrone
+                map.setFilter(borderLayerId, ['==', 'centerId', centerId]);
+                map.setPaintProperty(borderLayerId, 'line-opacity', 1);
+            } else {
+                console.warn(`Layer ${borderLayerId} does not exist`); // Debug log
+            }
+            
+            // Filter delivery points - hide all delivery layers first
+            Object.keys(colorToIndexMap).forEach((c) => {
+                const cIndex = colorToIndexMap[c];
+                const deliveryLayerId = `deliveries-color-${cIndex}`;
+                if (map.getLayer(deliveryLayerId)) {
+                    if (cIndex === colorIndex) {
+                        // For the matching color, show only deliveries assigned to this center
+                        const deliveryIds = result.deliveries.map(d => d.properties.id || d.id);
+                        if (deliveryIds.length > 0) {
+                            map.setFilter(deliveryLayerId, ['in', ['get', 'id'], ['literal', deliveryIds]]);
+                        } else {
+                            map.setFilter(deliveryLayerId, ['==', 'id', 'no-match']); // Hide if no deliveries
+                        }
+                    } else {
+                        // Hide all other color delivery layers
+                        map.setFilter(deliveryLayerId, ['==', 'id', 'no-match']);
+                    }
+                }
+            });
+            
+            // Hide unassigned deliveries during hover
+            if (map.getLayer('deliveries-unassigned')) {
+                map.setFilter('deliveries-unassigned', ['==', 'id', 'no-match']);
+            }
+            
+            // Create popup with delivery count (removed delivery center ID)
+            const deliveryCount = result.deliveries.length;
+            const html = `<div style="text-align: center; font-family: 'Hiragino Kaku Gothic Pro', 'Yu Gothic', 'Meiryo', sans-serif; font-size: 14px; padding: 5px;">
+                <span style="color: ${result.color}; font-weight: bold;">配達数: ${deliveryCount}</span>
+            </div>`;
+            
+            popup = new mapboxgl.Popup({
+                closeButton: false,
+                closeOnClick: false,
+                offset: [0, -10] // Offset popup above the icon
+            });
+
+            popup.setLngLat(feature.geometry.coordinates)
+                .setHTML(html)
+                .addTo(map);
+        }
+    });
+    
+    map.on('mouseleave', 'symbol-delivery-centers', (e) => {
+        // Remove popup
+        if (popup) {
+            popup.remove();
+            popup = null;
+        }
+        
+        // Use the global color mapping
+        Object.keys(colorToIndexMap).forEach((color) => {
+            const colorIndex = colorToIndexMap[color];
+            const fillLayerId = `isochrone-fill-color-${colorIndex}`;
+            const borderLayerId = `isochrone-border-color-${colorIndex}`;
+            
+            console.log(`Hiding layers for color ${color}, index: ${colorIndex}`); // Debug log
+            
+            // Check if layers exist before setting properties and filters
+            if (map.getLayer(fillLayerId)) {
+                map.setFilter(fillLayerId, ['==', 'centerId', '']); // Filter to show nothing
+                map.setPaintProperty(fillLayerId, 'fill-opacity', 0);
+            }
+            if (map.getLayer(borderLayerId)) {
+                map.setFilter(borderLayerId, ['==', 'centerId', '']); // Filter to show nothing
+                map.setPaintProperty(borderLayerId, 'line-opacity', 0);
+            }
+            
+            // Reset delivery point filters to show all deliveries of each color
+            const deliveryLayerId = `deliveries-color-${colorIndex}`;
+            if (map.getLayer(deliveryLayerId)) {
+                map.setFilter(deliveryLayerId, null); // Show all deliveries of this color
+            }
+        });
+        
+        // Show unassigned deliveries again
+        if (map.getLayer('deliveries-unassigned')) {
+            map.setFilter('deliveries-unassigned', null);
+        }
+    });
+}
+
+function clearAnalysisLayers() {
+    // Remove existing analysis layers
+    const layers = map.getStyle().layers;
+    layers.forEach(layer => {
+        if (layer.id.startsWith('isochrone-') || 
+            layer.id.startsWith('deliveries-color-') || 
+            layer.id === 'deliveries-unassigned') {
+            map.removeLayer(layer.id);
+        }
+    });
+    
+    // Remove existing analysis sources
+    const sources = map.getStyle().sources;
+    Object.keys(sources).forEach(sourceId => {
+        if (sourceId.startsWith('isochrone-') || 
+            sourceId.startsWith('deliveries-color-') || 
+            sourceId === 'deliveries-unassigned') {
+            map.removeSource(sourceId);
+        }
+    });
+    
+    // Show original delivery layer when clearing analysis
+    showOriginalDeliveryLayer();
+}
+
+// Remove the updateDeliveryColors function since we're not using it anymore
+
+// Keep the original delivery layer hidden during analysis
+function hideOriginalDeliveryLayer() {
     if (map.getLayer('symbol-deliveries')) {
-        map.removeLayer('symbol-deliveries');
+        map.setLayoutProperty('symbol-deliveries', 'visibility', 'none');
     }
-    if (map.getSource('deliveries')) {
-        map.removeSource('deliveries');
-    }
-
-    loadDeliveries()
 }
+
+// Show original delivery layer when analysis is cleared
+function showOriginalDeliveryLayer() {
+    if (map.getLayer('symbol-deliveries')) {
+        map.setLayoutProperty('symbol-deliveries', 'visibility', 'visible');
+    }
+}
+
+// Add these missing functions at the end of your file:
 
 const loadMap = () => {
     map = new mapboxgl.Map({
@@ -171,13 +635,13 @@ const loadMap = () => {
         center: defaultCoordinates,
         zoom: 12,
         minZoom: 3,
-        //maxZoom: 12,
         scrollZoom: true,
         language: 'ja'
     })
+    
     map.on('load', () => {
         setupControlListeners();
-        mts = document.getElementById('use-mts').checked;
+        
         map.loadImage('./assets/images/yamato.png', (error, image) => {
             if (error) throw error;
             if (!map.hasImage('yamato')) {
@@ -190,157 +654,20 @@ const loadMap = () => {
             .then(data => {
                 addDeliveryCenters(data)
             })
-            .catch(error => console.error('Error loading GeoJSON data:', error));
+            .catch(error => console.error('Error loading delivery centers:', error));
 
-        loadDeliveries();
+        fetch('deliveries.geojson')
+            .then(response => response.json())
+            .then(data => {
+                addDeliveries(data)
+            })
+            .catch(error => console.error('Error loading deliveries:', error));
     })
+    
     map.on('click', (event) => {
         const { lng, lat } = event.lngLat;
         console.log(`Longitude: ${lng}, Latitude: ${lat}`);
-
-        // Check if there are any delivery centers at the click point
-        const features = map.queryRenderedFeatures(event.point, {
-            layers: ['symbol-delivery-centers']
-        });
-
-        // If no delivery centers were clicked, reset the action
-        if (features.length === 0) {
-            resetClickAction();
-        }
     })
-
-    map.on('click', 'clusters', (e) => {
-        const features = map.queryRenderedFeatures(e.point, {
-            layers: ['clusters']
-        });
-        map.easeTo({
-            center: features[0].geometry.coordinates,
-            zoom: map.getZoom() + 2
-        });
-    });
-
-    let popup
-
-    map.on('click', 'symbol-delivery-centers', async (e) => {
-        const features = map.queryRenderedFeatures(e.point, {
-            layers: ['symbol-delivery-centers']
-        });
-
-        if (!features.length) {
-            resetClickAction();
-            return;
-        }
-        const feature = features[0];
-
-        // Get values from UI controls
-        const controls = getControlValues();
-
-        // Call isochrone API using UI values
-        const coordinates = feature.geometry.coordinates;
-        const isochroneData = await fetchIsochrone(controls.profile, coordinates, controls.minutes, '5A9FD4');
-
-        // Add isochrone to map if it doesn't exist
-        if (!map.getSource('isochrone')) {
-            map.addSource('isochrone', {
-                type: 'geojson',
-                data: {
-                    type: 'FeatureCollection',
-                    features: []
-                }
-            });
-
-            map.addLayer({
-                id: 'isochrone-fill',
-                type: 'fill',
-                source: 'isochrone',
-                paint: {
-                    'fill-color': '#5A9FD4',
-                    'fill-opacity': 0.3
-                }
-            });
-
-            map.addLayer({
-                id: 'isochrone-border',
-                type: 'line',
-                source: 'isochrone',
-                paint: {
-                    'line-color': '#5A9FD4',
-                    'line-width': 2
-                }
-            });
-        }
-
-        let deliveryCount = 0;
-
-        // Update the source with the isochrone data
-        if (isochroneData) {
-            map.getSource('isochrone').setData(isochroneData);
-
-            // Get all delivery features using UI MTS setting
-            let deliveryFeatures = null
-            if (controls.useMTS) {
-                deliveryFeatures = map.querySourceFeatures('deliveries', {
-                    sourceLayer: 'deliveries'
-                });
-            } else {
-                deliveryFeatures = map.getSource('deliveries')._data.features;
-            }
-
-            if (deliveryFeatures) {
-                const isochronePolygon = isochroneData.features[0];
-
-                // Filter delivery points that are within the isochrone polygon
-                const deliveriesWithin = deliveryFeatures.filter(deliveryFeature => {
-                    const point = deliveryFeature.geometry;
-                    return turf.booleanPointInPolygon(point, isochronePolygon);
-                });
-
-                // Create a filter expression for Mapbox GL JS
-                const deliveryIds = deliveriesWithin.map(feature => feature.properties.id || feature.id);
-                deliveryCount = deliveriesWithin.length;
-
-                // Apply filter to show only deliveries within the polygon
-                if (deliveryIds.length > 0) {
-                    map.setFilter('symbol-deliveries', ['in', ['get', 'id'], ['literal', deliveryIds]]);
-                } else {
-                    // If no deliveries within polygon, hide all
-                    map.setFilter('symbol-deliveries', ['==', 'id', 'no-match']);
-                }
-            }
-        }
-
-        let html = '<table>';
-        html += `<tr><th>配達数</th><td>${deliveryCount}</td></tr>`;
-        html += '</table>';
-
-        if (!popup) popup = new mapboxgl.Popup({
-            closeButton: false,
-            closeOnClick: false
-        });
-
-        popup.setLngLat(feature.geometry.coordinates)
-            .setHTML(html)
-            .addTo(map);
-    });
-
-    const resetClickAction = () => {
-        if (popup) {
-            popup.remove();
-        }
-
-        // Clear isochrone
-        if (map.getSource('isochrone')) {
-            map.getSource('isochrone').setData({
-                type: 'FeatureCollection',
-                features: []
-            });
-        }
-
-        // Reset delivery filter to show all deliveries
-        if (map.getLayer('symbol-deliveries')) {
-            map.setFilter('symbol-deliveries', null);
-        }
-    }
 }
 
 const addDeliveryCenters = (data) => {
@@ -353,9 +680,8 @@ const addDeliveryCenters = (data) => {
         id: "symbol-delivery-centers",
         type: "symbol",
         source: "delivery-centers",
-        // filter: ['!', ['has', 'point_count']],
         layout: {
-            "icon-image": "yamato", // ensure you have added this image beforehand
+            "icon-image": "yamato",
             "icon-size": [
                 "interpolate",
                 ["linear"],
@@ -370,11 +696,12 @@ const addDeliveryCenters = (data) => {
 }
 
 const addDeliveries = (data) => {
-    const source = {
+    map.addSource('deliveries', {
         type: 'geojson',
         data: data
-    }
-    const layer = {
+    });
+
+    map.addLayer({
         id: "symbol-deliveries",
         type: "circle",
         source: "deliveries",
@@ -387,23 +714,64 @@ const addDeliveries = (data) => {
                 10, 4,
                 15, 6
             ],
-            "circle-color": "#FF0000",
+            "circle-color": "#CCCCCC", // Changed from "#FF0000" to gray
             "circle-opacity": 0.8,
             "circle-stroke-width": 1,
             "circle-stroke-color": "#FFFFFF"
         },
         minzoom: 10
-    }
-    if (data === null) {
-        source.type = 'vector'
-        source.url = 'mapbox://kenji-shima.deliveries-z16'
-        layer['source-layer'] = 'deliveries'
-    }
-    map.addSource('deliveries', source);
-
-    map.addLayer(layer);
+    });
 }
 
+// Update the fetchIsochrone function to include retry logic:
+async function fetchIsochrone(profile, coordinates, minutes, colors) {
+    let contourColors = ''
+    if (colors) {
+        contourColors = `contours_colors=${colors}`
+    }
+    const isochrone_uri = 'https://api.mapbox.com/isochrone/v1/';
+    const url = `${isochrone_uri}${profile}/${coordinates[0]},${coordinates[1]}?contours_minutes=${minutes}&polygons=true&${contourColors}&access_token=${mapboxgl.accessToken}`;
+    
+    const maxRetries = 3;
+    let retries = 0;
+    
+    while (retries < maxRetries) {
+        try {
+            const response = await fetch(url);
+            
+            if (response.status === 429) {
+                // Rate limited, wait and retry
+                const retryAfter = response.headers.get('Retry-After') || 2; // Default 2 seconds
+                console.warn(`Rate limited, waiting ${retryAfter} seconds before retry ${retries + 1}/${maxRetries}`);
+                await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+                retries++;
+                continue;
+            }
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            return await response.json();
+            
+        } catch (error) {
+            retries++;
+            if (retries >= maxRetries) {
+                console.error(`Failed to fetch isochrone after ${maxRetries} retries:`, error);
+                throw error;
+            }
+            // Wait before retry
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
+}
+
+// Add a throttled request function:
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Initialize the map
 loadMap()
 </script>
 
