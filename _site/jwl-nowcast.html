@@ -990,7 +990,7 @@ function initTimeSlider(val) {
 
     const auto = document.getElementById('auto')
 
-    if (bandlist.length > 1) {
+    if (bandlist.length >= 1) {
         timeslider.disabled = false
         auto.disabled = false
         bandlist.forEach(datetime => {
@@ -1317,6 +1317,8 @@ const addRasterArrayLayer = (layer) => {
             'raster-color-range-transition': { duration: 0 },
             'raster-opacity': 0.8,
             'raster-array-band': bandlist[0],
+            'raster-emissive-strength': 1.0,
+            'raster-fade-duration': 0
         },
         // minzoom: layerVals.minzoom,
         // maxzoom: layerVals.maxzoom,
