@@ -1,3 +1,19 @@
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then(registration => {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+        }, err => {
+            console.log('ServiceWorker registration failed: ', err);
+        });
+    });
+
+    navigator.serviceWorker.addEventListener('message', event => {
+        if (event.data && event.data.type === 'TILE_FETCHED_FROM_NETWORK') {
+            updateAPICounter('tiles');
+        }
+    });
+}
+
 const venues = [
     //   { name: "三井アウトレットパーク マリンピア神戸", coordinates: [135.048538, 34.6261626] },
     //   { name: "LaLa arena TOKYO-BAY", coordinates: [139.9897519, 35.6837911] },
@@ -78,6 +94,7 @@ let defaultCoordinates = venues[1].coordinates;
 let mapxusToken = null;
 
 async function fetchMapxusToken(appId, secret) {
+    updateAPICounter('token');
     const res = await fetch('https://map-api.mapxus.co.jp/accounts/v1/auth/token', {
         method: 'POST',
         headers: {
@@ -89,6 +106,53 @@ async function fetchMapxusToken(appId, secret) {
 
     const data = await res.json();
     return data.accessToken;
+}
+
+let apiCallCounters = {
+    token: 0,
+    sprites: 0,
+    style: 0,
+    navigation: 0,
+    tiles: 0,
+    total: 0
+};
+
+function updateAPICounter(type) {
+    apiCallCounters[type]++;
+    apiCallCounters.total++;
+    displayAPICounters();
+}
+
+function displayAPICounters() {
+    let counterDisplay = document.getElementById('api-counter-display');
+    if (!counterDisplay) {
+        counterDisplay = document.createElement('div');
+        counterDisplay.id = 'api-counter-display';
+        counterDisplay.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 1000;
+            min-width: 200px;
+        `;
+        document.body.appendChild(counterDisplay);
+    }
+
+    counterDisplay.innerHTML = `
+        <div><strong>Mapxus API Calls</strong></div>
+        <div>Token: ${apiCallCounters.token}</div>
+        <div>Sprites: ${apiCallCounters.sprites}</div>
+        <div>Style: ${apiCallCounters.style}</div>
+        <div>Navigation: ${apiCallCounters.navigation}</div>
+        <div>Tiles: ~${apiCallCounters.tiles}</div>
+        <div><strong>Total: ${apiCallCounters.total}</strong></div>
+    `;
 }
 
 /**
@@ -323,6 +387,7 @@ async function loadMap() {
         scrollZoom: true,
         transformRequest: (url, resourceType) => {
             if (url.includes("map-api.mapxus.co.jp")) {
+                // This logic is now handled by the service worker
                 return {
                     url: url,
                     headers: { 'token': mapxusToken }
@@ -370,6 +435,9 @@ async function loadMap() {
     async function loadIcons() {
         const spriteJsonUrl = 'https://map-api.mapxus.co.jp/maps/v1/sprites/mapxus_style_v1/sprite@2x.json';
         const spritePngUrl = 'https://map-api.mapxus.co.jp/maps/v1/sprites/mapxus_style_v1/sprite@2x.png';
+
+        updateAPICounter('sprites'); // Count sprite JSON call
+        updateAPICounter('sprites');
 
         const [spriteMeta, spriteImage] = await Promise.all([
             fetch(spriteJsonUrl, {
@@ -420,6 +488,8 @@ async function loadMap() {
             maxzoom: 19,
             lineMetrics: true
         });
+
+        updateAPICounter('style');
 
         const styleRes = await fetch('https://map-api.mapxus.co.jp/maps/v1/styles/mapxus_mims2_v6', {
             headers: { 'token': mapxusToken }
@@ -822,6 +892,7 @@ function createRoutingControl() {
         navApiUrl.searchParams.append('vehicle', 'foot');
 
         try {
+            updateAPICounter('navigation');
             // 3. Fetch the route from the API
             const response = await fetch(navApiUrl, {
                 method: 'GET',
@@ -919,3 +990,4 @@ function createRoutingControl() {
 }
 
 loadMap();
+displayAPICounters();
