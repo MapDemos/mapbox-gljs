@@ -6,8 +6,8 @@
 <link rel="icon" href="data:;base64,iVBORw0KGgo=">
 <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-language/v1.0.0/mapbox-gl-language.js'></script>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
-<script src='https://api.mapbox.com/mapbox-gl-js/v3.15.0-beta.2/mapbox-gl.js'></script>
-<link href='https://api.mapbox.com/mapbox-gl-js/v3.15.0-beta.2/mapbox-gl.css' rel='stylesheet' />
+<script src='https://api.mapbox.com/mapbox-gl-js/v3.15.0/mapbox-gl.js'></script>
+<link href='https://api.mapbox.com/mapbox-gl-js/v3.15.0/mapbox-gl.css' rel='stylesheet' />
 <script src="https://unpkg.com/d3@7.8.5/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.min.js'></script>
@@ -464,7 +464,7 @@ const tilesets = {
     //     type: 'raster-array'
     // },
     nowcast: {
-        value: "mapbox://mapbox.weather-jp-nowcast",
+        value: "mapbox://kenji-shima.nowcast-r-20240620195000",
         label: "nowcast",
         type: 'raster-array'
     },
@@ -993,6 +993,7 @@ function initTimeSlider(val) {
     if (bandlist.length >= 1) {
         timeslider.disabled = false
         auto.disabled = false
+        timeslider.style = 'visibility: visible;'
         bandlist.forEach(datetime => {
             const datetimearray = convertTimeValue(datetime).split(" ")
             const timespan = timediv.appendChild(document.createElement('span'))
@@ -1001,6 +1002,7 @@ function initTimeSlider(val) {
         })
     } else {
         timeslider.disabled = true
+        timeslider.style = 'visibility: hidden;'
         if (autoFlag) play()
         auto.disabled = true
     }
