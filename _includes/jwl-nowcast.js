@@ -13,7 +13,7 @@ const tilesets = {
     //     type: 'raster-array'
     // },
     nowcast: {
-        value: "mapbox://kenji-shima.nowcast-r-20240620195000",
+        value: "mapbox://mapbox.weather-jp-nowcast",
         label: "nowcast",
         type: 'raster-array'
     },
