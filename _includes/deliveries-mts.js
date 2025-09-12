@@ -48,14 +48,17 @@ const addDeliveryCenters = (data) => {
  */
 const addIsochrones = (data) => {
     map.addSource('isochrones', {
-        type: 'geojson',
-        data: data
+        //type: 'geojson',
+        type: 'vector',
+        // data: data
+        url: 'mapbox://kenji-shima.delivery-center-15-walk'
     });
 
     map.addLayer({
         id: 'isochrones-fill',
         type: 'fill',
         source: 'isochrones',
+        'source-layer': 'delivery-centers',
         paint: {
             'fill-color': ['get', 'color'],
             'fill-opacity': 0 // Initially hidden
@@ -66,6 +69,7 @@ const addIsochrones = (data) => {
         id: 'isochrones-border',
         type: 'line',
         source: 'isochrones',
+        'source-layer': 'delivery-centers',
         paint: {
             'line-color': ['get', 'color'],
             'line-width': 2,
@@ -80,15 +84,18 @@ const addIsochrones = (data) => {
  */
 const addDeliveries = (data) => {
     map.addSource('assigned-deliveries', {
-        type: 'geojson',
-        data: data
+        //type: 'geojson',
+        type: 'vector',
+        url: 'mapbox://kenji-shima.deliveries-15-walk',
+        //data: data
     });
 
-    // Layer 1: All deliveries, always visible and gray
+    // Layer 1 (Bottom): All deliveries, colored by default.
     map.addLayer({
-        id: 'assigned-deliveries-circles-gray',
+        id: 'assigned-deliveries-circles-colored',
         type: 'circle',
         source: 'assigned-deliveries',
+        'source-layer': 'deliveries',
         paint: {
             "circle-radius": [
                 "interpolate", ["linear"], ["zoom"],
@@ -96,19 +103,20 @@ const addDeliveries = (data) => {
                 10, 4,
                 15, 6
             ],
-            "circle-color": '#CCCCCC', // All points are gray
-            "circle-opacity": 0.5,
+            "circle-color": ['get', 'color'], // Colored by default
+            "circle-opacity": 0.9,
             "circle-stroke-width": 1,
             "circle-stroke-color": "#FFFFFF"
         },
         minzoom: 10
     });
 
-    // Layer 2: Highlighted deliveries, colored, shown on hover
+    // Layer 2 (Top): A "gray-out" layer that covers non-matching points on hover.
     map.addLayer({
-        id: 'assigned-deliveries-circles-highlight',
+        id: 'assigned-deliveries-circles-grayout',
         type: 'circle',
         source: 'assigned-deliveries',
+        'source-layer': 'deliveries',
         paint: {
             "circle-radius": [
                 "interpolate", ["linear"], ["zoom"],
@@ -116,13 +124,13 @@ const addDeliveries = (data) => {
                 10, 4,
                 15, 6
             ],
-            "circle-color": ['get', 'color'], // Use the feature's color property
-            "circle-opacity": 0.9,
+            "circle-color": '#CCCCCC', // Gray color
+            "circle-opacity": 0.7,
             "circle-stroke-width": 1,
             "circle-stroke-color": "#FFFFFF"
         },
         minzoom: 10,
-        // Initially, this layer shows nothing
+        // Initially, this layer shows nothing.
         filter: ['==', 'isochrone_id', '']
     });
 };
@@ -132,14 +140,22 @@ const addDeliveries = (data) => {
  */
 const addHoverEvents = () => {
     let popup = null;
+    let hoveredCenterId = null;
+    let mouseleaveTimeout = null;
 
     map.on('mouseenter', 'symbol-delivery-centers', (e) => {
+        // If there's a pending mouseleave action, cancel it
+        if (mouseleaveTimeout) {
+            clearTimeout(mouseleaveTimeout);
+            mouseleaveTimeout = null;
+        }
+
         const feature = e.features[0];
-        const centerId = feature.properties.id;
+        hoveredCenterId = feature.properties.id;
 
         // Show popup with pre-calculated delivery count
-        const deliveryCount = deliveryCounts[centerId] || 0;
-        const color = (map.querySourceFeatures('isochrones', { filter: ['==', 'isochrone_id', centerId] })[0]?.properties.color) || '#000000';
+        const deliveryCount = deliveryCounts[hoveredCenterId] || 0;
+        const color = (map.querySourceFeatures('isochrones', { filter: ['==', 'isochrone_id', hoveredCenterId] })[0]?.properties.color) || '#000000';
         const html = `<div style="text-align: center; font-family: 'Hiragino Kaku Gothic Pro', 'Yu Gothic', 'Meiryo', sans-serif; font-size: 14px; padding: 5px;">
             <span style="color: ${color}; font-weight: bold;">配達数: ${deliveryCount}</span>
         </div>`;
@@ -151,15 +167,15 @@ const addHoverEvents = () => {
         }).setLngLat(feature.geometry.coordinates).setHTML(html).addTo(map);
 
         // Show corresponding isochrone by setting filter and opacity
-        map.setFilter('isochrones-fill', ['==', 'isochrone_id', centerId]);
-        map.setFilter('isochrones-border', ['==', 'isochrone_id', centerId]);
+        map.setFilter('isochrones-fill', ['==', 'isochrone_id', hoveredCenterId]);
+        map.setFilter('isochrones-border', ['==', 'isochrone_id', hoveredCenterId]);
         map.setPaintProperty('isochrones-fill', 'fill-opacity', 0.3);
         map.setPaintProperty('isochrones-border', 'line-opacity', 1);
 
-        // Show only corresponding deliveries on the highlight layer
-        map.setFilter('assigned-deliveries-circles-highlight', ['==', 'isochrone_id', centerId]);
-        // Hide the gray deliveries that are now being highlighted
-        map.setFilter('assigned-deliveries-circles-gray', ['!=', 'isochrone_id', centerId]);
+        // Filter the colored layer to ONLY show deliveries for the hovered center.
+        map.setFilter('assigned-deliveries-circles-colored', ['==', 'isochrone_id', hoveredCenterId]);
+        // Activate the grayout layer to cover all OTHER deliveries.
+        map.setFilter('assigned-deliveries-circles-grayout', ['!=', 'isochrone_id', hoveredCenterId]);
     });
 
     map.on('mouseleave', 'symbol-delivery-centers', () => {
@@ -169,16 +185,20 @@ const addHoverEvents = () => {
             popup = null;
         }
 
-        // Hide isochrones by resetting filter and opacity
-        map.setFilter('isochrones-fill', null);
-        map.setFilter('isochrones-border', null);
+        // Immediately start the fade-out animation
         map.setPaintProperty('isochrones-fill', 'fill-opacity', 0);
         map.setPaintProperty('isochrones-border', 'line-opacity', 0);
 
-        // Hide the highlight layer again
-        map.setFilter('assigned-deliveries-circles-highlight', ['==', 'isochrone_id', '']);
-        // Show all gray deliveries again
-        map.setFilter('assigned-deliveries-circles-gray', null);
+        // Deactivate the grayout layer.
+        map.setFilter('assigned-deliveries-circles-grayout', ['==', 'isochrone_id', '']);
+        // Reset the colored layer to show all deliveries again.
+        map.setFilter('assigned-deliveries-circles-colored', null);
+
+        // After a delay (e.g., 300ms for fade to complete), reset the filter
+        mouseleaveTimeout = setTimeout(() => {
+            map.setFilter('isochrones-fill', null);
+            map.setFilter('isochrones-border', null);
+        }, 300); // 300ms is a safe delay for default transitions
     });
 };
 
@@ -208,7 +228,7 @@ const loadMap = () => {
         try {
             // Fetch all data concurrently
             const [centersData, isochronesData, deliveriesData] = await Promise.all([
-                fetch('deliveryCenters.geojson').then(res => res.json()),
+                fetch('deliveryCentersAll.geojson').then(res => res.json()),
                 fetch('isochrones.geojson').then(res => res.json()),
                 fetch('assigned_deliveries.geojson').then(res => res.json())
             ]);
@@ -217,7 +237,7 @@ const loadMap = () => {
             calculateDeliveryCounts(deliveriesData);
 
             // Add sources and layers to the map in the correct visual order
-            addDeliveries(deliveriesData);    // Bottom layers (gray and highlight circles)
+            addDeliveries(deliveriesData);    // Bottom layers (colored circles and grayout layer)
             addIsochrones(isochronesData);    // Middle layers (isochrone fill and border)
             addDeliveryCenters(centersData);  // Top layer (center icons)
 

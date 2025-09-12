@@ -1,7 +1,7 @@
 ---
 layout: null
 title: Deliveries
-js: deliveries-mts.js
+js: deliveries.js
 ---
 
 <html lang="ja">

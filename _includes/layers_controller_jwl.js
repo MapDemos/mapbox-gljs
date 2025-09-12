@@ -395,6 +395,7 @@ function initTimeSlider(val) {
     if (bandlist.length >= 1) {
         timeslider.disabled = false
         auto.disabled = false
+        timeslider.style = 'visibility: visible;'
         bandlist.forEach(datetime => {
             const datetimearray = convertTimeValue(datetime).split(" ")
             const timespan = timediv.appendChild(document.createElement('span'))
@@ -403,6 +404,7 @@ function initTimeSlider(val) {
         })
     } else {
         timeslider.disabled = true
+        timeslider.style = 'visibility: hidden;'
         if (autoFlag) play()
         auto.disabled = true
     }
