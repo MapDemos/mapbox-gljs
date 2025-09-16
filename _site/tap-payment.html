@@ -30,67 +30,484 @@
     <div class="max-w-sm mx-auto bg-white shadow-md rounded-lg overflow-hidden my-4">
         <!-- Header -->
         <header class="flex items-center justify-between p-4 border-b bg-white sticky top-0 z-10">
-            <button class="text-gray-600 hover:text-gray-800">
+            <button id="back-button" class="text-gray-600 hover:text-gray-800 flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                 </svg>
                 <span class="ml-1 font-medium">戻る</span>
             </button>
             <h1 class="text-lg font-semibold text-gray-800">SF(電子マネー)利用履歴</h1>
-            <button class="text-gray-600 hover:text-gray-800">
-                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 16.382V5.618a1 1 0 00-1.447-.894L15 7m-6 10V7m0 0l6-3m0 0l6 3m-6-3v10" />
-                </svg>
+            <button id="map-toggle-button" class="text-gray-600 hover:text-gray-800">
+                 <i class="fa-regular fa-map text-2xl"></i>
             </button>
         </header>
-        <!-- Transaction List will be generated here -->
+
+        <!-- Transaction List -->
         <main id="transaction-list" class="divide-y divide-gray-200">
             <!-- Dynamic content goes here -->
         </main>
+
+        <!-- Map Container (hidden by default) -->
+        <div id="map-container" class="relative w-full h-[75vh]" style="display: none;">
+            <!-- Details Panel (hidden by default) -->
+            <div id="map-details-panel" class="absolute bottom-8 left-4 right-4 bg-white rounded-lg shadow-lg p-4 z-20" style="display: none;">
+                <button id="panel-close-button" class="absolute top-2 right-2 text-gray-500 hover:text-gray-800">&times;</button>
+                <div class="flex">
+                    <div class="flex-grow">
+                        <h3 id="panel-name" class="font-bold text-lg">Shop Name</h3>
+                        <p id="panel-details" class="text-sm text-gray-600">Details about the shop</p>
+                    </div>
+                    <img id="panel-image" src="" alt="Shop Image" class="w-20 h-20 rounded-md object-cover ml-4" />
+                </div>
+                <div class="flex justify-between mt-4">
+                    <button class="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-semibold w-full mr-2">ルート</button>
+                    <button class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg text-sm font-semibold w-full ml-2">詳細</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Hidden Tailwind CSS Palette to force JIT compilation -->
+    <div class="hidden">
+        <span class="bg-orange-400"></span>
+        <span class="bg-pink-400"></span>
+        <span class="bg-red-400"></span>
+        <span class="bg-blue-400"></span>
+        <span class="bg-purple-400"></span>
+        <span class="bg-green-400"></span>
     </div>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-    const transactions = [
-        { date: '07/07', merchant: '服の松本', amount: 7980, icon: 'fas fa-tshirt', color: 'bg-orange-400' },
-        { date: '07/06', merchant: 'スーパーあおき', amount: 9700, icon: 'fas fa-shopping-cart', color: 'bg-emerald-500' },
-        { date: '07/05', merchant: 'サフェひかり', amount: 9200, icon: 'fas fa-store', color: 'bg-blue-500' },
-        { date: '07/04', merchant: 'スーパーあおき', amount: 9200, icon: 'fas fa-cut', color: 'bg-pink-400' },
-        { date: '07/03', merchant: '服の松本', amount: 7980, icon: 'fas fa-tshirt', color: 'bg-orange-400' },
-        { date: '07/02', merchant: 'スーパーあおき', amount: 9700, icon: 'fas fa-shopping-cart', color: 'bg-emerald-500' },
-        { date: '07/01', merchant: 'デパート丸子', amount: 9300, icon: 'fas fa-info', color: 'bg-blue-400' },
-        { date: '06/30', merchant: '服の松本', amount: 7980, icon: 'fas fa-tshirt', color: 'bg-orange-400' },
-        { date: '06/29', merchant: 'スーパーあおき', amount: 9700, icon: 'fas fa-shopping-cart', color: 'bg-emerald-500' },
-        { date: '06/28', merchant: 'デパート丸子', amount: 8300, icon: 'fas fa-tag', color: 'bg-orange-400' },
-        { date: '06/27', merchant: '薬局たけだ', amount: 5400, icon: 'fas fa-pills', color: 'bg-red-400' },
-        { date: '06/26', merchant: '家電のヤマダ', amount: 10300, icon: 'fas fa-desktop', color: 'bg-teal-500' },
-        { date: '06/25', merchant: 'コンビニ大黒', amount: 12900, icon: 'fas fa-store', color: 'bg-blue-500' },
-        { date: '06/24', merchant: 'コンビニ大黒', amount: 3600, icon: 'fas fa-store', color: 'bg-blue-500' },
-        { date: '06/23', merchant: 'レストラン佐藤', amount: 9500, icon: 'fas fa-utensils', color: 'bg-green-500' },
-        { date: '06/23', merchant: 'レストラン加藤', amount: 1000, icon: 'fas fa-pause', color: 'bg-indigo-500' }
-    ];
+        const account = 'n2xNzqos7NirxGBJ'
+const results_per_page = 5
+const shop_details_url = `https://www.j-jti.com/appif/sight?appid=${account}&pagecount=${results_per_page}&responsetype=json`
 
+const shop_categories = {
+    eat: {
+        label: "食べる",
+        lgenre: "3",
+        icon: "fas fa-utensils", // Icon for food/restaurants
+        color:'bg-orange-400'
+    },
+    buy: {
+        label: "買う",
+        lgenre: "6",
+        icon: "fas fa-shopping-bag", // Icon for shopping/stores
+        color:'bg-green-400'
+    },
+    enjoy: {
+        label: "遊ぶ",
+        lgenre: "2",
+        icon: "fas fa-ticket-alt", // Icon for attractions/entertainment
+        color:'bg-blue-400'
+    },
+    see: {
+        label: "見る",
+        lgenre: "1",
+        icon: "fas fa-landmark", // Icon for sightseeing/landmarks
+        color:'bg-purple-400'
+    },
+}
+
+function getIconAndColorForGenre(lgenre) {
+    for (let key in shop_categories) {
+        if (shop_categories[key].lgenre === lgenre) {
+            return {
+                icon: shop_categories[key].icon,
+                color: shop_categories[key].color,
+                categorylabel: shop_categories[key].label
+            };
+        }
+    }
+    return null;
+}
+
+async function fetchJisList() {
+    try {
+        const response = await fetch('https://kenji-shima.github.io/resource-files/jis.json');
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error fetching JIS code data:', error);
+        return [];
+    }
+}
+
+async function getJis(address) {
+    const jisList = await fetchJisList();
+    for (let elem of jisList) {
+        if (elem.city === "") {
+            continue
+        }
+        const prefCity = elem.prefecture + elem.city
+        if (address.includes(prefCity)) {
+            code = elem.code.substring(0, 5)
+            if (code.endsWith("0")) {
+                continue
+            } else {
+                return code
+            }
+        }
+    }
+    return code
+}
+
+const getAllGenrePOIs = async (address) => {
+    const jis = await getJis(address);
+    if (jis === "") {
+        console.log("JIS code not found for address:", address);
+        return { "type": "FeatureCollection", "features": [] };
+    }
+    
+    // Create a promise for each category fetch
+    const promises = Object.keys(shop_categories).map(categoryid => {
+        return getShopPOIsFirstPage(categoryid, jis);
+    });
+
+    // Wait for all fetches to complete
+    const results = await Promise.all(promises);
+
+    // Combine the features from all the results into a single array
+    const allFeatures = results.flatMap(featureCollection => featureCollection.features);
+
+    return {
+        "type": "FeatureCollection",
+        "features": allFeatures
+    };
+}
+
+/**
+ * Fetches only the first page of POIs for a specific category and JIS code.
+ * This is a non-recursive version for simpler, single-page fetches.
+ * @param {string} categoryid - The category key (e.g., 'eat', 'buy').
+ * @param {string} jis - The 5-digit JIS code.
+ * @returns {Promise<object>} A promise that resolves to a GeoJSON FeatureCollection.
+ */
+async function getShopPOIsFirstPage(categoryid, jis) {
+    const lgenre = shop_categories[categoryid].lgenre;
+    const pageno = 1; // Always fetch the first page
+
+    // Fetch the data from the API
+    const json = await shopSearch(jis, lgenre, pageno);
+
+    // Convert the API response into a GeoJSON FeatureCollection
+    const featureCollection = convertShopResponseToFeatures(json);
+    console.log(`Fetched ${featureCollection.features.length} features for category ${categoryid} and JIS ${jis}`);
+
+    return featureCollection;
+}
+
+function setShopPOIs(categoryid, jis, featureCollection) {
+    return new Promise((resolve) => {
+        let pageno = 1;
+        recursiveShopSearch(jis, shop_categories[categoryid].lgenre, pageno, featureCollection, resolve);
+    });
+}
+
+function recursiveShopSearch(jis, lgenre, pageno, featureCollection, resolve) {
+    shopSearch(jis, lgenre, pageno).then(json => {
+        const newFeatures = convertShopResponseToFeatures(json).features;
+        if (newFeatures) {
+            // Correctly assign the new concatenated array
+            featureCollection.features = featureCollection.features.concat(newFeatures);
+        }
+
+        if (json[0].PageNo < json[0].TotalPages) {
+            // Pass all required arguments in the recursive call
+            recursiveShopSearch(jis, lgenre, pageno + 1, featureCollection, resolve);
+        } else {
+            // When the last page for this category is processed, resolve the promise.
+            resolve();
+        }
+    });
+}
+
+const shopImageUri = 'https://www.j-jti.com/Storage/Image/Product/SightImage/M/'
+function convertShopResponseToFeatures(json) {
+    let data = json[0].SightList
+    let featureCollection = {
+        "type": "FeatureCollection",
+        "features": []
+    }
+    if (!data) return featureCollection
+    featureCollection = {
+        "type": "FeatureCollection",
+        "features": data.filter((item) => item.PhotoList).map((item) => {
+
+            const properties = {
+                "item_id": item.SightID,
+                "name": item.Title,
+                "kana": item.Kana,
+                "address": item.Address,
+                "summary": item.Summary,
+                "time": item.Time,
+                "rank": item.Rank,
+                "tel": item.Tel,
+                "price": item.Price,
+                "lgenre": item.GenreList[0].LGenre.Code,
+                "photo": item.PhotoList ? shopImageUri + item.PhotoList[0].URL : null,
+                "photos": null
+            }
+
+            if (item.PhotoList && item.PhotoList.length > 0) {
+                properties.photos = item.PhotoList.map((photo, index) => ({
+                    [`photo${index + 1}`]: `${shopImageUri}${photo.URL}`,
+                }));
+            }
+
+            return {
+                "type": "Feature",
+                "properties": properties,
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [Number(item.LongitudeW10), Number(item.LatitudeW10)]
+                }
+            }
+        })
+    }
+    return featureCollection
+}
+
+let jis_list = ['13113', '13103', '13109']
+
+async function shopSearch(jis, lgenre, pageno) {
+    const query = await fetch(`${shop_details_url}&jis=${jis}&lgenre=${lgenre}&pageno=${pageno}`)
+    return await query.json()
+}
+        //let coordinates = [139.7671, 35.6812]; // Default to Tokyo Station
+let coordinates = [139.6380, 35.4437]; // Default to some coordinates
+let map; // To hold the map instance
+const colorCache = {}; // Cache for computed CSS colors
+
+/**
+ * Gets the computed background color for a given Tailwind CSS class.
+ * @param {string} className - The Tailwind class (e.g., 'bg-orange-400').
+ * @returns {string} The computed color in rgb() format.
+ */
+function getHexFromTailwindClass(className) {
+    if (colorCache[className]) {
+        return colorCache[className];
+    }
+
+    // Create a temporary, hidden element
+    const tempEl = document.createElement('div');
+    tempEl.style.display = 'none';
+    tempEl.className = className;
+    document.body.appendChild(tempEl);
+
+    // Get the computed color and cache it
+    const computedColor = window.getComputedStyle(tempEl).backgroundColor;
+    colorCache[className] = computedColor;
+
+    // Clean up the temporary element
+    document.body.removeChild(tempEl);
+    return computedColor;
+}
+
+function createRandomMMdd() {
+    const month = Math.floor(Math.random() * 12) + 1;
+    const day = Math.floor(Math.random() * 28) + 1; // To avoid complications with different month lengths
+    return `${month.toString().padStart(2, '0')}/${day.toString().padStart(2, '0')}`;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
     const transactionListContainer = document.getElementById('transaction-list');
+    const mapContainer = document.getElementById('map-container');
+    const mapToggleButton = document.getElementById('map-toggle-button');
+    const backButton = document.getElementById('back-button');
+    let transactions = []; // Store transactions in a higher scope
 
-    function renderTransactions() {
+    // Function to switch to Map View
+    function showMapView() {
+        transactionListContainer.style.display = 'none';
+        mapContainer.style.display = 'block';
+
+        if (!map) { // Initialize map only once
+            map = new mapboxgl.Map({
+                container: 'map-container',
+                //style: 'mapbox://styles/mapbox/streets-v12',
+                center: coordinates,
+                zoom: 14,
+                language: 'ja'
+            });
+
+            // Calculate the bounding box that contains all transaction points.
+            if (transactions.length > 0) {
+                const bounds = new mapboxgl.LngLatBounds();
+                transactions.forEach(t => {
+                    // Ensure the feature has valid geometry and coordinates
+                    if (t.geometry && t.geometry.coordinates) {
+                        bounds.extend(t.geometry.coordinates);
+                    }
+                });
+
+                // Fit the map to the calculated bounds.
+                map.fitBounds(bounds, {
+                    padding: 50, // Add 50px padding around the bounds
+                    duration: 0 // Jump to the view instantly
+                });
+            }
+
+
+            map.on('load', () => {
+                map.setConfigProperty('basemap', 'showPointOfInterestLabels', false);
+                // Create a GeoJSON source from the transaction data
+                const geojson = {
+                    type: 'FeatureCollection',
+                    features: transactions.map(t => ({
+                        type: 'Feature',
+                        geometry: t.geometry,
+                        properties: {
+                            // Pass the item_id to link back to the full data
+                            item_id: t.item_id,
+                            name: t.name,
+                            amount: t.amount,
+                            color: t.hexColor
+                        }
+                    }))
+                };
+
+                map.addSource('transactions', {
+                    type: 'geojson',
+                    data: geojson
+                });
+
+                map.addLayer({
+                    id: 'transaction-points',
+                    type: 'circle',
+                    source: 'transactions',
+                    paint: {
+                        'circle-radius': 8,
+                        'circle-color': ['get', 'color'], // Directly use the color from the feature
+                        'circle-stroke-width': 2,
+                        'circle-stroke-color': '#ffffff'
+                    }
+                });
+
+                // Get panel elements
+                const panel = document.getElementById('map-details-panel');
+                const panelName = document.getElementById('panel-name');
+                const panelDetails = document.getElementById('panel-details');
+                const panelImage = document.getElementById('panel-image');
+                const panelCloseButton = document.getElementById('panel-close-button');
+
+                // Hide panel when close button is clicked
+                panelCloseButton.addEventListener('click', () => {
+                    panel.style.display = 'none';
+                });
+
+                // Show panel with details on point click
+                map.on('click', 'transaction-points', (e) => {
+                    const props = e.features[0].properties;
+                    
+                    // Find the full transaction object using the unique item_id
+                    const fullTransaction = transactions.find(t => t.item_id === props.item_id);
+
+                    if (fullTransaction) {
+                        // Populate the panel
+                        panelName.textContent = fullTransaction.name;
+                        
+                        // Build the details string with styled titles and content
+                        const detailsParts = [];
+                        if (fullTransaction.rank) {
+                            detailsParts.push(`<span class="text-gray-500">ジャンル:</span> <span class="text-gray-900">${fullTransaction.categorylabel}</span>`);
+                        }
+                        if (fullTransaction.tel) {
+                            detailsParts.push(`<span class="text-gray-500">電話:</span> <span class="text-gray-900">${fullTransaction.tel}</span>`);
+                        }
+                        if (fullTransaction.time) {
+                            detailsParts.push(`<span class="text-gray-500">時間:</span> <span class="text-gray-900">${fullTransaction.time}</span>`);
+                        }
+                        panelDetails.innerHTML = detailsParts.join('<br>'); // Use innerHTML for line breaks
+
+                        panelImage.src = fullTransaction.photo || ''; // Use photo URL
+                        panelImage.style.display = fullTransaction.photo ? 'block' : 'none'; // Hide img if no photo
+
+                        // Show the panel
+                        panel.style.display = 'block';
+                    }
+                });
+
+                // Hide panel when clicking on the map canvas itself
+                map.on('click', (e) => {
+                    // Check if the click was on a point. If not, hide the panel.
+                    const features = map.queryRenderedFeatures(e.point, { layers: ['transaction-points'] });
+                    if (!features.length) {
+                        panel.style.display = 'none';
+                    }
+                });
+
+                map.on('mouseenter', 'transaction-points', () => { map.getCanvas().style.cursor = 'pointer'; });
+                map.on('mouseleave', 'transaction-points', () => { map.getCanvas().style.cursor = ''; });
+            });
+        } else {
+            map.resize(); // Ensure map is rendered correctly if it already exists
+        }
+    }
+
+    // Function to switch back to List View
+    function showListView() {
+        mapContainer.style.display = 'none';
+        transactionListContainer.style.display = 'block';
+    }
+
+    // Add event listeners
+    mapToggleButton.addEventListener('click', showMapView);
+    backButton.addEventListener('click', showListView);
+
+
+    // Fetch data and then render the initial list
+    getFirstAddress(coordinates).then(async address => {
+        console.log("Address:", address);
+        const allGenrePOIs = await getAllGenrePOIs(address);
+        
+        transactions = allGenrePOIs.features.map((feature) => {
+            const iconInfo = getIconAndColorForGenre(feature.properties.lgenre);
+            const tailwindColorClass = iconInfo ? iconInfo.color : 'bg-blue-500';
+
+            return {
+                ...feature.properties,
+                geometry: feature.geometry,
+                date: createRandomMMdd(),
+                amount: Math.floor(Math.random() * 10000) + 1000,
+                icon: iconInfo ? iconInfo.icon : 'fas fa-store',
+                color: tailwindColorClass, // For the list view (e.g., 'bg-orange-400')
+                categorylabel: iconInfo ? iconInfo.categorylabel : 'ー',  
+                hexColor: getHexFromTailwindClass(tailwindColorClass) // For the map view (e.g., 'rgb(251, 146, 60)')
+            };
+        });
+        console.log("Transactions with colors:", transactions);
+
+        transactions.sort((a, b) => {
+            const dateA = new Date(`2024/${a.date}`);
+            const dateB = new Date(`2024/${b.date}`);
+            return dateB - dateA;
+        });
+
+        renderTransactions(transactions);
+    });
+
+    function renderTransactions(trans) {
         let html = '';
-        transactions.forEach(transaction => {
+        trans.forEach(transaction => {
             html += `
                 <div class="p-4 flex items-center">
-                    <div class="text-sm text-gray-500 mr-4">${transaction.date}</div>
-                    <div class="w-10 h-10 ${transaction.color} rounded-lg flex items-center justify-center mr-4">
+                    <div class="w-12 text-sm text-gray-500 mr-4 flex-shrink-0">${transaction.date}</div>
+                    <div class="w-10 h-10 ${transaction.color} rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
                         <i class="${transaction.icon} text-white"></i>
                     </div>
-                    <div class="flex-grow">
-                        <div class="text-gray-800">${transaction.merchant}</div>
+                    <div class="flex-grow min-w-0 mr-4">
+                        <div class="text-gray-800">${transaction.name}</div>
                     </div>
-                    <div class="text-gray-800 font-semibold">¥${transaction.amount.toLocaleString()}</div>
+                    <div class="text-gray-800 font-semibold whitespace-nowrap flex-shrink-0">¥${transaction.amount.toLocaleString()}</div>
                 </div>
             `;
         });
         transactionListContainer.innerHTML = html;
     }
-
-    renderTransactions();
 });
     </script>
 </body>

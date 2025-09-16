@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mapbox-tiles-v1';
+/*const CACHE_NAME = 'mapbox-tiles-v1';
 const TILE_URL_PATTERN = 'https://map-api.mapxus.co.jp/maps/v1/tiles/indoor/';
 
 self.addEventListener('install', (event) => {
@@ -76,3 +76,4 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(fetch(event.request));
     }
 });
+*/
