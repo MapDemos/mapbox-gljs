@@ -40,21 +40,46 @@ js: tap-payment.js
             <!-- Dynamic content goes here -->
         </main>
 
+        <!-- Transaction Details View (hidden by default) -->
+        <div id="details-view" style="display: none;">
+            <div class="bg-slate-500 text-white p-6 text-center">
+                <h2 id="details-shop-name" class="text-xl font-semibold"></h2>
+            </div>
+            <div class="text-center p-8">
+                <p class="text-gray-500 text-sm">支払い額</p>
+                <p id="details-amount" class="text-5xl font-bold text-gray-800">¥0</p>
+            </div>
+            <div class="px-6 pb-6">
+                <div class="border-t border-gray-200 pt-4">
+                    <div class="flex justify-between text-gray-700">
+                        <span>購入小計</span>
+                        <span id="details-subtotal">¥0</span>
+                    </div>
+                    <div class="flex justify-between text-gray-700 mt-1">
+                        <span>消費税 (10%)</span>
+                        <span id="details-tax">¥0</span>
+                    </div>
+                    <div class="flex justify-between text-gray-900 font-bold mt-2 pt-2 border-t">
+                        <span>合計</span>
+                        <span id="details-total">¥0</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Static Map Image Container -->
+            <div id="details-map-container" class="w-full h-48">
+                <img id="details-map-image" src="" alt="Transaction Location Map" class="w-full h-full object-cover">
+            </div>
+        </div>
+
         <!-- Map Container (hidden by default) -->
         <div id="map-container" class="relative w-full h-[75vh]" style="display: none;">
-            <!-- Details Panel (hidden by default) -->
-            <div id="map-details-panel" class="absolute bottom-8 left-4 right-4 bg-white rounded-lg shadow-lg p-4 z-20" style="display: none;">
-                <button id="panel-close-button" class="absolute top-2 right-2 text-gray-500 hover:text-gray-800">&times;</button>
-                <div class="flex">
-                    <div class="flex-grow">
-                        <h3 id="panel-name" class="font-bold text-lg">Shop Name</h3>
-                        <p id="panel-details" class="text-sm text-gray-600">Details about the shop</p>
-                    </div>
-                    <img id="panel-image" src="" alt="Shop Image" class="w-20 h-20 rounded-md object-cover ml-4">
-                </div>
-                <div class="flex justify-between mt-4">
-                    <button class="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-semibold w-full mr-2">ルート</button>
-                    <button class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg text-sm font-semibold w-full ml-2">詳細</button>
+            <!-- Horizontally Scrolling Details Panel -->
+            <div id="map-details-panel" class="absolute bottom-0 left-0 right-0 bg-transparent z-20 p-4" style="display: none;">
+                <button id="panel-close-button" class="absolute top-1 right-4 text-gray-600 hover:text-gray-900 z-30 w-8 h-8 flex items-center justify-center rounded-full bg-white/50 hover:bg-white/80 backdrop-blur-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                <div id="horizontal-scroll-container" class="flex overflow-x-auto space-x-4 pb-2 snap-x snap-mandatory">
+                    <!-- Individual panels will be injected here by JS -->
                 </div>
             </div>
         </div>
