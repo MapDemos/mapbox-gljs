@@ -480,7 +480,7 @@ let lastBandIndex = 0
 async function changeBand(index) {
     lastBandIndex = index
     const now = Date.now();
-    if (now - lastChangeBandTime > 60000) {
+    if (now - lastChangeBandTime > 60000000000) {
         await getCurrentBands(index);
         initTimeSlider(lastBandIndex)
     }
