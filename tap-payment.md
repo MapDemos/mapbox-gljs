@@ -51,6 +51,10 @@ js: tap-payment.js
             </div>
             <div class="px-6 pb-6">
                 <div class="border-t border-gray-200 pt-4">
+                   <div class="flex justify-between text-gray-700">
+                        <span>決済日時</span>
+                        <span id="details-datetime"></span>
+                    </div>
                     <div class="flex justify-between text-gray-700">
                         <span>購入小計</span>
                         <span id="details-subtotal">¥0</span>
