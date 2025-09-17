@@ -45,6 +45,12 @@ function createRandomMMdd() {
     return `${month.toString().padStart(2, '0')}/${day.toString().padStart(2, '0')}`;
 }
 
+function createRandomHHMM() {
+    const hour = Math.floor(Math.random() * 24);
+    const minute = Math.floor(Math.random() * 60);
+    return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const transactionListContainer = document.getElementById('transaction-list');
     const mapContainer = document.getElementById('map-container');
@@ -212,13 +218,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         const response = await fetch(url);
                         const data = await response.json();
                         const route = polyline.toGeoJSON(data.routes[0].geometry);
-                        
+
                         const geojson = {
                             'type': 'Feature',
                             'properties': {},
                             'geometry': route
                         };
-                        
+
                         // Update the route source with the new data
                         map.getSource('route').setData(geojson);
 
@@ -243,7 +249,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (transaction.tel) {
                             detailsParts.push(`<span class="text-gray-500">電話:</span> <span class="text-gray-900">${transaction.tel}</span>`);
                         }
-                        // "Time" is no longer added here
+
+                        // Calculate payment details
+                        const totalAmount = transaction.amount;
+                        const subtotal = Math.round(totalAmount / 1.10);
+                        const tax = totalAmount - subtotal;
+                        const paymentDate = new Date(`2025/${transaction.date} ${transaction.time}`);
+                        const formattedDateTime = `${paymentDate.getFullYear()}年${paymentDate.getMonth() + 1}月${paymentDate.getDate()}日 ${transaction.time}`;
 
                         html += `
                             <div class="map-panel-item bg-white rounded-lg shadow-lg p-4 w-80 flex-shrink-0 snap-center transition-all duration-300 max-h-[70vh] overflow-y-auto" data-item-id="${transaction.item_id}">
@@ -267,10 +279,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                                 <!-- Expanded details section (hidden by default) -->
                                 <div class="panel-expanded-content hidden mt-4 border-t pt-4 text-sm">
-                                    <p class="text-gray-700 mb-2">${transaction.summary || ''}</p>
-                                    <p class="text-gray-700"><span class="font-semibold">ランク:</span> <span>${transaction.rank || '情報なし'}</span></p>
-                                    <p class="text-gray-700 mt-1"><span class="font-semibold">住所:</span> <span>${transaction.address || '情報なし'}</span></p>
-                                    <p class="text-gray-700 mt-1"><span class="font-semibold">時間:</span> <span>${transaction.time || '情報なし'}</span></p>
+                                    <div class="flex justify-between mb-1"><span>決済日時</span><span>${formattedDateTime}</span></div>
+                                    <div class="flex justify-between mb-1"><span>支払い額</span><span>¥${totalAmount.toLocaleString()}</span></div>
+                                    <div class="flex justify-between mb-1"><span>購入小計</span><span>¥${subtotal.toLocaleString()}</span></div>
+                                    <div class="flex justify-between mb-1"><span>消費税（10%）</span><span>¥${tax.toLocaleString()}</span></div>
+                                    <div class="flex justify-between font-bold mt-2 pt-2 border-t"><span>合計</span><span>¥${totalAmount.toLocaleString()}</span></div>
                                 </div>
                             </div>
                         `;
@@ -399,7 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Populate the details view
         document.getElementById('details-shop-name').textContent = transaction.name;
-        
+
         // Calculate subtotal and tax from the total amount
         const totalAmount = transaction.amount;
         const subtotal = Math.round(totalAmount / 1.10);
@@ -409,8 +422,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalFormatted = `¥${totalAmount.toLocaleString()}`;
         const subtotalFormatted = `¥${subtotal.toLocaleString()}`;
         const taxFormatted = `¥${tax.toLocaleString()}`;
+        const paymentDate = new Date(`2025/${transaction.date} ${transaction.time}`);
+        const formattedDateTime = `${paymentDate.getFullYear()}年${paymentDate.getMonth() + 1}月${paymentDate.getDate()}日 ${transaction.time}`;
+
+
 
         // Update the DOM
+        document.getElementById('details-datetime').textContent = formattedDateTime;
         document.getElementById('details-amount').textContent = totalFormatted;
         document.getElementById('details-subtotal').textContent = subtotalFormatted;
         document.getElementById('details-tax').textContent = taxFormatted;
@@ -423,7 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const width = 600; // Image width
             const height = 300; // Image height
             const zoom = 14;
-            const pitch = 0; 
+            const pitch = 0;
             const bearing = 0; // Camera bearing
 
             // Convert the transaction's rgb color to a hex code for the API
@@ -444,7 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Construct the Static Images API URL with 3D style, Japanese labels, and no POIs
             const staticImageUrl = `https://api.mapbox.com/styles/v1/kenji-shima/cmfn8lqzj009t01rfd4ny8xsh/static/${overlay}/${lng},${lat},${zoom},${bearing},${pitch}/${width}x${height}?access_token=${accessToken}`;
-            
+
             // Set the image source
             document.getElementById('details-map-image').src = staticImageUrl;
         }
@@ -452,7 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Event Listeners ---
     mapToggleButton.addEventListener('click', showMapView);
-    
+
     // Back button now handles multiple views
     backButton.addEventListener('click', () => {
         if (currentView === 'map' || currentView === 'details') {
@@ -482,7 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
     getFirstAddress(coordinates).then(async address => {
         console.log("Address:", address);
         const allGenrePOIs = await getAllGenrePOIs(address);
-        
+
         transactions = allGenrePOIs.features.map((feature) => {
             const iconInfo = getIconAndColorForGenre(feature.properties.lgenre);
             const tailwindColorClass = iconInfo ? iconInfo.color : 'bg-blue-500';
@@ -491,10 +509,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 ...feature.properties,
                 geometry: feature.geometry,
                 date: createRandomMMdd(),
+                time: createRandomHHMM(),
                 amount: Math.floor(Math.random() * 10000) + 1000,
                 icon: iconInfo ? iconInfo.icon : 'fas fa-store',
                 color: tailwindColorClass, // For the list view (e.g., 'bg-orange-400')
-                categorylabel: iconInfo ? iconInfo.categorylabel : 'ー',  
+                categorylabel: iconInfo ? iconInfo.categorylabel : 'ー',
                 hexColor: getHexFromTailwindClass(tailwindColorClass) // For the map view (e.g., 'rgb(251, 146, 60)')
             };
         });
