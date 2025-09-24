@@ -42,7 +42,7 @@ const tilesets = {
         value: "mapbox://mapbox.weather-jp-alert",
         label: "alert",
         type: 'raster-array',
-        colorscale: 'Kikikuru'
+        colorscale: 'KikikuruShinsui'
     },
     humidity39: {
         value: "mapbox://mapbox.weather-jp-humidity-0-39",
@@ -58,7 +58,7 @@ const tilesets = {
         value: "mapbox://mapbox.weather-jp-landslide",
         label: "landslide",
         type: 'raster-array',
-        colorscale: 'Kikikuru'
+        colorscale: 'KikikuruDosha'
     },
     pressure39: {
         value: "mapbox://mapbox.weather-jp-pressure-0-39",
