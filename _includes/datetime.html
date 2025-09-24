@@ -1,0 +1,27 @@
+<style>
+    #time-display-container {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 2; /* Ensure it's on top of other elements */
+        background-color: #e6ecf2;
+        padding: 8px 15px;
+        border-radius: 5px;
+        border: 1px solid #c8d0d8;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        font-family: sans-serif;
+        opacity: 0.9;
+    }
+
+    .time-display-text {
+        font-size: 24px;
+        font-weight: 600;
+        color: #3d4752;
+        white-space: nowrap;
+    }
+</style>
+
+<div id="time-display-container">
+    <span class="time-display-text" id="active-date"></span>
+    <span class="time-display-text" id="active-time"></span>
+</div>
