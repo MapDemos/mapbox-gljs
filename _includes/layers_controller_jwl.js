@@ -195,8 +195,19 @@ const snowScale = () => {
     return domain.map((v, i) => [v, range[i]]).flat();
 }
 
-const kikikuruScale = () => {
+const kikikuruShinsuiScale = () => {
     const domain = [2, 3, 4, 5];
+    const range = [
+        "rgba(242, 231, 0, 1)",
+        "rgba(255, 40, 0, 1)",
+        "rgba(170, 0, 170, 1)",
+        "rgba(12, 0, 12, 1)",
+    ];
+    return domain.map((v, i) => [v, range[i]]).flat();
+}
+
+const kikikuruDoshaScale = () => {
+    const domain = [4, 5, 6, 7];
     const range = [
         "rgba(242, 231, 0, 1)",
         "rgba(255, 40, 0, 1)",
@@ -330,9 +341,13 @@ const COLORSCALES = {
         manual: true,
         value: vectorScale()
     },
-    'Kikikuru': {
+    'KikikuruShinsui': {
         manual: true,
-        value: kikikuruScale()
+        value: kikikuruShinsuiScale()
+    },
+    'KikikuruDosha': {
+        manual: true,
+        value: kikikuruDoshaScale()
     }
 }
 
@@ -953,7 +968,7 @@ const addRasterLayer = () => {
         type: 'raster',
         source: 'rastersource',
         paint: {
-            'raster-opacity': 0.8,
+            'raster-opacity': 1.0,
         }
     }
     map.addLayer(layer_def, layerAbove);
@@ -978,7 +993,7 @@ const addRasterArrayLayer = (layer) => {
             'raster-color': getColorScale(layerVals.color_range),
             'raster-resampling': tilesetresampling,
             'raster-color-range-transition': { duration: 0 },
-            'raster-opacity': 0.8,
+            'raster-opacity': 1.0,
             'raster-array-band': bandlist[0],
             'raster-emissive-strength': 1.0,
             'raster-fade-duration': 0
