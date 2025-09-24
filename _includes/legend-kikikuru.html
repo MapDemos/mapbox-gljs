@@ -1,0 +1,219 @@
+<style>
+    /* A simple reset and basic body styling for demonstration */
+    .kikikuru-warning-container-wrapper {
+        position: absolute;
+        bottom: 40px;
+        right: 20px;
+        z-index: 1; /* Ensures it's on top of the map */
+        width: 350px; /* Set a fixed width for the container */
+        /*font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        /* background-color: #f0f2f5; */
+        margin: 0;
+        color: #333;
+        opacity: 0.9;
+    }
+
+    /* Main container for the entire component */
+    .kikikuru-warning-container {
+        background-color: #ffffff;
+        border-radius: 8px;
+        padding: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        /* max-width: 550px; */
+        /* width: 100%; */ /* This was causing the collapse */
+    }
+
+    /* Title styling */
+    .kikikuru-warning-container h2 {
+        text-align: left;
+        margin-top: 0;
+        font-size: 0.9rem;
+        color: #333;
+    }
+
+    /* Flex container for the meter and legend */
+    .warning-display {
+        display: flex;
+        align-items: flex-start; /* Align tops of meter and legend */
+        justify-content: left;
+        gap: 40px;
+        /* Space between meter and legend */
+    }
+
+    /* The meter graphic container */
+    .danger-meter {
+        position: relative;
+        width: 60px;
+        height: 120px;
+        display: flex;
+        flex-direction: column;
+        /* Creates the inverted trapezoid shape */
+        clip-path: polygon(0 0, 100% 0, 85% 100%, 15% 100%);
+    }
+
+    /* Styling for each colored level inside the meter */
+    .level {
+        flex: 1;
+        /* Makes each level have equal height */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 0.8rem;
+        font-weight: bold;
+        color: white;
+    }
+
+    /* Specific colors for each level */
+    .level-black {
+        background-color: #231815;
+    }
+
+    .level-purple {
+        background-color: #6c2484;
+    }
+
+    .level-red {
+        background-color: #d71920;
+    }
+
+    .level-yellow {
+        background-color: #fff100;
+        color: #555;
+    }
+
+    .level-white {
+        background-color: #ffffff;
+        border-top: 1px solid #ccc;
+        /* Border to distinguish from background */
+        color: black;
+    }
+
+    /* Common styling for labels on the meter */
+    .meter-label {
+        position: absolute;
+        background-color: white;
+        padding: 2px 6px;
+        font-weight: bold;
+        color: black;
+        border: 1px solid black;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        /* Prevents text wrapping */
+    }
+
+    /* Positioning for the "High" label */
+    .label-high {
+        top: -15px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    /* Positioning for the "Low" label */
+    .label-low {
+        bottom: -15px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    /* Styling and positioning for the vertical "Danger Level" label */
+    .label-vertical {
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: gray;
+        font-size: 0.8rem;
+        font-weight: bold;
+        pointer-events: none; /* Allows clicks to pass through */
+        letter-spacing: 0.5em; /* Adds space between characters */
+    }
+
+    /* The legend section to the right of the meter */
+    .legend-kikikuru {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .legend-kikikuru-item {
+        flex: 1; /* Each item takes up equal space, matching the 'level' divs */
+        display: flex;
+        align-items: center;
+        font-size: 0.8rem;
+        height: 24px;
+    }
+
+    /* The colored square (swatch) in the legend */
+    .swatch {
+        width: 24px;
+        height: 14px;
+        margin-right: 12px;
+        flex-shrink: 0;
+        /* Prevents swatch from shrinking */
+    }
+
+    .swatch-label {
+        height: 24px;
+    }
+
+    /* Specific colors for each swatch */
+    .swatch-black {
+        background-color: #231815;
+    }
+
+    .swatch-purple {
+        background-color: #6c2484;
+    }
+
+    .swatch-red {
+        background-color: #d71920;
+    }
+
+    .swatch-yellow {
+        background-color: #fff100;
+    }
+
+    .swatch-white {
+        background-color: #ffffff;
+        border: 1px solid #333;
+    }
+</style>
+<div class="kikikuru-warning-container-wrapper" id="kikikuru-legend">
+    <div class="kikikuru-warning-container">
+        <h2><span id="kikikuru-type">浸水害</span>の危険度</h2>
+        <div class="warning-display">
+            <div class="danger-meter">
+                <div class="level level-black">高</div>
+                <div class="level level-purple"></div>
+                <div class="level level-red"></div>
+                <div class="level level-yellow"></div>
+                <div class="level level-white" id="kikikuru-level-lowest">低</div>
+                <div class="label-vertical">危険度</div>
+            </div>
+
+            <div class="legend-kikikuru">
+                <div class="legend-kikikuru-item">
+                    <div class="swatch swatch-black"></div>
+                    <div class="swatch-label">災害切迫【警戒レベル５相当】</div>
+                </div>
+                <div class="legend-kikikuru-item">
+                    <div class="swatch swatch-purple"></div>
+                    <div class="swatch-label">危険【警戒レベル４相当】</div>
+                </div>
+                <div class="legend-kikikuru-item">
+                    <div class="swatch swatch-red"></div>
+                    <div class="swatch-label">警戒【警戒レベル３相当】</div>
+                </div>
+                <div class="legend-kikikuru-item">
+                    <div class="swatch swatch-yellow"></div>
+                    <div class="swatch-label">注意【警戒レベル２相当】</div>
+                </div>
+                <div class="legend-kikikuru-item">
+                    <div class="swatch swatch-white" id="swatch-level-lowest"></div>
+                    <div class="swatch-label">今後の情報等に留意</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

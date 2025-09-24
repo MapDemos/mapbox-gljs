@@ -1,23 +1,27 @@
-
-const defaultzoom = 3
+const defaultzoom = 4
 let zoom = defaultzoom
 let particlelayerid = null
 let currentprojection = 'mercator'
 
+const defaultStyle = 'mapbox://styles/mapbox/streets-v12'
 const firsttileset = Object.keys(tilesets)[0]
+let tilesetid = firsttileset
 let tileset = tilesets[firsttileset].value
 let tilesettype = tilesets[firsttileset].type
 let tilesetvectortype = null
 let tilesetvectorsource = null
+let mapstyle = tilesets[firsttileset].mapstyle || defaultStyle
 
 let map = new mapboxgl.Map({
     container: 'map',
-    style: 'mapbox://styles/mapbox/light-v11',
+    //style: defaultStyle,
+    style: mapstyle,
     center: [lng, lat],
     zoom: zoom,
     //maxZoom: 12,
     scrollZoom: true,
-    projection: currentprojection
+    projection: currentprojection,
+    language: 'ja'
 })
 
 map.on('style.load', () => {
@@ -53,10 +57,10 @@ map.on('style.load', () => {
                     popup.setLngLat(e.lngLat)
                         .setHTML(`<div><strong>Value:</strong> ${value}</div>`)
                         .addTo(map);
-                }else{
+                } else {
                     if (popup) {
                         popup.remove();
-                    }   
+                    }
                 }
             } catch (error) {
                 console.error('Error querying raster value:', error);
@@ -77,12 +81,12 @@ map.on('zoom', () => {
     document.getElementById('zoom').innerHTML = zoom
 })
 
-map.on('movestart', (e) => {
-    if (tilesettype !== 'raster-array') {
-        return;
-    }
-    changeBand(lastBandIndex);
-});
+// map.on('movestart', (e) => {
+//     if (tilesettype !== 'raster-array') {
+//         return;
+//     }
+//     changeBand(lastBandIndex);
+// });
 
 map.on('click', (e) => {
     const coordinates = e.lngLat;
@@ -153,14 +157,13 @@ const jmaSedimentScale = () => {
         "rgba(0, 0, 0, 1.0)",
         "rgba(0, 0, 0, 1.0)"
     ];
-
     return domain.map((v, i) => [v, range[i]]).flat();
 }
 
 const vectorScale = () => {
     const domain = [0, 1, 4, 8, 12, 16, 24, 32, 40, 48, 56, 64, 80, 200];
     const range = [
-        "rgba(204, 255, 255, 0.0)",
+        "rgba(50, 54, 54, 0)",
         "rgba(102, 255, 255, 0.0)",
         "rgba(0, 204, 255, 0.0)",
         "rgba(0, 153, 255, 0.8)",
@@ -175,7 +178,123 @@ const vectorScale = () => {
         "rgba(255, 0, 0, 0.8)",
         "rgba(183, 0, 16, 0.8)"
     ];
+    return domain.map((v, i) => [v, range[i]]).flat();
+}
 
+const snowScale = () => {
+    const domain = [5, 20, 50, 100, 150, 200];
+    const range = [
+        "rgba(102, 255, 255, 0.8)",  // 水色 (5)
+        "rgba(0, 204, 255, 0.8)",    // 明るい青 (20)
+        "rgba(51, 102, 255, 0.8)",   // 青 (50)
+        "rgba(255, 204, 0, 0.8)",    // 黄色 (100)
+        "rgba(255, 153, 0, 0.8)",    // オレンジ (150)
+        "rgba(255, 0, 0, 0.8)",      // 赤 (200)
+        "rgba(183, 0, 16, 0.8)"      // 紫 (200+)
+    ];
+    return domain.map((v, i) => [v, range[i]]).flat();
+}
+
+const kikikuruScale = () => {
+    const domain = [2, 3, 4, 5];
+    const range = [
+        "rgba(242, 231, 0, 1)",
+        "rgba(255, 40, 0, 1)",
+        "rgba(170, 0, 170, 1)",
+        "rgba(12, 0, 12, 1)",
+    ];
+    return domain.map((v, i) => [v, range[i]]).flat();
+}
+
+const rainScale = () => {
+    const domain = [
+        2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+        23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41,
+        42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60,
+        61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80
+    ];
+
+    const range = [
+        "rgba(102, 255, 255, 0.7)",
+        "rgba(68, 238, 255, 0.7)",
+        "rgba(34, 221, 255, 0.71)",
+        "rgba(0, 204, 255, 0.71)",
+        "rgba(10, 184, 255, 0.71)",
+        "rgba(20, 163, 255, 0.71)",
+        "rgba(31, 143, 255, 0.72)",
+        "rgba(41, 122, 255, 0.72)",
+        "rgba(51, 102, 255, 0.72)",
+        "rgba(71, 112, 230, 0.72)",
+        "rgba(92, 122, 204, 0.73)",
+        "rgba(112, 133, 178, 0.73)",
+        "rgba(133, 143, 153, 0.73)",
+        "rgba(153, 153, 128, 0.73)",
+        "rgba(173, 163, 102, 0.74)",
+        "rgba(194, 173, 76, 0.74)",
+        "rgba(214, 184, 51, 0.74)",
+        "rgba(235, 194, 26, 0.74)",
+        "rgba(255, 204, 0, 0.75)",
+        "rgba(255, 199, 0, 0.75)",
+        "rgba(255, 194, 0, 0.75)",
+        "rgba(255, 189, 0, 0.75)",
+        "rgba(255, 184, 0, 0.76)",
+        "rgba(255, 178, 0, 0.76)",
+        "rgba(255, 173, 0, 0.76)",
+        "rgba(255, 168, 0, 0.76)",
+        "rgba(255, 163, 0, 0.77)",
+        "rgba(255, 158, 0, 0.77)",
+        "rgba(255, 153, 0, 0.77)",
+        "rgba(255, 145, 0, 0.77)",
+        "rgba(255, 138, 0, 0.78)",
+        "rgba(255, 130, 0, 0.78)",
+        "rgba(255, 122, 0, 0.78)",
+        "rgba(255, 115, 0, 0.78)",
+        "rgba(255, 107, 0, 0.79)",
+        "rgba(255, 99, 0, 0.79)",
+        "rgba(255, 92, 0, 0.79)",
+        "rgba(255, 84, 0, 0.79)",
+        "rgba(255, 76, 0, 0.8)",
+        "rgba(255, 69, 0, 0.8)",
+        "rgba(255, 61, 0, 0.8)",
+        "rgba(255, 54, 0, 0.81)",
+        "rgba(255, 46, 0, 0.81)",
+        "rgba(255, 38, 0, 0.81)",
+        "rgba(255, 31, 0, 0.81)",
+        "rgba(255, 23, 0, 0.82)",
+        "rgba(255, 15, 0, 0.82)",
+        "rgba(255, 8, 0, 0.82)",
+        "rgba(255, 0, 0, 0.82)",
+        "rgba(253, 0, 1, 0.83)",
+        "rgba(250, 0, 1, 0.83)",
+        "rgba(248, 0, 2, 0.83)",
+        "rgba(245, 0, 2, 0.83)",
+        "rgba(243, 0, 3, 0.84)",
+        "rgba(241, 0, 3, 0.84)",
+        "rgba(238, 0, 4, 0.84)",
+        "rgba(236, 0, 4, 0.84)",
+        "rgba(233, 0, 5, 0.85)",
+        "rgba(231, 0, 5, 0.85)",
+        "rgba(229, 0, 6, 0.85)",
+        "rgba(226, 0, 6, 0.85)",
+        "rgba(224, 0, 7, 0.86)",
+        "rgba(221, 0, 7, 0.86)",
+        "rgba(219, 0, 8, 0.86)",
+        "rgba(217, 0, 9, 0.86)",
+        "rgba(214, 0, 9, 0.87)",
+        "rgba(212, 0, 10, 0.87)",
+        "rgba(209, 0, 10, 0.87)",
+        "rgba(207, 0, 11, 0.87)",
+        "rgba(205, 0, 11, 0.88)",
+        "rgba(202, 0, 12, 0.88)",
+        "rgba(200, 0, 12, 0.88)",
+        "rgba(197, 0, 13, 0.88)",
+        "rgba(195, 0, 13, 0.89)",
+        "rgba(193, 0, 14, 0.89)",
+        "rgba(190, 0, 14, 0.89)",
+        "rgba(188, 0, 15, 0.89)",
+        "rgba(185, 0, 15, 0.9)",
+        "rgba(183, 0, 16, 0.9)"
+    ];
     return domain.map((v, i) => [v, range[i]]).flat();
 }
 
@@ -191,22 +310,35 @@ const COLORSCALES = {
     'Warm': d3.interpolateWarm,
     'Cool': d3.interpolateCool,
     'Cubehelix': d3.interpolateCubehelixDefault,
-    'YJRain': {
-        manual: true,
-        value: yjRainScale()
-    },
+    // 'YJRain': {
+    //     manual: true,
+    //     value: yjRainScale()
+    // },
     'JMASediment': {
         manual: true,
         value: jmaSedimentScale()
+    },
+    'Rain': {
+        manual: true,
+        value: rainScale()
+    },
+    'Snow': {
+        manual: true,
+        value: snowScale()
     },
     'Vector': {
         manual: true,
         value: vectorScale()
     },
+    'Kikikuru': {
+        manual: true,
+        value: kikikuruScale()
+    }
 }
 
-let selctedcolorscalename = 'Turbo'
-let colorscaletype = COLORSCALES[selctedcolorscalename]
+const defaultcolorscalename = 'Turbo'
+let selectedcolorscalename = tilesets[firsttileset].colorscale || defaultcolorscalename
+let colorscaletype = COLORSCALES[selectedcolorscalename]
 let colorsteps = 256
 //let colorsteps = 8
 
@@ -303,7 +435,21 @@ function showAllOptions() {
     if (tilesettype === 'raster-array') {
         document.getElementById('raster-array-options').style.display = 'block'
         document.getElementById('raster-array-coloring-options').style.display = 'block'
-        document.getElementById('legend').style.display = 'block'
+        if (tilesetid === 'alert' || tilesetid === 'landslide') {
+            document.getElementById('legend').style.display = 'none'
+            document.getElementById('kikikuru-legend').style.display = 'block'
+            document.getElementById('kikikuru-level-lowest').style = ''
+            document.getElementById('swatch-level-lowest').style = ''
+            if (tilesetid === 'alert') {
+                document.getElementById('kikikuru-type').innerText = '浸水害'
+            }else if (tilesetid === 'landslide') {
+                document.getElementById('kikikuru-type').innerText = '土砂災害'
+            }
+        } else {
+            document.getElementById('kikikuru-legend').style.display = 'none'
+            document.getElementById('legend').style.display = 'block'
+        }
+
         document.getElementById('map-overlay-bottom').style.display = 'block'
         showAllRasterArrayOptions()
     } else if (tilesettype === 'raster-array-particle') {
@@ -323,34 +469,51 @@ function showAllOptions() {
                 addCircleLayer()
             } else if (tilesetvectortype === 'fill') {
                 addFillLayer()
+            } else if (tilesetvectortype === 'line' && tilesetvectorsource === 'river_flood') {
+                addFloodLayer()
             } else if (tilesetvectortype === 'line') {
                 addLineLayer()
             }
         }
+        if (tilesetid === 'flood') {
+            document.getElementById('kikikuru-legend').style.display = 'block'
+            document.getElementById('kikikuru-type').innerText = '洪水'
+            document.getElementById('kikikuru-level-lowest').style = 'background-color: #00FFFF;'
+            document.getElementById('swatch-level-lowest').style = 'background-color: #00FFFF;'
+        } 
+        // if (tileset === 'mapbox://mapbox.weather-jp-river-flood') {
+        getTilejson().then(tilejson => {
+            bandlist = []
+            initTimeSlider(0)
+
+            const utcTimestamp = tilejson.description.split(':: ')[1];
+
+            // Convert UTC yyyyMMddHHmmSS to JST yyyyMMddHHmmSS
+            const jstTimestamp = utcStringToJST(utcTimestamp);
+
+            // Format the JST timestamp into the desired format
+            const year = jstTimestamp.substring(0, 4);
+            const month = jstTimestamp.substring(4, 6);
+            const day = jstTimestamp.substring(6, 8);
+            const hour = jstTimestamp.substring(8, 10);
+            const minute = jstTimestamp.substring(10, 12);
+
+            const formattedDate = `${year}/${month}/${day}`;
+            const formattedTime = `${hour}:${minute}`;
+
+            document.getElementById('active-date').innerHTML = formattedDate;
+            document.getElementById('active-time').innerHTML = formattedTime;
+        })
+
+        // }
     }
 }
 
 async function showAllRasterArrayOptions() {
-    // const source = map.getSource('rastersource')
-    // layers = {}
-    // console.log("source", source)
-    // source.rasterLayers.forEach(l => {
-    //     if (l.fields.name === 'wind' || l.fields.name === 'winds') {
-    //         particlelayerid = l.fields.name
-    //         return
-    //     }
-    //     const f = l.fields
-    //     bandlist = f.bands
-    //     layers[f.name] = {
-    //         label: f.name,
-    //         layer: f.name,
-    //         color_range: f.range,
-    //     }
-    //     initOption = f.name
-    // })
     await getCurrentBands()
     setLayerOptions()
-    showLayer(initOption)
+    changeColorscaleType(selectedcolorscalename)
+    // showLayer(initOption)
 
     const colorscaleselect = document.getElementById('colorscale-selector')
     colorscaleselect.innerHTML = ''
@@ -358,7 +521,7 @@ async function showAllRasterArrayOptions() {
         const option = colorscaleselect.appendChild(document.createElement('option'))
         option.value = type
         option.innerHTML = type
-        if (type === selctedcolorscalename) option.selected = true
+        if (type === selectedcolorscalename) option.selected = true
     }
 
     if (particlelayerid) {
@@ -376,7 +539,7 @@ async function showAllRasterArrayOptions() {
         if (tilesets[tile].value === tileset) option.selected = true
     }
 
-    //initTimeSlider(0)
+    initTimeSlider(0)
 
 }
 
@@ -387,26 +550,42 @@ function initTimeSlider(val) {
 
     const timediv = document.getElementById('timediv')
     timediv.innerHTML = ''
-    const date = document.getElementById('active-datetime')
+    const date = document.getElementById('active-date')
     date.innerHTML = ''
+    const time = document.getElementById('active-time')
+    time.innerHTML = ''
 
     const auto = document.getElementById('auto')
 
     if (bandlist.length >= 1) {
+        const currentDateTime = convertTimeValue(bandlist[val]).split(" ");
+        date.innerHTML = currentDateTime[0];
+        time.innerHTML = currentDateTime[1];
+
         timeslider.disabled = false
         auto.disabled = false
         timeslider.style = 'visibility: visible;'
+        let index = 0
         bandlist.forEach(datetime => {
             const datetimearray = convertTimeValue(datetime).split(" ")
             const timespan = timediv.appendChild(document.createElement('span'))
-            timespan.innerHTML = `${datetimearray[1]}`
-            date.innerHTML = datetimearray[0]
+            if (index === 0 || index === bandlist.length - 1) {
+                timespan.innerHTML = `${datetimearray[1]}`
+            } else {
+                timespan.innerHTML = `・`
+            }
+            // date.innerHTML = datetimearray[0] // This line was incorrect
+            index++
         })
+        if (bandlist.length === 1) {
+            document.getElementById('map-overlay-bottom').style.display = 'none'
+        }
     } else {
         timeslider.disabled = true
         timeslider.style = 'visibility: hidden;'
         if (autoFlag) play()
         auto.disabled = true
+        document.getElementById('map-overlay-bottom').style.display = 'none'
     }
 }
 
@@ -424,7 +603,7 @@ function convertTimeValue(timeValue) {
         minute: '2-digit',
         hour12: false, // Use 24-hour format
     };
-    const formatter = new Intl.DateTimeFormat('en-GB', options);
+    const formatter = new Intl.DateTimeFormat('ja-JP', options);
     const parts = formatter.formatToParts(date);
     const dateString = `${parts.find(p => p.type === 'year').value}/` +
         `${parts.find(p => p.type === 'month').value}/` +
@@ -436,6 +615,32 @@ function convertTimeValue(timeValue) {
 }
 
 async function getCurrentBands() {
+    const tilejson = await getTilejson()
+    currentLayer = tilejson.raster_layers[0].fields.name; // Default to the first layer if none is set
+    if (currentLayer === 'wind' || currentLayer === 'winds') {
+        particlelayerid = currentLayer;
+        return tilejson
+    }
+    tilejson.raster_layers.forEach(layer => {
+        if (layer.id === currentLayer) {
+            bandlist = layer.fields.bands;
+            initTimeSlider(lastBandIndex);
+            initOption = layer.fields.name;
+            currentLayer = layer.fields.name;
+
+            layers[layer.fields.name] = {
+                label: layer.fields.name,
+                layer: layer.fields.name,
+                color_range: layer.fields.range,
+                minzoom: tilejson.minzoom,
+                maxzoom: tilejson.maxzoom,
+            }
+        }
+    });
+    return tilejson; // Return the data for callers who need it
+}
+
+async function getTilejson() {
     const tilesetid = tileset.split('/').slice(-1)[0];
     const tilejsonurl = `https://api.mapbox.com/v4/${tilesetid}.json?access_token=${mapboxgl.accessToken}`;
     try {
@@ -445,47 +650,18 @@ async function getCurrentBands() {
         }
         const tilejson = await response.json();
         console.log('Tile JSON:', tilejson);
-        currentLayer = tilejson.raster_layers[0].fields.name; // Default to the first layer if none is set
-        // console.log('Current layer:', currentLayer);
-        if (currentLayer === 'wind' || currentLayer === 'winds') {
-            particlelayerid = currentLayer;
-            return tilejson
-        }
-        tilejson.raster_layers.forEach(layer => {
-            if (layer.id === currentLayer) {
-                bandlist = layer.fields.bands;
-                initTimeSlider(lastBandIndex);
-                initOption = layer.fields.name;
-                currentLayer = layer.fields.name;
-
-                layers[layer.fields.name] = {
-                    label: layer.fields.name,
-                    layer: layer.fields.name,
-                    color_range: layer.fields.range,
-                    minzoom: tilejson.minzoom,
-                    maxzoom: tilejson.maxzoom,
-                }
-                //map.setPaintProperty(currentLayer, 'raster-array-band', bandlist[lastBandIndex])
-            }
-        });
-        return tilejson; // Return the data for callers who need it
+        return tilejson;
     } catch (error) {
         console.error('Error fetching tile JSON:', error);
         throw error; // Re-throw so callers can handle the error
     }
 }
 
-let lastChangeBandTime = 0
 let lastBandIndex = 0
 async function changeBand(index) {
     lastBandIndex = index
-    const now = Date.now();
-    if (now - lastChangeBandTime > 60000000000) {
-        await getCurrentBands(index);
-        initTimeSlider(lastBandIndex)
-    }
+    initTimeSlider(lastBandIndex)
     map.setPaintProperty(currentLayer, 'raster-array-band', bandlist[lastBandIndex])
-    lastChangeBandTime = Date.now();
 }
 window.changeBand = changeBand
 
@@ -528,8 +704,13 @@ function removeAllLayers() {
 
 function changeTileset(t) {
     removeAllLayers()
+    tilesetid = t
     tileset = tilesets[t].value
     tilesettype = tilesets[t].type
+    mapstyle = tilesets[t].mapstyle || defaultStyle
+    map.setStyle(mapstyle)
+    tilesetsuffix = tilesets[t].suffix || ''
+    tilesetresampling = tilesets[t].resampling || 'nearest'
     if (tilesettype === 'vector') {
         tilesetvectortype = tilesets[t].vector_layer_type
         tilesetvectorsource = tilesets[t].vector_layer_source
@@ -539,13 +720,18 @@ function changeTileset(t) {
     } else {
         zoom = defaultzoom
     }
+    if (tilesets[t].colorscale) {
+        selectedcolorscalename = tilesets[t].colorscale
+    } else {
+        selectedcolorscalename = defaultcolorscalename
+    }
     showAllOptions()
     // init()
 }
 window.changeTileset = changeTileset
 
 function changeColorscaleType(type) {
-    selctedcolorscalename = type
+    selectedcolorscalename = type
     colorscaletype = COLORSCALES[type]
     showLayer(currentLayer)
 }
@@ -590,6 +776,7 @@ function setLayerOptions() {
 }
 
 let currentLayer = initOption
+const layerAbove = 'road-exit-shield' // Specify the layer ID above which to insert new layers
 const showLayer = (layer) => {
     currentLayer = layer
     for (let l in layers) {
@@ -628,7 +815,8 @@ const addCircleLayer = () => {
             'circle-color': 'rgba(255, 0, 0, 1)',
             'circle-stroke-width': 1,
             'circle-stroke-color': 'rgba(0, 0, 0, 1)'
-        }
+        },
+        layerAbove
     })
 }
 
@@ -652,6 +840,7 @@ const addFillLayer = () => {
             'fill-color': 'rgba(255, 0, 0, 0.5)',
             'fill-outline-color': 'rgba(0, 0, 0, 1)'
         },
+        layerAbove
     })
 }
 
@@ -675,6 +864,76 @@ const addLineLayer = () => {
             'line-color': 'rgba(255, 0, 0, 1)',
             'line-width': 2
         }
+        , layerAbove
+    })
+}
+
+const addFloodLayer = () => {
+    if (map.getLayer('vector')) {
+        map.removeLayer('vector')
+    }
+    if (map.getSource("vectorsource")) {
+        map.removeSource("vectorsource")
+    }
+    map.addSource('vectorsource', {
+        type: 'vector',
+        url: tileset
+    })
+    map.addLayer({
+        id: 'vector',
+        type: 'line',
+        source: 'vectorsource',
+        'source-layer': tilesetvectorsource,
+        'paint': {
+            'line-color': [
+                'case',
+                ['==', ['get', 'TYPE'], "1"],
+                [
+                    'interpolate',
+                    ['linear'],
+                    ['to-number', ['get', 'FLOODRISK']],
+                    1, '#cccc00', // Darker yellow for 1
+                    2, '#ff0000', // Red for 2
+                    3, '#800080', // Purple for 3
+                    4, '#000000', // Black for 4
+                ],
+                ['==', ['get', 'TYPE'], "2"],
+                [
+                    'interpolate',
+                    ['linear'],
+                    ['to-number', ['get', 'FLOODFCST']],
+                    2, '#cccc00', // Darker yellow for 1
+                    3, '#ff0000', // Red for 2
+                    4, '#800080', // Purple for 3
+                    5, '#000000', // Black for 4
+                ],
+                '#ADD8E6' // Default color if TYPE is not 1 or 2
+            ],
+            'line-width': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                0,
+                ['case',
+                    ['==', ['get', 'TYPE'], "1"], 1,
+                    ['==', ['get', 'TYPE'], "2"], 2,
+                    1 // Default width if TYPE is not 1 or 2
+                ],
+                10,
+                ['case',
+                    ['==', ['get', 'TYPE'], "1"], 4,
+                    ['==', ['get', 'TYPE'], "2"], 6,
+                    4 // Default width if TYPE is not 1 or 2
+                ],
+                15,
+                ['case',
+                    ['==', ['get', 'TYPE'], "1"], 8,
+                    ['==', ['get', 'TYPE'], "2"], 12,
+                    8 // Default width if TYPE is not 1 or 2
+                ]
+            ],
+            'line-opacity': 1.0,
+        },
     })
 }
 
@@ -697,7 +956,7 @@ const addRasterLayer = () => {
             'raster-opacity': 0.8,
         }
     }
-    map.addLayer(layer_def)
+    map.addLayer(layer_def, layerAbove);
 }
 
 const addRasterArrayLayer = (layer) => {
@@ -711,7 +970,7 @@ const addRasterArrayLayer = (layer) => {
     const layer_def = {
         id: layer,
         type: 'raster',
-        slot: 'bottom',
+        //slot: 'bottom',
         source: 'rastersource',
         'source-layer': layerVals.layer,
         paint: {
@@ -727,7 +986,7 @@ const addRasterArrayLayer = (layer) => {
         // minzoom: layerVals.minzoom,
         // maxzoom: layerVals.maxzoom,
     }
-    map.addLayer(layer_def)
+    map.addLayer(layer_def, layerAbove)
     const element = document.getElementById(layer)
     updateLegendBar(layerVals.color_range)
 
@@ -765,7 +1024,7 @@ const addParticles = () => {
                 'raster-particle-reset-rate-factor': 0.4,
             }
         }
-        map.addLayer(particlelayer)
+        map.addLayer(particlelayer, layerAbove)
         let particleCount = 1000
         document.getElementById('particle-count-slider').value = particleCount
         setParticleCount(particleCount)
