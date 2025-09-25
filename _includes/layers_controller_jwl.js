@@ -723,7 +723,7 @@ function changeTileset(t) {
     tileset = tilesets[t].value
     tilesettype = tilesets[t].type
     mapstyle = tilesets[t].mapstyle || defaultStyle
-    map.setStyle(mapstyle)
+    //map.setStyle(mapstyle)
     tilesetsuffix = tilesets[t].suffix || ''
     tilesetresampling = tilesets[t].resampling || 'nearest'
     if (tilesettype === 'vector') {
