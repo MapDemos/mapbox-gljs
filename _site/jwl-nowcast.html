@@ -1272,7 +1272,7 @@ function showAllOptions() {
             document.getElementById('swatch-level-lowest').style = ''
             if (tilesetid === 'alert') {
                 document.getElementById('kikikuru-type').innerText = '浸水害'
-            }else if (tilesetid === 'landslide') {
+            } else if (tilesetid === 'landslide') {
                 document.getElementById('kikikuru-type').innerText = '土砂災害'
             }
         } else {
@@ -1283,11 +1283,14 @@ function showAllOptions() {
         document.getElementById('map-overlay-bottom').style.display = 'block'
         showAllRasterArrayOptions()
     } else if (tilesettype === 'raster-array-particle') {
-        showAllRasterArrayOptions()
-        addParticles()
-        document.getElementById('raster-array-coloring-options').style.display = 'none'
-        document.getElementById('legend').style.display = 'none'
-        document.getElementById('map-overlay-bottom').style.display = 'none'
+        showAllRasterArrayOptions().then(() => {
+            addParticles()
+            document.getElementById('raster-array-coloring-options').style.display = 'none'
+            document.getElementById('legend').style.display = 'none'
+            document.getElementById('map-overlay-bottom').style.display = 'none'
+            setTimeFromTileJson()
+        })
+
     } else {
         document.getElementById('raster-array-options').style.display = 'none'
         document.getElementById('legend').style.display = 'none'
@@ -1310,33 +1313,33 @@ function showAllOptions() {
             document.getElementById('kikikuru-type').innerText = '洪水'
             document.getElementById('kikikuru-level-lowest').style = 'background-color: #00FFFF;'
             document.getElementById('swatch-level-lowest').style = 'background-color: #00FFFF;'
-        } 
-        // if (tileset === 'mapbox://mapbox.weather-jp-river-flood') {
-        getTilejson().then(tilejson => {
-            bandlist = []
-            initTimeSlider(0)
+        }
+        setTimeFromTileJson()
 
-            const utcTimestamp = tilejson.description.split(':: ')[1];
-
-            // Convert UTC yyyyMMddHHmmSS to JST yyyyMMddHHmmSS
-            const jstTimestamp = utcStringToJST(utcTimestamp);
-
-            // Format the JST timestamp into the desired format
-            const year = jstTimestamp.substring(0, 4);
-            const month = jstTimestamp.substring(4, 6);
-            const day = jstTimestamp.substring(6, 8);
-            const hour = jstTimestamp.substring(8, 10);
-            const minute = jstTimestamp.substring(10, 12);
-
-            const formattedDate = `${year}/${month}/${day}`;
-            const formattedTime = `${hour}:${minute}`;
-
-            document.getElementById('active-date').innerHTML = formattedDate;
-            document.getElementById('active-time').innerHTML = formattedTime;
-        })
-
-        // }
     }
+}
+
+function setTimeFromTileJson() {
+    getTilejson().then(tilejson => {
+        const utcTimestamp = tilejson.description.split(':: ')[1];
+        console.log('UTC Timestamp from TileJSON:', utcTimestamp);
+
+        // Convert UTC yyyyMMddHHmmSS to JST yyyyMMddHHmmSS
+        const jstTimestamp = utcStringToJST(utcTimestamp);
+
+        // Format the JST timestamp into the desired format
+        const year = jstTimestamp.substring(0, 4);
+        const month = jstTimestamp.substring(4, 6);
+        const day = jstTimestamp.substring(6, 8);
+        const hour = jstTimestamp.substring(8, 10);
+        const minute = jstTimestamp.substring(10, 12);
+
+        const formattedDate = `${year}/${month}/${day}`;
+        const formattedTime = `${hour}:${minute}`;
+
+        document.getElementById('active-date').innerHTML = formattedDate;
+        document.getElementById('active-time').innerHTML = formattedTime;
+    })
 }
 
 async function showAllRasterArrayOptions() {
@@ -1533,6 +1536,7 @@ function removeAllLayers() {
 }
 
 function changeTileset(t) {
+    lastBandIndex = 0
     removeAllLayers()
     tilesetid = t
     tileset = tilesets[t].value
