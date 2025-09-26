@@ -3,7 +3,8 @@ let zoom = defaultzoom
 let particlelayerid = null
 let currentprojection = 'mercator'
 
-const defaultStyle = 'mapbox://styles/mapbox/streets-v12'
+//const defaultStyle = 'mapbox://styles/mapbox/streets-v12'
+const defaultStyle = 'mapbox://styles/kenji-shima/cmfurpm8w00j101r86qp530c8'
 const firsttileset = Object.keys(tilesets)[0]
 let tilesetid = firsttileset
 let tileset = tilesets[firsttileset].value
@@ -473,6 +474,7 @@ function showAllOptions() {
             document.getElementById('raster-array-coloring-options').style.display = 'none'
             document.getElementById('legend').style.display = 'none'
             document.getElementById('map-overlay-bottom').style.display = 'none'
+            document.getElementById('kikikuru-legend').style.display = 'none'
             setTimeFromTileJson()
         })
 
@@ -507,7 +509,6 @@ function showAllOptions() {
 function setTimeFromTileJson() {
     getTilejson().then(tilejson => {
         const utcTimestamp = tilejson.description.split(':: ')[1];
-        console.log('UTC Timestamp from TileJSON:', utcTimestamp);
 
         // Convert UTC yyyyMMddHHmmSS to JST yyyyMMddHHmmSS
         const jstTimestamp = utcStringToJST(utcTimestamp);
@@ -613,7 +614,7 @@ function convertTimeValue(timeValue) {
     const totalMilliseconds = Math.round(timeValue * millisecondsInDay);
     const date = new Date(baseDate.getTime() + totalMilliseconds);
     const options = {
-        timeZone: 'Australia/Sydney',
+        timeZone: 'Asia/Tokyo',
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -720,14 +721,15 @@ function removeAllLayers() {
     currentLayer = null
 }
 
+let currentStyle = mapstyle
 function changeTileset(t) {
     lastBandIndex = 0
     removeAllLayers()
     tilesetid = t
     tileset = tilesets[t].value
     tilesettype = tilesets[t].type
-    mapstyle = tilesets[t].mapstyle || defaultStyle
-    //map.setStyle(mapstyle)
+    const newMapStyle = tilesets[t].mapstyle || defaultStyle
+    layerAbove = tilesets[t].maplayer_above || layerAboveDefault
     tilesetsuffix = tilesets[t].suffix || ''
     tilesetresampling = tilesets[t].resampling || 'nearest'
     if (tilesettype === 'vector') {
@@ -744,8 +746,19 @@ function changeTileset(t) {
     } else {
         selectedcolorscalename = defaultcolorscalename
     }
-    showAllOptions()
-    // init()
+
+    // Check if the new style is different from the current one.
+    if (currentStyle !== newMapStyle) {
+        // If styles are different, wait for the new style to load.
+        map.once('style.load', () => {
+            showAllOptions()
+        })
+        map.setStyle(newMapStyle)
+    } else {
+        // If style is the same, the map is ready. Just add the new layers.
+        showAllOptions()
+    }
+    currentStyle = newMapStyle
 }
 window.changeTileset = changeTileset
 
@@ -795,7 +808,8 @@ function setLayerOptions() {
 }
 
 let currentLayer = initOption
-const layerAbove = 'road-exit-shield' // Specify the layer ID above which to insert new layers
+const layerAboveDefault = 'road-exit-shield'
+let layerAbove = layerAboveDefault
 const showLayer = (layer) => {
     currentLayer = layer
     for (let l in layers) {
