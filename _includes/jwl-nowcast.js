@@ -114,11 +114,24 @@ const tilesets = {
         value: "mapbox://mapbox.weather-jp-wind-0-39",
         label: "wind 0-39",
         type: 'raster-array-particle'
+        
     },
     wind_78: {
         value: "mapbox://mapbox.weather-jp-wind-40-78",
         label: "wind 40-78",
         type: 'raster-array-particle'
+    },
+    wind_39_z8: {
+        value: "mapbox://kenji-shima.202402190000-wind-z8",
+        label: "wind 0-39 Zoom 8",
+        type: 'raster-array-particle'
+        
+    },
+    wind_39_z12: {
+        value: "mapbox://kenji-shima.202402190000-wind-z12",
+        label: "wind 0-39 Zoom 12",
+        type: 'raster-array-particle'
+        
     },
 
 }
