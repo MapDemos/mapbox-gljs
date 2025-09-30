@@ -1055,7 +1055,10 @@ const addParticles = () => {
                 'raster-particle-max-speed': 10,
                 'raster-particle-fade-opacity-factor': 0.90,
                 'raster-particle-reset-rate-factor': 0.4,
-            }
+                'raster-resampling': 'bilinear',
+            },
+            'minzoom': 0,
+            'maxzoom': 22,
         }
         map.addLayer(particlelayer, layerAbove)
         let particleCount = 1000
