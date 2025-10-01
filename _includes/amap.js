@@ -1,0 +1,62 @@
+window._AMapSecurityConfig = {
+    securityJsCode: "fa771f305b22880bd9c5eb9f4d5a118b",
+};
+
+AMapLoader.load({
+    key: "3654c552398e35b4b7eb1f69eaca4a79",
+    version: "2.0",
+})
+    .then((AMap) => {
+        const map = new AMap.Map("container", {
+            viewMode: "3D", //Default to 2D mode
+            zoom: 11, //Zoom level
+            showOversea: false, //Enable world Map
+            center: [116.481181, 39.989792], //Center point
+            //mapStyle: "amap://styles/whitesmoke",
+        });
+        const infoWindow = new AMap.InfoWindow({
+            isCustom: true,
+            content: "<div>HELLO,AMAP!</div>",
+            offset: new AMap.Pixel(16, -45),
+        });
+        const onMarkerClick = function (e) {
+            infoWindow.open(map, e.target.getPosition());
+        };
+        const marker = new AMap.Marker({
+            position: [116.481181, 39.989792],
+        });
+        map.add(marker);
+        marker.on("click", onMarkerClick);
+        const lineArr = [
+            [116.368904, 39.913423],
+            [116.382122, 39.901176],
+            [116.387271, 39.912501],
+            [116.398258, 39.904600]
+        ];
+        const polyline = new AMap.Polyline({
+            path: lineArr,
+            strokeColor: "#3366FF",
+            strokeWeight: 5,
+            strokeStyle: "solid",
+        });
+        map.add(polyline);
+
+        AMap.plugin('AMap.ToolBar', function () {
+            var toolbar = new AMap.ToolBar();
+            map.addControl(toolbar);
+            // toolbar.show();
+        });
+
+        const traffic = new AMap.TileLayer.Traffic({
+            autoRefresh: true,
+            interval: 180,
+        });
+        map.add(traffic);
+
+
+    })
+    .catch((e) => {
+        console.error(e);
+    });
+
+
