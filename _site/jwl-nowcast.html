@@ -927,6 +927,12 @@ map.on('style.load', () => {
 
 })
 
+function changeProjection(projectionType) {
+    currentprojection = projectionType
+    map.setProjection(projectionType)
+}
+window.changeProjection = changeProjection
+
 map.on('zoom', () => {
     let zoom = map.getZoom()
     zoom = Math.round((zoom + Number.EPSILON) * 100) / 100
