@@ -1165,13 +1165,14 @@ const setParticleSpeed = (val) => {
 document.setParticleSpeed = setParticleSpeed
 
 const setParticleColor = (val) => {
-    const color = [
-        "interpolate",
-        ["linear"],
-        ["raster-particle-speed"],
-        0, "rgba(0,0,0,0)",
-        10, val
-    ]
+    // const color = [
+    //     "interpolate",
+    //     ["linear"],
+    //     ["raster-particle-speed"],
+    //     0, "rgba(0,0,0,0)",
+    //     10, val
+    // ]
+    const color = val
     map.setPaintProperty('particlelayer', 'raster-particle-color', color)
 }
 document.setParticleColor = setParticleColor

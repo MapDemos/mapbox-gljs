@@ -156,41 +156,41 @@ const tilesets = {
         vector_layer_source: 'hotspot',
         zoom: 4
     },
-    spactial_reception_z9: {
-        value: "mapbox://kenji-shima.spacial-reception-z9",
-        label: "Spacial Reception Zoom 9",
-        type: 'vector',
-        vector_layer_type: 'fill',
-        vector_layer_source: 'spacial-reception',
-        zoom: 4
-    },
-    spactial_reception_z12: {
-        value: "mapbox://kenji-shima.spacial-reception-z12",
-        label: "Spacial Reception Zoom 12",
-        type: 'vector',
-        vector_layer_type: 'fill',
-        vector_layer_source: 'spacial-reception',
-        zoom: 4
-    },
-    sbkk_eq_z8: {
-        value: "mapbox://kenji-shima.sbkk-eq-z8",
-        label: "SBKK Earthquake Zoom 8",
-        type: 'vector',
-        vector_layer_type: 'line',
-        vector_layer_source: 'eq',
-    },
-    sbkk_eq_z12: {
-        value: "mapbox://kenji-shima.sbkk-eq-z12",
-        label: "SBKK Earthquake Zoom 12",
-        type: 'vector',
-        vector_layer_type: 'line',
-        vector_layer_source: 'eq',
-    },
-    sbkk_eq_z16: {
-        value: "mapbox://kenji-shima.sbkk-eq-z16",
-        label: "SBKK Earthquake Zoom 16",
-        type: 'vector',
-        vector_layer_type: 'line',
-        vector_layer_source: 'eq',
-    },
+    // spactial_reception_z9: {
+    //     value: "mapbox://kenji-shima.spacial-reception-z9",
+    //     label: "Spacial Reception Zoom 9",
+    //     type: 'vector',
+    //     vector_layer_type: 'fill',
+    //     vector_layer_source: 'spacial-reception',
+    //     zoom: 4
+    // },
+    // spactial_reception_z12: {
+    //     value: "mapbox://kenji-shima.spacial-reception-z12",
+    //     label: "Spacial Reception Zoom 12",
+    //     type: 'vector',
+    //     vector_layer_type: 'fill',
+    //     vector_layer_source: 'spacial-reception',
+    //     zoom: 4
+    // },
+    // sbkk_eq_z8: {
+    //     value: "mapbox://kenji-shima.sbkk-eq-z8",
+    //     label: "SBKK Earthquake Zoom 8",
+    //     type: 'vector',
+    //     vector_layer_type: 'line',
+    //     vector_layer_source: 'eq',
+    // },
+    // sbkk_eq_z12: {
+    //     value: "mapbox://kenji-shima.sbkk-eq-z12",
+    //     label: "SBKK Earthquake Zoom 12",
+    //     type: 'vector',
+    //     vector_layer_type: 'line',
+    //     vector_layer_source: 'eq',
+    // },
+    // sbkk_eq_z16: {
+    //     value: "mapbox://kenji-shima.sbkk-eq-z16",
+    //     label: "SBKK Earthquake Zoom 16",
+    //     type: 'vector',
+    //     vector_layer_type: 'line',
+    //     vector_layer_source: 'eq',
+    // },
 }
