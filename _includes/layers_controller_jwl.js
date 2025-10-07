@@ -203,7 +203,8 @@ const snowScale = () => {
 }
 
 const kikikuruShinsuiScale = () => {
-    const domain = [2, 3, 4, 5];
+    //const domain = [2, 3, 4, 5];
+    const domain = [1.5, 2.5, 3.5, 4.5];
     const range = [
         "rgba(242, 231, 0, 1)",
         "rgba(255, 40, 0, 1)",
@@ -214,7 +215,8 @@ const kikikuruShinsuiScale = () => {
 }
 
 const kikikuruDoshaScale = () => {
-    const domain = [4, 5, 6, 7];
+    //const domain = [4, 5, 6, 7];
+    const domain = [3.5, 4.5, 5.5, 6.5];
     const range = [
         "rgba(242, 231, 0, 1)",
         "rgba(255, 40, 0, 1)",
@@ -457,14 +459,14 @@ function showAllOptions() {
     if (tilesettype === 'raster-array') {
         document.getElementById('raster-array-options').style.display = 'block'
         document.getElementById('raster-array-coloring-options').style.display = 'block'
-        if (tilesetid === 'alert' || tilesetid === 'landslide') {
+        if (tilesetid.indexOf('alert') !== -1 || tilesetid.indexOf('landslide') !== -1) {
             document.getElementById('legend').style.display = 'none'
             document.getElementById('kikikuru-legend').style.display = 'block'
             document.getElementById('kikikuru-level-lowest').style = ''
             document.getElementById('swatch-level-lowest').style = ''
-            if (tilesetid === 'alert') {
+            if (tilesetid.indexOf('alert') !== -1) {
                 document.getElementById('kikikuru-type').innerText = '浸水害'
-            } else if (tilesetid === 'landslide') {
+            } else if (tilesetid.indexOf('landslide') !== -1) {
                 document.getElementById('kikikuru-type').innerText = '土砂災害'
             }
         } else {
@@ -501,7 +503,7 @@ function showAllOptions() {
                 addLineLayer()
             }
         }
-        if (tilesetid === 'flood') {
+        if (tilesetid.indexOf('flood') !== -1) {
             document.getElementById('kikikuru-legend').style.display = 'block'
             document.getElementById('kikikuru-type').innerText = '洪水'
             document.getElementById('kikikuru-level-lowest').style = 'background-color: #00FFFF;'
@@ -1025,6 +1027,7 @@ const addRasterArrayLayer = (layer) => {
         // minzoom: layerVals.minzoom,
         // maxzoom: layerVals.maxzoom,
     }
+    console.log('Adding layer with definition:', layer_def);
     map.addLayer(layer_def, layerAbove)
     const element = document.getElementById(layer)
     updateLegendBar(layerVals.color_range)

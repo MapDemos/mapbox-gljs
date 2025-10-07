@@ -155,4 +155,103 @@ const tilesets = {
         
     // },
 
+
+    // alert1: {
+    //     value: "mapbox://kenji-shima.alert-20250810050000",
+    //     label: "alert 20250810050000【警報危険度分布】",
+    //     type: 'raster-array',
+    //     mapstyle: 'mapbox://styles/mapbox/light-v11',
+    //     maplayer_above: 'admin-0-boundary-disputed',
+    //     colorscale: 'KikikuruShinsui'
+    // },
+    // alert2: {
+    //     value: "mapbox://kenji-shima.alert-20250810060000",
+    //     label: "alert 20250810060000【警報危険度分布】",
+    //     type: 'raster-array',
+    //     mapstyle: 'mapbox://styles/mapbox/light-v11',
+    //     maplayer_above: 'admin-0-boundary-disputed',
+    //     colorscale: 'KikikuruShinsui'
+    // },
+    // alert3: {
+    //     value: "mapbox://kenji-shima.alert-20250810070000",
+    //     label: "alert 20250810070000【警報危険度分布】",
+    //     type: 'raster-array',
+    //     mapstyle: 'mapbox://styles/mapbox/light-v11',
+    //     maplayer_above: 'admin-0-boundary-disputed',
+    //     colorscale: 'KikikuruShinsui'
+    // },
+    // alert4: {
+    //     value: "mapbox://kenji-shima.alert-20250810080000",
+    //     label: "alert 20250810080000【警報危険度分布】",
+    //     type: 'raster-array',
+    //     mapstyle: 'mapbox://styles/mapbox/light-v11',
+    //     maplayer_above: 'admin-0-boundary-disputed',
+    //     colorscale: 'KikikuruShinsui'
+    // },
+    // alert5: {
+    //     value: "mapbox://kenji-shima.alert-20250810090000",
+    //     label: "alert 20250810090000【警報危険度分布】",
+    //     type: 'raster-array',
+    //     mapstyle: 'mapbox://styles/mapbox/light-v11',
+    //     maplayer_above: 'admin-0-boundary-disputed',
+    //     colorscale: 'KikikuruShinsui'
+    // },
+    // alert6: {
+    //     value: "mapbox://kenji-shima.alert-20250810100000",
+    //     label: "alert 20250810100000【警報危険度分布】",
+    //     type: 'raster-array',
+    //     mapstyle: 'mapbox://styles/mapbox/light-v11',
+    //     maplayer_above: 'admin-0-boundary-disputed',
+    //     colorscale: 'KikikuruShinsui'
+    // },
+
+    // landslide1: {
+    //     value: "mapbox://kenji-shima.landslide-20250810050000",
+    //     label: "landslide 20250810050000【大雨警報（土砂災害）の危険度分布】",
+    //     type: 'raster-array',
+    //     mapstyle: 'mapbox://styles/mapbox/light-v11',
+    //     maplayer_above: 'admin-0-boundary-disputed',
+    //     colorscale: 'KikikuruDosha'
+    // },
+    // landslide2: {
+    //     value: "mapbox://kenji-shima.landslide-20250810060000",
+    //     label: "landslide 20250810060000【大雨警報（土砂災害）の危険度分布】",
+    //     type: 'raster-array',
+    //     mapstyle: 'mapbox://styles/mapbox/light-v11',
+    //     maplayer_above: 'admin-0-boundary-disputed',
+    //     colorscale: 'KikikuruDosha'
+    // },
+    // landslide3: {
+    //     value: "mapbox://kenji-shima.landslide-20250810070000",
+    //     label: "landslide 20250810070000【大雨警報（土砂災害）の危険度分布】",
+    //     type: 'raster-array',
+    //     mapstyle: 'mapbox://styles/mapbox/light-v11',
+    //     maplayer_above: 'admin-0-boundary-disputed',
+    //     colorscale: 'KikikuruDosha'
+    // },
+    // landslide4: {
+    //     value: "mapbox://kenji-shima.landslide-20250810080000",
+    //     label: "landslide 20250810080000【大雨警報（土砂災害）の危険度分布】",
+    //     type: 'raster-array',
+    //     mapstyle: 'mapbox://styles/mapbox/light-v11',
+    //     maplayer_above: 'admin-0-boundary-disputed',
+    //     colorscale: 'KikikuruDosha'
+    // },
+    // landslide5: {
+    //     value: "mapbox://kenji-shima.landslide-20250810090000",
+    //     label: "landslide 20250810090000【大雨警報（土砂災害）の危険度分布】",
+    //     type: 'raster-array',
+    //     mapstyle: 'mapbox://styles/mapbox/light-v11',
+    //     maplayer_above: 'admin-0-boundary-disputed',
+    //     colorscale: 'KikikuruDosha'
+    // },
+    // landslide6: {
+    //     value: "mapbox://kenji-shima.landslide-20250810100000",
+    //     label: "landslide 20250810100000【大雨警報（土砂災害）の危険度分布】",
+    //     type: 'raster-array',
+    //     mapstyle: 'mapbox://styles/mapbox/light-v11',
+    //     maplayer_above: 'admin-0-boundary-disputed',
+    //     colorscale: 'KikikuruDosha'
+    // },
+
 }
