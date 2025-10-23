@@ -189,15 +189,15 @@ const vectorScale = () => {
 }
 
 const snowScale = () => {
-    const domain = [5, 20, 50, 100, 150, 200];
+    const domain = [1.5, 4.5, 19.5, 49.5, 90.5, 149.5, 199.5];
     const range = [
-        "rgba(102, 255, 255, 0.8)",  // 水色 (5)
-        "rgba(0, 204, 255, 0.8)",    // 明るい青 (20)
-        "rgba(51, 102, 255, 0.8)",   // 青 (50)
-        "rgba(255, 204, 0, 0.8)",    // 黄色 (100)
-        "rgba(255, 153, 0, 0.8)",    // オレンジ (150)
-        "rgba(255, 0, 0, 0.8)",      // 赤 (200)
-        "rgba(183, 0, 16, 0.8)"      // 紫 (200+)
+        "rgba(160, 210, 255, 0.9)",  // 水色 (5)
+        "rgba(33, 140, 255, 0.9)",  // 水色 (5)
+        "rgba(0, 65, 255, 0.9)",    // 明るい青 (20)
+        "rgba(250, 245, 0, 0.9)",   // 青 (50)
+        "rgba(255, 153, 0, 0.9)",    // 黄色 (100)
+        "rgba(255, 40, 0, 0.9)",    // オレンジ (150)
+        "rgba(180, 0, 104, 0.9)"      // 赤 (200)
     ];
     return domain.map((v, i) => [v, range[i]]).flat();
 }
@@ -816,7 +816,7 @@ function setLayerOptions() {
 }
 
 let currentLayer = initOption
-const layerAboveDefault = 'road-exit-shield'
+const layerAboveDefault = tilesets[firsttileset].maplayer_above || 'road-exit-shield'
 let layerAbove = layerAboveDefault
 const showLayer = (layer) => {
     currentLayer = layer

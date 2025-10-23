@@ -2,23 +2,13 @@ lat = 35.681236;
 lng = 139.767125;
 
 const tilesets = {
-    // snow_forecast: {
-    //     value: "mapbox://kenji-shima.snow-20250123000000-forecast",
-    //     label: "snow forecast",
-    //     type: 'raster-array',
-    //     colorscale: 'Snow'
-    // },
-    // snow_depth: {
-    //     value: "mapbox://kenji-shima.snow-depth-20250123010000",
-    //     label: "snow depth",
-    //     type: 'raster-array',
-    //     colorscale: 'Snow'
-    // },
     nowcast: {
         value: "mapbox://mapbox.weather-jp-nowcast",
         label: "nowcast【高解像度降水ナウキャスト】",
         type: 'raster-array',
-        colorscale: 'Rain'
+        mapstyle: 'mapbox://styles/kenji-shima/cmfurpm8w00j101r86qp530c8',
+        maplayer_above: 'road-exit-shield',
+        colorscale: 'Rain',
     },
     nowcast_last60min: {
         value: "mapbox://mapbox.weather-jp-nowcast-last-60m",
@@ -124,36 +114,38 @@ const tilesets = {
         mapstyle: 'mapbox://styles/mapbox/satellite-v9',
         maplayer_above: 'satellite',
     },
-    // wind_39_z6: {
-    //     value: "mapbox://kenji-shima.202402190000-wind-z6",
-    //     label: "wind 0-39 Zoom 6",
-    //     type: 'raster-array-particle'
+
+
+    // // wind_39_z6: {
+    // //     value: "mapbox://kenji-shima.202402190000-wind-z6",
+    // //     label: "wind 0-39 Zoom 6",
+    // //     type: 'raster-array-particle'
         
-    // },
-    // wind_39_z8: {
-    //     value: "mapbox://kenji-shima.202402190000-wind-z8",
-    //     label: "wind 0-39 Zoom 8",
-    //     type: 'raster-array-particle'
+    // // },
+    // // wind_39_z8: {
+    // //     value: "mapbox://kenji-shima.202402190000-wind-z8",
+    // //     label: "wind 0-39 Zoom 8",
+    // //     type: 'raster-array-particle'
         
-    // },
-    // wind_39_z12: {
-    //     value: "mapbox://kenji-shima.202402190000-wind-z12",
-    //     label: "wind 0-39 Zoom 12",
-    //     type: 'raster-array-particle'
+    // // },
+    // // wind_39_z12: {
+    // //     value: "mapbox://kenji-shima.202402190000-wind-z12",
+    // //     label: "wind 0-39 Zoom 12",
+    // //     type: 'raster-array-particle'
         
-    // },
-    // wind_LFM_z8: {
-    //     value: "mapbox://kenji-shima.202209180000-wind-LFM-z8",
-    //     label: "wind LFM Zoom 8",
-    //     type: 'raster-array-particle'
+    // // },
+    // // wind_LFM_z8: {
+    // //     value: "mapbox://kenji-shima.202209180000-wind-LFM-z8",
+    // //     label: "wind LFM Zoom 8",
+    // //     type: 'raster-array-particle'
         
-    // },
-    // wind_LFM_z10: {
-    //     value: "mapbox://kenji-shima.202209180000-wind-LFM-z10",
-    //     label: "wind LFM Zoom 10",
-    //     type: 'raster-array-particle'
+    // // },
+    // // wind_LFM_z10: {
+    // //     value: "mapbox://kenji-shima.202209180000-wind-LFM-z10",
+    // //     label: "wind LFM Zoom 10",
+    // //     type: 'raster-array-particle'
         
-    // },
+    // // },
 
 
     // alert1: {
@@ -199,6 +191,14 @@ const tilesets = {
     // alert6: {
     //     value: "mapbox://kenji-shima.alert-20250810100000",
     //     label: "alert 20250810100000【警報危険度分布】",
+    //     type: 'raster-array',
+    //     mapstyle: 'mapbox://styles/mapbox/light-v11',
+    //     maplayer_above: 'admin-0-boundary-disputed',
+    //     colorscale: 'KikikuruShinsui'
+    // },
+    // alert7: {
+    //     value: "mapbox://kenji-shima.alert-20250807200000",
+    //     label: "alert 20250807200000【警報危険度分布】",
     //     type: 'raster-array',
     //     mapstyle: 'mapbox://styles/mapbox/light-v11',
     //     maplayer_above: 'admin-0-boundary-disputed',
@@ -252,6 +252,22 @@ const tilesets = {
     //     mapstyle: 'mapbox://styles/mapbox/light-v11',
     //     maplayer_above: 'admin-0-boundary-disputed',
     //     colorscale: 'KikikuruDosha'
+    // },
+
+
+    // nowcast: {
+    //     value: "mapbox://kenji-shima.nowcast-r-20240620195000",
+    //     label: "nowcast【高解像度降水ナウキャスト】",
+    //     type: 'raster-array',
+    //     mapstyle: 'mapbox://styles/kenji-shima/cmfurpm8w00j101r86qp530c8',
+    //     maplayer_above: 'road-exit-shield',
+    //     colorscale: 'Rain',
+    // },
+    // nowcast_last60min: {
+    //     value: "mapbox://kenji-shima.nowcast-last60m-20240620195000",
+    //     label: "nowcast last 60 minutes【高解像度降水ナウキャスト 過去60分】",
+    //     type: 'raster-array',
+    //     colorscale: 'Rain'
     // },
 
 }
