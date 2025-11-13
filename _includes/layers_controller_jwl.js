@@ -644,7 +644,7 @@ function convertTimeValue(timeValue) {
 async function getCurrentBands() {
     const tilejson = await getTilejson()
     currentLayer = tilejson.raster_layers[0].fields.name; // Default to the first layer if none is set
-    if (currentLayer === 'wind' || currentLayer === 'winds') {
+    if (currentLayer === 'wind' || currentLayer === 'winds' || currentLayer === '10winds') {
         particlelayerid = currentLayer;
         return tilejson
     }
