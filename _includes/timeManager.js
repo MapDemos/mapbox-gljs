@@ -140,7 +140,7 @@ class TimeManager {
     }
 
     getPastPresentFuture() {
-        return ''
+        return '';
         const timeDiff = this.getMinutesDifference();
         if (timeDiff > 1) return '（予想）';
         else if (timeDiff < -1) return '（時点）';

@@ -17,17 +17,17 @@ if (false && 'serviceWorker' in navigator) {
 const venues = [
     //   { name: "三井アウトレットパーク マリンピア神戸", coordinates: [135.048538, 34.6261626] },
     //   { name: "LaLa arena TOKYO-BAY", coordinates: [139.9897519, 35.6837911] },
-    { name: "ららテラス HARUMI FLAG", coordinates: [139.7744125, 35.6513492] },
+    { name: 'ららテラス HARUMI FLAG', coordinates: [139.7744125, 35.6513492] },
     //   { name: "東京ミッドタウン（六本木）", coordinates: [139.73124, 35.6663925] },
     //   { name: "ららテラスTOKYO-BAY", coordinates: [139.9949369, 35.681543] },
     //   { name: "東京ミッドタウン八重洲", coordinates: [139.769174, 35.6791136] },
-    { name: "ららぽーと門真･三井アウトレットパーク 大阪門真", coordinates: [135.5844238, 34.7319119] },
-    { name: "ららぽーと和泉", coordinates: [135.4481652, 34.4374509] },
+    { name: 'ららぽーと門真･三井アウトレットパーク 大阪門真', coordinates: [135.5844238, 34.7319119] },
+    { name: 'ららぽーと和泉', coordinates: [135.4481652, 34.4374509] },
     //   { name: "ららぽーと堺", coordinates: [135.5605418, 34.5409695] },
-    { name: "ららぽーと富士見", coordinates: [139.5478683, 35.8600363] },
+    { name: 'ららぽーと富士見', coordinates: [139.5478683, 35.8600363] },
     //   { name: "ららぽーとEXPOCITY", coordinates: [135.5353341, 34.8052491] },
     //   { name: "淀屋橋 odona", coordinates: [135.5002415, 34.6911195] },
-    { name: "ららぽーと柏の葉", coordinates: [139.951162, 35.8936338] },
+    { name: 'ららぽーと柏の葉', coordinates: [139.951162, 35.8936338] },
     //   { name: "赤れんが テラス", coordinates: [141.3504111, 43.0638781] },
     //   { name: "ららぽーと福岡", coordinates: [130.4401776, 33.5648337] },
     //   { name: "ララガーデン長町", coordinates: [140.8758501, 38.2253153] },
@@ -85,7 +85,7 @@ const venues = [
     //   { name: "コレド室町2", coordinates: [139.7748405, 35.686899] },
     //   { name: "ZOE銀座", coordinates: [139.7657767, 35.6734624] },
     //   { name: "ニッタビル", coordinates: [139.7597311, 35.6700186] },
-    { name: "ららぽーと安城", coordinates: [137.0798505, 34.9653132] }
+    { name: 'ららぽーと安城', coordinates: [137.0798505, 34.9653132] }
 ];
 const is2D = true; // Set to false to use default Mapbox 3D style
 const originalFilters = {};
@@ -171,12 +171,12 @@ function filterIndoorLayers(displayedLevels, filteringLayers = map.getStyle().la
     if (!filteringLayers.length) return;
 
     for (const layer of filteringLayers) {
-        if (!layer["source-layer"]) continue;
+        if (!layer['source-layer']) continue;
 
-        const sourceLayer = layer["source-layer"];
+        const sourceLayer = layer['source-layer'];
         if (
-            sourceLayer === "mapxus_venue" ||
-            sourceLayer === "mapxus_building" ||
+            sourceLayer === 'mapxus_venue' ||
+            sourceLayer === 'mapxus_building' ||
             !layer.filter
         ) {
             continue;
@@ -188,19 +188,19 @@ function filterIndoorLayers(displayedLevels, filteringLayers = map.getStyle().la
         const filter = originalFilters[id];
 
         const newFilter = [
-            "all",
-            sourceLayer === "mapxus_level"
-                ? ["in", "id", ...displayedLevels]
-                : ["in", "ref:level", ...displayedLevels],
-            ...(sourceLayer === "mapxus_place" && type === "symbol"
+            'all',
+            sourceLayer === 'mapxus_level'
+                ? ['in', 'id', ...displayedLevels]
+                : ['in', 'ref:level', ...displayedLevels],
+            ...(sourceLayer === 'mapxus_place' && type === 'symbol'
                 ? [[
-                    "any",
+                    'any',
                     [
-                        "all",
-                        ["has", "overlap"],
-                        ["in", "ref:building", ...(this && this._upperBuildings ? this._upperBuildings : [])],
+                        'all',
+                        ['has', 'overlap'],
+                        ['in', 'ref:building', ...(this && this._upperBuildings ? this._upperBuildings : [])],
                     ],
-                    ["!has", "overlap"],
+                    ['!has', 'overlap'],
                 ]]
                 : []),
             filter
@@ -386,7 +386,7 @@ async function loadMap() {
         language: 'ja',
         scrollZoom: true,
         transformRequest: (url, resourceType) => {
-            if (url.includes("map-api.mapxus.co.jp")) {
+            if (url.includes('map-api.mapxus.co.jp')) {
                 // This logic is now handled by the service worker
                 return {
                     url: url,
@@ -430,7 +430,7 @@ async function loadMap() {
         } else {
             console.log('No features clicked.');
         }
-    })
+    });
 
     async function loadIcons() {
         const spriteJsonUrl = 'https://map-api.mapxus.co.jp/maps/v1/sprites/mapxus_style_v1/sprite@2x.json';
@@ -599,7 +599,7 @@ async function loadMap() {
                 'icon-allow-overlap': true,
                 'icon-ignore-placement': true,
                 'icon-anchor': 'bottom'
-            }
+            };
 
             map.addSource('start-point-source', {
                 type: 'geojson',
@@ -756,7 +756,7 @@ function createRoutingControl() {
         searchInput.type = 'text';
         searchInput.placeholder = `${labelText}を検索...`;
         searchInput.id = `${id}-search-input`;
-        searchInput.className = 'routing-search-input'
+        searchInput.className = 'routing-search-input';
 
         const resultsContainer = document.createElement('div');
         resultsContainer.id = `${id}-search-results`;
@@ -952,7 +952,7 @@ function createRoutingControl() {
                 startFloorButton.click();
                 map.flyTo({ center: startCoords, zoom: 20, pitch: 45 });
             } else {
-                console.error("Could not find the floor button for the starting destination.");
+                console.error('Could not find the floor button for the starting destination.');
             }
 
         } catch (error) {

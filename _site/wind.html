@@ -699,48 +699,48 @@ lng = 134.6455347407337;
 
 const tilesets = {
     wind_4: {
-        value: "mapbox://kenji-shima.bom-wind-z4",
-        label: "wind zoom 4",
+        value: 'mapbox://kenji-shima.bom-wind-z4',
+        label: 'wind zoom 4',
         type: 'raster-array-particle',
         mapstyle: 'mapbox://styles/mapbox/satellite-v9',
         maplayer_above: 'satellite',
     },
     wind_6: {
-        value: "mapbox://kenji-shima.bom-wind-z6",
-        label: "wind zoom 6",
+        value: 'mapbox://kenji-shima.bom-wind-z6',
+        label: 'wind zoom 6',
         type: 'raster-array-particle',
         mapstyle: 'mapbox://styles/mapbox/satellite-v9',
         maplayer_above: 'satellite',
     },
     wind_8: {
-        value: "mapbox://kenji-shima.bom-wind-z8",
-        label: "wind zoom 8",
+        value: 'mapbox://kenji-shima.bom-wind-z8',
+        label: 'wind zoom 8',
         type: 'raster-array-particle',
         mapstyle: 'mapbox://styles/mapbox/satellite-v9',
         maplayer_above: 'satellite',
     },
     wind_10: {
-        value: "mapbox://kenji-shima.bom-wind-z10",
-        label: "wind zoom 10",
+        value: 'mapbox://kenji-shima.bom-wind-z10',
+        label: 'wind zoom 10',
         type: 'raster-array-particle',
         mapstyle: 'mapbox://styles/mapbox/satellite-v9',
         maplayer_above: 'satellite',
     },
-}
-  const defaultzoom = 4
-let zoom = defaultzoom
-let particlelayerid = null
-let currentprojection = 'mercator'
+};
+  const defaultzoom = 4;
+let zoom = defaultzoom;
+let particlelayerid = null;
+let currentprojection = 'mercator';
 
 //const defaultStyle = 'mapbox://styles/mapbox/streets-v12'
-const defaultStyle = 'mapbox://styles/kenji-shima/cmfurpm8w00j101r86qp530c8'
-const firsttileset = Object.keys(tilesets)[0]
-let tilesetid = firsttileset
-let tileset = tilesets[firsttileset].value
-let tilesettype = tilesets[firsttileset].type
-let tilesetvectortype = null
-let tilesetvectorsource = null
-let mapstyle = tilesets[firsttileset].mapstyle || defaultStyle
+const defaultStyle = 'mapbox://styles/kenji-shima/cmfurpm8w00j101r86qp530c8';
+const firsttileset = Object.keys(tilesets)[0];
+let tilesetid = firsttileset;
+let tileset = tilesets[firsttileset].value;
+let tilesettype = tilesets[firsttileset].type;
+let tilesetvectortype = null;
+let tilesetvectorsource = null;
+let mapstyle = tilesets[firsttileset].mapstyle || defaultStyle;
 
 let map = new mapboxgl.Map({
     container: 'map',
@@ -752,11 +752,11 @@ let map = new mapboxgl.Map({
     scrollZoom: true,
     projection: currentprojection,
     language: 'ja'
-})
+});
 
 map.on('style.load', () => {
-    map.showTileBoundaries = true
-    showAllOptions()
+    map.showTileBoundaries = true;
+    showAllOptions();
 
     // map.setFog({
     //     color: 'rgba(61, 70, 79, 1)', // Lower atmosphere
@@ -801,21 +801,21 @@ map.on('style.load', () => {
             }
         }
 
-    })
+    });
 
-})
+});
 
 function changeProjection(projectionType) {
-    currentprojection = projectionType
-    map.setProjection(projectionType)
+    currentprojection = projectionType;
+    map.setProjection(projectionType);
 }
-window.changeProjection = changeProjection
+window.changeProjection = changeProjection;
 
 map.on('zoom', () => {
-    let zoom = map.getZoom()
-    zoom = Math.round((zoom + Number.EPSILON) * 100) / 100
-    document.getElementById('zoom').innerHTML = zoom
-})
+    let zoom = map.getZoom();
+    zoom = Math.round((zoom + Number.EPSILON) * 100) / 100;
+    document.getElementById('zoom').innerHTML = zoom;
+});
 
 // map.on('movestart', (e) => {
 //     if (tilesettype !== 'raster-array') {
@@ -827,9 +827,9 @@ map.on('zoom', () => {
 map.on('click', (e) => {
     const coordinates = e.lngLat;
     console.log('Latitude: ' + coordinates.lat + ', Longitude: ' + coordinates.lng);
-})
+});
 
-let sourceSetStart = 0
+let sourceSetStart = 0;
 map.on('sourcedata', (e) => {
     // console.log('Source data event:', e);
     // console.log('currenttileset:', tileset);
@@ -837,22 +837,22 @@ map.on('sourcedata', (e) => {
         return;
     }
     if (e.isSourceLoaded) {
-        document.getElementById('load-time').innerHTML = `<div class="title">Layer Load Time</div><div>${Date.now() - sourceSetStart} ms</div>`
-        sourceSetStart = Date.now()
+        document.getElementById('load-time').innerHTML = `<div class="title">Layer Load Time</div><div>${Date.now() - sourceSetStart} ms</div>`;
+        sourceSetStart = Date.now();
     }
 
-})
+});
 
-document.getElementById('zoom-adjust').innerHTML = `<div class="title">Change Zoom</div><div><select id="zoom-selector" onchange="changeZoom(this.value)"></select></div>`
-const zoomSelector = document.getElementById('zoom-selector')
+document.getElementById('zoom-adjust').innerHTML = `<div class="title">Change Zoom</div><div><select id="zoom-selector" onchange="changeZoom(this.value)"></select></div>`;
+const zoomSelector = document.getElementById('zoom-selector');
 for (let i = 0; i < 12; i++) {
-    const option = document.createElement('option')
-    option.value = i
-    option.textContent = i
-    zoomSelector.appendChild(option)
+    const option = document.createElement('option');
+    option.value = i;
+    option.textContent = i;
+    zoomSelector.appendChild(option);
 }
 function changeZoom(value) {
-    map.setZoom(value)
+    map.setZoom(value);
 }
 
 
@@ -860,100 +860,100 @@ function changeZoom(value) {
 const yjRainScale = () => {
     const domain = [0, 1, 4, 8, 12, 16, 24, 32, 40, 48, 56, 64, 80, 200];
     const range = [
-        "rgba(204, 255, 255, 0.0)",
-        "rgba(102, 255, 255, 0.0)",
-        "rgba(0, 204, 255, 0.8)",
-        "rgba(0, 153, 255, 0.8)",
-        "rgba(51, 102, 255, 0.8)",
-        "rgba(51, 255, 0, 0.8)",
-        "rgba(51, 204, 0, 0.8)",
-        "rgba(25, 153, 0, 0.8)",
-        "rgba(255, 255, 0, 0.8)",
-        "rgba(255, 204, 0, 0.8)",
-        "rgba(255, 153, 0, 0.8)",
-        "rgba(255, 80, 102, 0.8)",
-        "rgba(255, 0, 0, 0.8)",
-        "rgba(183, 0, 16, 0.8)"
-    ]
+        'rgba(204, 255, 255, 0.0)',
+        'rgba(102, 255, 255, 0.0)',
+        'rgba(0, 204, 255, 0.8)',
+        'rgba(0, 153, 255, 0.8)',
+        'rgba(51, 102, 255, 0.8)',
+        'rgba(51, 255, 0, 0.8)',
+        'rgba(51, 204, 0, 0.8)',
+        'rgba(25, 153, 0, 0.8)',
+        'rgba(255, 255, 0, 0.8)',
+        'rgba(255, 204, 0, 0.8)',
+        'rgba(255, 153, 0, 0.8)',
+        'rgba(255, 80, 102, 0.8)',
+        'rgba(255, 0, 0, 0.8)',
+        'rgba(183, 0, 16, 0.8)'
+    ];
     return domain.map((v, i) => [v, range[i]]).flat();
 };
 
 const jmaSedimentScale = () => {
     const domain = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     const range = [
-        "rgba(0, 0, 0, 1.0)",
-        "rgba(0, 0, 0, 1.0)",
-        "rgba(0, 0, 0, 1.0)",
-        "rgba(0, 0, 0, 1.0)",
-        "rgba(242, 231, 0, 1.0)",
-        "rgba(255, 40, 0, 1.0)",
-        "rgba(170, 0, 170, 1.0)",
-        "rgba(12, 0, 12, 1.0)",
-        "rgba(0, 0, 0, 1.0)",
-        "rgba(0, 0, 0, 1.0)",
-        "rgba(0, 0, 0, 1.0)"
+        'rgba(0, 0, 0, 1.0)',
+        'rgba(0, 0, 0, 1.0)',
+        'rgba(0, 0, 0, 1.0)',
+        'rgba(0, 0, 0, 1.0)',
+        'rgba(242, 231, 0, 1.0)',
+        'rgba(255, 40, 0, 1.0)',
+        'rgba(170, 0, 170, 1.0)',
+        'rgba(12, 0, 12, 1.0)',
+        'rgba(0, 0, 0, 1.0)',
+        'rgba(0, 0, 0, 1.0)',
+        'rgba(0, 0, 0, 1.0)'
     ];
     return domain.map((v, i) => [v, range[i]]).flat();
-}
+};
 
 const vectorScale = () => {
     const domain = [0, 1, 4, 8, 12, 16, 24, 32, 40, 48, 56, 64, 80, 200];
     const range = [
-        "rgba(50, 54, 54, 0)",
-        "rgba(102, 255, 255, 0.0)",
-        "rgba(0, 204, 255, 0.0)",
-        "rgba(0, 153, 255, 0.8)",
-        "rgba(51, 102, 255, 0.8)",
-        "rgba(51, 255, 0, 0.8)",
-        "rgba(51, 204, 0, 0.8)",
-        "rgba(25, 153, 0, 0.8)",
-        "rgba(255, 255, 0, 0.8)",
-        "rgba(255, 204, 0, 0.8)",
-        "rgba(255, 153, 0, 0.8)",
-        "rgba(255, 80, 102, 0.8)",
-        "rgba(255, 0, 0, 0.8)",
-        "rgba(183, 0, 16, 0.8)"
+        'rgba(50, 54, 54, 0)',
+        'rgba(102, 255, 255, 0.0)',
+        'rgba(0, 204, 255, 0.0)',
+        'rgba(0, 153, 255, 0.8)',
+        'rgba(51, 102, 255, 0.8)',
+        'rgba(51, 255, 0, 0.8)',
+        'rgba(51, 204, 0, 0.8)',
+        'rgba(25, 153, 0, 0.8)',
+        'rgba(255, 255, 0, 0.8)',
+        'rgba(255, 204, 0, 0.8)',
+        'rgba(255, 153, 0, 0.8)',
+        'rgba(255, 80, 102, 0.8)',
+        'rgba(255, 0, 0, 0.8)',
+        'rgba(183, 0, 16, 0.8)'
     ];
     return domain.map((v, i) => [v, range[i]]).flat();
-}
+};
 
 const snowScale = () => {
     const domain = [1.5, 4.5, 19.5, 49.5, 90.5, 149.5, 199.5];
     const range = [
-        "rgba(160, 210, 255, 0.9)",  // 水色 (5)
-        "rgba(33, 140, 255, 0.9)",  // 水色 (5)
-        "rgba(0, 65, 255, 0.9)",    // 明るい青 (20)
-        "rgba(250, 245, 0, 0.9)",   // 青 (50)
-        "rgba(255, 153, 0, 0.9)",    // 黄色 (100)
-        "rgba(255, 40, 0, 0.9)",    // オレンジ (150)
-        "rgba(180, 0, 104, 0.9)"      // 赤 (200)
+        'rgba(160, 210, 255, 0.9)',  // 水色 (5)
+        'rgba(33, 140, 255, 0.9)',  // 水色 (5)
+        'rgba(0, 65, 255, 0.9)',    // 明るい青 (20)
+        'rgba(250, 245, 0, 0.9)',   // 青 (50)
+        'rgba(255, 153, 0, 0.9)',    // 黄色 (100)
+        'rgba(255, 40, 0, 0.9)',    // オレンジ (150)
+        'rgba(180, 0, 104, 0.9)'      // 赤 (200)
     ];
     return domain.map((v, i) => [v, range[i]]).flat();
-}
+};
 
 const kikikuruShinsuiScale = () => {
     //const domain = [2, 3, 4, 5];
     const domain = [1.5, 2.5, 3.5, 4.5];
     const range = [
-        "rgba(242, 231, 0, 1)",
-        "rgba(255, 40, 0, 1)",
-        "rgba(170, 0, 170, 1)",
-        "rgba(12, 0, 12, 1)",
+        'rgba(242, 231, 0, 1)',
+        'rgba(255, 40, 0, 1)',
+        'rgba(170, 0, 170, 1)',
+        'rgba(12, 0, 12, 1)',
     ];
     return domain.map((v, i) => [v, range[i]]).flat();
-}
+};
 
 const kikikuruDoshaScale = () => {
     //const domain = [4, 5, 6, 7];
     const domain = [3.5, 4.5, 5.5, 6.5];
     const range = [
-        "rgba(242, 231, 0, 1)",
-        "rgba(255, 40, 0, 1)",
-        "rgba(170, 0, 170, 1)",
-        "rgba(12, 0, 12, 1)",
+        'rgba(242, 231, 0, 1)',
+        'rgba(255, 40, 0, 1)',
+        'rgba(170, 0, 170, 1)',
+        'rgba(12, 0, 12, 1)',
     ];
     return domain.map((v, i) => [v, range[i]]).flat();
-}
+};
 
 const rainScale = () => {
     const domain = [
@@ -964,88 +964,88 @@ const rainScale = () => {
     ];
 
     const range = [
-        "rgba(102, 255, 255, 0.7)",
-        "rgba(68, 238, 255, 0.7)",
-        "rgba(34, 221, 255, 0.71)",
-        "rgba(0, 204, 255, 0.71)",
-        "rgba(10, 184, 255, 0.71)",
-        "rgba(20, 163, 255, 0.71)",
-        "rgba(31, 143, 255, 0.72)",
-        "rgba(41, 122, 255, 0.72)",
-        "rgba(51, 102, 255, 0.72)",
-        "rgba(71, 112, 230, 0.72)",
-        "rgba(92, 122, 204, 0.73)",
-        "rgba(112, 133, 178, 0.73)",
-        "rgba(133, 143, 153, 0.73)",
-        "rgba(153, 153, 128, 0.73)",
-        "rgba(173, 163, 102, 0.74)",
-        "rgba(194, 173, 76, 0.74)",
-        "rgba(214, 184, 51, 0.74)",
-        "rgba(235, 194, 26, 0.74)",
-        "rgba(255, 204, 0, 0.75)",
-        "rgba(255, 199, 0, 0.75)",
-        "rgba(255, 194, 0, 0.75)",
-        "rgba(255, 189, 0, 0.75)",
-        "rgba(255, 184, 0, 0.76)",
-        "rgba(255, 178, 0, 0.76)",
-        "rgba(255, 173, 0, 0.76)",
-        "rgba(255, 168, 0, 0.76)",
-        "rgba(255, 163, 0, 0.77)",
-        "rgba(255, 158, 0, 0.77)",
-        "rgba(255, 153, 0, 0.77)",
-        "rgba(255, 145, 0, 0.77)",
-        "rgba(255, 138, 0, 0.78)",
-        "rgba(255, 130, 0, 0.78)",
-        "rgba(255, 122, 0, 0.78)",
-        "rgba(255, 115, 0, 0.78)",
-        "rgba(255, 107, 0, 0.79)",
-        "rgba(255, 99, 0, 0.79)",
-        "rgba(255, 92, 0, 0.79)",
-        "rgba(255, 84, 0, 0.79)",
-        "rgba(255, 76, 0, 0.8)",
-        "rgba(255, 69, 0, 0.8)",
-        "rgba(255, 61, 0, 0.8)",
-        "rgba(255, 54, 0, 0.81)",
-        "rgba(255, 46, 0, 0.81)",
-        "rgba(255, 38, 0, 0.81)",
-        "rgba(255, 31, 0, 0.81)",
-        "rgba(255, 23, 0, 0.82)",
-        "rgba(255, 15, 0, 0.82)",
-        "rgba(255, 8, 0, 0.82)",
-        "rgba(255, 0, 0, 0.82)",
-        "rgba(253, 0, 1, 0.83)",
-        "rgba(250, 0, 1, 0.83)",
-        "rgba(248, 0, 2, 0.83)",
-        "rgba(245, 0, 2, 0.83)",
-        "rgba(243, 0, 3, 0.84)",
-        "rgba(241, 0, 3, 0.84)",
-        "rgba(238, 0, 4, 0.84)",
-        "rgba(236, 0, 4, 0.84)",
-        "rgba(233, 0, 5, 0.85)",
-        "rgba(231, 0, 5, 0.85)",
-        "rgba(229, 0, 6, 0.85)",
-        "rgba(226, 0, 6, 0.85)",
-        "rgba(224, 0, 7, 0.86)",
-        "rgba(221, 0, 7, 0.86)",
-        "rgba(219, 0, 8, 0.86)",
-        "rgba(217, 0, 9, 0.86)",
-        "rgba(214, 0, 9, 0.87)",
-        "rgba(212, 0, 10, 0.87)",
-        "rgba(209, 0, 10, 0.87)",
-        "rgba(207, 0, 11, 0.87)",
-        "rgba(205, 0, 11, 0.88)",
-        "rgba(202, 0, 12, 0.88)",
-        "rgba(200, 0, 12, 0.88)",
-        "rgba(197, 0, 13, 0.88)",
-        "rgba(195, 0, 13, 0.89)",
-        "rgba(193, 0, 14, 0.89)",
-        "rgba(190, 0, 14, 0.89)",
-        "rgba(188, 0, 15, 0.89)",
-        "rgba(185, 0, 15, 0.9)",
-        "rgba(183, 0, 16, 0.9)"
+        'rgba(102, 255, 255, 0.7)',
+        'rgba(68, 238, 255, 0.7)',
+        'rgba(34, 221, 255, 0.71)',
+        'rgba(0, 204, 255, 0.71)',
+        'rgba(10, 184, 255, 0.71)',
+        'rgba(20, 163, 255, 0.71)',
+        'rgba(31, 143, 255, 0.72)',
+        'rgba(41, 122, 255, 0.72)',
+        'rgba(51, 102, 255, 0.72)',
+        'rgba(71, 112, 230, 0.72)',
+        'rgba(92, 122, 204, 0.73)',
+        'rgba(112, 133, 178, 0.73)',
+        'rgba(133, 143, 153, 0.73)',
+        'rgba(153, 153, 128, 0.73)',
+        'rgba(173, 163, 102, 0.74)',
+        'rgba(194, 173, 76, 0.74)',
+        'rgba(214, 184, 51, 0.74)',
+        'rgba(235, 194, 26, 0.74)',
+        'rgba(255, 204, 0, 0.75)',
+        'rgba(255, 199, 0, 0.75)',
+        'rgba(255, 194, 0, 0.75)',
+        'rgba(255, 189, 0, 0.75)',
+        'rgba(255, 184, 0, 0.76)',
+        'rgba(255, 178, 0, 0.76)',
+        'rgba(255, 173, 0, 0.76)',
+        'rgba(255, 168, 0, 0.76)',
+        'rgba(255, 163, 0, 0.77)',
+        'rgba(255, 158, 0, 0.77)',
+        'rgba(255, 153, 0, 0.77)',
+        'rgba(255, 145, 0, 0.77)',
+        'rgba(255, 138, 0, 0.78)',
+        'rgba(255, 130, 0, 0.78)',
+        'rgba(255, 122, 0, 0.78)',
+        'rgba(255, 115, 0, 0.78)',
+        'rgba(255, 107, 0, 0.79)',
+        'rgba(255, 99, 0, 0.79)',
+        'rgba(255, 92, 0, 0.79)',
+        'rgba(255, 84, 0, 0.79)',
+        'rgba(255, 76, 0, 0.8)',
+        'rgba(255, 69, 0, 0.8)',
+        'rgba(255, 61, 0, 0.8)',
+        'rgba(255, 54, 0, 0.81)',
+        'rgba(255, 46, 0, 0.81)',
+        'rgba(255, 38, 0, 0.81)',
+        'rgba(255, 31, 0, 0.81)',
+        'rgba(255, 23, 0, 0.82)',
+        'rgba(255, 15, 0, 0.82)',
+        'rgba(255, 8, 0, 0.82)',
+        'rgba(255, 0, 0, 0.82)',
+        'rgba(253, 0, 1, 0.83)',
+        'rgba(250, 0, 1, 0.83)',
+        'rgba(248, 0, 2, 0.83)',
+        'rgba(245, 0, 2, 0.83)',
+        'rgba(243, 0, 3, 0.84)',
+        'rgba(241, 0, 3, 0.84)',
+        'rgba(238, 0, 4, 0.84)',
+        'rgba(236, 0, 4, 0.84)',
+        'rgba(233, 0, 5, 0.85)',
+        'rgba(231, 0, 5, 0.85)',
+        'rgba(229, 0, 6, 0.85)',
+        'rgba(226, 0, 6, 0.85)',
+        'rgba(224, 0, 7, 0.86)',
+        'rgba(221, 0, 7, 0.86)',
+        'rgba(219, 0, 8, 0.86)',
+        'rgba(217, 0, 9, 0.86)',
+        'rgba(214, 0, 9, 0.87)',
+        'rgba(212, 0, 10, 0.87)',
+        'rgba(209, 0, 10, 0.87)',
+        'rgba(207, 0, 11, 0.87)',
+        'rgba(205, 0, 11, 0.88)',
+        'rgba(202, 0, 12, 0.88)',
+        'rgba(200, 0, 12, 0.88)',
+        'rgba(197, 0, 13, 0.88)',
+        'rgba(195, 0, 13, 0.89)',
+        'rgba(193, 0, 14, 0.89)',
+        'rgba(190, 0, 14, 0.89)',
+        'rgba(188, 0, 15, 0.89)',
+        'rgba(185, 0, 15, 0.9)',
+        'rgba(183, 0, 16, 0.9)'
     ];
     return domain.map((v, i) => [v, range[i]]).flat();
-}
+};
 
 const COLORSCALES = {
     'Turbo': d3.interpolateTurbo,
@@ -1087,37 +1087,37 @@ const COLORSCALES = {
         manual: true,
         value: kikikuruDoshaScale()
     }
-}
+};
 
-const defaultcolorscalename = 'Turbo'
-let selectedcolorscalename = tilesets[firsttileset].colorscale || defaultcolorscalename
-let colorscaletype = COLORSCALES[selectedcolorscalename]
-let colorsteps = 256
+const defaultcolorscalename = 'Turbo';
+let selectedcolorscalename = tilesets[firsttileset].colorscale || defaultcolorscalename;
+let colorscaletype = COLORSCALES[selectedcolorscalename];
+let colorsteps = 256;
 //let colorsteps = 8
 
 const stepexpression = [
     'step',
     ['raster-value'],
     'rgba(0, 0, 0, 0)'
-]
+];
 const interpolateexpression = [
     'interpolate',
     ['linear'],
     ['raster-value']
-]
+];
 
 //let colorscaleExpressiontemplate = interpolateexpression
-let colorscaleExpressiontemplate = stepexpression
-let tilesetsuffix = ''
+let colorscaleExpressiontemplate = stepexpression;
+let tilesetsuffix = '';
 //let tilesetresampling = 'linear'
-let tilesetresampling = 'nearest'
+let tilesetresampling = 'nearest';
 
 function getColorScale(colorRange) {
-    let colorscale = null
+    let colorscale = null;
     if (colorscaletype.manual) {
-        colorscale = colorscaletype.value
+        colorscale = colorscaletype.value;
     } else {
-        colorscale = d3.quantize(colorscaletype, colorsteps).map((c, i) => [(i / colorsteps), c])
+        colorscale = d3.quantize(colorscaletype, colorsteps).map((c, i) => [(i / colorsteps), c]);
         const [minValue, maxValue] = colorRange;
         colorscale = colorscale.map(([x, c]) => [
             minValue + (maxValue - minValue) * x,
@@ -1125,30 +1125,30 @@ function getColorScale(colorRange) {
         ])
             .flat();
     }
-    const colorscaleExpression = colorscaleExpressiontemplate.slice()
+    const colorscaleExpression = colorscaleExpressiontemplate.slice();
     colorscale.forEach(item => {
-        colorscaleExpression.push(item)
-    })
+        colorscaleExpression.push(item);
+    });
     return colorscaleExpression;
 }
 
 function updateLegendBar(colorRange) {
-    const increment = oneTwoFive(colorRange)
-    const [minValue, maxValue] = colorRange
-    let legendVals = []
+    const increment = oneTwoFive(colorRange);
+    const [minValue, maxValue] = colorRange;
+    let legendVals = [];
     for (let i = minValue + increment; i <= maxValue; i += increment) {
         legendVals.push(i);
     }
-    let colors = null
+    let colors = null;
     if (colorscaletype.manual) {
-        colors = colorscaletype.value
-        let updateColors = []
+        colors = colorscaletype.value;
+        let updateColors = [];
         for (let i = 0; i < colors.length; i += 2) {
             updateColors.push([colors[i], colors[i + 1].replace(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*[\d.]+\)/, 'rgb($1,$2,$3)')]);
         }
-        colors = updateColors
+        colors = updateColors;
     } else {
-        colors = d3.quantize(colorscaletype, colorsteps).map((c, i) => [(i / colorsteps), c])
+        colors = d3.quantize(colorscaletype, colorsteps).map((c, i) => [(i / colorsteps), c]);
     }
     const updatedColors = colors.map(([stop, color]) => {
         if (color.startsWith('rgb(') && !color.startsWith('rgba(')) {
@@ -1170,75 +1170,75 @@ function updateLegendBar(colorRange) {
 
     legendBar.style.background = `linear-gradient(to right, ${gradientColors})`;
 
-    legendBar.innerHTML = ''
+    legendBar.innerHTML = '';
     legendVals.forEach(element => {
-        const span = legendBar.appendChild(document.createElement('span'))
-        span.className = 'label'
-        span.style = ''
-        span.innerHTML = element
+        const span = legendBar.appendChild(document.createElement('span'));
+        span.className = 'label';
+        span.style = '';
+        span.innerHTML = element;
     });
 }
 
-let initOption
+let initOption;
 
-let bandlist = []
+let bandlist = [];
 
 function showAllOptions() {
-    sourceSetStart = Date.now()
+    sourceSetStart = Date.now();
     if (tilesettype === 'raster-array') {
-        document.getElementById('raster-array-options').style.display = 'block'
-        document.getElementById('raster-array-coloring-options').style.display = 'block'
+        document.getElementById('raster-array-options').style.display = 'block';
+        document.getElementById('raster-array-coloring-options').style.display = 'block';
         if (tilesetid.indexOf('alert') !== -1 || tilesetid.indexOf('landslide') !== -1) {
-            document.getElementById('legend').style.display = 'none'
-            document.getElementById('kikikuru-legend').style.display = 'block'
-            document.getElementById('kikikuru-level-lowest').style = ''
-            document.getElementById('swatch-level-lowest').style = ''
+            document.getElementById('legend').style.display = 'none';
+            document.getElementById('kikikuru-legend').style.display = 'block';
+            document.getElementById('kikikuru-level-lowest').style = '';
+            document.getElementById('swatch-level-lowest').style = '';
             if (tilesetid.indexOf('alert') !== -1) {
-                document.getElementById('kikikuru-type').innerText = '浸水害'
+                document.getElementById('kikikuru-type').innerText = '浸水害';
             } else if (tilesetid.indexOf('landslide') !== -1) {
-                document.getElementById('kikikuru-type').innerText = '土砂災害'
+                document.getElementById('kikikuru-type').innerText = '土砂災害';
             }
         } else {
-            document.getElementById('kikikuru-legend').style.display = 'none'
-            document.getElementById('legend').style.display = 'block'
+            document.getElementById('kikikuru-legend').style.display = 'none';
+            document.getElementById('legend').style.display = 'block';
         }
 
-        document.getElementById('map-overlay-bottom').style.display = 'block'
-        showAllRasterArrayOptions()
+        document.getElementById('map-overlay-bottom').style.display = 'block';
+        showAllRasterArrayOptions();
     } else if (tilesettype === 'raster-array-particle') {
         showAllRasterArrayOptions().then(() => {
-            addParticles()
-            document.getElementById('raster-array-coloring-options').style.display = 'none'
-            document.getElementById('legend').style.display = 'none'
-            document.getElementById('map-overlay-bottom').style.display = 'none'
-            document.getElementById('kikikuru-legend').style.display = 'none'
-            setTimeFromTileJson()
-        })
+            addParticles();
+            document.getElementById('raster-array-coloring-options').style.display = 'none';
+            document.getElementById('legend').style.display = 'none';
+            document.getElementById('map-overlay-bottom').style.display = 'none';
+            document.getElementById('kikikuru-legend').style.display = 'none';
+            setTimeFromTileJson();
+        });
 
     } else {
-        document.getElementById('raster-array-options').style.display = 'none'
-        document.getElementById('legend').style.display = 'none'
-        document.getElementById('map-overlay-bottom').style.display = 'none'
+        document.getElementById('raster-array-options').style.display = 'none';
+        document.getElementById('legend').style.display = 'none';
+        document.getElementById('map-overlay-bottom').style.display = 'none';
         if (tilesettype === 'raster') {
-            addRasterLayer()
+            addRasterLayer();
         } else if (tilesettype === 'vector') {
             if (tilesetvectortype === 'circle') {
-                addCircleLayer()
+                addCircleLayer();
             } else if (tilesetvectortype === 'fill') {
-                addFillLayer()
+                addFillLayer();
             } else if (tilesetvectortype === 'line' && tilesetvectorsource === 'river_flood') {
-                addFloodLayer()
+                addFloodLayer();
             } else if (tilesetvectortype === 'line') {
-                addLineLayer()
+                addLineLayer();
             }
         }
         if (tilesetid.indexOf('flood') !== -1) {
-            document.getElementById('kikikuru-legend').style.display = 'block'
-            document.getElementById('kikikuru-type').innerText = '洪水'
-            document.getElementById('kikikuru-level-lowest').style = 'background-color: #00FFFF;'
-            document.getElementById('swatch-level-lowest').style = 'background-color: #00FFFF;'
+            document.getElementById('kikikuru-legend').style.display = 'block';
+            document.getElementById('kikikuru-type').innerText = '洪水';
+            document.getElementById('kikikuru-level-lowest').style = 'background-color: #00FFFF;';
+            document.getElementById('swatch-level-lowest').style = 'background-color: #00FFFF;';
         }
-        setTimeFromTileJson()
+        setTimeFromTileJson();
 
     }
 }
@@ -1262,86 +1262,86 @@ function setTimeFromTileJson() {
 
         document.getElementById('active-date').innerHTML = formattedDate;
         document.getElementById('active-time').innerHTML = formattedTime;
-    })
+    });
 }
 
 async function showAllRasterArrayOptions() {
-    await getCurrentBands()
-    setLayerOptions()
-    changeColorscaleType(selectedcolorscalename)
+    await getCurrentBands();
+    setLayerOptions();
+    changeColorscaleType(selectedcolorscalename);
     // showLayer(initOption)
 
-    const colorscaleselect = document.getElementById('colorscale-selector')
-    colorscaleselect.innerHTML = ''
+    const colorscaleselect = document.getElementById('colorscale-selector');
+    colorscaleselect.innerHTML = '';
     for (let type in COLORSCALES) {
-        const option = colorscaleselect.appendChild(document.createElement('option'))
-        option.value = type
-        option.innerHTML = type
-        if (type === selectedcolorscalename) option.selected = true
+        const option = colorscaleselect.appendChild(document.createElement('option'));
+        option.value = type;
+        option.innerHTML = type;
+        if (type === selectedcolorscalename) option.selected = true;
     }
 
     if (particlelayerid) {
-        document.getElementById('particles-options-wrapper').style.display = 'block'
+        document.getElementById('particles-options-wrapper').style.display = 'block';
     } else {
-        document.getElementById('particles-options-wrapper').style.display = 'none'
+        document.getElementById('particles-options-wrapper').style.display = 'none';
     }
 
-    const tilesetselect = document.getElementById('tileset-selector')
-    tilesetselect.innerHTML = ''
+    const tilesetselect = document.getElementById('tileset-selector');
+    tilesetselect.innerHTML = '';
     for (let tile in tilesets) {
-        const option = tilesetselect.appendChild(document.createElement('option'))
-        option.value = tile
-        option.innerHTML = tilesets[tile].label
-        if (tilesets[tile].value === tileset) option.selected = true
+        const option = tilesetselect.appendChild(document.createElement('option'));
+        option.value = tile;
+        option.innerHTML = tilesets[tile].label;
+        if (tilesets[tile].value === tileset) option.selected = true;
     }
 
-    initTimeSlider(0)
+    initTimeSlider(0);
 
 }
 
 function initTimeSlider(val) {
-    const timeslider = document.getElementById('slider')
-    timeslider.max = bandlist.length - 1
-    timeslider.value = val
+    const timeslider = document.getElementById('slider');
+    timeslider.max = bandlist.length - 1;
+    timeslider.value = val;
 
-    const timediv = document.getElementById('timediv')
-    timediv.innerHTML = ''
-    const date = document.getElementById('active-date')
-    date.innerHTML = ''
-    const time = document.getElementById('active-time')
-    time.innerHTML = ''
+    const timediv = document.getElementById('timediv');
+    timediv.innerHTML = '';
+    const date = document.getElementById('active-date');
+    date.innerHTML = '';
+    const time = document.getElementById('active-time');
+    time.innerHTML = '';
 
-    const auto = document.getElementById('auto')
+    const auto = document.getElementById('auto');
 
     if (bandlist.length >= 1) {
-        const currentDateTime = convertTimeValue(bandlist[val]).split(" ");
+        const currentDateTime = convertTimeValue(bandlist[val]).split(' ');
         date.innerHTML = currentDateTime[0];
         time.innerHTML = currentDateTime[1];
 
-        timeslider.disabled = false
-        auto.disabled = false
-        timeslider.style = 'visibility: visible;'
-        let index = 0
+        timeslider.disabled = false;
+        auto.disabled = false;
+        timeslider.style = 'visibility: visible;';
+        let index = 0;
         bandlist.forEach(datetime => {
-            const datetimearray = convertTimeValue(datetime).split(" ")
-            const timespan = timediv.appendChild(document.createElement('span'))
+            const datetimearray = convertTimeValue(datetime).split(' ');
+            const timespan = timediv.appendChild(document.createElement('span'));
             if (index === 0 || index === bandlist.length - 1) {
-                timespan.innerHTML = `${datetimearray[1]}`
+                timespan.innerHTML = `${datetimearray[1]}`;
             } else {
-                timespan.innerHTML = `・`
+                timespan.innerHTML = `・`;
             }
             // date.innerHTML = datetimearray[0] // This line was incorrect
-            index++
-        })
+            index++;
+        });
         if (bandlist.length === 1) {
-            document.getElementById('map-overlay-bottom').style.display = 'none'
+            document.getElementById('map-overlay-bottom').style.display = 'none';
         }
     } else {
-        timeslider.disabled = true
-        timeslider.style = 'visibility: hidden;'
-        if (autoFlag) play()
-        auto.disabled = true
-        document.getElementById('map-overlay-bottom').style.display = 'none'
+        timeslider.disabled = true;
+        timeslider.style = 'visibility: hidden;';
+        if (autoFlag) play();
+        auto.disabled = true;
+        document.getElementById('map-overlay-bottom').style.display = 'none';
     }
 }
 
@@ -1371,11 +1371,11 @@ function convertTimeValue(timeValue) {
 }
 
 async function getCurrentBands() {
-    const tilejson = await getTilejson()
+    const tilejson = await getTilejson();
     currentLayer = tilejson.raster_layers[0].fields.name; // Default to the first layer if none is set
     if (currentLayer === 'wind' || currentLayer === 'winds' || currentLayer === '10winds') {
         particlelayerid = currentLayer;
-        return tilejson
+        return tilejson;
     }
     tilejson.raster_layers.forEach(layer => {
         if (layer.id === currentLayer) {
@@ -1390,7 +1390,7 @@ async function getCurrentBands() {
                 color_range: layer.fields.range,
                 minzoom: tilejson.minzoom,
                 maxzoom: tilejson.maxzoom,
-            }
+            };
         }
     });
     return tilejson; // Return the data for callers who need it
@@ -1413,104 +1413,104 @@ async function getTilejson() {
     }
 }
 
-let lastBandIndex = 0
+let lastBandIndex = 0;
 async function changeBand(index) {
-    lastBandIndex = index
-    initTimeSlider(lastBandIndex)
-    map.setPaintProperty(currentLayer, 'raster-array-band', bandlist[lastBandIndex])
+    lastBandIndex = index;
+    initTimeSlider(lastBandIndex);
+    map.setPaintProperty(currentLayer, 'raster-array-band', bandlist[lastBandIndex]);
 }
-window.changeBand = changeBand
+window.changeBand = changeBand;
 
 function removeAllLayers() {
     // Remove all raster array layers
     for (let l in layers) {
         if (map.getLayer(l)) {
-            map.removeLayer(l)
+            map.removeLayer(l);
         }
     }
 
     // Remove common layer types
-    const commonLayers = ['vector', 'raster', 'particlelayer']
+    const commonLayers = ['vector', 'raster', 'particlelayer'];
     commonLayers.forEach(layerId => {
         if (map.getLayer(layerId)) {
-            map.removeLayer(layerId)
+            map.removeLayer(layerId);
         }
-    })
+    });
 
     // Remove particles
-    removeParticles()
+    removeParticles();
 
     // Remove all sources
-    const commonSources = ['rastersource', 'vectorsource', 'particlesource']
+    const commonSources = ['rastersource', 'vectorsource', 'particlesource'];
     commonSources.forEach(sourceId => {
         if (map.getSource(sourceId)) {
-            map.removeSource(sourceId)
+            map.removeSource(sourceId);
         }
-    })
+    });
 
     // Reset layers object
-    layers = {}
+    layers = {};
 
     // Reset layer-related variables
-    particlelayerid = null
-    bandlist = []
-    initOption = null
-    currentLayer = null
+    particlelayerid = null;
+    bandlist = [];
+    initOption = null;
+    currentLayer = null;
 }
 
-let currentStyle = mapstyle
+let currentStyle = mapstyle;
 function changeTileset(t) {
-    lastBandIndex = 0
-    removeAllLayers()
-    tilesetid = t
-    tileset = tilesets[t].value
-    tilesettype = tilesets[t].type
-    const newMapStyle = tilesets[t].mapstyle || defaultStyle
-    layerAbove = tilesets[t].maplayer_above || layerAboveDefault
-    tilesetsuffix = tilesets[t].suffix || ''
-    tilesetresampling = tilesets[t].resampling || 'nearest'
+    lastBandIndex = 0;
+    removeAllLayers();
+    tilesetid = t;
+    tileset = tilesets[t].value;
+    tilesettype = tilesets[t].type;
+    const newMapStyle = tilesets[t].mapstyle || defaultStyle;
+    layerAbove = tilesets[t].maplayer_above || layerAboveDefault;
+    tilesetsuffix = tilesets[t].suffix || '';
+    tilesetresampling = tilesets[t].resampling || 'nearest';
     if (tilesettype === 'vector') {
-        tilesetvectortype = tilesets[t].vector_layer_type
-        tilesetvectorsource = tilesets[t].vector_layer_source
+        tilesetvectortype = tilesets[t].vector_layer_type;
+        tilesetvectorsource = tilesets[t].vector_layer_source;
     }
     if (tilesets[t].zoom) {
-        zoom = tilesets[t].zoom
+        zoom = tilesets[t].zoom;
     } else {
-        zoom = defaultzoom
+        zoom = defaultzoom;
     }
     if (tilesets[t].colorscale) {
-        selectedcolorscalename = tilesets[t].colorscale
+        selectedcolorscalename = tilesets[t].colorscale;
     } else {
-        selectedcolorscalename = defaultcolorscalename
+        selectedcolorscalename = defaultcolorscalename;
     }
 
     // Check if the new style is different from the current one.
     if (currentStyle !== newMapStyle) {
         // If styles are different, wait for the new style to load.
         map.once('style.load', () => {
-            showAllOptions()
-        })
-        map.setStyle(newMapStyle)
+            showAllOptions();
+        });
+        map.setStyle(newMapStyle);
     } else {
         // If style is the same, the map is ready. Just add the new layers.
-        showAllOptions()
+        showAllOptions();
     }
-    currentStyle = newMapStyle
+    currentStyle = newMapStyle;
 }
-window.changeTileset = changeTileset
+window.changeTileset = changeTileset;
 
 function changeColorscaleType(type) {
-    selectedcolorscalename = type
-    colorscaletype = COLORSCALES[type]
-    showLayer(currentLayer)
+    selectedcolorscalename = type;
+    colorscaletype = COLORSCALES[type];
+    showLayer(currentLayer);
 }
-window.changeColorscaleType = changeColorscaleType
+window.changeColorscaleType = changeColorscaleType;
 
 function changeColorSteps(steps) {
-    colorsteps = steps
-    showLayer(currentLayer)
+    colorsteps = steps;
+    showLayer(currentLayer);
 }
-window.changeColorSteps = changeColorSteps
+window.changeColorSteps = changeColorSteps;
 
 function oneTwoFive(range, maxSteps = 15) {
     const rng = range[1] - range[0];
@@ -1526,55 +1526,55 @@ function oneTwoFive(range, maxSteps = 15) {
 }
 
 let layers = {
-}
+};
 
 function setLayerOptions() {
-    const select = document.getElementById('layer-selector')
-    select.innerHTML = ''
+    const select = document.getElementById('layer-selector');
+    select.innerHTML = '';
     for (let l in layers) {
-        const option = select.appendChild(document.createElement('option'))
-        option.value = l
-        option.innerHTML = l
+        const option = select.appendChild(document.createElement('option'));
+        option.value = l;
+        option.innerHTML = l;
         if (l === initOption) {
-            option.selected = true
+            option.selected = true;
         }
     }
     document.getElementById('layer-selector').addEventListener('change', function () {
         showLayer(this.value);
-    })
+    });
 }
 
-let currentLayer = initOption
-const layerAboveDefault = tilesets[firsttileset].maplayer_above || 'road-exit-shield'
-let layerAbove = layerAboveDefault
+let currentLayer = initOption;
+const layerAboveDefault = tilesets[firsttileset].maplayer_above || 'road-exit-shield';
+let layerAbove = layerAboveDefault;
 const showLayer = (layer) => {
-    currentLayer = layer
+    currentLayer = layer;
     for (let l in layers) {
         if (map.getLayer(l)) {
-            map.removeLayer(l)
+            map.removeLayer(l);
         }
     }
-    removeParticles()
-    if (map.getSource("rastersource")) {
-        map.removeSource("rastersource")
+    removeParticles();
+    if (map.getSource('rastersource')) {
+        map.removeSource('rastersource');
     }
     if (tilesettype === 'raster-array') {
-        addRasterArrayLayer(layer)
+        addRasterArrayLayer(layer);
     }
-}
-document.showLayer = showLayer
+};
+document.showLayer = showLayer;
 
 const addCircleLayer = () => {
     if (map.getLayer('vector')) {
-        map.removeLayer('vector')
+        map.removeLayer('vector');
     }
-    if (map.getSource("vectorsource")) {
-        map.removeSource("vectorsource")
+    if (map.getSource('vectorsource')) {
+        map.removeSource('vectorsource');
     }
     map.addSource('vectorsource', {
         type: 'vector',
         url: tileset
-    })
+    });
     map.addLayer({
         id: 'vector',
         type: 'circle',
@@ -1587,20 +1587,20 @@ const addCircleLayer = () => {
             'circle-stroke-color': 'rgba(0, 0, 0, 1)'
         },
         layerAbove
-    })
-}
+    });
+};
 
 const addFillLayer = () => {
     if (map.getLayer('vector')) {
-        map.removeLayer('vector')
+        map.removeLayer('vector');
     }
-    if (map.getSource("vectorsource")) {
-        map.removeSource("vectorsource")
+    if (map.getSource('vectorsource')) {
+        map.removeSource('vectorsource');
     }
     map.addSource('vectorsource', {
         type: 'vector',
         url: tileset
-    })
+    });
     map.addLayer({
         id: 'vector',
         type: 'fill',
@@ -1611,20 +1611,20 @@ const addFillLayer = () => {
             'fill-outline-color': 'rgba(0, 0, 0, 1)'
         },
         layerAbove
-    })
-}
+    });
+};
 
 const addLineLayer = () => {
     if (map.getLayer('vector')) {
-        map.removeLayer('vector')
+        map.removeLayer('vector');
     }
-    if (map.getSource("vectorsource")) {
-        map.removeSource("vectorsource")
+    if (map.getSource('vectorsource')) {
+        map.removeSource('vectorsource');
     }
     map.addSource('vectorsource', {
         type: 'vector',
         url: tileset
-    })
+    });
     map.addLayer({
         id: 'vector',
         type: 'line',
@@ -1635,20 +1635,20 @@ const addLineLayer = () => {
             'line-width': 2
         }
         , layerAbove
-    })
-}
+    });
+};
 
 const addFloodLayer = () => {
     if (map.getLayer('vector')) {
-        map.removeLayer('vector')
+        map.removeLayer('vector');
     }
-    if (map.getSource("vectorsource")) {
-        map.removeSource("vectorsource")
+    if (map.getSource('vectorsource')) {
+        map.removeSource('vectorsource');
     }
     map.addSource('vectorsource', {
         type: 'vector',
         url: tileset
-    })
+    });
     map.addLayer({
         id: 'vector',
         type: 'line',
@@ -1657,7 +1657,7 @@ const addFloodLayer = () => {
         'paint': {
             'line-color': [
                 'case',
-                ['==', ['get', 'TYPE'], "1"],
+                ['==', ['get', 'TYPE'], '1'],
                 [
                     'interpolate',
                     ['linear'],
@@ -1667,7 +1667,7 @@ const addFloodLayer = () => {
                     3, '#800080', // Purple for 3
                     4, '#000000', // Black for 4
                 ],
-                ['==', ['get', 'TYPE'], "2"],
+                ['==', ['get', 'TYPE'], '2'],
                 [
                     'interpolate',
                     ['linear'],
@@ -1685,39 +1685,39 @@ const addFloodLayer = () => {
                 ['zoom'],
                 0,
                 ['case',
-                    ['==', ['get', 'TYPE'], "1"], 1,
-                    ['==', ['get', 'TYPE'], "2"], 2,
+                    ['==', ['get', 'TYPE'], '1'], 1,
+                    ['==', ['get', 'TYPE'], '2'], 2,
                     1 // Default width if TYPE is not 1 or 2
                 ],
                 10,
                 ['case',
-                    ['==', ['get', 'TYPE'], "1"], 4,
-                    ['==', ['get', 'TYPE'], "2"], 6,
+                    ['==', ['get', 'TYPE'], '1'], 4,
+                    ['==', ['get', 'TYPE'], '2'], 6,
                     4 // Default width if TYPE is not 1 or 2
                 ],
                 15,
                 ['case',
-                    ['==', ['get', 'TYPE'], "1"], 8,
-                    ['==', ['get', 'TYPE'], "2"], 12,
+                    ['==', ['get', 'TYPE'], '1'], 8,
+                    ['==', ['get', 'TYPE'], '2'], 12,
                     8 // Default width if TYPE is not 1 or 2
                 ]
             ],
             'line-opacity': 1.0,
         },
-    })
-}
+    });
+};
 
 const addRasterLayer = () => {
     if (map.getLayer('raster')) {
-        map.removeLayer('raster')
+        map.removeLayer('raster');
     }
-    if (map.getSource("rastersource")) {
-        map.removeSource("rastersource")
+    if (map.getSource('rastersource')) {
+        map.removeSource('rastersource');
     }
     map.addSource('rastersource', {
         type: 'raster',
         url: tileset
-    })
+    });
     const layer_def = {
         id: 'raster',
         type: 'raster',
@@ -1725,17 +1725,17 @@ const addRasterLayer = () => {
         paint: {
             'raster-opacity': 1.0,
         }
-    }
+    };
     map.addLayer(layer_def, layerAbove);
-}
+};
 
 const addRasterArrayLayer = (layer) => {
     // console.log('Adding raster array source:', tileset + tilesetsuffix);
     map.addSource('rastersource', {
         type: 'raster-array',
         url: tileset + tilesetsuffix
-    })
-    const layerVals = layers[layer]
+    });
+    const layerVals = layers[layer];
     // console.log('Layer values:', layerVals);
     const layer_def = {
         id: layer,
@@ -1755,23 +1755,23 @@ const addRasterArrayLayer = (layer) => {
         },
         // minzoom: layerVals.minzoom,
         // maxzoom: layerVals.maxzoom,
-    }
+    };
     console.log('Adding layer with definition:', layer_def);
-    map.addLayer(layer_def, layerAbove)
-    const element = document.getElementById(layer)
-    updateLegendBar(layerVals.color_range)
+    map.addLayer(layer_def, layerAbove);
+    const element = document.getElementById(layer);
+    updateLegendBar(layerVals.color_range);
 
-    addParticles()
-}
+    addParticles();
+};
 
 const removeParticles = () => {
     if (map.getLayer('particlelayer')) {
-        map.removeLayer('particlelayer')
+        map.removeLayer('particlelayer');
     }
     if (map.getSource('particlesource')) {
-        map.removeSource('particlesource')
+        map.removeSource('particlesource');
     }
-}
+};
 
 const addParticles = () => {
     // console.log('Adding particles for layer:', particlelayerid);
@@ -1780,8 +1780,8 @@ const addParticles = () => {
             id: 'particlesource',
             type: 'raster-array',
             url: tileset
-        }
-        map.addSource('particlesource', particlesource)
+        };
+        map.addSource('particlesource', particlesource);
         const particlelayer = {
             'id': 'particlelayer',
             'type': 'raster-particle',
@@ -1797,80 +1797,80 @@ const addParticles = () => {
             },
             'minzoom': 0,
             'maxzoom': 22,
-        }
-        map.addLayer(particlelayer, layerAbove)
-        let particleCount = 1000
-        document.getElementById('particle-count-slider').value = particleCount
-        setParticleCount(particleCount)
+        };
+        map.addLayer(particlelayer, layerAbove);
+        let particleCount = 1000;
+        document.getElementById('particle-count-slider').value = particleCount;
+        setParticleCount(particleCount);
 
-        let particleSpeed = 0.08
-        document.getElementById('particle-speed-slider').value = particleSpeed
-        setParticleSpeed(particleSpeed)
+        let particleSpeed = 0.08;
+        document.getElementById('particle-speed-slider').value = particleSpeed;
+        setParticleSpeed(particleSpeed);
 
-        let particleColor = '#ffffff'
-        document.getElementById('particle-color').value = particleColor
-        setParticleColor(particleColor)
+        let particleColor = '#ffffff';
+        document.getElementById('particle-color').value = particleColor;
+        setParticleColor(particleColor);
     }
-}
+};
 
 function showWind(elem) {
     if (elem.checked) {
-        document.getElementById('particle-options').style.display = 'block'
-        addParticles()
+        document.getElementById('particle-options').style.display = 'block';
+        addParticles();
     } else {
-        document.getElementById('particle-options').style.display = 'none'
-        removeParticles()
+        document.getElementById('particle-options').style.display = 'none';
+        removeParticles();
     }
 }
-document.showWind = showWind
+document.showWind = showWind;
 
-let autoFlag = false
+let autoFlag = false;
 const autoUpdate = () => {
-    if (!autoFlag) return
-    const slider = document.getElementById('slider')
-    let index = slider.value
-    index++
+    if (!autoFlag) return;
+    const slider = document.getElementById('slider');
+    let index = slider.value;
+    index++;
     if (index > bandlist.length - 1) {
-        index = 0
+        index = 0;
     }
-    slider.value = index
+    slider.value = index;
 
-    var inputEvent = new Event("input", {
+    var inputEvent = new Event('input', {
         bubbles: true,
         cancelable: true
-    })
+    });
 
-    slider.dispatchEvent(inputEvent)
+    slider.dispatchEvent(inputEvent);
 
-    setTimeout(autoUpdate, 1000)
-}
+    setTimeout(autoUpdate, 1000);
+};
 
 function play() {
-    const auto = document.getElementById('auto')
+    const auto = document.getElementById('auto');
     if (auto.innerHTML === 'Play') {
-        autoFlag = true
-        autoUpdate()
-        auto.innerHTML = 'Stop'
-        auto.style.backgroundColor = '#f44336'
+        autoFlag = true;
+        autoUpdate();
+        auto.innerHTML = 'Stop';
+        auto.style.backgroundColor = '#f44336';
     } else {
-        autoFlag = false
-        auto.innerHTML = 'Play'
-        auto.style.backgroundColor = '#4CAF50'
+        autoFlag = false;
+        auto.innerHTML = 'Play';
+        auto.style.backgroundColor = '#4CAF50';
     }
 }
-window.play = play
+window.play = play;
 
 const setParticleCount = (val) => {
-    document.getElementById('particle-count').innerHTML = val
-    map.setPaintProperty('particlelayer', 'raster-particle-count', Number(val))
-}
-document.setParticleCount = setParticleCount
+    document.getElementById('particle-count').innerHTML = val;
+    map.setPaintProperty('particlelayer', 'raster-particle-count', Number(val));
+};
+document.setParticleCount = setParticleCount;
 
 const setParticleSpeed = (val) => {
-    document.getElementById('particle-speed').innerHTML = val
-    map.setPaintProperty('particlelayer', 'raster-particle-speed-factor', Number(val))
-}
-document.setParticleSpeed = setParticleSpeed
+    document.getElementById('particle-speed').innerHTML = val;
+    map.setPaintProperty('particlelayer', 'raster-particle-speed-factor', Number(val));
+};
+document.setParticleSpeed = setParticleSpeed;
 
 const setParticleColor = (val) => {
     // const color = [
@@ -1880,10 +1880,10 @@ const setParticleColor = (val) => {
     //     0, "rgba(0,0,0,0)",
     //     10, val
     // ]
-    color = val
-    map.setPaintProperty('particlelayer', 'raster-particle-color', color)
-}
-document.setParticleColor = setParticleColor
+    color = val;
+    map.setPaintProperty('particlelayer', 'raster-particle-color', color);
+};
+document.setParticleColor = setParticleColor;
   // Converted from TypeScript to JavaScript
 
 const roundToNearestFive = (date) => {
@@ -2026,7 +2026,7 @@ class TimeManager {
     }
 
     getPastPresentFuture() {
-        return ''
+        return '';
         const timeDiff = this.getMinutesDifference();
         if (timeDiff > 1) return '（予想）';
         else if (timeDiff < -1) return '（時点）';

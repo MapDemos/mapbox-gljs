@@ -1,7 +1,7 @@
-let specifiedDate = '2024-05-28'
+let specifiedDate = '2024-05-28';
 
-let map
-let popup
+let map;
+let popup;
 
 let geojsonData = null;
 let dataDownloaded = false;
@@ -17,7 +17,7 @@ const loadMap = () => {
         maxZoom: 22,
         scrollZoom: true,
         language: 'ja',
-    })
+    });
 
     /*map.on('load', () => {
         // Fetch the GeoJSON data
@@ -80,7 +80,7 @@ const loadMap = () => {
         map.addSource('random-points', {
             type: 'vector',
             url: 'mapbox://kenji-shima.elevators'
-        })
+        });
 
         map.addLayer({
             id: 'random-points',
@@ -106,12 +106,12 @@ const loadMap = () => {
                     '#ccc'
                 ]
             }
-        })
+        });
 
-    })
+    });
     map.on('idle', () => {
 
-    })
+    });
 
     // map.on('click', (event) => {
     //     const { lng, lat } = event.lngLat;
@@ -140,7 +140,7 @@ const loadMap = () => {
         tableContent += '</table></div>';
 
         if (popup) {
-            popup.remove()
+            popup.remove();
         }
         popup = new mapboxgl.Popup()
             .setLngLat(e.lngLat)
@@ -159,30 +159,30 @@ const loadMap = () => {
         }
     });
 
-}
+};
 
-loadMap()
+loadMap();
 
 function filterByType(type) {
-    if (type === "ALL") {
+    if (type === 'ALL') {
         map.setFilter('random-points', null); // Remove the filter to show all values
     } else {
         map.setFilter('random-points', ['==', ['get', 'tp'], type]);
     }
 }
-window.filterByType = filterByType
+window.filterByType = filterByType;
 
 function getIso() {
     const typeSelect = document.getElementById('type-select');
     typeSelect.value = 'ALL';
     typeSelect.dispatchEvent(new Event('change'));
-    const center = map.getCenter()
-    fetchIsochrone("mapbox/driving", [center.lng, center.lat], 20).then((data) => {
+    const center = map.getCenter();
+    fetchIsochrone('mapbox/driving', [center.lng, center.lat], 20).then((data) => {
         if (map.getLayer('isochrone-layer')) {
-            map.removeLayer('isochrone-layer')
+            map.removeLayer('isochrone-layer');
         }
         if (map.getSource('isochrone')) {
-            map.removeSource('isochrone')
+            map.removeSource('isochrone');
         }
         map.addSource('isochrone', {
             type: 'geojson',
@@ -202,11 +202,11 @@ function getIso() {
             'random-points'
         );
 
-        checkIfInPoly(data.features[0])
+        checkIfInPoly(data.features[0]);
 
     });
 }
-window.getIso = getIso
+window.getIso = getIso;
 
 function checkIfInPoly(poly) {
 
@@ -215,14 +215,14 @@ function checkIfInPoly(poly) {
         return;
     }
 
-    const polygon = turf.polygon(poly.geometry.coordinates)
-    const features = []
-    const points = geojsonData.features
+    const polygon = turf.polygon(poly.geometry.coordinates);
+    const features = [];
+    const points = geojsonData.features;
     points.forEach(element => {
-        const point = turf.point(element.geometry.coordinates)
-        const isInside = turf.booleanPointInPolygon(point, polygon)
+        const point = turf.point(element.geometry.coordinates);
+        const isInside = turf.booleanPointInPolygon(point, polygon);
         if (isInside) {
-            features.push(element)
+            features.push(element);
         }
     });
 
@@ -280,16 +280,16 @@ function checkIfInPoly(poly) {
 
 function clearIso() {
     if (map.getLayer('isochrone-layer')) {
-        map.removeLayer('isochrone-layer')
+        map.removeLayer('isochrone-layer');
     }
     if (map.getSource('isochrone')) {
-        map.removeSource('isochrone')
+        map.removeSource('isochrone');
     }
     map.setFilter('random-points', null);
     const idListDiv = document.getElementById('idlist');
     idListDiv.innerHTML = '';
     if (popup) {
-        popup.remove()
+        popup.remove();
     }
 }
-window.clearIso = clearIso
+window.clearIso = clearIso;

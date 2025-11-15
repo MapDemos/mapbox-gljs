@@ -119,14 +119,14 @@ var layerTypes = {
     'raster': ['raster-opacity'],
     'fill-extrusion': ['fill-extrusion-opacity'],
     'heatmap': ['heatmap-opacity']
-}
+};
 
 var alignments = {
     'left': 'lefty',
     'center': 'centered',
     'right': 'righty',
     'full': 'fully'
-}
+};
 
 function getLayerPaintType(layer) {
     var layerType = map.getLayer(layer).type;
@@ -138,8 +138,8 @@ function setLayerOpacity(layer) {
     paintProps.forEach(function (prop) {
         var options = {};
         if (layer.duration) {
-            var transitionProp = prop + "-transition";
-            options = { "duration": layer.duration };
+            var transitionProp = prop + '-transition';
+            options = { 'duration': layer.duration };
             map.setPaintProperty(layer.layer, transitionProp, options);
         }
         map.setPaintProperty(layer.layer, prop, layer.opacity, options);
@@ -232,12 +232,12 @@ if (footer.innerText.length > 0) {
 mapboxgl.accessToken = config.accessToken;
 
 const transformRequest = (url) => {
-    const hasQuery = url.indexOf("?") !== -1;
-    const suffix = hasQuery ? "&pluginName=scrollytellingV2" : "?pluginName=scrollytellingV2";
+    const hasQuery = url.indexOf('?') !== -1;
+    const suffix = hasQuery ? '&pluginName=scrollytellingV2' : '?pluginName=scrollytellingV2';
     return {
         url: url + suffix
-    }
-}
+    };
+};
 
 var map = new mapboxgl.Map({
     container: 'map',
@@ -277,7 +277,7 @@ if (config.showMarkers) {
 var scroller = scrollama();
 
 
-map.on("load", function () {
+map.on('load', function () {
     if (config.use3dTerrain) {
         map.addSource('mapbox-dem', {
             'type': 'raster-dem',
@@ -374,13 +374,13 @@ function getInsetBounds() {
     let bounds = map.getBounds();
 
     let boundsJson = {
-        "type": "FeatureCollection",
-        "features": [{
-            "type": "Feature",
-            "properties": {},
-            "geometry": {
-                "type": "Polygon",
-                "coordinates": [
+        'type': 'FeatureCollection',
+        'features': [{
+            'type': 'Feature',
+            'properties': {},
+            'geometry': {
+                'type': 'Polygon',
+                'coordinates': [
                     [
                         [
                             bounds._sw.lng,
@@ -406,7 +406,7 @@ function getInsetBounds() {
                 ]
             }
         }]
-    }
+    };
 
     if (initLoad) {
         addInsetLayer(boundsJson);
