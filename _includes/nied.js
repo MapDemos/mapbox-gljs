@@ -7,21 +7,21 @@ function getParameterByName(name, url = window.location.href) {
     if (!results[2]) return '';
     return decodeURIComponent(results[2].replace(/\+/g, ' '));
 }
-let lang = getParameterByName('lang')
+let lang = getParameterByName('lang');
 if (!lang) {
-    lang = 'ja'
+    lang = 'ja';
 }
 
-let currentprojection = 'globe'
+let currentprojection = 'globe';
 function changeProjection(projectionType) {
-    currentprojection = projectionType
-    map.setProjection(projectionType)
+    currentprojection = projectionType;
+    map.setProjection(projectionType);
 }
-window.changeProjection = changeProjection
+window.changeProjection = changeProjection;
 
-let map
+let map;
 function init() {
-    if (map) map.remove()
+    if (map) map.remove();
     map = new mapboxgl.Map({
         container: 'map',
         //style: 'mapbox://styles/kenji-shima/clx8j5mmb01wn01q16w4148e6',
@@ -30,14 +30,14 @@ function init() {
         zoom: 4,
         projection: currentprojection,
         language: lang
-    })
+    });
 
     //const language = new MapboxLanguage();
     //map.addControl(language);
 
     map.on('load', () => {
-        setTimeout(showAllOptions, 200)
-    })
+        setTimeout(showAllOptions, 200);
+    });
 
     map.on('style.load', () => {
         map.setFog({
@@ -46,58 +46,58 @@ function init() {
             'horizon-blend': 0.02, // Atmosphere thickness (default 0.2 at low zooms)
             'space-color': 'rgb(11, 11, 25)', // Background color
             'star-intensity': 0.6 // Background star brightness (default 0.35 at low zoooms )
-        })
+        });
 
         map.addSource('rastersource', {
             type: 'raster-array',
             url: tileset + tilesetsuffix
-        })
-    })
+        });
+    });
 }
 
-init()
+init();
 
 const tilesets = {
     nowcast_30: {
-        value: "mapbox://kenji-shima.nowcast-20240620195000-30m-nied",
-        label: "高解像度ナウキャスト ~30m",
+        value: 'mapbox://kenji-shima.nowcast-20240620195000-30m-nied',
+        label: '高解像度ナウキャスト ~30m',
         type: 'raster-array',
         zoom: 4
     },
     nowcast_60: {
-        value: "mapbox://kenji-shima.nowcast-20240620195000-60m-nied",
-        label: "高解像度ナウキャスト ~60m",
+        value: 'mapbox://kenji-shima.nowcast-20240620195000-60m-nied',
+        label: '高解像度ナウキャスト ~60m',
         type: 'raster-array',
         zoom: 4
     },
     forecast_6: {
-        value: "mapbox://kenji-shima.forecast-20240620203000-6h-nied",
-        label: "降水短時間予報 ~6h",
+        value: 'mapbox://kenji-shima.forecast-20240620203000-6h-nied',
+        label: '降水短時間予報 ~6h',
         type: 'raster-array',
         zoom: 4
     },
     nied_hangen: {
-        value: "mapbox://kenji-shima.hangen-90-202409200000-nied",
-        label: "半減期90分",
+        value: 'mapbox://kenji-shima.hangen-90-202409200000-nied',
+        label: '半減期90分',
         type: 'raster-array',
         zoom: 4
     },
-}
+};
 
-let tileset = tilesets['nowcast_30'].value
+let tileset = tilesets['nowcast_30'].value;
 
 const yjRainScale = () => {
     const domain = [0, 0.1, 1, 5, 10, 20, 30, 50, 80];
     const range = [
-        "rgba(0, 0, 0, 0.0)",
-        "rgba(240, 240, 254, 0.0)",
-        "rgba(153, 204, 253, 0.0)",
-        "rgba(44, 131, 251, 1.0)",
-        "rgba(27, 65, 250, 1.0)",
-        "rgba(253, 241, 49, 1.0)",
-        "rgba(251, 143, 36, 1.0)",
-        "rgba(250, 46, 28, 1.0)",
-        "rgba(168, 23, 93, 1.0)"
+        'rgba(0, 0, 0, 0.0)',
+        'rgba(240, 240, 254, 0.0)',
+        'rgba(153, 204, 253, 0.0)',
+        'rgba(44, 131, 251, 1.0)',
+        'rgba(27, 65, 250, 1.0)',
+        'rgba(253, 241, 49, 1.0)',
+        'rgba(251, 143, 36, 1.0)',
+        'rgba(250, 46, 28, 1.0)',
+        'rgba(168, 23, 93, 1.0)'
     ];
 
     return domain.map((v, i) => [v, range[i]]).flat();
@@ -106,56 +106,56 @@ const yjRainScale = () => {
 const jmaSedimentScale = () => {
     const domain = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     const range = [
-        "rgba(0, 0, 0, 1.0)",
-        "rgba(0, 0, 0, 1.0)",
-        "rgba(0, 0, 0, 1.0)",
-        "rgba(0, 0, 0, 1.0)",
-        "rgba(242, 231, 0, 1.0)",
-        "rgba(255, 40, 0, 1.0)",
-        "rgba(170, 0, 170, 1.0)",
-        "rgba(12, 0, 12, 1.0)",
-        "rgba(0, 0, 0, 1.0)",
-        "rgba(0, 0, 0, 1.0)",
-        "rgba(0, 0, 0, 1.0)"
+        'rgba(0, 0, 0, 1.0)',
+        'rgba(0, 0, 0, 1.0)',
+        'rgba(0, 0, 0, 1.0)',
+        'rgba(0, 0, 0, 1.0)',
+        'rgba(242, 231, 0, 1.0)',
+        'rgba(255, 40, 0, 1.0)',
+        'rgba(170, 0, 170, 1.0)',
+        'rgba(12, 0, 12, 1.0)',
+        'rgba(0, 0, 0, 1.0)',
+        'rgba(0, 0, 0, 1.0)',
+        'rgba(0, 0, 0, 1.0)'
     ];
 
     return domain.map((v, i) => [v, range[i]]).flat();
-}
+};
 
 const vectorScale = () => {
     const domain = [0, 1, 4, 8, 12, 16, 24, 32, 40, 48, 56, 64, 80, 200];
     const range = [
-        "rgba(204, 255, 255, 0.0)",
-        "rgba(102, 255, 255, 0.0)",
-        "rgba(0, 204, 255, 0.0)",
-        "rgba(0, 153, 255, 0.8)",
-        "rgba(51, 102, 255, 0.8)",
-        "rgba(51, 255, 0, 0.8)",
-        "rgba(51, 204, 0, 0.8)",
-        "rgba(25, 153, 0, 0.8)",
-        "rgba(255, 255, 0, 0.8)",
-        "rgba(255, 204, 0, 0.8)",
-        "rgba(255, 153, 0, 0.8)",
-        "rgba(255, 80, 102, 0.8)",
-        "rgba(255, 0, 0, 0.8)",
-        "rgba(183, 0, 16, 0.8)"
+        'rgba(204, 255, 255, 0.0)',
+        'rgba(102, 255, 255, 0.0)',
+        'rgba(0, 204, 255, 0.0)',
+        'rgba(0, 153, 255, 0.8)',
+        'rgba(51, 102, 255, 0.8)',
+        'rgba(51, 255, 0, 0.8)',
+        'rgba(51, 204, 0, 0.8)',
+        'rgba(25, 153, 0, 0.8)',
+        'rgba(255, 255, 0, 0.8)',
+        'rgba(255, 204, 0, 0.8)',
+        'rgba(255, 153, 0, 0.8)',
+        'rgba(255, 80, 102, 0.8)',
+        'rgba(255, 0, 0, 0.8)',
+        'rgba(183, 0, 16, 0.8)'
     ];
 
     return domain.map((v, i) => [v, range[i]]).flat();
-}
+};
 
 const doshaScale = () => {
     const domain = [3, 3.75, 4.5, 5.5, 6.5];
     const range = [
-        "rgba(0, 0, 0, 0)",
-        "rgba(245, 237, 99, 1)",
-        "rgba(236, 105, 76, 1)",
-        "rgba(175, 72, 83, 1)",
-        "rgba(66, 60, 70, 1)"
+        'rgba(0, 0, 0, 0)',
+        'rgba(245, 237, 99, 1)',
+        'rgba(236, 105, 76, 1)',
+        'rgba(175, 72, 83, 1)',
+        'rgba(66, 60, 70, 1)'
     ];
 
     return domain.map((v, i) => [v, range[i]]).flat();
-}
+};
 
 const COLORSCALES = {
     'Turbo': d3.interpolateTurbo,
@@ -185,47 +185,47 @@ const COLORSCALES = {
         manual: true,
         value: doshaScale()
     }
-}
+};
 
-let selctedcolorscalename = 'YJRain'
-let colorscaletype = COLORSCALES[selctedcolorscalename]
-let colorsteps = 256
+let selctedcolorscalename = 'YJRain';
+let colorscaletype = COLORSCALES[selctedcolorscalename];
+let colorsteps = 256;
 
 const stepexpression = [
     'step',
     ['raster-value'],
     'rgba(0, 0, 0, 0)'
-]
+];
 const interpolateexpression = [
     'interpolate',
     ['linear'],
     ['raster-value']
-]
+];
 
-let colorscaleExpressiontemplate = stepexpression
-let tilesetsuffix = ''
-let tilesetresampling = 'nearest'
+let colorscaleExpressiontemplate = stepexpression;
+let tilesetsuffix = '';
+let tilesetresampling = 'nearest';
 
 function changeColorSampling(resampling){
     if(resampling === 'step'){
-        colorscaleExpressiontemplate = stepexpression
-        tilesetsuffix = ''
-        tilesetresampling = 'nearest'
+        colorscaleExpressiontemplate = stepexpression;
+        tilesetsuffix = '';
+        tilesetresampling = 'nearest';
     }else{
-        colorscaleExpressiontemplate = interpolateexpression
-        tilesetsuffix = '-bi'
-        tilesetresampling = 'linear'
+        colorscaleExpressiontemplate = interpolateexpression;
+        tilesetsuffix = '-bi';
+        tilesetresampling = 'linear';
     }
-    init()
+    init();
 }
-window.changeColorSampling = changeColorSampling
+window.changeColorSampling = changeColorSampling;
 
 function getColorScale(colorRange) {
-    let colorscale = null
+    let colorscale = null;
     if (colorscaletype.manual) {
-        colorscale = colorscaletype.value
+        colorscale = colorscaletype.value;
     } else {
-        colorscale = d3.quantize(colorscaletype, colorsteps).map((c, i) => [(i / colorsteps), c])
+        colorscale = d3.quantize(colorscaletype, colorsteps).map((c, i) => [(i / colorsteps), c]);
         const [minValue, maxValue] = colorRange;
         colorscale = colorscale.map(([x, c]) => [
             minValue + (maxValue - minValue) * x,
@@ -233,30 +233,30 @@ function getColorScale(colorRange) {
         ])
             .flat();
     }
-    const colorscaleExpression = colorscaleExpressiontemplate.slice()
+    const colorscaleExpression = colorscaleExpressiontemplate.slice();
     colorscale.forEach(item => {
-        colorscaleExpression.push(item)
-    })
+        colorscaleExpression.push(item);
+    });
     return colorscaleExpression;
 }
 
 function updateLegendBar(colorRange) {
-    const increment = oneTwoFive(colorRange)
-    const [minValue, maxValue] = colorRange
-    let legendVals = []
+    const increment = oneTwoFive(colorRange);
+    const [minValue, maxValue] = colorRange;
+    let legendVals = [];
     for (let i = minValue + increment; i <= maxValue; i += increment) {
         legendVals.push(i);
     }
-    let colors = null
+    let colors = null;
     if (colorscaletype.manual) {
-        colors = colorscaletype.value
-        let updateColors = []
+        colors = colorscaletype.value;
+        let updateColors = [];
         for (let i = 0; i < colors.length; i += 2) {
             updateColors.push([colors[i], colors[i + 1].replace(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*[\d.]+\)/, 'rgb($1,$2,$3)')]);
         }
-        colors = updateColors
+        colors = updateColors;
     } else {
-        colors = d3.quantize(colorscaletype, colorsteps).map((c, i) => [(i / colorsteps), c])
+        colors = d3.quantize(colorscaletype, colorsteps).map((c, i) => [(i / colorsteps), c]);
     }
     const updatedColors = colors.map(([stop, color]) => {
         if (color.startsWith('rgb(') && !color.startsWith('rgba(')) {
@@ -278,76 +278,76 @@ function updateLegendBar(colorRange) {
 
     legendBar.style.background = `linear-gradient(to right, ${gradientColors})`;
 
-    legendBar.innerHTML = ''
+    legendBar.innerHTML = '';
     legendVals.forEach(element => {
-        const span = legendBar.appendChild(document.createElement('span'))
-        span.className = 'label'
-        span.style = ''
-        span.innerHTML = element
+        const span = legendBar.appendChild(document.createElement('span'));
+        span.className = 'label';
+        span.style = '';
+        span.innerHTML = element;
     });
 }
 
 
-let initOption
+let initOption;
 
-let bandlist = []
+let bandlist = [];
 
 function showAllOptions() {
-    const source = map.getSource('rastersource')
-    layers = {}
-    console.log("source",source)
+    const source = map.getSource('rastersource');
+    layers = {};
+    console.log('source',source);
     source.rasterLayers.forEach(l => {
-        const f = l.fields
-        bandlist = f.bands
+        const f = l.fields;
+        bandlist = f.bands;
         layers[f.name] = {
             label: f.name,
             layer: f.name,
             color_range: f.range,
-        }
-        initOption = f.name
-    })
-    setLayerOptions()
-    showLayer(initOption)
+        };
+        initOption = f.name;
+    });
+    setLayerOptions();
+    showLayer(initOption);
 
-    const colorscaleselect = document.getElementById('colorscale-selector')
-    colorscaleselect.innerHTML = ''
+    const colorscaleselect = document.getElementById('colorscale-selector');
+    colorscaleselect.innerHTML = '';
     for (let type in COLORSCALES) {
-        const option = colorscaleselect.appendChild(document.createElement('option'))
-        option.value = type
-        option.innerHTML = type
-        if (type === selctedcolorscalename) option.selected = true
+        const option = colorscaleselect.appendChild(document.createElement('option'));
+        option.value = type;
+        option.innerHTML = type;
+        if (type === selctedcolorscalename) option.selected = true;
     }
 
-    const tilesetselect = document.getElementById('tileset-selector')
-    tilesetselect.innerHTML = ''
+    const tilesetselect = document.getElementById('tileset-selector');
+    tilesetselect.innerHTML = '';
     for (let tile in tilesets) {
-        const option = tilesetselect.appendChild(document.createElement('option'))
-        option.value = tilesets[tile].value
-        option.innerHTML = tilesets[tile].label
-        if (option.value === tileset) option.selected = true
+        const option = tilesetselect.appendChild(document.createElement('option'));
+        option.value = tilesets[tile].value;
+        option.innerHTML = tilesets[tile].label;
+        if (option.value === tileset) option.selected = true;
     }
 
-    const timeslider = document.getElementById('slider')
-    timeslider.max = bandlist.length - 1
-    timeslider.value = 0
+    const timeslider = document.getElementById('slider');
+    timeslider.max = bandlist.length - 1;
+    timeslider.value = 0;
 
-    const timediv = document.getElementById('timediv')
-    timediv.innerHTML = ''
-    const date = document.getElementById('active-datetime')
-    date.innerHTML = ''
+    const timediv = document.getElementById('timediv');
+    timediv.innerHTML = '';
+    const date = document.getElementById('active-datetime');
+    date.innerHTML = '';
 
-    const auto = document.getElementById('auto')
+    const auto = document.getElementById('auto');
 
     if (bandlist.length >= 1) {
-        timeslider.disabled = false
-        auto.disabled = false
+        timeslider.disabled = false;
+        auto.disabled = false;
         bandlist.forEach(datetime => {
-            const datetimearray = convertUnixToJST(datetime).split(" ")
-            const timespan = timediv.appendChild(document.createElement('span'))
-            timespan.innerHTML = `${datetimearray[1]}`
-            date.innerHTML = datetimearray[0]
-        })
-        colorscaleselect.value = 'YJRain'
+            const datetimearray = convertUnixToJST(datetime).split(' ');
+            const timespan = timediv.appendChild(document.createElement('span'));
+            timespan.innerHTML = `${datetimearray[1]}`;
+            date.innerHTML = datetimearray[0];
+        });
+        colorscaleselect.value = 'YJRain';
     // } else {
     //     timeslider.disabled = true
     //     date.innerHTML = '2024/09/20'
@@ -355,11 +355,11 @@ function showAllOptions() {
     //     auto.disabled = true
     //     colorscaleselect.value = 'YJRain'
     }
-    var inputEvent = new Event("change", {
+    var inputEvent = new Event('change', {
         bubbles: true,
         cancelable: true
-    })
-    colorscaleselect.dispatchEvent(inputEvent)
+    });
+    colorscaleselect.dispatchEvent(inputEvent);
 }
 
 function convertUnixToJST(unixTimestamp) {
@@ -368,22 +368,22 @@ function convertUnixToJST(unixTimestamp) {
 }
 
 function changeBand(index) {
-    map.setPaintProperty(currentLayer, 'raster-array-band', bandlist[index])
+    map.setPaintProperty(currentLayer, 'raster-array-band', bandlist[index]);
 }
-window.changeBand = changeBand
+window.changeBand = changeBand;
 
 function changeTileset(t) {
-    tileset = t
-    init()
+    tileset = t;
+    init();
 }
-window.changeTileset = changeTileset
+window.changeTileset = changeTileset;
 
 function changeColorscaleType(type) {
-    selctedcolorscalename = type
-    colorscaletype = COLORSCALES[type]
-    showLayer(currentLayer)
+    selctedcolorscalename = type;
+    colorscaletype = COLORSCALES[type];
+    showLayer(currentLayer);
 }
-window.changeColorscaleType = changeColorscaleType
+window.changeColorscaleType = changeColorscaleType;
 
 function oneTwoFive(range, maxSteps = 15) {
     const rng = range[1] - range[0];
@@ -399,40 +399,40 @@ function oneTwoFive(range, maxSteps = 15) {
 }
 
 let layers = {
-}
+};
 
 function setLayerOptions() {
-    const select = document.getElementById('layer-selector')
-    select.innerHTML = ''
+    const select = document.getElementById('layer-selector');
+    select.innerHTML = '';
     for (let l in layers) {
-        const option = select.appendChild(document.createElement('option'))
-        option.value = l
-        option.innerHTML = l
+        const option = select.appendChild(document.createElement('option'));
+        option.value = l;
+        option.innerHTML = l;
         if (l === initOption) {
-            option.selected = true
+            option.selected = true;
         }
     }
     document.getElementById('layer-selector').addEventListener('change', function () {
         showLayer(this.value);
-    })
+    });
 }
 
-let currentLayer = initOption
+let currentLayer = initOption;
 const showLayer = (layer) => {
-    currentLayer = layer
+    currentLayer = layer;
     for (let l in layers) {
         if (map.getLayer(l)) {
-            map.removeLayer(l)
+            map.removeLayer(l);
         }
     }
-    if (map.getSource("rastersource")) {
-        map.removeSource("rastersource")
+    if (map.getSource('rastersource')) {
+        map.removeSource('rastersource');
     }
     map.addSource('rastersource', {
         type: 'raster-array',
         url: tileset + tilesetsuffix
-    })
-    const layerVals = layers[layer]
+    });
+    const layerVals = layers[layer];
     const layer_def = {
         id: layer,
         type: 'raster',
@@ -447,46 +447,46 @@ const showLayer = (layer) => {
             'raster-opacity': 0.8,
             'raster-array-band': bandlist[0],
         }
-    }
-    map.addLayer(layer_def)
-    const element = document.getElementById(layer)
-    updateLegendBar(layerVals.color_range)
-}
-document.showLayer = showLayer
+    };
+    map.addLayer(layer_def);
+    const element = document.getElementById(layer);
+    updateLegendBar(layerVals.color_range);
+};
+document.showLayer = showLayer;
 
-let autoFlag = false
+let autoFlag = false;
 const autoUpdate = () => {
-    if (!autoFlag) return
-    const slider = document.getElementById('slider')
-    let index = slider.value
-    index++
+    if (!autoFlag) return;
+    const slider = document.getElementById('slider');
+    let index = slider.value;
+    index++;
     if (index > bandlist.length - 1) {
-        index = 0
+        index = 0;
     }
-    slider.value = index
+    slider.value = index;
 
-    var inputEvent = new Event("change", {
+    var inputEvent = new Event('change', {
         bubbles: true,
         cancelable: true
-    })
+    });
 
-    slider.dispatchEvent(inputEvent)
+    slider.dispatchEvent(inputEvent);
 
-    setTimeout(autoUpdate, 1000)
-}
+    setTimeout(autoUpdate, 1000);
+};
 
 function play() {
-    const auto = document.getElementById('auto')
+    const auto = document.getElementById('auto');
     if (auto.innerHTML === '再生') {
-        autoFlag = true
-        autoUpdate()
-        auto.innerHTML = '停止'
-        auto.style.backgroundColor = '#f44336'
+        autoFlag = true;
+        autoUpdate();
+        auto.innerHTML = '停止';
+        auto.style.backgroundColor = '#f44336';
     } else {
-        autoFlag = false
-        auto.innerHTML = '再生'
-        auto.style.backgroundColor = '#4CAF50'
+        autoFlag = false;
+        auto.innerHTML = '再生';
+        auto.style.backgroundColor = '#4CAF50';
     }
 }
-window.play = play
+window.play = play;
 

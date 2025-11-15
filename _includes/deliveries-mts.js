@@ -26,18 +26,18 @@ const addDeliveryCenters = (data) => {
     });
 
     map.addLayer({
-        id: "symbol-delivery-centers",
-        type: "symbol",
-        source: "delivery-centers",
+        id: 'symbol-delivery-centers',
+        type: 'symbol',
+        source: 'delivery-centers',
         layout: {
-            "icon-image": "yamato",
-            "icon-size": [
-                "interpolate", ["linear"], ["zoom"],
+            'icon-image': 'yamato',
+            'icon-size': [
+                'interpolate', ['linear'], ['zoom'],
                 0, 0.1,
                 10, 0.3,
                 15, 0.6
             ],
-            "icon-allow-overlap": true
+            'icon-allow-overlap': true
         }
     });
 };
@@ -97,16 +97,16 @@ const addDeliveries = (data) => {
         source: 'assigned-deliveries',
         'source-layer': 'deliveries',
         paint: {
-            "circle-radius": [
-                "interpolate", ["linear"], ["zoom"],
+            'circle-radius': [
+                'interpolate', ['linear'], ['zoom'],
                 0, 2,
                 10, 4,
                 15, 6
             ],
-            "circle-color": ['get', 'color'], // Colored by default
-            "circle-opacity": 0.9,
-            "circle-stroke-width": 1,
-            "circle-stroke-color": "#FFFFFF"
+            'circle-color': ['get', 'color'], // Colored by default
+            'circle-opacity': 0.9,
+            'circle-stroke-width': 1,
+            'circle-stroke-color': '#FFFFFF'
         },
         minzoom: 10
     });
@@ -118,16 +118,16 @@ const addDeliveries = (data) => {
         source: 'assigned-deliveries',
         'source-layer': 'deliveries',
         paint: {
-            "circle-radius": [
-                "interpolate", ["linear"], ["zoom"],
+            'circle-radius': [
+                'interpolate', ['linear'], ['zoom'],
                 0, 2,
                 10, 4,
                 15, 6
             ],
-            "circle-color": '#CCCCCC', // Gray color
-            "circle-opacity": 0.7,
-            "circle-stroke-width": 1,
-            "circle-stroke-color": "#FFFFFF"
+            'circle-color': '#CCCCCC', // Gray color
+            'circle-opacity': 0.7,
+            'circle-stroke-width': 1,
+            'circle-stroke-color': '#FFFFFF'
         },
         minzoom: 10,
         // Initially, this layer shows nothing.
@@ -245,7 +245,7 @@ const loadMap = () => {
             addHoverEvents();
 
         } catch (error) {
-            console.error("Failed to load map data:", error);
+            console.error('Failed to load map data:', error);
         }
     });
 };

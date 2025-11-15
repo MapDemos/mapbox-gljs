@@ -780,20 +780,20 @@ class IndoorMap extends mapboxgl.Map {
 
 mapboxgl.accessToken = 'pk.eyJ1Ijoia2Vuamktc2hpbWEiLCJhIjoiY2xpd2RwaHhzMGJoYjNlbnduYjJmMm5xNyJ9.Zi2lDBa9rXEAj6KyhLrINA';
 
-const colorMain = '#888'
+const colorMain = '#888';
 
-let center = CENTER
-let zoom = ZOOM
-let pitch = PITCH
-let bearing = 160
+let center = CENTER;
+let zoom = ZOOM;
+let pitch = PITCH;
+let bearing = 160;
 let map; // Declare the map variable
 
-lng = 139.7645445
-lat = 35.6812405
+lng = 139.7645445;
+lat = 35.6812405;
 
 function clearMap() {
-    let container = document.getElementById('map')
-    container.innerHTML = ''
+    let container = document.getElementById('map');
+    container.innerHTML = '';
 }
 
 function toIndoor() {
@@ -804,8 +804,8 @@ function toIndoor() {
         pitch = map.getPitch();
         bearing = map.getBearing();
     }
-    clearMap()
-    map = new RouteIndoorMap({ container: 'map' })
+    clearMap();
+    map = new RouteIndoorMap({ container: 'map' });
     // Update the switch control mode
     if (map.mapSwitchControl) {
         map.mapSwitchControl.setMode('Indoor');
@@ -820,8 +820,8 @@ function to3D() {
         pitch = map.getPitch();
         bearing = map.getBearing();
     }
-    clearMap()
-    map = new Map3D({ container: 'map' })
+    clearMap();
+    map = new Map3D({ container: 'map' });
     // Update the switch control mode
     if (map.mapSwitchControl) {
         map.mapSwitchControl.setMode('3D');
@@ -831,21 +831,21 @@ function to3D() {
 let startMarker;
 let endMarker;
 function setMarker(coordinates, color) {
-    if (!color) color = '#ff0000'
-    const marker = new mapboxgl.Marker({ color: color })
-    marker.setLngLat(coordinates).addTo(map)
-    return marker
+    if (!color) color = '#ff0000';
+    const marker = new mapboxgl.Marker({ color: color });
+    marker.setLngLat(coordinates).addTo(map);
+    return marker;
 }
 
 const setStartMarker = (longitude, latitude) => {
     //resetPrevious(true);
     lng = longitude;
-    lat = latitude
+    lat = latitude;
     if (startMarker) {
         startMarker.remove();
     }
     startMarker = setMarker([lng, lat], 'blue');
-}
+};
 
 class Map3D extends mapboxgl.Map {
 
@@ -859,7 +859,7 @@ class Map3D extends mapboxgl.Map {
             language:'ja,en'
         }, options));
 
-        this.doubleClickZoom.disable()
+        this.doubleClickZoom.disable();
 
         // Add the switch control to the top-left (above search)
         this.mapSwitchControl = new MapSwitchControl('3D');
@@ -886,20 +886,20 @@ class Map3D extends mapboxgl.Map {
     }
 
     onToIndoor() {
-        zoom = super.getZoom()
-        pitch = super.getPitch()
-        bearing = super.getBearing()
-        center = super.getCenter()
-        toIndoor()
+        zoom = super.getZoom();
+        pitch = super.getPitch();
+        bearing = super.getBearing();
+        center = super.getCenter();
+        toIndoor();
     }
 
     onLoad() {
-        super.setConfigProperty('basemap', 'showPlaceLabels', false)
-        map.setConfigProperty('basemap', 'showRoadLabels', true)
-        map.setConfigProperty('basemap', 'showPointOfInterestLabels', true)
+        super.setConfigProperty('basemap', 'showPlaceLabels', false);
+        map.setConfigProperty('basemap', 'showRoadLabels', true);
+        map.setConfigProperty('basemap', 'showPointOfInterestLabels', true);
         map.setConfigProperty('basemap', 'showTransitLabels', true);
         //map.setConfigProperty('basemap', 'lightPreset', 'night')
-        super.setConfigProperty('basemap', 'font', "DIN Pro")
+        super.setConfigProperty('basemap', 'font', 'DIN Pro');
 
     }
 
@@ -937,19 +937,19 @@ class RouteIndoorMap extends IndoorMap {
     }
 
     onStyleLoad() {
-        this.visibleFloorId = 0
-        this.toggleFloorButtons()
-        this.selectFloor(this.visibleFloorId)
-        document.getElementsByClassName('mapboxgl-ctrl-layer')[0].click()
+        this.visibleFloorId = 0;
+        this.toggleFloorButtons();
+        this.selectFloor(this.visibleFloorId);
+        document.getElementsByClassName('mapboxgl-ctrl-layer')[0].click();
 
     }
 
     onToB1(){
-        this.selectFloor(-1)
+        this.selectFloor(-1);
     }
 
     onTo0(){
-        this.selectFloor(0)
+        this.selectFloor(0);
     }
 
     onLoad() {
@@ -1041,9 +1041,9 @@ class RouteIndoorMap extends IndoorMap {
                 type: 'symbol',
                 source: 'indoor',
                 'source-layer': 'indoor_poi_label',
-                "metadata": {
-                    "mapbox:featureComponent": "point-of-interest-labels",
-                    "mapbox:group": "Point of interest labels, poi-labels"
+                'metadata': {
+                    'mapbox:featureComponent': 'point-of-interest-labels',
+                    'mapbox:group': 'Point of interest labels, poi-labels'
                 },
                 filter: floorFilter,
                 layout: this.layout,
@@ -1068,19 +1068,19 @@ class RouteIndoorMap extends IndoorMap {
                 this.hoverFeature();
             });
         }
-        this.onStyleLoad()
+        this.onStyleLoad();
     }
 
     onTo3D() {
-        zoom = super.getZoom()
-        pitch = super.getPitch()
-        bearing = super.getBearing()
-        center = super.getCenter()
-        to3D()
+        zoom = super.getZoom();
+        pitch = super.getPitch();
+        bearing = super.getBearing();
+        center = super.getCenter();
+        to3D();
     }
 
     updateMap() {
-        super.updateMap()
+        super.updateMap();
         for (const floorId of FLOOR_IDS) {
             const opacity = this.getFloorOpacity(floorId);
             this.setPaintProperty(`symbol-${floorId}`, 'icon-opacity', opacity);
@@ -1097,60 +1097,60 @@ class RouteIndoorMap extends IndoorMap {
     }
 
     layout = {
-        "text-size": 14,
-        "icon-image": [
-            "case",
-            ["has", "maki_beta"],
+        'text-size': 14,
+        'icon-image': [
+            'case',
+            ['has', 'maki_beta'],
             [
-                "coalesce",
-                ["image", ["get", "maki_beta"]],
-                ["image", ["get", "maki"]]
+                'coalesce',
+                ['image', ['get', 'maki_beta']],
+                ['image', ['get', 'maki']]
             ],
-            ["image", ["get", "maki"]]
+            ['image', ['get', 'maki']]
         ],
-        "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"],
-        "text-offset": [0, 1.6],
-        "text-anchor": [
-            "step",
-            ["zoom"],
-            ["step", ["get", "sizerank"], "center", 5, "top"],
+        'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+        'text-offset': [0, 1.6],
+        'text-anchor': [
+            'step',
+            ['zoom'],
+            ['step', ['get', 'sizerank'], 'center', 5, 'top'],
             17,
-            ["step", ["get", "sizerank"], "center", 13, "top"]
+            ['step', ['get', 'sizerank'], 'center', 13, 'top']
         ],
-        "text-field": ["coalesce", ["get", "name_ja"], ["get", "name"]]
-    }
+        'text-field': ['coalesce', ['get', 'name_ja'], ['get', 'name']]
+    };
 
     paint = {
         //"text-emissive-strength": 1,
-        "icon-opacity": 1,
-        "text-halo-color": "hsl(20, 20%, 100%)",
-        "text-halo-width": 0.5,
+        'icon-opacity': 1,
+        'text-halo-color': 'hsl(20, 20%, 100%)',
+        'text-halo-width': 0.5,
         //"text-halo-blur": 0.5,
-        "text-color": [
-            "match",
-            ["get", "class"],
-            "food_and_drink",
-            "hsl(40, 95%, 43%)",
-            "park_like",
-            "hsl(110, 70%, 28%)",
-            "education",
-            "hsl(30, 50%, 43%)",
-            "medical",
-            "hsl(0, 70%, 58%)",
-            "sport_and_leisure",
-            "hsl(190, 60%, 48%)",
-            ["store_like", "food_and_drink_stores"],
-            "hsl(210, 70%, 58%)",
-            ["commercial_services", "motorist", "lodging"],
-            "hsl(260, 70%, 63%)",
-            ["arts_and_entertainment", "historic", "landmark"],
-            "hsl(320, 70%, 63%)",
-            "hsl(210, 20%, 46%)"
+        'text-color': [
+            'match',
+            ['get', 'class'],
+            'food_and_drink',
+            'hsl(40, 95%, 43%)',
+            'park_like',
+            'hsl(110, 70%, 28%)',
+            'education',
+            'hsl(30, 50%, 43%)',
+            'medical',
+            'hsl(0, 70%, 58%)',
+            'sport_and_leisure',
+            'hsl(190, 60%, 48%)',
+            ['store_like', 'food_and_drink_stores'],
+            'hsl(210, 70%, 58%)',
+            ['commercial_services', 'motorist', 'lodging'],
+            'hsl(260, 70%, 63%)',
+            ['arts_and_entertainment', 'historic', 'landmark'],
+            'hsl(320, 70%, 63%)',
+            'hsl(210, 20%, 46%)'
         ]
-    }
+    };
 }
 
-to3D()
+to3D();
 </script>
 
 </html>

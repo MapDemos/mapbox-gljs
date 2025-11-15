@@ -3,11 +3,11 @@ lat = defaultCoordinates[1];
 lng = defaultCoordinates[0];
 const tilesets = {
     nowcast: {
-        value: "mapbox://kenji-shima.nowcast-20240816090000-30m-n",
-        label: "60m Nowcast",
+        value: 'mapbox://kenji-shima.nowcast-20240816090000-30m-n',
+        label: '60m Nowcast',
         type: 'raster-array'
     },
-}
+};
 
 function setTileset(tileset) {
     // map.on('load', () => {

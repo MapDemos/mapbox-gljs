@@ -1,6 +1,6 @@
 const defaultCoordinates = [144.96596, -37.744995];
 
-let map
+let map;
 
 const loadMap = () => {
     map = new mapboxgl.Map({
@@ -9,11 +9,11 @@ const loadMap = () => {
         center: defaultCoordinates,
         zoom: 18,
         scrollZoom: true
-    })
+    });
     map.on('load', () => {
         
 
-    })
+    });
     map.on('click', async (event) => {
         const coords = event.lngLat;
 
@@ -45,7 +45,7 @@ const loadMap = () => {
         } catch (err) {
             console.error('Error fetching isochrone:', err);
         }
-    })
-}
+    });
+};
 
-loadMap()
+loadMap();

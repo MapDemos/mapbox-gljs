@@ -1,0 +1,26 @@
+{
+  "name": "mapbox-gljs",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "",
+  "main": "sw.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MapDemos/mapbox-gljs.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MapDemos/mapbox-gljs/issues"
+  },
+  "homepage": "https://github.com/MapDemos/mapbox-gljs#readme",
+  "devDependencies": {
+    "eslint": "^9.39.1"
+  }
+}

@@ -7,8 +7,8 @@ const sendBtn = document.getElementById('send');
 
 let messages = [
     {
-        role: "system",
-        content: "You are a helpful assistant that can help with location-based queries using Mapbox services."
+        role: 'system',
+        content: 'You are a helpful assistant that can help with location-based queries using Mapbox services.'
     }
 ];
 
@@ -21,9 +21,9 @@ async function callMCPTool(toolName, arguments) {
             'Accept': 'application/json, text/event-stream'
         },
         body: JSON.stringify({
-            jsonrpc: "2.0",
+            jsonrpc: '2.0',
             id: Date.now(),
-            method: "tools/call",
+            method: 'tools/call',
             params: {
                 name: toolName,
                 arguments: arguments
@@ -38,17 +38,17 @@ async function callMCPTool(toolName, arguments) {
 // Define available functions for OpenAI
 const functions = [
     {
-        name: "forward_geocode",
-        description: "Find coordinates for a location",
+        name: 'forward_geocode',
+        description: 'Find coordinates for a location',
         parameters: {
-            type: "object",
+            type: 'object',
             properties: {
                 q: {
-                    type: "string",
-                    description: "The location to geocode"
+                    type: 'string',
+                    description: 'The location to geocode'
                 }
             },
-            required: ["q"]
+            required: ['q']
         }
     }
 ];
@@ -66,7 +66,7 @@ async function sendMessage() {
     if (!userMessage) return;
 
     addMessage(userMessage, 'user');
-    messages.push({ role: "user", content: userMessage });
+    messages.push({ role: 'user', content: userMessage });
     input.value = '';
 
     try {
@@ -78,10 +78,10 @@ async function sendMessage() {
                 'Authorization': `Bearer ${OPENAI_API_KEY}`
             },
             body: JSON.stringify({
-                model: "gpt-4",
+                model: 'gpt-4',
                 messages: messages,
                 functions: functions,
-                function_call: "auto"
+                function_call: 'auto'
             })
         });
 
@@ -112,12 +112,12 @@ async function sendMessage() {
                         'Authorization': `Bearer ${OPENAI_API_KEY}`
                     },
                     body: JSON.stringify({
-                        model: "gpt-4",
+                        model: 'gpt-4',
                         messages: [
                             ...messages,
                             responseMessage,
                             {
-                                role: "function",
+                                role: 'function',
                                 name: functionName,
                                 content: JSON.stringify(toolResult)
                             }
@@ -127,12 +127,12 @@ async function sendMessage() {
 
                 const secondData = await secondResponse.json();
                 addMessage(secondData.choices[0].message.content, 'assistant');
-                messages.push({ role: "assistant", content: secondData.choices[0].message.content });
+                messages.push({ role: 'assistant', content: secondData.choices[0].message.content });
             }
         } else {
             // Regular response
             addMessage(responseMessage.content, 'assistant');
-            messages.push({ role: "assistant", content: responseMessage.content });
+            messages.push({ role: 'assistant', content: responseMessage.content });
         }
 
     } catch (error) {

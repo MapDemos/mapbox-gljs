@@ -1,13 +1,13 @@
 const precipitationColorScale = () => {
     const domain = [2, 5, 10, 20, 30, 50, 80];
     const range = [
-        "rgba(102, 255, 255, 0.8)",
-        "rgba(0, 204, 255, 0.8)",
-        "rgba(51, 102, 255, 0.8)",
-        "rgba(255, 204, 0, 0.8)",
-        "rgba(255, 153, 0, 0.8)",
-        "rgba(255, 0, 0, 0.8)",
-        "rgba(183, 0, 16, 0.8)"
+        'rgba(102, 255, 255, 0.8)',
+        'rgba(0, 204, 255, 0.8)',
+        'rgba(51, 102, 255, 0.8)',
+        'rgba(255, 204, 0, 0.8)',
+        'rgba(255, 153, 0, 0.8)',
+        'rgba(255, 0, 0, 0.8)',
+        'rgba(183, 0, 16, 0.8)'
     ];
 
     // const domain = [0, 1, 4, 8, 12, 16, 24, 32, 40, 48, 56, 64, 80, 200];
@@ -29,7 +29,7 @@ const precipitationColorScale = () => {
     // ]
 
     let result = domain.map((v, i) => [v, range[i]]).flat();
-    result.unshift("rgba(0, 0, 0, 0)");
+    result.unshift('rgba(0, 0, 0, 0)');
     return result;
 };
 

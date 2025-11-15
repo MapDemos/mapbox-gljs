@@ -29,13 +29,13 @@ let map = new mapboxgl.Map({
     center: [lng, lat],
     zoom: 14,
     scrollZoom: true,
-    language: "ja,en"
+    language: 'ja,en'
     //pitch: 60
 });
 
 map.on('load', () => {
     //map.setConfigProperty('basemap', 'lightPreset', 'night')
-    usedCoords = []
+    usedCoords = [];
     setAltitude = cityAltitude;
     setPitch = cityPitch;
     setMultiplyBy = cityMultiplyBy;
@@ -80,8 +80,8 @@ map.on('load', () => {
         
     });
 
-    cloneModels()
-    addSingleModel('nathan_animated_man.glb', 0, 0.05, lat,lng)
+    cloneModels();
+    addSingleModel('nathan_animated_man.glb', 0, 0.05, lat,lng);
     
 
 });
@@ -95,7 +95,7 @@ map.on('contextmenu', (e) => {
 const setStartMarker = (longitude, latitude) => {
     resetPrevious(true);
     lng = longitude;
-    lat = latitude
+    lat = latitude;
     if (startMarker) {
         startMarker.remove();
     }
@@ -132,13 +132,13 @@ function resetPrevious(remove_menu) {
         menuwrapper.innerHTML = '';
     }
 
-    removeAllRoutes(map)
+    removeAllRoutes(map);
 
     if (map.getLayer('tp-line-layer')) {
         map.removeLayer('tp-line-layer');
     }
     if (map.getSource('tp-line')) {
-        map.removeSource('tp-line')
+        map.removeSource('tp-line');
     }
 
     map.getSource('mpl-points').setData({
@@ -157,10 +157,10 @@ let intersectingPoints = null;
 async function getRoute(end) {
     resetPrevious(true);
     const start = [lng, lat];
-    await setRoute(map, start, end, 'red', null, 'walking')
+    await setRoute(map, start, end, 'red', null, 'walking');
 
     for(let id in routes){
-        routeGeo = routes[id].route
+        routeGeo = routes[id].route;
     }
 
     createMenu();
@@ -176,7 +176,7 @@ function createMenu() {
 
 }
 
-let popUpList = []
+let popUpList = [];
 
 const cityAltitude = 30;
 const cityPitch = 40;
@@ -192,31 +192,31 @@ const replay = () => {
 
     // https://en.wikipedia.org/wiki/Transpeninsular_Line
     const transpeninsularLine = {
-        type: "Feature",
+        type: 'Feature',
         properties: {
-            stroke: "#555555",
-            "stroke-width": 2,
-            "stroke-opacity": 1
+            stroke: '#555555',
+            'stroke-width': 2,
+            'stroke-opacity': 1
         },
         geometry: routeGeo
     };
 
-    map.addSource("tp-line", {
-        type: "geojson",
+    map.addSource('tp-line', {
+        type: 'geojson',
         data: transpeninsularLine,
         // Line metrics is required to use the 'line-progress' property
         lineMetrics: true
     });
 
     map.addLayer({
-        id: "tp-line-layer",
-        type: "line",
-        source: "tp-line",
+        id: 'tp-line-layer',
+        type: 'line',
+        source: 'tp-line',
         paint: {
-            "line-color": "rgba(0,0,0,0)",
-            "line-width": 8,
-            "line-opacity": 0.7,
-            "line-emissive-strength": 10,
+            'line-color': 'rgba(0,0,0,0)',
+            'line-width': 8,
+            'line-opacity': 0.7,
+            'line-emissive-strength': 10,
         }
     });
     map.setFog({}); // Set the default atmosphere style
@@ -231,11 +231,11 @@ const replay = () => {
     let startTime;
     //const duration = 10000;
 
-   var previousPosition = [lng, lat]
+   var previousPosition = [lng, lat];
 
-   var modelPreviousPosition = [lng, lat]
+   var modelPreviousPosition = [lng, lat];
 
-   setMPLPoints([lng, lat])
+   setMPLPoints([lng, lat]);
    
     const frame = (time) => {
         let pitch = setPitch;
@@ -258,27 +258,27 @@ const replay = () => {
 
         // Reduce the visible length of the line by using a line-gradient to cutoff the line
         // animationPhase is a value between 0 and 1 that reprents the progress of the animation
-        map.setPaintProperty("tp-line-layer", "line-gradient", [
-            "step",
-            ["line-progress"],
-            "yellow",
+        map.setPaintProperty('tp-line-layer', 'line-gradient', [
+            'step',
+            ['line-progress'],
+            'yellow',
             animationPhase,
-            "rgba(0, 0, 0, 0)"
+            'rgba(0, 0, 0, 0)'
         ]);
 
-        const diffMeters = getMetersDiff(previousPosition, targetPosition)
+        const diffMeters = getMetersDiff(previousPosition, targetPosition);
         if(diffMeters > 150){
-            previousPosition = targetPosition
-            setMPLPoints(targetPosition)
+            previousPosition = targetPosition;
+            setMPLPoints(targetPosition);
         }
 
         if (animationPhase > 1) {
             return;
         }
 
-        modelObjList[0].rotation.z = getBearing(modelPreviousPosition, targetPosition)
-        modelObjList[0].setCoords(targetPosition)
-        modelPreviousPosition = targetPosition
+        modelObjList[0].rotation.z = getBearing(modelPreviousPosition, targetPosition);
+        modelObjList[0].setCoords(targetPosition);
+        modelPreviousPosition = targetPosition;
 
         window.requestAnimationFrame(frame);
     };
@@ -331,7 +331,7 @@ function setMPLPoints(targetPosition){
             type: 'FeatureCollection',
             features: [...existingData.features, ...json.features],
         };
-        source.setData(newData)
+        source.setData(newData);
 
         const select = document.getElementById('type-select');
 
@@ -344,9 +344,9 @@ function setMPLPoints(targetPosition){
                 option.value = type;
                 option.innerHTML = type;
             }
-            addRandomModel(feature.geometry.coordinates)
+            addRandomModel(feature.geometry.coordinates);
         }
-    })
+    });
 }
 
 var modelList = [
@@ -400,45 +400,45 @@ var modelList = [
     {name:'Orc_Skull.fbx', scale:0.02, animationIndex:0},
     {name:'Orc.fbx', scale:0.02, animationIndex:0},
     {name:'Yeti.fbx', scale:0.02, animationIndex:0},
-]
+];
 //var usedModelList = []
-var clonableModelNames = ['Apple_1.fbx','Apple_2.fbx','Apple_3.fbx','Apple_4.fbx','Apple_Crop.fbx','Apple_Harvested.fbx','Bamboo_1.fbx','Bamboo_2.fbx','Bamboo_3.fbx','Bamboo_4.fbx','Bamboo_Crop.fbx','Beet_1.fbx','Beet_2.fbx','Beet_3.fbx','Beet_4.fbx','Beet_Crop.fbx','BushBerries_1.fbx','BushBerries_2.fbx','BushBerries_3.fbx','BushBerries_4.fbx','BushBerries_Crop.fbx','BushBerries_Harvested.fbx','Cactus_1.fbx','Cactus_2.fbx','Cactus_3.fbx','Cactus_4.fbx','Cactus_Crop.fbx','Cactus_Harvested.fbx','Carrot_1.fbx','Carrot_2.fbx','Carrot_3.fbx','Carrot_4.fbx','Carrot_Crop.fbx','Coconut_Half.fbx','Corn_1.fbx','Corn_2.fbx','Corn_3.fbx','Corn_4.fbx','Corn_Crop.fbx','Corn_Harvested.fbx','Flower_1.fbx','Flower_2.fbx','Flower_3.fbx','Flower_4.fbx','Flowers_Crop.fbx','Flowers_Harvested.fbx','Grass_1.fbx','Grass_2.fbx','Grass_3.fbx','Grass_4.fbx','Lettuce_1.fbx','Lettuce_2.fbx','Lettuce_3.fbx','Lettuce_4.fbx','Lettuce_Crop.fbx','Lettuce_Harvested.fbx','Mushroom_1.fbx','Mushroom_2.fbx','Mushroom_3.fbx','Mushroom_4.fbx','Mushroom_Crop.fbx','Mushroom_Harvested.fbx','Orange_1.fbx','Orange_2.fbx','Orange_3.fbx','Orange_4.fbx','Orange_Crop.fbx','Orange_Harvested.fbx','PalmTree_1.fbx','PalmTree_2.fbx','PalmTree_3.fbx','PalmTree_4.fbx','PalmTree_Crop.fbx','PalmTree_Harvested.fbx','Pumpkin_1.fbx','Pumpkin_2.fbx','Pumpkin_3.fbx','Pumpkin_4.fbx','Pumpkin_Crop.fbx','Pumpkin_Harvested.fbx','Rice_1.fbx','Rice_2.fbx','Rice_3.fbx','Rice_4.fbx','Rice_Crop.fbx','Tomato_1.fbx','Tomato_2.fbx','Tomato_3.fbx','Tomato_4.fbx','Tomato_Crop.fbx','Tomato_Harvested.fbx','Watermelon_1.fbx','Watermelon_2.fbx','Watermelon_3.fbx','Watermelon_4.fbx','Watermelon_Crop.fbx','Watermelon_Harvested.fbx','Wheat_1.fbx','Wheat_2.fbx','Wheat_3.fbx','Wheat_4.fbx','Wheat_Crop.fbx']
-var cloneableModelList = []
+var clonableModelNames = ['Apple_1.fbx','Apple_2.fbx','Apple_3.fbx','Apple_4.fbx','Apple_Crop.fbx','Apple_Harvested.fbx','Bamboo_1.fbx','Bamboo_2.fbx','Bamboo_3.fbx','Bamboo_4.fbx','Bamboo_Crop.fbx','Beet_1.fbx','Beet_2.fbx','Beet_3.fbx','Beet_4.fbx','Beet_Crop.fbx','BushBerries_1.fbx','BushBerries_2.fbx','BushBerries_3.fbx','BushBerries_4.fbx','BushBerries_Crop.fbx','BushBerries_Harvested.fbx','Cactus_1.fbx','Cactus_2.fbx','Cactus_3.fbx','Cactus_4.fbx','Cactus_Crop.fbx','Cactus_Harvested.fbx','Carrot_1.fbx','Carrot_2.fbx','Carrot_3.fbx','Carrot_4.fbx','Carrot_Crop.fbx','Coconut_Half.fbx','Corn_1.fbx','Corn_2.fbx','Corn_3.fbx','Corn_4.fbx','Corn_Crop.fbx','Corn_Harvested.fbx','Flower_1.fbx','Flower_2.fbx','Flower_3.fbx','Flower_4.fbx','Flowers_Crop.fbx','Flowers_Harvested.fbx','Grass_1.fbx','Grass_2.fbx','Grass_3.fbx','Grass_4.fbx','Lettuce_1.fbx','Lettuce_2.fbx','Lettuce_3.fbx','Lettuce_4.fbx','Lettuce_Crop.fbx','Lettuce_Harvested.fbx','Mushroom_1.fbx','Mushroom_2.fbx','Mushroom_3.fbx','Mushroom_4.fbx','Mushroom_Crop.fbx','Mushroom_Harvested.fbx','Orange_1.fbx','Orange_2.fbx','Orange_3.fbx','Orange_4.fbx','Orange_Crop.fbx','Orange_Harvested.fbx','PalmTree_1.fbx','PalmTree_2.fbx','PalmTree_3.fbx','PalmTree_4.fbx','PalmTree_Crop.fbx','PalmTree_Harvested.fbx','Pumpkin_1.fbx','Pumpkin_2.fbx','Pumpkin_3.fbx','Pumpkin_4.fbx','Pumpkin_Crop.fbx','Pumpkin_Harvested.fbx','Rice_1.fbx','Rice_2.fbx','Rice_3.fbx','Rice_4.fbx','Rice_Crop.fbx','Tomato_1.fbx','Tomato_2.fbx','Tomato_3.fbx','Tomato_4.fbx','Tomato_Crop.fbx','Tomato_Harvested.fbx','Watermelon_1.fbx','Watermelon_2.fbx','Watermelon_3.fbx','Watermelon_4.fbx','Watermelon_Crop.fbx','Watermelon_Harvested.fbx','Wheat_1.fbx','Wheat_2.fbx','Wheat_3.fbx','Wheat_4.fbx','Wheat_Crop.fbx'];
+var cloneableModelList = [];
 
-var coordList = []
+var coordList = [];
 
 function addRandomModel(coordinates){
-    const coords_string = `${coordinates[0]}_${coordinates[1]}`
-    if(coordList.includes(coords_string)) return
-    coordList.push(coords_string)
+    const coords_string = `${coordinates[0]}_${coordinates[1]}`;
+    if(coordList.includes(coords_string)) return;
+    coordList.push(coords_string);
     //if(usedModelList.length === modelList.length){
     if(modelObjIndex >= modelObjList.length){
-        addRandomClonable(coordinates)
-        return
+        addRandomClonable(coordinates);
+        return;
     }
-    const type = getRandomInt(2)
+    const type = getRandomInt(2);
     if(type === 1){
-        addNextModel(coordinates)
+        addNextModel(coordinates);
     }else{
-        addRandomClonable(coordinates)
+        addRandomClonable(coordinates);
     }
 }
-let usedCoords = []
+let usedCoords = [];
 function addNextModel(coordinates){
-    if(usedCoords.includes(coordinates)) return
-    usedCoords.push(coordinates)
+    if(usedCoords.includes(coordinates)) return;
+    usedCoords.push(coordinates);
     //const index = modelList.length - usedModelList.length - 1
     //const item = modelList[index]
     //usedModelList.push(item)
 
     //addModel(item.name, item.animationIndex, item.scale, coordinates[1], coordinates[0])
-    addModel(coordinates)
+    addModel(coordinates);
     
 }
 
 function cloneModels(){
     clonableModelNames.forEach(name => {
-        const type = name.substring(name.lastIndexOf('.')+1)
+        const type = name.substring(name.lastIndexOf('.')+1);
         const options = {
             obj: `https://kenji-shima.github.io/resource-files/models/${name}`,
             type: type,
@@ -446,28 +446,28 @@ function cloneModels(){
             units: 'meters',
             rotation: { x: 90, y: 270, z: 0 }, // default rotation
             anchor : 'center'
-        }
+        };
         tb.loadObj(options, function (model) {
-            cloneableModelList.push(model)
-        })
-    })
+            cloneableModelList.push(model);
+        });
+    });
 }
 
 function addRandomClonable(coordinates){
-    const index = getRandomInt(cloneableModelList.length)
-    const clone = cloneableModelList[index].duplicate().setCoords(coordinates)
-    tb.add(clone)
+    const index = getRandomInt(cloneableModelList.length);
+    const clone = cloneableModelList[index].duplicate().setCoords(coordinates);
+    tb.add(clone);
 }
 
 function loadAllModels(){
     for(let model of modelList){
-        loadModel(model.name, model.animationIndex, model.scale)
+        loadModel(model.name, model.animationIndex, model.scale);
     }
 }
 
 function loadModel(name, animationIndex, scale) {
 
-    const type = name.substring(name.lastIndexOf('.')+1)
+    const type = name.substring(name.lastIndexOf('.')+1);
     
     const modelOptions = {
       obj: `https://kenji-shima.github.io/resource-files/models/${name}`,
@@ -480,7 +480,7 @@ function loadModel(name, animationIndex, scale) {
     
     tb.loadObj(modelOptions, function (model) {
       //const modelObj = model;
-      modelObjList.push(model)
+      modelObjList.push(model);
       tb.add(model);
       const animations = model.animations;
       const mixer = new THREE.AnimationMixer(model);
@@ -491,16 +491,16 @@ function loadModel(name, animationIndex, scale) {
     
   }
 
-let modelObjIndex = 1
+let modelObjIndex = 1;
 function addModel(coordinates){
-    modelObjList[modelObjIndex].setCoords(coordinates)
+    modelObjList[modelObjIndex].setCoords(coordinates);
     //tb.add(model);
-    modelObjIndex+=1
+    modelObjIndex+=1;
 }
 
 function addSingleModel(name, animationIndex, scale, lat1, lng1) {
 
-    const type = name.substring(name.lastIndexOf('.')+1)
+    const type = name.substring(name.lastIndexOf('.')+1);
     
     const modelOptions = {
       obj: `https://kenji-shima.github.io/resource-files/models/${name}`,
@@ -513,7 +513,7 @@ function addSingleModel(name, animationIndex, scale, lat1, lng1) {
     
     tb.loadObj(modelOptions, function (model) {
       const modelObj = model.setCoords([lng1, lat1]);
-      modelObjList.push(modelObj)
+      modelObjList.push(modelObj);
       tb.add(model);
       const animations = model.animations;
       const mixer = new THREE.AnimationMixer(model);
@@ -521,26 +521,26 @@ function addSingleModel(name, animationIndex, scale, lat1, lng1) {
       const clipAction = mixer.clipAction(animations[animationIndex]);
       clipAction.play();
 
-      loadAllModels()
+      loadAllModels();
     });
     
   }
-var modelObjList = []
-var mixerList = []
-const clock = new THREE.Clock()
+var modelObjList = [];
+var mixerList = [];
+const clock = new THREE.Clock();
 const updateMixerList = () =>{
-    const delta = clock.getDelta()
+    const delta = clock.getDelta();
     for(const mixer of mixerList){
-        mixer.update(delta)
+        mixer.update(delta);
         map.triggerRepaint({ layers: ['threebox-layer'] });
     }
     for(var i=1; i<modelObjList.length; i++){
-        const model = modelObjList[i]
-        model.rotation.z = getBearing(model.coordinates, modelObjList[0].coordinates)
+        const model = modelObjList[i];
+        model.rotation.z = getBearing(model.coordinates, modelObjList[0].coordinates);
     }
-    window.requestAnimationFrame(updateMixerList)
-}
-window.requestAnimationFrame(updateMixerList)
+    window.requestAnimationFrame(updateMixerList);
+};
+window.requestAnimationFrame(updateMixerList);
 
 
 function createPopup(event){
@@ -558,11 +558,11 @@ function createPopup(event){
     for(const name of names){
         if(name === 'tilequery') continue;
         const val = feature.properties[name];
-        all = `${all}<tr><th>${name}</th><td>${val}</td></tr>`
+        all = `${all}<tr><th>${name}</th><td>${val}</td></tr>`;
     }
-    const tilequery = feature.properties.tilequery.replace("{","").replace("}","").replaceAll("\"","").split(",");
+    const tilequery = feature.properties.tilequery.replace('{','').replace('}','').replaceAll('"','').split(',');
     for(const tile of tilequery){
-        const t = tile.split(":");
+        const t = tile.split(':');
         all = `${all}<tr><th>${t[0]}</th><td>${t[1]}</td></tr>`;
     }
     const popup = new mapboxgl.Popup()
@@ -585,7 +585,7 @@ const filterByType = function(){
     const popUps = document.getElementsByClassName('mapboxgl-popup');
     if (popUps[0]) popUps[0].remove();
     const selected = document.getElementById('type-select');
-    if(selected.value === ""){
+    if(selected.value === ''){
         map.setFilter(
             'mpl-points-layer',
             null
@@ -600,6 +600,6 @@ const filterByType = function(){
             selected.value
         ]
     );
-}
+};
 
 window.filterByType = filterByType;

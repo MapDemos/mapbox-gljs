@@ -1,6 +1,6 @@
 const defaultCoordinates = [139.76652995236685, 35.67881527736655];
 
-let map
+let map;
 let analysisResults = null;
 let colorToIndexMap = {}; 
 let colorPalette = [
@@ -265,18 +265,18 @@ function updateVisualization() {
                 type: 'circle',
                 source: deliverySourceId,
                 paint: {
-                    "circle-radius": [
-                        "interpolate",
-                        ["linear"],
-                        ["zoom"],
+                    'circle-radius': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
                         0, 2,
                         10, 4,
                         15, 6
                     ],
-                    "circle-color": color,
-                    "circle-opacity": 0.8,
-                    "circle-stroke-width": 1,
-                    "circle-stroke-color": "#FFFFFF"
+                    'circle-color': color,
+                    'circle-opacity': 0.8,
+                    'circle-stroke-width': 1,
+                    'circle-stroke-color': '#FFFFFF'
                 },
                 minzoom: 10
             });
@@ -326,18 +326,18 @@ function createUnassignedDeliveriesLayer() {
             type: 'circle',
             source: 'deliveries-unassigned',
             paint: {
-                "circle-radius": [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
+                'circle-radius': [
+                    'interpolate',
+                    ['linear'],
+                    ['zoom'],
                     0, 2,
                     10, 4,
                     15, 6
                 ],
-                "circle-color": "#CCCCCC",
-                "circle-opacity": 0.8,
-                "circle-stroke-width": 1,
-                "circle-stroke-color": "#FFFFFF"
+                'circle-color': '#CCCCCC',
+                'circle-opacity': 0.8,
+                'circle-stroke-width': 1,
+                'circle-stroke-color': '#FFFFFF'
             },
             minzoom: 10
         });
@@ -519,7 +519,7 @@ const loadMap = () => {
         minZoom: 3,
         scrollZoom: true,
         language: 'ja'
-    })
+    });
     
     map.on('load', () => {
         setupControlListeners();
@@ -534,23 +534,23 @@ const loadMap = () => {
         fetch('deliveryCenters.geojson')
             .then(response => response.json())
             .then(data => {
-                addDeliveryCenters(data)
+                addDeliveryCenters(data);
             })
             .catch(error => console.error('Error loading delivery centers:', error));
 
         fetch('deliveries.geojson')
             .then(response => response.json())
             .then(data => {
-                addDeliveries(data)
+                addDeliveries(data);
             })
             .catch(error => console.error('Error loading deliveries:', error));
-    })
+    });
     
     map.on('click', (event) => {
         const { lng, lat } = event.lngLat;
         console.log(`Longitude: ${lng}, Latitude: ${lat}`);
-    })
-}
+    });
+};
 
 const addDeliveryCenters = (data) => {
     map.addSource('delivery-centers', {
@@ -559,23 +559,23 @@ const addDeliveryCenters = (data) => {
     });
 
     map.addLayer({
-        id: "symbol-delivery-centers",
-        type: "symbol",
-        source: "delivery-centers",
+        id: 'symbol-delivery-centers',
+        type: 'symbol',
+        source: 'delivery-centers',
         layout: {
-            "icon-image": "yamato",
-            "icon-size": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
+            'icon-image': 'yamato',
+            'icon-size': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
                 0, 0.1,
                 10, 0.3,
                 15, 0.6
             ],
-            "icon-allow-overlap": true
+            'icon-allow-overlap': true
         }
     });
-}
+};
 
 const addDeliveries = (data) => {
     map.addSource('deliveries', {
@@ -584,32 +584,32 @@ const addDeliveries = (data) => {
     });
 
     map.addLayer({
-        id: "symbol-deliveries",
-        type: "circle",
-        source: "deliveries",
+        id: 'symbol-deliveries',
+        type: 'circle',
+        source: 'deliveries',
         paint: {
-            "circle-radius": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
+            'circle-radius': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
                 0, 2,
                 10, 4,
                 15, 6
             ],
-            "circle-color": "#CCCCCC", // Changed from "#FF0000" to gray
-            "circle-opacity": 0.8,
-            "circle-stroke-width": 1,
-            "circle-stroke-color": "#FFFFFF"
+            'circle-color': '#CCCCCC', // Changed from "#FF0000" to gray
+            'circle-opacity': 0.8,
+            'circle-stroke-width': 1,
+            'circle-stroke-color': '#FFFFFF'
         },
         minzoom: 10
     });
-}
+};
 
 // Update the fetchIsochrone function to include retry logic:
 async function fetchIsochrone(profile, coordinates, minutes, colors) {
-    let contourColors = ''
+    let contourColors = '';
     if (colors) {
-        contourColors = `contours_colors=${colors}`
+        contourColors = `contours_colors=${colors}`;
     }
     const isochrone_uri = 'https://api.mapbox.com/isochrone/v1/';
     const url = `${isochrone_uri}${profile}/${coordinates[0]},${coordinates[1]}?contours_minutes=${minutes}&polygons=true&${contourColors}&access_token=${mapboxgl.accessToken}`;
@@ -654,4 +654,4 @@ function delay(ms) {
 }
 
 // Initialize the map
-loadMap()
+loadMap();

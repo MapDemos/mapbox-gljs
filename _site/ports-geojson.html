@@ -358,7 +358,7 @@ button:hover {
   
 const defaultCoordinates = [139.76652995236685, 35.67881527736655];
 
-let map
+let map;
 
 const loadMap = () => {
     map = new mapboxgl.Map({
@@ -369,7 +369,7 @@ const loadMap = () => {
         minZoom: 3,
         //maxZoom: 12,
         scrollZoom: true
-    })
+    });
     map.on('load', () => {
         map.loadImage('https://docs.mapbox.com/mapbox-gl-js/assets/custom_marker.png', (error, image) => {
             if (error) throw error;
@@ -381,14 +381,14 @@ const loadMap = () => {
         fetch('ports.geojson')
             .then(response => response.json())
             .then(data => {
-                addAllLayers(data)
+                addAllLayers(data);
             })
             .catch(error => console.error('Error loading GeoJSON data:', error));
-    })
+    });
     map.on('click', (event) => {
         const { lng, lat } = event.lngLat;
         console.log(`Longitude: ${lng}, Latitude: ${lat}`);
-    })
+    });
 
     map.on('click', 'clusters', (e) => {
         const features = map.queryRenderedFeatures(e.point, {
@@ -404,7 +404,7 @@ const loadMap = () => {
         const features = map.queryRenderedFeatures(e.point, {
             layers: ['symbol-port']
         });
-        console.log("feature", features[0].properties)
+        console.log('feature', features[0].properties);
         if (!features.length) return;
         const feature = features[0];
 
@@ -421,7 +421,7 @@ const loadMap = () => {
             .setHTML(html)
             .addTo(map);
     });
-}
+};
 
 const addAllLayers = (data) => {
     map.addSource('ports', {
@@ -432,21 +432,21 @@ const addAllLayers = (data) => {
         clusterRadius: 50
     });
     map.addLayer({
-        id: "clusters",
-        type: "circle",
-        source: "ports",
+        id: 'clusters',
+        type: 'circle',
+        source: 'ports',
         filter: ['has', 'point_count'],
         paint: {
-            "circle-color": [
-                "step",
-                ["get", "point_count"],
-                "#51bbd6",
+            'circle-color': [
+                'step',
+                ['get', 'point_count'],
+                '#51bbd6',
                 2,
-                "#f1f075",
+                '#f1f075',
                 100,
-                "#f28cb1",
+                '#f28cb1',
             ],
-            "circle-radius": ["step", ["get", "point_count"],
+            'circle-radius': ['step', ['get', 'point_count'],
                 20,
                 100,
                 30,
@@ -456,38 +456,38 @@ const addAllLayers = (data) => {
     });
 
     map.addLayer({
-        id: "cluster-count",
-        type: "symbol",
-        source: "ports",
+        id: 'cluster-count',
+        type: 'symbol',
+        source: 'ports',
         filter: ['has', 'point_count'],
         layout: {
             'text-field': ['get', 'point_count_abbreviated'],
-            "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
-            "text-size": 12,
+            'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+            'text-size': 12,
         },
     });
 
     map.addLayer({
-        id: "symbol-port",
-        type: "symbol",
-        source: "ports",
+        id: 'symbol-port',
+        type: 'symbol',
+        source: 'ports',
         filter: ['!', ['has', 'point_count']],
         layout: {
-            "icon-image": "port", // ensure you have added this image beforehand
-            "icon-size": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
+            'icon-image': 'port', // ensure you have added this image beforehand
+            'icon-size': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
                 0, 0.1,
                 10, 0.5,
                 15, 0.8
             ],
-            "icon-allow-overlap": true
+            'icon-allow-overlap': true
         }
     });
-}
+};
 
-loadMap()
+loadMap();
 </script>
 
 </html>

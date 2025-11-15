@@ -1,7 +1,7 @@
-lng = 139.746173
-lat = 35.650641
+lng = 139.746173;
+lat = 35.650641;
 
-let beforeMap
+let beforeMap;
 
 const loadMap = () => {
     beforeMap = new mapboxgl.Map({
@@ -12,7 +12,7 @@ const loadMap = () => {
         minZoom: 3,
         scrollZoom: true,
         language: 'en'
-    })
+    });
 
     const tiles = [
         // 'tile_16_58207_25812',
@@ -20,21 +20,21 @@ const loadMap = () => {
         // 'tile_16_58208_25812',
         // 'tile_16_58208_25813',
         'consolidated_buildings'
-    ]
+    ];
     beforeMap.on('load', () => {
-        beforeMap.showTileBoundaries = true
+        beforeMap.showTileBoundaries = true;
 
         tiles.forEach((tile) => {
-            addLayer(tile)
-        })
+            addLayer(tile);
+        });
 
-    })
+    });
 
     beforeMap.on('click', (event) => {
         const { lng, lat } = event.lngLat;
         console.log(`Longitude: ${lng}, Latitude: ${lat}`);
-    })
-}
+    });
+};
 
 const addLayer = (filename) => {
     beforeMap.addSource(
@@ -43,7 +43,7 @@ const addLayer = (filename) => {
             type: 'geojson',
             data: `./assets/images/${filename}.geojson`
         }
-    )
+    );
     beforeMap.addLayer({
         id: `${filename}`,
         type: 'fill',
@@ -60,11 +60,11 @@ const addLayer = (filename) => {
             'fill-opacity': 1
         },
         filter: [
-            "all",
-            ["has", "landmark_name"],
-            [">", "height", 20]
+            'all',
+            ['has', 'landmark_name'],
+            ['>', 'height', 20]
         ]
-    })
+    });
 
     var popup = new mapboxgl.Popup({
         closeButton: false,
@@ -92,9 +92,9 @@ const addLayer = (filename) => {
         beforeMap.getCanvas().style.cursor = '';
         popup.remove();
     });
-}
+};
 
-loadMap()
+loadMap();
 
 const afterMap = new mapboxgl.Map({
     container: 'after',

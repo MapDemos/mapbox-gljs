@@ -357,7 +357,7 @@ button:hover {
 <script>
   const defaultCoordinates = [139.76652995236685, 35.67881527736655];
 
-let map
+let map;
 
 const loadMap = () => {
     map = new mapboxgl.Map({
@@ -368,20 +368,20 @@ const loadMap = () => {
         minZoom: 3,
         language: 'ja',
         scrollZoom: true
-    })
+    });
     map.on('load', () => {
         map.addSource('rivers', {
             type: 'vector',
             url: `mapbox://kenji-shima.floodrisk-all`
         });
         map.addLayer({
-            id: "rivers",
-            type: "line",
-            source: "rivers",
-            "source-layer": "rivers",
+            id: 'rivers',
+            type: 'line',
+            source: 'rivers',
+            'source-layer': 'rivers',
             paint: {
-                "line-color": 'blue',
-                "line-opacity": 1
+                'line-color': 'blue',
+                'line-opacity': 1
             }
         }, 'waterway-label');
         map.on('sourcedata', (e) => {
@@ -471,7 +471,7 @@ const loadMap = () => {
                 .addTo(map);
         });*/
     });
-}
+};
 
 const updateRiverLabels = () => {
     const features = map.queryRenderedFeatures({ layers: ['rivers'] });
@@ -571,7 +571,7 @@ const updateRiverLabels = () => {
     }
 };
 
-loadMap()
+loadMap();
 </script>
 
 </html>

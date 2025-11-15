@@ -109,7 +109,7 @@ const cities = {
         coordinates: [124.157222, 24.340278],
         label: '石垣',
     }
-}
+};
 
 function updateLegendBar() {
     const legend = document.querySelector('.legend-bar');
@@ -150,7 +150,7 @@ function updateLegendBar() {
 }
 
 const sliderDomain = [0, 38];
-const baseDate = "20240621055000";
+const baseDate = '20240621055000';
 const timeManager = new TimeManager(baseDate);
 
 // const yjRainScale = () => {
@@ -198,19 +198,19 @@ const rasterTileQuery = async (coords) => {
     const currentTileset = preciptationHelper.precipitation_tiles[currentKey].tileset_id;
     const currentBand = preciptationHelper.currentVisibleBand;
 
-    const layers = ['precipitation']
-    const bands = [currentBand]
-    const layerString = layers.length > 0 ? `&layers=${layers.join(',')}` : ''
-    const bandString = bands.length > 0 ? `&bands=${bands.join(',')}` : ''
-    const response = await fetch(`https://api.mapbox.com/v4/${currentTileset}/tilequery/${coords[0]},${coords[1]}.json?${layerString}${bandString}&access_token=${mapboxgl.accessToken}`)
-    const data = await response.json()
-    return data
-}
+    const layers = ['precipitation'];
+    const bands = [currentBand];
+    const layerString = layers.length > 0 ? `&layers=${layers.join(',')}` : '';
+    const bandString = bands.length > 0 ? `&bands=${bands.join(',')}` : '';
+    const response = await fetch(`https://api.mapbox.com/v4/${currentTileset}/tilequery/${coords[0]},${coords[1]}.json?${layerString}${bandString}&access_token=${mapboxgl.accessToken}`);
+    const data = await response.json();
+    return data;
+};
 
 const batchRasterTileQuery = async (coords) => {
-    const tileset_id = []
-    const layers = []
-    const bands = []
+    const tileset_id = [];
+    const layers = [];
+    const bands = [];
 
     for (const key in preciptationHelper.precipitation_tiles) {
         const tile = preciptationHelper.precipitation_tiles[key];
@@ -231,18 +231,18 @@ const batchRasterTileQuery = async (coords) => {
             }
         }
     }
-    const layerString = layers.length > 0 ? `&layers=${layers.join(',')}` : ''
-    const bandString = bands.length > 0 ? `&bands=${bands.join(',')}` : ''
-    const response = await fetch(`https://api.mapbox.com/v4/${tileset_id}/tilequery/${coords[0]},${coords[1]}.json?${layerString}${bandString}&access_token=${mapboxgl.accessToken}`)
-    const data = await response.json()
-    return data
-}
+    const layerString = layers.length > 0 ? `&layers=${layers.join(',')}` : '';
+    const bandString = bands.length > 0 ? `&bands=${bands.join(',')}` : '';
+    const response = await fetch(`https://api.mapbox.com/v4/${tileset_id}/tilequery/${coords[0]},${coords[1]}.json?${layerString}${bandString}&access_token=${mapboxgl.accessToken}`);
+    const data = await response.json();
+    return data;
+};
 
 const reverseGeocode = async (coords) => {
-    const response = await fetch(`https://api.mapbox.com/search/geocode/v6/reverse?longitude=${coords[0]}&latitude=${coords[1]}&language=ja&country=jp&types=place&access_token=${mapboxgl.accessToken}`)
-    const data = await response.json()
-    return data
-}
+    const response = await fetch(`https://api.mapbox.com/search/geocode/v6/reverse?longitude=${coords[0]}&latitude=${coords[1]}&language=ja&country=jp&types=place&access_token=${mapboxgl.accessToken}`);
+    const data = await response.json();
+    return data;
+};
 
 const getLightPreset = () => {
     const HHmm = timeManager.getHHmm();
@@ -253,7 +253,7 @@ const getLightPreset = () => {
     else if (hour >= 17 && hour < 19) lightPreset = 'dusk';
     else lightPreset = 'night';
     return lightPreset;
-}
+};
 
 const setLocalEffects = (lng, lat) => {
 
@@ -279,11 +279,11 @@ const setLocalEffects = (lng, lat) => {
         if (data.features.length) {
             precipitation = data.features[0].properties['val'];
             if (precipitation > 1) {
-                density = precipitation * 0.01 * 2
+                density = precipitation * 0.01 * 2;
                 if (density > 1) {
-                    density = 1.0
+                    density = 1.0;
                 }
-                intensity = density
+                intensity = density;
             }
             if (density > 0.3) {
                 highColor = 'rgb(71, 76, 89)';
@@ -319,7 +319,7 @@ const setLocalEffects = (lng, lat) => {
             'distortion-strength': 0.5,
             vignette: 0.5,
             vignetteColor: '#6e6e6e'
-        })
+        });
 
         const weather = getWeather(precipitation);
         const model = getModel(weather);
@@ -359,7 +359,7 @@ const setLocalEffects = (lng, lat) => {
         // map.setConfigProperty('basemap', 'lightPreset', lightPreset);
 
 
-    })
+    });
 
     batchRasterTileQuery([lng, lat]).then((data) => {
         if (data.features.length > 0) {
@@ -381,7 +381,7 @@ const setLocalEffects = (lng, lat) => {
             showPrecipitationChart(results);
         }
     });
-}
+};
 
 // const SUNNY = { name: "the_sun.glb", size: 40, height: 3000 };
 // const CLOUDY = { name: 'cloud_ring.glb', size: 140, height: 200 };
@@ -407,9 +407,9 @@ function addPrecipitationLayers(map) {
         preciptationHelper.addLayer(yyyyMMddHHmmSS);
     });
 
-    const timeslider = document.getElementById('slider')
-    timeslider.max = sliderDomain[sliderDomain.length - 1]
-    timeslider.value = 12
+    const timeslider = document.getElementById('slider');
+    timeslider.max = sliderDomain[sliderDomain.length - 1];
+    timeslider.value = 12;
 
     function loadFirstLayer() {
         if (!preciptationHelper.checkAllSourcesLoaded()) {
@@ -432,7 +432,7 @@ function setCurrentTime() {
 }
 function inputBand(val) {
     const minutesOffset = getMinutesOffset(val);
-    timeManager.updateTimeByOffset(minutesOffset)
+    timeManager.updateTimeByOffset(minutesOffset);
     preciptationHelper.visibleLayer(timeManager.getyyyyMMddHHmmSS(minutesOffset));
     setCurrentTime();
 }
@@ -472,14 +472,14 @@ function addThreeboxLayer(map) {
             window.tb.update();
         }
 
-    })
+    });
 }
 
-let cg_models = {}
+let cg_models = {};
 let rotateRequestId = null;
 let isRotating = false;
 async function loadModel(name, scale) {
-    const type = name.substring(name.lastIndexOf('.') + 1)
+    const type = name.substring(name.lastIndexOf('.') + 1);
     const options = {
         obj: `./assets/models/${name}`,
         type: type,
@@ -487,7 +487,7 @@ async function loadModel(name, scale) {
         units: 'meters',
         rotation: { x: 90, y: 270, z: 0 }, // default rotation
         anchor: 'center'
-    }
+    };
     window.tb.loadObj(options, function (model) {
         // Add a PointLight at the center of the model to simulate sunlight
         // const pointLight = new THREE.PointLight(0xffffff, 5, 1000);
@@ -496,8 +496,8 @@ async function loadModel(name, scale) {
         cg_models[name] = {
             model: model,
             scale: scale
-        }
-    })
+        };
+    });
 }
 
 function clearModels() {
@@ -507,11 +507,11 @@ function clearModels() {
 }
 
 function moveModel(name, coordinates, height = 400) {
-    const model = cg_models[name].model
-    window.tb.add(model)
+    const model = cg_models[name].model;
+    window.tb.add(model);
     model.setCoords([coordinates[0], coordinates[1], height]);
     //model.set({ position: { x: 0, y: 0, z: 0 } })
-    return model
+    return model;
 }
 
 function getWeather(precipitation) {
@@ -623,7 +623,7 @@ const boxClick = (coordinates, zoom, pitch, rotateOnce = true) => {
         }
         rotateOnce();
     });
-}
+};
 window.boxClick = boxClick;
 
 const getMinutesOffset = (value) => {
@@ -647,7 +647,7 @@ const getMinutesOffset = (value) => {
         // console.log(`Adjusted time for ${value}: ${adjustedTime} (base: ${base}) (adjusted: ${adjusted})`);
         return Math.floor((adjusted - base) / 60000); // difference in minutes
     }
-}
+};
 
 const loadMap = () => {
     map = new mapboxgl.Map({
@@ -659,7 +659,7 @@ const loadMap = () => {
         language: 'ja',
         scrollZoom: true,
         projection: 'mercator',
-    })
+    });
 
     map.on('load', () => {
 
@@ -760,9 +760,9 @@ const loadMap = () => {
         }
         boxClick(defaultCoordinates, 4, 0, false);
     });
-}
+};
 
-loadMap()
+loadMap();
 
 map.on('click', (e) => {
     console.log('Map clicked at:', [e.lngLat.lng, e.lngLat.lat]);
@@ -852,5 +852,5 @@ function showPrecipitationChart(data) {
         const isNow = item.band_jstyyyyMMddHHmmSS === timeManager.getRefyyyyMMddHHmmSS();
         results.push({ time: time, val: val, now: isNow });
     });
-    showBarChart(results)
+    showBarChart(results);
 };

@@ -1,33 +1,33 @@
-const account = 'n2xNzqos7NirxGBJ'
-const results_per_page = 5
-const shop_details_url = `https://www.j-jti.com/appif/sight?appid=${account}&pagecount=${results_per_page}&responsetype=json`
+const account = 'n2xNzqos7NirxGBJ';
+const results_per_page = 5;
+const shop_details_url = `https://www.j-jti.com/appif/sight?appid=${account}&pagecount=${results_per_page}&responsetype=json`;
 
 const shop_categories = {
     eat: {
-        label: "食べる",
-        lgenre: "3",
-        icon: "fas fa-utensils", // Icon for food/restaurants
+        label: '食べる',
+        lgenre: '3',
+        icon: 'fas fa-utensils', // Icon for food/restaurants
         color:'bg-orange-400'
     },
     buy: {
-        label: "買う",
-        lgenre: "6",
-        icon: "fas fa-shopping-bag", // Icon for shopping/stores
+        label: '買う',
+        lgenre: '6',
+        icon: 'fas fa-shopping-bag', // Icon for shopping/stores
         color:'bg-green-400'
     },
     enjoy: {
-        label: "遊ぶ",
-        lgenre: "2",
-        icon: "fas fa-ticket-alt", // Icon for attractions/entertainment
+        label: '遊ぶ',
+        lgenre: '2',
+        icon: 'fas fa-ticket-alt', // Icon for attractions/entertainment
         color:'bg-blue-400'
     },
     see: {
-        label: "見る",
-        lgenre: "1",
-        icon: "fas fa-landmark", // Icon for sightseeing/landmarks
+        label: '見る',
+        lgenre: '1',
+        icon: 'fas fa-landmark', // Icon for sightseeing/landmarks
         color:'bg-purple-400'
     },
-}
+};
 
 function getIconAndColorForGenre(lgenre) {
     for (let key in shop_categories) {
@@ -59,27 +59,27 @@ async function fetchJisList() {
 async function getJis(address) {
     const jisList = await fetchJisList();
     for (let elem of jisList) {
-        if (elem.city === "") {
-            continue
+        if (elem.city === '') {
+            continue;
         }
-        const prefCity = elem.prefecture + elem.city
+        const prefCity = elem.prefecture + elem.city;
         if (address.includes(prefCity)) {
-            code = elem.code.substring(0, 5)
-            if (code.endsWith("0")) {
-                continue
+            code = elem.code.substring(0, 5);
+            if (code.endsWith('0')) {
+                continue;
             } else {
-                return code
+                return code;
             }
         }
     }
-    return code
+    return code;
 }
 
 const getAllGenrePOIs = async (address) => {
     const jis = await getJis(address);
-    if (jis === "") {
-        console.log("JIS code not found for address:", address);
-        return { "type": "FeatureCollection", "features": [] };
+    if (jis === '') {
+        console.log('JIS code not found for address:', address);
+        return { 'type': 'FeatureCollection', 'features': [] };
     }
     
     // Create a promise for each category fetch
@@ -94,10 +94,10 @@ const getAllGenrePOIs = async (address) => {
     const allFeatures = results.flatMap(featureCollection => featureCollection.features);
 
     return {
-        "type": "FeatureCollection",
-        "features": allFeatures
+        'type': 'FeatureCollection',
+        'features': allFeatures
     };
-}
+};
 
 /**
  * Fetches only the first page of POIs for a specific category and JIS code.
@@ -145,32 +145,32 @@ function recursiveShopSearch(jis, lgenre, pageno, featureCollection, resolve) {
     });
 }
 
-const shopImageUri = 'https://www.j-jti.com/Storage/Image/Product/SightImage/M/'
+const shopImageUri = 'https://www.j-jti.com/Storage/Image/Product/SightImage/M/';
 function convertShopResponseToFeatures(json) {
-    let data = json[0].SightList
+    let data = json[0].SightList;
     let featureCollection = {
-        "type": "FeatureCollection",
-        "features": []
-    }
-    if (!data) return featureCollection
+        'type': 'FeatureCollection',
+        'features': []
+    };
+    if (!data) return featureCollection;
     featureCollection = {
-        "type": "FeatureCollection",
-        "features": data.filter((item) => item.PhotoList).map((item) => {
+        'type': 'FeatureCollection',
+        'features': data.filter((item) => item.PhotoList).map((item) => {
 
             const properties = {
-                "item_id": item.SightID,
-                "name": item.Title,
-                "kana": item.Kana,
-                "address": item.Address,
-                "summary": item.Summary,
-                "time": item.Time,
-                "rank": item.Rank,
-                "tel": item.Tel,
-                "price": item.Price,
-                "lgenre": item.GenreList[0].LGenre.Code,
-                "photo": item.PhotoList ? shopImageUri + item.PhotoList[0].URL : null,
-                "photos": null
-            }
+                'item_id': item.SightID,
+                'name': item.Title,
+                'kana': item.Kana,
+                'address': item.Address,
+                'summary': item.Summary,
+                'time': item.Time,
+                'rank': item.Rank,
+                'tel': item.Tel,
+                'price': item.Price,
+                'lgenre': item.GenreList[0].LGenre.Code,
+                'photo': item.PhotoList ? shopImageUri + item.PhotoList[0].URL : null,
+                'photos': null
+            };
 
             if (item.PhotoList && item.PhotoList.length > 0) {
                 properties.photos = item.PhotoList.map((photo, index) => ({
@@ -179,21 +179,21 @@ function convertShopResponseToFeatures(json) {
             }
 
             return {
-                "type": "Feature",
-                "properties": properties,
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [Number(item.LongitudeW10), Number(item.LatitudeW10)]
+                'type': 'Feature',
+                'properties': properties,
+                'geometry': {
+                    'type': 'Point',
+                    'coordinates': [Number(item.LongitudeW10), Number(item.LatitudeW10)]
                 }
-            }
+            };
         })
-    }
-    return featureCollection
+    };
+    return featureCollection;
 }
 
-let jis_list = ['13113', '13103', '13109']
+let jis_list = ['13113', '13103', '13109'];
 
 async function shopSearch(jis, lgenre, pageno) {
-    const query = await fetch(`${shop_details_url}&jis=${jis}&lgenre=${lgenre}&pageno=${pageno}`)
-    return await query.json()
+    const query = await fetch(`${shop_details_url}&jis=${jis}&lgenre=${lgenre}&pageno=${pageno}`);
+    return await query.json();
 }

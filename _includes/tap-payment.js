@@ -36,7 +36,7 @@ function getHexFromTailwindClass(className) {
 function rgbToHex(rgb) {
     if (!rgb || !rgb.startsWith('rgb')) return '#CCCCCC'; // Return a default if format is wrong
     const [r, g, b] = rgb.match(/\d+/g).map(Number);
-    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
+    return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
 }
 
 function createRandomMMdd() {
@@ -229,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         map.getSource('route').setData(geojson);
 
                     } catch (error) {
-                        console.error("Error fetching directions:", error);
+                        console.error('Error fetching directions:', error);
                     }
                 }
 
@@ -449,11 +449,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Create a GeoJSON object for a styled circle marker
             const geojson = {
-                "type": "FeatureCollection",
-                "features": [{
-                    "type": "Feature",
-                    "geometry": { "type": "Point", "coordinates": [lng, lat] },
-                    "properties": { "marker-color": markerColorHex, "marker-size": "medium" }
+                'type': 'FeatureCollection',
+                'features': [{
+                    'type': 'Feature',
+                    'geometry': { 'type': 'Point', 'coordinates': [lng, lat] },
+                    'properties': { 'marker-color': markerColorHex, 'marker-size': 'medium' }
                 }]
             };
 
@@ -491,14 +491,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (clickedTransaction) {
                 showDetailsView(clickedTransaction);
             } else {
-                console.error("Transaction not found for ID:", itemId);
+                console.error('Transaction not found for ID:', itemId);
             }
         }
     });
 
     // Fetch data and then render the initial list
     getFirstAddress(coordinates).then(async address => {
-        console.log("Address:", address);
+        console.log('Address:', address);
         const allGenrePOIs = await getAllGenrePOIs(address);
 
         transactions = allGenrePOIs.features.map((feature) => {
@@ -517,7 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 hexColor: getHexFromTailwindClass(tailwindColorClass) // For the map view (e.g., 'rgb(251, 146, 60)')
             };
         });
-        console.log("Transactions with colors:", transactions);
+        console.log('Transactions with colors:', transactions);
 
         transactions.sort((a, b) => {
             const dateA = new Date(`2024/${a.date}`);
