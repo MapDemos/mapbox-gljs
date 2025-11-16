@@ -21,9 +21,11 @@ export default [
         cancelAnimationFrame: "readonly",
         createImageBitmap: "readonly",
         URL: "readonly",
+        URLSearchParams: "readonly",
         Event: "readonly",
         crypto: "readonly",
         Image: "readonly",
+        SpeechSynthesisUtterance: "readonly",
 
         // Mapbox GL globals
         mapboxgl: "readonly",
