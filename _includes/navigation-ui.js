@@ -294,6 +294,14 @@ class NavigationUI {
         this.navigation.config.voiceEnabled = !this.navigation.config.voiceEnabled;
         voiceToggle.classList.toggle('active');
         voiceToggle.textContent = this.navigation.config.voiceEnabled ? '🔊' : '🔇';
+
+        // Prime speech synthesis when enabling voice (important for iOS)
+        if (this.navigation.config.voiceEnabled) {
+          this.navigation.primeSpeechSynthesis();
+          console.log('🔊 Voice enabled');
+        } else {
+          console.log('🔇 Voice disabled');
+        }
       });
     }
 
