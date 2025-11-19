@@ -610,6 +610,11 @@ class TurnByTurnNavigation {
     // Voice synthesis
     this.synth = window.speechSynthesis;
     this.lastSpokenInstruction = null;
+    this.voicesLoaded = false;
+    this.speechPrimed = false;
+
+    // Load voices (required for iOS)
+    this._loadVoices();
 
     // Event callbacks
     this.callbacks = {
@@ -741,6 +746,48 @@ class TurnByTurnNavigation {
           'circle-stroke-width': 3
         }
       });
+    }
+  }
+
+  /**
+   * Load voices for speech synthesis (required for iOS)
+   */
+  _loadVoices() {
+    if (!this.synth) return;
+
+    const loadVoicesImpl = () => {
+      const voices = this.synth.getVoices();
+      if (voices.length > 0) {
+        this.voicesLoaded = true;
+        console.log('🗣️ Voices loaded:', voices.length);
+      }
+    };
+
+    // Load voices immediately if available
+    loadVoicesImpl();
+
+    // Also listen for voiceschanged event (fires on iOS/Chrome)
+    if (this.synth.onvoiceschanged !== undefined) {
+      this.synth.onvoiceschanged = loadVoicesImpl;
+    }
+  }
+
+  /**
+   * Prime speech synthesis for iOS (must be called from user interaction)
+   */
+  primeSpeechSynthesis() {
+    if (!this.synth || this.speechPrimed) return;
+
+    try {
+      // Speak empty utterance to "unlock" speech synthesis on iOS
+      const utterance = new SpeechSynthesisUtterance('');
+      utterance.volume = 0; // Silent
+      utterance.rate = 10; // Fast
+      this.synth.speak(utterance);
+      this.speechPrimed = true;
+      console.log('🔓 Speech synthesis primed for iOS');
+    } catch (error) {
+      console.warn('⚠️ Failed to prime speech synthesis:', error);
     }
   }
 
@@ -1545,6 +1592,13 @@ class TurnByTurnNavigation {
     if (text === this.lastSpokenInstruction) return;
     this.lastSpokenInstruction = text;
 
+    // Wait for voices to load if not ready yet (iOS)
+    if (!this.voicesLoaded) {
+      console.log('⏳ Waiting for voices to load...');
+      setTimeout(() => this._speakInstruction(text), 100);
+      return;
+    }
+
     // Cancel any ongoing speech
     this.synth.cancel();
 
@@ -1557,15 +1611,35 @@ class TurnByTurnNavigation {
     const locale = this.config.language === 'ja' ? 'ja-JP' : 'en-US';
     utterance.lang = locale;
 
-    // Check if voice is available (optional, for debugging)
+    // Try to select a matching voice (important for iOS)
     const voices = this.synth.getVoices();
     const matchingVoice = voices.find(v => v.lang.startsWith(this.config.language));
+
     if (matchingVoice) {
+      utterance.voice = matchingVoice; // Explicitly set the voice
       console.log(`🗣️ Using voice: ${matchingVoice.name} (${matchingVoice.lang})`);
     } else {
       console.warn(`⚠️ No ${locale} voice found. Using default voice. Available voices:`,
         voices.map(v => `${v.name} (${v.lang})`).join(', '));
     }
+
+    // iOS Safari requires speaking to happen soon after user interaction
+    // If speech fails silently, this helps debug
+    utterance.onerror = (event) => {
+      console.error('❌ Speech error:', event.error);
+      // iOS sometimes fails on first attempt - retry once
+      if (event.error === 'synthesis-failed' || event.error === 'audio-busy') {
+        console.log('🔄 Retrying speech...');
+        setTimeout(() => {
+          this.synth.cancel();
+          this.synth.speak(utterance);
+        }, 100);
+      }
+    };
+
+    utterance.onstart = () => {
+      console.log('▶️ Speech started:', text.substring(0, 30) + '...');
+    };
 
     this.synth.speak(utterance);
   }
@@ -1584,6 +1658,10 @@ class TurnByTurnNavigation {
     if (this.synth) {
       this.synth.cancel();
     }
+
+    // Reset speech priming flag for next navigation session
+    this.speechPrimed = false;
+    this.lastSpokenInstruction = null;
 
     // Clear route from map
     this.map.getSource('nav-route').setData({ type: 'FeatureCollection', features: [] });
@@ -1912,6 +1990,14 @@ class NavigationUI {
         this.navigation.config.voiceEnabled = !this.navigation.config.voiceEnabled;
         voiceToggle.classList.toggle('active');
         voiceToggle.textContent = this.navigation.config.voiceEnabled ? '🔊' : '🔇';
+
+        // Prime speech synthesis when enabling voice (important for iOS)
+        if (this.navigation.config.voiceEnabled) {
+          this.navigation.primeSpeechSynthesis();
+          console.log('🔊 Voice enabled');
+        } else {
+          console.log('🔇 Voice disabled');
+        }
       });
     }
 
@@ -2553,6 +2639,9 @@ class NavigationUI {
 
         // Update navigation config with simulation mode
         navigation.config.simulationMode = simulationMode;
+
+        // Prime speech synthesis for iOS (must be done from user interaction)
+        navigation.primeSpeechSynthesis();
 
         // Hide setup panel
         document.getElementById('setup-panel').classList.add('hidden');

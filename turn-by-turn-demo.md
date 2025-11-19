@@ -1039,6 +1039,9 @@ title: Turn-by-Turn Navigation Demo
         // Update navigation config with simulation mode
         navigation.config.simulationMode = simulationMode;
 
+        // Prime speech synthesis for iOS (must be done from user interaction)
+        navigation.primeSpeechSynthesis();
+
         // Hide setup panel
         document.getElementById('setup-panel').classList.add('hidden');
 
