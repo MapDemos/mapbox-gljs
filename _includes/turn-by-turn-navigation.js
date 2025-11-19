@@ -15,12 +15,15 @@ class TurnByTurnNavigation {
       voiceEnabled: options.voiceEnabled !== false,
       cameraFollowEnabled: options.cameraFollowEnabled !== false,
       profile: options.profile || 'mapbox/driving-traffic', // driving, walking, cycling
+      language: options.language || 'ja', // ja (Japanese) or en (English)
       cameraPitch: options.cameraPitch || 60,
       cameraZoom: options.cameraZoom || 17,
       // Movement filtering
       minMovementDistance: options.minMovementDistance || 10, // meters
       minMovementSpeed: options.minMovementSpeed || 0.5, // m/s
       maxAccuracy: options.maxAccuracy || 50, // meters
+      // Simulation mode
+      simulationMode: options.simulationMode || false,
     };
 
     // State
@@ -207,8 +210,21 @@ class TurnByTurnNavigation {
       // Display route
       this._displayRoute(route);
 
-      // Start location tracking
-      this._startLocationTracking();
+      // Enable camera follow and move to origin location
+      const originLocation = Array.isArray(origin)
+        ? { lng: origin[0], lat: origin[1] }
+        : origin;
+      this.state.userLocation = originLocation;
+
+      // Enable camera following
+      this.enableCameraFollow();
+
+      // Start location tracking (only if not in simulation mode)
+      if (!this.config.simulationMode) {
+        this._startLocationTracking();
+      } else {
+        console.log('🎬 Simulation mode: Skipping GPS location tracking');
+      }
 
       // Emit route update
       this._emit('onRouteUpdate', { route });
@@ -241,7 +257,7 @@ class TurnByTurnNavigation {
       banner_instructions: 'true',
       voice_instructions: 'true',
       alternatives: 'false',
-      language: 'ja'
+      language: this.config.language
     });
     console.log('🚦 Fetching route:', `${url}?${params}`);
     const response = await fetch(`${url}?${params}`);
@@ -987,6 +1003,20 @@ class TurnByTurnNavigation {
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
+
+    // Set language based on config (map to full locale codes)
+    const locale = this.config.language === 'ja' ? 'ja-JP' : 'en-US';
+    utterance.lang = locale;
+
+    // Check if voice is available (optional, for debugging)
+    const voices = this.synth.getVoices();
+    const matchingVoice = voices.find(v => v.lang.startsWith(this.config.language));
+    if (matchingVoice) {
+      console.log(`🗣️ Using voice: ${matchingVoice.name} (${matchingVoice.lang})`);
+    } else {
+      console.warn(`⚠️ No ${locale} voice found. Using default voice. Available voices:`,
+        voices.map(v => `${v.name} (${v.lang})`).join(', '));
+    }
 
     this.synth.speak(utterance);
   }
