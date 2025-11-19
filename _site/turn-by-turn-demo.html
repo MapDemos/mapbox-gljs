@@ -260,6 +260,80 @@
       background: rgba(255,255,255,0.3);
     }
 
+    /* Simulation Controls */
+    #simulation-controls {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+    }
+    .sim-panel {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      min-width: 280px;
+    }
+    .sim-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 12px 15px;
+      border-radius: 12px 12px 0 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .sim-title {
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .sim-close {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+    }
+    .sim-close:hover {
+      background: rgba(255,255,255,0.3);
+    }
+    .sim-body {
+      padding: 15px;
+    }
+    .sim-info {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-size: 13px;
+      color: #666;
+    }
+    .sim-controls-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    .sim-btn {
+      flex: 1;
+      padding: 8px 12px;
+      border: 2px solid #e5e7eb;
+      background: white;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .sim-btn:hover {
+      background: #f3f4f6;
+      border-color: #667eea;
+    }
+    .sim-btn.active {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+
     /* Mobile-specific styles */
     @media (max-width: 768px) {
       #setup-panel {
@@ -336,6 +410,18 @@
         padding: 8px 16px;
         font-size: 13px;
       }
+      #simulation-controls {
+        bottom: 10px;
+        right: 10px;
+        left: 10px;
+      }
+      .sim-panel {
+        min-width: unset;
+      }
+      .sim-btn {
+        font-size: 11px;
+        padding: 6px 8px;
+      }
     }
   </style>
 </head>
@@ -368,6 +454,14 @@
     </div>
 
     <div class="input-group">
+      <label>Language / 言語</label>
+      <select id="language-select" class="input-group input" style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+        <option value="ja">🇯🇵 Japanese / 日本語</option>
+        <option value="en">🇺🇸 English</option>
+      </select>
+    </div>
+
+    <div class="input-group">
       <label>Destination Coordinates</label>
       <input type="text" id="destination-input" placeholder="e.g., 139.7671,35.6812 (Tokyo Station)" />
     </div>
@@ -393,6 +487,11 @@
       </select>
     </div>
 
+    <div class="input-group" style="display: flex; align-items: center; gap: 10px;">
+      <input type="checkbox" id="simulation-mode" style="width: auto; margin: 0;" />
+      <label for="simulation-mode" style="margin: 0; cursor: pointer;">🎬 Use simulation mode (for testing)</label>
+    </div>
+
     <div class="button-group">
       <button class="btn btn-primary" id="start-btn" onclick="startNavigation()" disabled="" style="width: 100%;">
         ⏳ Waiting for location...
@@ -408,6 +507,27 @@
         <div class="map-picker-subtitle">Select your destination</div>
       </div>
       <button class="btn-close-picker" onclick="closeMapPicker()">✕ Cancel</button>
+    </div>
+  </div>
+
+  <!-- Simulation Controls -->
+  <div id="simulation-controls" class="hidden">
+    <div class="sim-panel">
+      <div class="sim-header">
+        <span class="sim-title">🎬 Route Simulation</span>
+        <button class="sim-close" onclick="stopSimulation()">✕</button>
+      </div>
+      <div class="sim-body">
+        <div class="sim-info">
+          <span id="sim-progress">0 / 0</span>
+          <span id="sim-speed">Speed: 1x</span>
+        </div>
+        <div class="sim-controls-buttons">
+          <button class="sim-btn" id="sim-play-pause" onclick="toggleSimulation()">▶️ Play</button>
+          <button class="sim-btn" onclick="changeSimSpeed(-1)">🐢 Slower</button>
+          <button class="sim-btn" onclick="changeSimSpeed(1)">🐰 Faster</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -429,12 +549,15 @@ class TurnByTurnNavigation {
       voiceEnabled: options.voiceEnabled !== false,
       cameraFollowEnabled: options.cameraFollowEnabled !== false,
       profile: options.profile || 'mapbox/driving-traffic', // driving, walking, cycling
+      language: options.language || 'ja', // ja (Japanese) or en (English)
       cameraPitch: options.cameraPitch || 60,
       cameraZoom: options.cameraZoom || 17,
       // Movement filtering
       minMovementDistance: options.minMovementDistance || 10, // meters
       minMovementSpeed: options.minMovementSpeed || 0.5, // m/s
       maxAccuracy: options.maxAccuracy || 50, // meters
+      // Simulation mode
+      simulationMode: options.simulationMode || false,
     };
 
     // State
@@ -621,8 +744,21 @@ class TurnByTurnNavigation {
       // Display route
       this._displayRoute(route);
 
-      // Start location tracking
-      this._startLocationTracking();
+      // Enable camera follow and move to origin location
+      const originLocation = Array.isArray(origin)
+        ? { lng: origin[0], lat: origin[1] }
+        : origin;
+      this.state.userLocation = originLocation;
+
+      // Enable camera following
+      this.enableCameraFollow();
+
+      // Start location tracking (only if not in simulation mode)
+      if (!this.config.simulationMode) {
+        this._startLocationTracking();
+      } else {
+        console.log('🎬 Simulation mode: Skipping GPS location tracking');
+      }
 
       // Emit route update
       this._emit('onRouteUpdate', { route });
@@ -655,7 +791,7 @@ class TurnByTurnNavigation {
       banner_instructions: 'true',
       voice_instructions: 'true',
       alternatives: 'false',
-      language: 'ja'
+      language: this.config.language
     });
     console.log('🚦 Fetching route:', `${url}?${params}`);
     const response = await fetch(`${url}?${params}`);
@@ -1402,6 +1538,20 @@ class TurnByTurnNavigation {
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
 
+    // Set language based on config (map to full locale codes)
+    const locale = this.config.language === 'ja' ? 'ja-JP' : 'en-US';
+    utterance.lang = locale;
+
+    // Check if voice is available (optional, for debugging)
+    const voices = this.synth.getVoices();
+    const matchingVoice = voices.find(v => v.lang.startsWith(this.config.language));
+    if (matchingVoice) {
+      console.log(`🗣️ Using voice: ${matchingVoice.name} (${matchingVoice.lang})`);
+    } else {
+      console.warn(`⚠️ No ${locale} voice found. Using default voice. Available voices:`,
+        voices.map(v => `${v.name} (${v.lang})`).join(', '));
+    }
+
     this.synth.speak(utterance);
   }
 
@@ -1476,13 +1626,21 @@ class NavigationUI {
   _createUI() {
     this.container.innerHTML = `
       <div class="nav-ui-container">
+        <!-- Controls -->
+        <div class="nav-controls">
+          <button id="nav-stop-btn" class="nav-button nav-button-danger" title="Stop Navigation">
+            ✕
+          </button>
+          <button id="nav-voice-toggle" class="nav-button nav-button-secondary" title="Toggle Voice">
+            🔊
+          </button>
+          <button id="nav-recenter" class="nav-button nav-button-secondary" title="Recenter">
+            📍
+          </button>
+        </div>
+
         <!-- Instruction Banner -->
         <div class="nav-instruction-banner">
-          <div class="nav-maneuver-icon">
-            <svg id="nav-maneuver-svg" width="60" height="60" viewBox="0 0 24 24">
-              <path fill="white" d="M12 2L4 8v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V8l-8-6z"/>
-            </svg>
-          </div>
           <div class="nav-instruction-text">
             <div class="nav-instruction-primary" id="nav-instruction">
               Waiting for route...
@@ -1493,33 +1651,20 @@ class NavigationUI {
           </div>
         </div>
 
-        <!-- Progress Info -->
-        <div class="nav-progress-info">
+        <!-- Info Panel -->
+        <div class="nav-info-panel">
           <div class="nav-info-item">
-            <div class="nav-info-label">Distance</div>
+            <div class="nav-info-label">Total Distance</div>
             <div class="nav-info-value" id="nav-distance-remaining">--</div>
           </div>
           <div class="nav-info-item">
-            <div class="nav-info-label">Time</div>
+            <div class="nav-info-label">Time Remaining</div>
             <div class="nav-info-value" id="nav-time-remaining">--</div>
           </div>
           <div class="nav-info-item">
             <div class="nav-info-label">Arrival</div>
             <div class="nav-info-value" id="nav-eta">--</div>
           </div>
-        </div>
-
-        <!-- Controls -->
-        <div class="nav-controls">
-          <button id="nav-stop-btn" class="nav-button nav-button-danger">
-            Stop Navigation
-          </button>
-          <button id="nav-voice-toggle" class="nav-button nav-button-secondary">
-            🔊 Voice
-          </button>
-          <button id="nav-recenter" class="nav-button nav-button-secondary">
-            📍 Recenter
-          </button>
         </div>
 
         <!-- Status Messages -->
@@ -1542,95 +1687,97 @@ class NavigationUI {
     styles.id = 'nav-ui-styles';
     styles.textContent = `
       .nav-ui-container {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        right: 10px;
+        position: relative;
         z-index: 1000;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
       }
 
-      .nav-instruction-banner {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      .nav-controls {
+        position: fixed;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
         display: flex;
-        align-items: center;
-        gap: 15px;
-        margin-bottom: 15px;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 1001;
       }
 
-      .nav-maneuver-icon {
-        flex-shrink: 0;
-        width: 60px;
-        height: 60px;
-        background: rgba(255,255,255,0.2);
-        border-radius: 50%;
+      .nav-button {
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.2s;
         display: flex;
         align-items: center;
         justify-content: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      }
+
+      .nav-instruction-banner {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        z-index: 1000;
       }
 
       .nav-instruction-text {
-        flex: 1;
+        width: 100%;
       }
 
       .nav-instruction-primary {
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 600;
         margin-bottom: 5px;
       }
 
       .nav-instruction-distance {
-        font-size: 24px;
+        font-size: 22px;
         font-weight: 700;
       }
 
-      .nav-progress-info {
-        background: white;
+      .nav-info-panel {
+        position: fixed;
+        top: 95px;
+        right: 10px;
+        background: rgba(128, 128, 128, 0.8);
+        color: white;
+        padding: 12px 16px;
         border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        padding: 15px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+        z-index: 1000;
         display: flex;
-        justify-content: space-around;
-        margin-bottom: 15px;
+        gap: 20px;
       }
 
       .nav-info-item {
-        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
       }
 
       .nav-info-label {
-        font-size: 12px;
-        color: #666;
-        margin-bottom: 5px;
+        font-size: 11px;
+        opacity: 0.9;
+        font-weight: 500;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+        margin-bottom: 3px;
       }
 
       .nav-info-value {
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 700;
-        color: #333;
-      }
-
-      .nav-controls {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 15px;
-      }
-
-      .nav-button {
-        flex: 1;
-        padding: 12px;
-        border: none;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
       }
 
       .nav-button-danger {
@@ -1657,12 +1804,17 @@ class NavigationUI {
       }
 
       .nav-status {
+        position: fixed;
+        top: 150px;
+        left: 10px;
+        right: 10px;
         background: #fbbf24;
         color: #92400e;
-        padding: 15px;
+        padding: 12px;
         border-radius: 8px;
         font-weight: 600;
         text-align: center;
+        z-index: 1000;
       }
 
       .nav-status.hidden {
@@ -1680,14 +1832,44 @@ class NavigationUI {
       }
 
       @media (max-width: 768px) {
+        .nav-controls {
+          left: 5px;
+        }
+        .nav-button {
+          width: 36px;
+          height: 36px;
+          font-size: 14px;
+        }
+        .nav-instruction-banner {
+          top: 5px;
+          left: 5px;
+          right: 5px;
+          padding: 12px 15px;
+        }
         .nav-instruction-primary {
-          font-size: 16px;
+          font-size: 14px;
         }
         .nav-instruction-distance {
-          font-size: 20px;
+          font-size: 18px;
+        }
+        .nav-info-panel {
+          top: 80px;
+          right: 5px;
+          padding: 10px 12px;
+          gap: 15px;
+        }
+        .nav-info-label {
+          font-size: 9px;
         }
         .nav-info-value {
-          font-size: 16px;
+          font-size: 14px;
+        }
+        .nav-status {
+          top: 140px;
+          left: 5px;
+          right: 5px;
+          padding: 10px;
+          font-size: 13px;
         }
       }
     `;
@@ -1714,7 +1896,7 @@ class NavigationUI {
       voiceToggle.addEventListener('click', () => {
         this.navigation.config.voiceEnabled = !this.navigation.config.voiceEnabled;
         voiceToggle.classList.toggle('active');
-        voiceToggle.textContent = this.navigation.config.voiceEnabled ? '🔊 Voice' : '🔇 Muted';
+        voiceToggle.textContent = this.navigation.config.voiceEnabled ? '🔊' : '🔇';
       });
     }
 
@@ -1781,32 +1963,6 @@ class NavigationUI {
     if (instructionEl) {
       instructionEl.textContent = data.instruction;
     }
-
-    // Update maneuver icon (simplified - you can add more icons)
-    this._updateManeuverIcon(data.maneuver);
-  }
-
-  /**
-   * Update maneuver icon
-   */
-  _updateManeuverIcon(maneuver) {
-    const svg = document.getElementById('nav-maneuver-svg');
-    if (!svg) return;
-
-    // Simple arrow icons for different maneuvers
-    const icons = {
-      'turn-right': 'M12 4l8 8-8 8v-6H4v-4h8V4z',
-      'turn-left': 'M12 4l-8 8 8 8v-6h8v-4h-8V4z',
-      'straight': 'M12 4l0 16m-4-4l4 4 4-4',
-      'arrive': 'M12 2L4 8v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V8l-8-6z'
-    };
-
-    let iconPath = icons.straight;
-    if (maneuver && maneuver.type) {
-      iconPath = icons[maneuver.type] || icons.straight;
-    }
-
-    svg.innerHTML = `<path fill="white" d="${iconPath}"/>`;
   }
 
   /**
@@ -1893,6 +2049,14 @@ class NavigationUI {
     let destinationMarker = null;
     let isMapPickerMode = false;
 
+    // Simulation variables
+    let simulationMode = false;
+    let simulationCoordinates = [];
+    let simulationIndex = 0;
+    let simulationInterval = null;
+    let simulationSpeed = 1; // 1x speed
+    let simulationPaused = false;
+
     // Add navigation control
     map.addControl(new mapboxgl.NavigationControl());
 
@@ -1903,6 +2067,123 @@ class NavigationUI {
     const statusDetails = document.getElementById('status-details');
     const startBtn = document.getElementById('start-btn');
     const nearbyBtn = document.getElementById('nearby-btn');
+
+    // Simulation functions
+    function startSimulation(route) {
+      simulationCoordinates = route.geometry.coordinates;
+      simulationIndex = 0;
+      simulationPaused = false;
+
+      // Stop real GPS tracking to prevent conflicts
+      if (navigation && navigation.watchId) {
+        navigator.geolocation.clearWatch(navigation.watchId);
+        navigation.watchId = null;
+        console.log('🎬 Stopped real GPS tracking for simulation');
+      }
+
+      // Show simulation controls
+      document.getElementById('simulation-controls').classList.remove('hidden');
+      updateSimulationUI();
+
+      console.log(`🎬 Starting simulation with ${simulationCoordinates.length} points`);
+
+      // Start the simulation loop
+      runSimulationStep();
+    }
+
+    function runSimulationStep() {
+      if (simulationPaused || !simulationMode) return;
+
+      if (simulationIndex >= simulationCoordinates.length) {
+        console.log('🎬 Simulation complete');
+        stopSimulation();
+        return;
+      }
+
+      const coord = simulationCoordinates[simulationIndex];
+
+      // Create fake position object
+      const fakePosition = {
+        coords: {
+          longitude: coord[0],
+          latitude: coord[1],
+          accuracy: 10,
+          altitude: null,
+          altitudeAccuracy: null,
+          heading: null,
+          speed: simulationSpeed * 5 // Simulate speed based on multiplier
+        },
+        timestamp: Date.now()
+      };
+
+      // Inject into navigation system
+      if (navigation && navigation._handleLocationUpdate) {
+        navigation._handleLocationUpdate(fakePosition);
+      }
+
+      simulationIndex++;
+      updateSimulationUI();
+
+      // Schedule next step (base interval: 1000ms / speed)
+      const interval = 1000 / simulationSpeed;
+      simulationInterval = setTimeout(runSimulationStep, interval);
+    }
+
+    function toggleSimulation() {
+      simulationPaused = !simulationPaused;
+      const btn = document.getElementById('sim-play-pause');
+
+      if (simulationPaused) {
+        btn.textContent = '▶️ Play';
+        btn.classList.remove('active');
+      } else {
+        btn.textContent = '⏸️ Pause';
+        btn.classList.add('active');
+        runSimulationStep();
+      }
+    }
+
+    function changeSimSpeed(direction) {
+      const speeds = [0.25, 0.5, 1, 2, 5, 10];
+      let currentIndex = speeds.indexOf(simulationSpeed);
+
+      if (direction > 0 && currentIndex < speeds.length - 1) {
+        currentIndex++;
+      } else if (direction < 0 && currentIndex > 0) {
+        currentIndex--;
+      }
+
+      simulationSpeed = speeds[currentIndex];
+      updateSimulationUI();
+      console.log(`🎬 Simulation speed: ${simulationSpeed}x`);
+    }
+
+    function updateSimulationUI() {
+      document.getElementById('sim-progress').textContent =
+        `${simulationIndex} / ${simulationCoordinates.length}`;
+      document.getElementById('sim-speed').textContent =
+        `Speed: ${simulationSpeed}x`;
+    }
+
+    function stopSimulation() {
+      simulationMode = false;
+      simulationPaused = true;
+
+      if (simulationInterval) {
+        clearTimeout(simulationInterval);
+        simulationInterval = null;
+      }
+
+      // Update navigation config
+      if (navigation) {
+        navigation.config.simulationMode = false;
+      }
+
+      document.getElementById('simulation-controls').classList.add('hidden');
+      document.getElementById('simulation-mode').checked = false;
+
+      console.log('🎬 Simulation stopped');
+    }
 
     // Map picker functions
     function openMapPicker() {
@@ -2108,14 +2389,16 @@ class NavigationUI {
 
     // Initialize navigation when map loads
     map.on('load', () => {
-      // Get selected profile from dropdown
+      // Get selected profile and language from dropdowns
       const selectedProfile = document.getElementById('profile-select').value;
+      const selectedLanguage = document.getElementById('language-select').value;
 
       navigation = new TurnByTurnNavigation(map, {
         advanceInstructionDistance: 50,
         voiceEnabled: true,
         cameraFollowEnabled: true,
         profile: selectedProfile,
+        language: selectedLanguage,
         cameraPitch: 60,
         cameraZoom: 17
       });
@@ -2129,6 +2412,33 @@ class NavigationUI {
       if (navigation) {
         navigation.config.profile = e.target.value;
         console.log('📝 Navigation profile changed to:', e.target.value);
+      }
+    });
+
+    // Update navigation language when user changes selection
+    document.getElementById('language-select').addEventListener('change', (e) => {
+      if (navigation) {
+        navigation.config.language = e.target.value;
+        console.log('📝 Navigation language changed to:', e.target.value);
+      }
+    });
+
+    // Enable/disable start button based on simulation mode
+    document.getElementById('simulation-mode').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        // In simulation mode, location not required
+        startBtn.disabled = false;
+        startBtn.textContent = '🎬 Start Simulation';
+        console.log('🎬 Simulation mode enabled - location not required');
+      } else {
+        // Normal mode, check if location is available
+        if (userLocation) {
+          startBtn.disabled = false;
+          startBtn.textContent = 'Start Navigation';
+        } else {
+          startBtn.disabled = true;
+          startBtn.textContent = '⏳ Waiting for location...';
+        }
       }
     });
 
@@ -2171,6 +2481,7 @@ class NavigationUI {
     // Start navigation
     async function startNavigation() {
       const destInput = document.getElementById('destination-input').value.trim();
+      const isSimulationMode = document.getElementById('simulation-mode').checked;
 
       if (!destInput) {
         updateLocationStatus('error', 'Destination required',
@@ -2179,7 +2490,8 @@ class NavigationUI {
         return;
       }
 
-      if (!userLocation) {
+      // In simulation mode, use map center as starting point if no location
+      if (!userLocation && !isSimulationMode) {
         updateLocationStatus('error', 'Location not available',
           'Please wait for location to be obtained or try again.<br>' +
           '<button class="btn-retry" onclick="getUserLocation()">🔄 Retry Location</button>');
@@ -2200,6 +2512,9 @@ class NavigationUI {
 
         const destination = { lng, lat };
 
+        // Use map center as origin in simulation mode if no user location
+        const origin = userLocation || { lng: map.getCenter().lng, lat: map.getCenter().lat };
+
         // Remove user marker (navigation will handle it)
         if (userMarker) {
           userMarker.remove();
@@ -2218,6 +2533,12 @@ class NavigationUI {
           map.removeSource('user-accuracy');
         }
 
+        // Check if simulation mode is enabled
+        simulationMode = document.getElementById('simulation-mode').checked;
+
+        // Update navigation config with simulation mode
+        navigation.config.simulationMode = simulationMode;
+
         // Hide setup panel
         document.getElementById('setup-panel').classList.add('hidden');
 
@@ -2225,7 +2546,13 @@ class NavigationUI {
         navigationUI.show();
 
         // Start navigation
-        await navigation.startNavigation(userLocation, destination);
+        await navigation.startNavigation(origin, destination);
+
+        // If simulation mode, start simulation with route
+        if (simulationMode && navigation.state && navigation.state.currentRoute) {
+          console.log('🎬 Simulation mode enabled - starting route replay');
+          startSimulation(navigation.state.currentRoute);
+        }
 
       } catch (error) {
         console.error('Navigation error:', error);
@@ -2235,6 +2562,7 @@ class NavigationUI {
           '<button class="btn-retry" onclick="startNavigation()">🔄 Retry Navigation</button>');
         document.getElementById('setup-panel').classList.remove('hidden');
         navigationUI.hide();
+        stopSimulation();
       }
     }
 

@@ -23,13 +23,21 @@ class NavigationUI {
   _createUI() {
     this.container.innerHTML = `
       <div class="nav-ui-container">
+        <!-- Controls -->
+        <div class="nav-controls">
+          <button id="nav-stop-btn" class="nav-button nav-button-danger" title="Stop Navigation">
+            ✕
+          </button>
+          <button id="nav-voice-toggle" class="nav-button nav-button-secondary" title="Toggle Voice">
+            🔊
+          </button>
+          <button id="nav-recenter" class="nav-button nav-button-secondary" title="Recenter">
+            📍
+          </button>
+        </div>
+
         <!-- Instruction Banner -->
         <div class="nav-instruction-banner">
-          <div class="nav-maneuver-icon">
-            <svg id="nav-maneuver-svg" width="60" height="60" viewBox="0 0 24 24">
-              <path fill="white" d="M12 2L4 8v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V8l-8-6z"/>
-            </svg>
-          </div>
           <div class="nav-instruction-text">
             <div class="nav-instruction-primary" id="nav-instruction">
               Waiting for route...
@@ -40,33 +48,20 @@ class NavigationUI {
           </div>
         </div>
 
-        <!-- Progress Info -->
-        <div class="nav-progress-info">
+        <!-- Info Panel -->
+        <div class="nav-info-panel">
           <div class="nav-info-item">
-            <div class="nav-info-label">Distance</div>
+            <div class="nav-info-label">Total Distance</div>
             <div class="nav-info-value" id="nav-distance-remaining">--</div>
           </div>
           <div class="nav-info-item">
-            <div class="nav-info-label">Time</div>
+            <div class="nav-info-label">Time Remaining</div>
             <div class="nav-info-value" id="nav-time-remaining">--</div>
           </div>
           <div class="nav-info-item">
             <div class="nav-info-label">Arrival</div>
             <div class="nav-info-value" id="nav-eta">--</div>
           </div>
-        </div>
-
-        <!-- Controls -->
-        <div class="nav-controls">
-          <button id="nav-stop-btn" class="nav-button nav-button-danger">
-            Stop Navigation
-          </button>
-          <button id="nav-voice-toggle" class="nav-button nav-button-secondary">
-            🔊 Voice
-          </button>
-          <button id="nav-recenter" class="nav-button nav-button-secondary">
-            📍 Recenter
-          </button>
         </div>
 
         <!-- Status Messages -->
@@ -89,95 +84,97 @@ class NavigationUI {
     styles.id = 'nav-ui-styles';
     styles.textContent = `
       .nav-ui-container {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        right: 10px;
+        position: relative;
         z-index: 1000;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
       }
 
-      .nav-instruction-banner {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      .nav-controls {
+        position: fixed;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
         display: flex;
-        align-items: center;
-        gap: 15px;
-        margin-bottom: 15px;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 1001;
       }
 
-      .nav-maneuver-icon {
-        flex-shrink: 0;
-        width: 60px;
-        height: 60px;
-        background: rgba(255,255,255,0.2);
-        border-radius: 50%;
+      .nav-button {
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.2s;
         display: flex;
         align-items: center;
         justify-content: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      }
+
+      .nav-instruction-banner {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        z-index: 1000;
       }
 
       .nav-instruction-text {
-        flex: 1;
+        width: 100%;
       }
 
       .nav-instruction-primary {
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 600;
         margin-bottom: 5px;
       }
 
       .nav-instruction-distance {
-        font-size: 24px;
+        font-size: 22px;
         font-weight: 700;
       }
 
-      .nav-progress-info {
-        background: white;
+      .nav-info-panel {
+        position: fixed;
+        top: 95px;
+        right: 10px;
+        background: rgba(128, 128, 128, 0.8);
+        color: white;
+        padding: 12px 16px;
         border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        padding: 15px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+        z-index: 1000;
         display: flex;
-        justify-content: space-around;
-        margin-bottom: 15px;
+        gap: 20px;
       }
 
       .nav-info-item {
-        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
       }
 
       .nav-info-label {
-        font-size: 12px;
-        color: #666;
-        margin-bottom: 5px;
+        font-size: 11px;
+        opacity: 0.9;
+        font-weight: 500;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+        margin-bottom: 3px;
       }
 
       .nav-info-value {
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 700;
-        color: #333;
-      }
-
-      .nav-controls {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 15px;
-      }
-
-      .nav-button {
-        flex: 1;
-        padding: 12px;
-        border: none;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
       }
 
       .nav-button-danger {
@@ -204,12 +201,17 @@ class NavigationUI {
       }
 
       .nav-status {
+        position: fixed;
+        top: 150px;
+        left: 10px;
+        right: 10px;
         background: #fbbf24;
         color: #92400e;
-        padding: 15px;
+        padding: 12px;
         border-radius: 8px;
         font-weight: 600;
         text-align: center;
+        z-index: 1000;
       }
 
       .nav-status.hidden {
@@ -227,14 +229,44 @@ class NavigationUI {
       }
 
       @media (max-width: 768px) {
+        .nav-controls {
+          left: 5px;
+        }
+        .nav-button {
+          width: 36px;
+          height: 36px;
+          font-size: 14px;
+        }
+        .nav-instruction-banner {
+          top: 5px;
+          left: 5px;
+          right: 5px;
+          padding: 12px 15px;
+        }
         .nav-instruction-primary {
-          font-size: 16px;
+          font-size: 14px;
         }
         .nav-instruction-distance {
-          font-size: 20px;
+          font-size: 18px;
+        }
+        .nav-info-panel {
+          top: 80px;
+          right: 5px;
+          padding: 10px 12px;
+          gap: 15px;
+        }
+        .nav-info-label {
+          font-size: 9px;
         }
         .nav-info-value {
-          font-size: 16px;
+          font-size: 14px;
+        }
+        .nav-status {
+          top: 140px;
+          left: 5px;
+          right: 5px;
+          padding: 10px;
+          font-size: 13px;
         }
       }
     `;
@@ -261,7 +293,7 @@ class NavigationUI {
       voiceToggle.addEventListener('click', () => {
         this.navigation.config.voiceEnabled = !this.navigation.config.voiceEnabled;
         voiceToggle.classList.toggle('active');
-        voiceToggle.textContent = this.navigation.config.voiceEnabled ? '🔊 Voice' : '🔇 Muted';
+        voiceToggle.textContent = this.navigation.config.voiceEnabled ? '🔊' : '🔇';
       });
     }
 
@@ -328,32 +360,6 @@ class NavigationUI {
     if (instructionEl) {
       instructionEl.textContent = data.instruction;
     }
-
-    // Update maneuver icon (simplified - you can add more icons)
-    this._updateManeuverIcon(data.maneuver);
-  }
-
-  /**
-   * Update maneuver icon
-   */
-  _updateManeuverIcon(maneuver) {
-    const svg = document.getElementById('nav-maneuver-svg');
-    if (!svg) return;
-
-    // Simple arrow icons for different maneuvers
-    const icons = {
-      'turn-right': 'M12 4l8 8-8 8v-6H4v-4h8V4z',
-      'turn-left': 'M12 4l-8 8 8 8v-6h8v-4h-8V4z',
-      'straight': 'M12 4l0 16m-4-4l4 4 4-4',
-      'arrive': 'M12 2L4 8v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V8l-8-6z'
-    };
-
-    let iconPath = icons.straight;
-    if (maneuver && maneuver.type) {
-      iconPath = icons[maneuver.type] || icons.straight;
-    }
-
-    svg.innerHTML = `<path fill="white" d="${iconPath}"/>`;
   }
 
   /**

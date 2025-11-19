@@ -239,6 +239,80 @@ title: Turn-by-Turn Navigation Demo
       background: rgba(255,255,255,0.3);
     }
 
+    /* Simulation Controls */
+    #simulation-controls {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+    }
+    .sim-panel {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      min-width: 280px;
+    }
+    .sim-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 12px 15px;
+      border-radius: 12px 12px 0 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .sim-title {
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .sim-close {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+    }
+    .sim-close:hover {
+      background: rgba(255,255,255,0.3);
+    }
+    .sim-body {
+      padding: 15px;
+    }
+    .sim-info {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-size: 13px;
+      color: #666;
+    }
+    .sim-controls-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    .sim-btn {
+      flex: 1;
+      padding: 8px 12px;
+      border: 2px solid #e5e7eb;
+      background: white;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .sim-btn:hover {
+      background: #f3f4f6;
+      border-color: #667eea;
+    }
+    .sim-btn.active {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+
     /* Mobile-specific styles */
     @media (max-width: 768px) {
       #setup-panel {
@@ -315,6 +389,18 @@ title: Turn-by-Turn Navigation Demo
         padding: 8px 16px;
         font-size: 13px;
       }
+      #simulation-controls {
+        bottom: 10px;
+        right: 10px;
+        left: 10px;
+      }
+      .sim-panel {
+        min-width: unset;
+      }
+      .sim-btn {
+        font-size: 11px;
+        padding: 6px 8px;
+      }
     }
   </style>
 </head>
@@ -347,6 +433,14 @@ title: Turn-by-Turn Navigation Demo
     </div>
 
     <div class="input-group">
+      <label>Language / 言語</label>
+      <select id="language-select" class="input-group input" style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+        <option value="ja">🇯🇵 Japanese / 日本語</option>
+        <option value="en">🇺🇸 English</option>
+      </select>
+    </div>
+
+    <div class="input-group">
       <label>Destination Coordinates</label>
       <input type="text" id="destination-input" placeholder="e.g., 139.7671,35.6812 (Tokyo Station)">
     </div>
@@ -372,6 +466,11 @@ title: Turn-by-Turn Navigation Demo
       </select>
     </div>
 
+    <div class="input-group" style="display: flex; align-items: center; gap: 10px;">
+      <input type="checkbox" id="simulation-mode" style="width: auto; margin: 0;">
+      <label for="simulation-mode" style="margin: 0; cursor: pointer;">🎬 Use simulation mode (for testing)</label>
+    </div>
+
     <div class="button-group">
       <button class="btn btn-primary" id="start-btn" onclick="startNavigation()" disabled style="width: 100%;">
         ⏳ Waiting for location...
@@ -387,6 +486,27 @@ title: Turn-by-Turn Navigation Demo
         <div class="map-picker-subtitle">Select your destination</div>
       </div>
       <button class="btn-close-picker" onclick="closeMapPicker()">✕ Cancel</button>
+    </div>
+  </div>
+
+  <!-- Simulation Controls -->
+  <div id="simulation-controls" class="hidden">
+    <div class="sim-panel">
+      <div class="sim-header">
+        <span class="sim-title">🎬 Route Simulation</span>
+        <button class="sim-close" onclick="stopSimulation()">✕</button>
+      </div>
+      <div class="sim-body">
+        <div class="sim-info">
+          <span id="sim-progress">0 / 0</span>
+          <span id="sim-speed">Speed: 1x</span>
+        </div>
+        <div class="sim-controls-buttons">
+          <button class="sim-btn" id="sim-play-pause" onclick="toggleSimulation()">▶️ Play</button>
+          <button class="sim-btn" onclick="changeSimSpeed(-1)">🐢 Slower</button>
+          <button class="sim-btn" onclick="changeSimSpeed(1)">🐰 Faster</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -414,6 +534,14 @@ title: Turn-by-Turn Navigation Demo
     let destinationMarker = null;
     let isMapPickerMode = false;
 
+    // Simulation variables
+    let simulationMode = false;
+    let simulationCoordinates = [];
+    let simulationIndex = 0;
+    let simulationInterval = null;
+    let simulationSpeed = 1; // 1x speed
+    let simulationPaused = false;
+
     // Add navigation control
     map.addControl(new mapboxgl.NavigationControl());
 
@@ -424,6 +552,123 @@ title: Turn-by-Turn Navigation Demo
     const statusDetails = document.getElementById('status-details');
     const startBtn = document.getElementById('start-btn');
     const nearbyBtn = document.getElementById('nearby-btn');
+
+    // Simulation functions
+    function startSimulation(route) {
+      simulationCoordinates = route.geometry.coordinates;
+      simulationIndex = 0;
+      simulationPaused = false;
+
+      // Stop real GPS tracking to prevent conflicts
+      if (navigation && navigation.watchId) {
+        navigator.geolocation.clearWatch(navigation.watchId);
+        navigation.watchId = null;
+        console.log('🎬 Stopped real GPS tracking for simulation');
+      }
+
+      // Show simulation controls
+      document.getElementById('simulation-controls').classList.remove('hidden');
+      updateSimulationUI();
+
+      console.log(`🎬 Starting simulation with ${simulationCoordinates.length} points`);
+
+      // Start the simulation loop
+      runSimulationStep();
+    }
+
+    function runSimulationStep() {
+      if (simulationPaused || !simulationMode) return;
+
+      if (simulationIndex >= simulationCoordinates.length) {
+        console.log('🎬 Simulation complete');
+        stopSimulation();
+        return;
+      }
+
+      const coord = simulationCoordinates[simulationIndex];
+
+      // Create fake position object
+      const fakePosition = {
+        coords: {
+          longitude: coord[0],
+          latitude: coord[1],
+          accuracy: 10,
+          altitude: null,
+          altitudeAccuracy: null,
+          heading: null,
+          speed: simulationSpeed * 5 // Simulate speed based on multiplier
+        },
+        timestamp: Date.now()
+      };
+
+      // Inject into navigation system
+      if (navigation && navigation._handleLocationUpdate) {
+        navigation._handleLocationUpdate(fakePosition);
+      }
+
+      simulationIndex++;
+      updateSimulationUI();
+
+      // Schedule next step (base interval: 1000ms / speed)
+      const interval = 1000 / simulationSpeed;
+      simulationInterval = setTimeout(runSimulationStep, interval);
+    }
+
+    function toggleSimulation() {
+      simulationPaused = !simulationPaused;
+      const btn = document.getElementById('sim-play-pause');
+
+      if (simulationPaused) {
+        btn.textContent = '▶️ Play';
+        btn.classList.remove('active');
+      } else {
+        btn.textContent = '⏸️ Pause';
+        btn.classList.add('active');
+        runSimulationStep();
+      }
+    }
+
+    function changeSimSpeed(direction) {
+      const speeds = [0.25, 0.5, 1, 2, 5, 10];
+      let currentIndex = speeds.indexOf(simulationSpeed);
+
+      if (direction > 0 && currentIndex < speeds.length - 1) {
+        currentIndex++;
+      } else if (direction < 0 && currentIndex > 0) {
+        currentIndex--;
+      }
+
+      simulationSpeed = speeds[currentIndex];
+      updateSimulationUI();
+      console.log(`🎬 Simulation speed: ${simulationSpeed}x`);
+    }
+
+    function updateSimulationUI() {
+      document.getElementById('sim-progress').textContent =
+        `${simulationIndex} / ${simulationCoordinates.length}`;
+      document.getElementById('sim-speed').textContent =
+        `Speed: ${simulationSpeed}x`;
+    }
+
+    function stopSimulation() {
+      simulationMode = false;
+      simulationPaused = true;
+
+      if (simulationInterval) {
+        clearTimeout(simulationInterval);
+        simulationInterval = null;
+      }
+
+      // Update navigation config
+      if (navigation) {
+        navigation.config.simulationMode = false;
+      }
+
+      document.getElementById('simulation-controls').classList.add('hidden');
+      document.getElementById('simulation-mode').checked = false;
+
+      console.log('🎬 Simulation stopped');
+    }
 
     // Map picker functions
     function openMapPicker() {
@@ -629,14 +874,16 @@ title: Turn-by-Turn Navigation Demo
 
     // Initialize navigation when map loads
     map.on('load', () => {
-      // Get selected profile from dropdown
+      // Get selected profile and language from dropdowns
       const selectedProfile = document.getElementById('profile-select').value;
+      const selectedLanguage = document.getElementById('language-select').value;
 
       navigation = new TurnByTurnNavigation(map, {
         advanceInstructionDistance: 50,
         voiceEnabled: true,
         cameraFollowEnabled: true,
         profile: selectedProfile,
+        language: selectedLanguage,
         cameraPitch: 60,
         cameraZoom: 17
       });
@@ -650,6 +897,33 @@ title: Turn-by-Turn Navigation Demo
       if (navigation) {
         navigation.config.profile = e.target.value;
         console.log('📝 Navigation profile changed to:', e.target.value);
+      }
+    });
+
+    // Update navigation language when user changes selection
+    document.getElementById('language-select').addEventListener('change', (e) => {
+      if (navigation) {
+        navigation.config.language = e.target.value;
+        console.log('📝 Navigation language changed to:', e.target.value);
+      }
+    });
+
+    // Enable/disable start button based on simulation mode
+    document.getElementById('simulation-mode').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        // In simulation mode, location not required
+        startBtn.disabled = false;
+        startBtn.textContent = '🎬 Start Simulation';
+        console.log('🎬 Simulation mode enabled - location not required');
+      } else {
+        // Normal mode, check if location is available
+        if (userLocation) {
+          startBtn.disabled = false;
+          startBtn.textContent = 'Start Navigation';
+        } else {
+          startBtn.disabled = true;
+          startBtn.textContent = '⏳ Waiting for location...';
+        }
       }
     });
 
@@ -692,6 +966,7 @@ title: Turn-by-Turn Navigation Demo
     // Start navigation
     async function startNavigation() {
       const destInput = document.getElementById('destination-input').value.trim();
+      const isSimulationMode = document.getElementById('simulation-mode').checked;
 
       if (!destInput) {
         updateLocationStatus('error', 'Destination required',
@@ -700,7 +975,8 @@ title: Turn-by-Turn Navigation Demo
         return;
       }
 
-      if (!userLocation) {
+      // In simulation mode, use map center as starting point if no location
+      if (!userLocation && !isSimulationMode) {
         updateLocationStatus('error', 'Location not available',
           'Please wait for location to be obtained or try again.<br>' +
           '<button class="btn-retry" onclick="getUserLocation()">🔄 Retry Location</button>');
@@ -721,6 +997,9 @@ title: Turn-by-Turn Navigation Demo
 
         const destination = { lng, lat };
 
+        // Use map center as origin in simulation mode if no user location
+        const origin = userLocation || { lng: map.getCenter().lng, lat: map.getCenter().lat };
+
         // Remove user marker (navigation will handle it)
         if (userMarker) {
           userMarker.remove();
@@ -739,6 +1018,12 @@ title: Turn-by-Turn Navigation Demo
           map.removeSource('user-accuracy');
         }
 
+        // Check if simulation mode is enabled
+        simulationMode = document.getElementById('simulation-mode').checked;
+
+        // Update navigation config with simulation mode
+        navigation.config.simulationMode = simulationMode;
+
         // Hide setup panel
         document.getElementById('setup-panel').classList.add('hidden');
 
@@ -746,7 +1031,13 @@ title: Turn-by-Turn Navigation Demo
         navigationUI.show();
 
         // Start navigation
-        await navigation.startNavigation(userLocation, destination);
+        await navigation.startNavigation(origin, destination);
+
+        // If simulation mode, start simulation with route
+        if (simulationMode && navigation.state && navigation.state.currentRoute) {
+          console.log('🎬 Simulation mode enabled - starting route replay');
+          startSimulation(navigation.state.currentRoute);
+        }
 
       } catch (error) {
         console.error('Navigation error:', error);
@@ -756,6 +1047,7 @@ title: Turn-by-Turn Navigation Demo
           '<button class="btn-retry" onclick="startNavigation()">🔄 Retry Navigation</button>');
         document.getElementById('setup-panel').classList.remove('hidden');
         navigationUI.hide();
+        stopSimulation();
       }
     }
 
