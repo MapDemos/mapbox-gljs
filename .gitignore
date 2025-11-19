@@ -9,3 +9,5 @@ _includes/google-mapbox.js
 _includes/luup_all.js
 _includes/luup_random_select.js
 vendor
+192.168.11.27-key.pem
+192.168.11.27.pem
