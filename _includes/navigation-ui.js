@@ -267,10 +267,8 @@ class NavigationUI {
 
     if (recenterBtn) {
       recenterBtn.addEventListener('click', () => {
-        this.navigation.config.cameraFollowEnabled = true;
-        if (this.navigation.state.userLocation) {
-          this.navigation._updateCamera(this.navigation.state.userLocation);
-        }
+        console.log('🎯 Recenter button clicked');
+        this.navigation.enableCameraFollow();
       });
     }
 

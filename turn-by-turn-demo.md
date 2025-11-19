@@ -43,14 +43,20 @@ title: Turn-by-Turn Navigation Demo
       z-index: 2000;
       max-width: 400px;
       width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
     }
     #setup-panel h2 {
       margin-top: 0;
+      margin-bottom: 10px;
       color: #333;
+      font-size: 24px;
     }
     #setup-panel p {
       color: #666;
       line-height: 1.5;
+      font-size: 14px;
+      margin-bottom: 15px;
     }
     .input-group {
       margin-bottom: 15px;
@@ -177,6 +183,139 @@ title: Turn-by-Turn Navigation Demo
     .btn-retry:hover {
       background: #2563eb;
     }
+
+    /* Map Picker Overlay */
+    #map-picker-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1500;
+      pointer-events: none;
+    }
+    #map-picker-overlay * {
+      pointer-events: auto;
+    }
+    .map-picker-banner {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px 30px;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      max-width: 90%;
+    }
+    .map-picker-text {
+      flex: 1;
+    }
+    .map-picker-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+    .map-picker-subtitle {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+    .btn-close-picker {
+      background: rgba(255,255,255,0.2);
+      border: 2px solid white;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-close-picker:hover {
+      background: rgba(255,255,255,0.3);
+    }
+
+    /* Mobile-specific styles */
+    @media (max-width: 768px) {
+      #setup-panel {
+        padding: 15px;
+        width: 95%;
+        max-height: 85vh;
+        border-radius: 8px;
+      }
+      #setup-panel h2 {
+        font-size: 20px;
+        margin-bottom: 8px;
+      }
+      #setup-panel p {
+        font-size: 13px;
+        margin-bottom: 10px;
+        line-height: 1.4;
+      }
+      .intro-text {
+        display: none; /* Hide intro text on mobile to save space */
+      }
+      .input-group {
+        margin-bottom: 10px;
+      }
+      .input-group label {
+        font-size: 12px;
+        margin-bottom: 4px;
+      }
+      .input-group input,
+      .input-group select {
+        padding: 8px !important;
+        font-size: 13px !important;
+      }
+      .input-group small {
+        font-size: 11px !important;
+      }
+      .location-status {
+        padding: 10px;
+        margin-bottom: 10px;
+      }
+      .status-icon {
+        font-size: 20px !important;
+      }
+      .status-text {
+        font-size: 14px !important;
+      }
+      .status-details {
+        font-size: 11px !important;
+      }
+      .button-group {
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .btn {
+        padding: 10px;
+        font-size: 13px;
+      }
+      .btn-retry {
+        padding: 6px 12px;
+        font-size: 12px;
+      }
+      .map-picker-banner {
+        padding: 15px 20px;
+        gap: 15px;
+        top: 10px;
+      }
+      .map-picker-title {
+        font-size: 16px;
+        margin-bottom: 3px;
+      }
+      .map-picker-subtitle {
+        font-size: 12px;
+      }
+      .btn-close-picker {
+        padding: 8px 16px;
+        font-size: 13px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -185,7 +324,7 @@ title: Turn-by-Turn Navigation Demo
 
   <div id="setup-panel">
     <h2>🧭 Turn-by-Turn Navigation</h2>
-    <p>Enter your destination to start navigation. Your current location will be used as the starting point.</p>
+    <p class="intro-text">Enter your destination to start navigation. Your current location will be used as the starting point.</p>
 
     <!-- Location Status -->
     <div class="location-status loading" id="location-status">
@@ -199,13 +338,31 @@ title: Turn-by-Turn Navigation Demo
     </div>
 
     <div class="input-group">
+      <label>Navigation Profile</label>
+      <select id="profile-select" class="input-group input" style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+        <option value="mapbox.tmp.valhalla-zenrin/driving-traffic">🚗 Driving (with traffic)</option>
+        <option value="mapbox.tmp.valhalla-zenrin/walking">🚶 Walking</option>
+        <option value="mapbox.tmp.valhalla-zenrin/cycling">🚴 Cycling</option>
+      </select>
+    </div>
+
+    <div class="input-group">
       <label>Destination Coordinates</label>
       <input type="text" id="destination-input" placeholder="e.g., 139.7671,35.6812 (Tokyo Station)">
     </div>
 
+    <div class="button-group" style="margin-bottom: 15px;">
+      <button class="btn btn-secondary" style="flex: 1;" onclick="openMapPicker()">
+        🗺️ Pick on Map
+      </button>
+      <button class="btn btn-secondary" id="nearby-btn" onclick="useCurrentLocationAsDestination()" disabled>
+        📍 Nearby
+      </button>
+    </div>
+
     <div class="input-group">
       <label>Or use quick examples:</label>
-      <select id="example-destinations" class="input-group input">
+      <select id="example-destinations" class="input-group input" style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
         <option value="">Select a destination...</option>
         <option value="139.7671,35.6812">Tokyo Station</option>
         <option value="-122.4194,37.7749">San Francisco</option>
@@ -216,12 +373,20 @@ title: Turn-by-Turn Navigation Demo
     </div>
 
     <div class="button-group">
-      <button class="btn btn-secondary" id="nearby-btn" onclick="useCurrentLocationAsDestination()" disabled>
-        📍 Nearby Destination
-      </button>
-      <button class="btn btn-primary" id="start-btn" onclick="startNavigation()" disabled>
+      <button class="btn btn-primary" id="start-btn" onclick="startNavigation()" disabled style="width: 100%;">
         ⏳ Waiting for location...
       </button>
+    </div>
+  </div>
+
+  <!-- Map Picker Overlay -->
+  <div id="map-picker-overlay" class="hidden">
+    <div class="map-picker-banner">
+      <div class="map-picker-text">
+        <div class="map-picker-title">📍 Tap anywhere on the map</div>
+        <div class="map-picker-subtitle">Select your destination</div>
+      </div>
+      <button class="btn-close-picker" onclick="closeMapPicker()">✕ Cancel</button>
     </div>
   </div>
 
@@ -234,10 +399,11 @@ title: Turn-by-Turn Navigation Demo
 
     const map = new mapboxgl.Map({
       container: 'map',
-      style: 'mapbox://styles/mapbox/streets-v12',
+      //style: 'mapbox://styles/mapbox/streets-v12',
       center: [139.7671, 35.6812], // Tokyo
       zoom: 12,
-      pitch: 0
+      pitch: 0,
+      language: 'ja'
     });
 
     let navigation;
@@ -245,6 +411,8 @@ title: Turn-by-Turn Navigation Demo
     let userLocation = null;
     let userMarker = null;
     let locationAccuracy = null;
+    let destinationMarker = null;
+    let isMapPickerMode = false;
 
     // Add navigation control
     map.addControl(new mapboxgl.NavigationControl());
@@ -256,6 +424,21 @@ title: Turn-by-Turn Navigation Demo
     const statusDetails = document.getElementById('status-details');
     const startBtn = document.getElementById('start-btn');
     const nearbyBtn = document.getElementById('nearby-btn');
+
+    // Map picker functions
+    function openMapPicker() {
+      isMapPickerMode = true;
+      document.getElementById('setup-panel').classList.add('hidden');
+      document.getElementById('map-picker-overlay').classList.remove('hidden');
+      console.log('📍 Map picker mode activated');
+    }
+
+    function closeMapPicker() {
+      isMapPickerMode = false;
+      document.getElementById('setup-panel').classList.remove('hidden');
+      document.getElementById('map-picker-overlay').classList.add('hidden');
+      console.log('📍 Map picker mode closed');
+    }
 
     // Update location status UI
     function updateLocationStatus(state, message, details) {
@@ -368,12 +551,36 @@ title: Turn-by-Turn Navigation Demo
         }
       });
 
-      // Fly to user location
+      // Fly to user location (but allow user to interrupt)
+      let userInterrupted = false;
+
+      const stopCamera = () => {
+        userInterrupted = true;
+        map.stop(); // Stop the camera animation
+      };
+
+      // Listen for user interactions to interrupt camera
+      map.once('mousedown', stopCamera);
+      map.once('touchstart', stopCamera);
+      map.once('wheel', stopCamera);
+      map.once('dragstart', stopCamera);
+
+      // Start the fly animation
       map.flyTo({
         center: [userLocation.lng, userLocation.lat],
         zoom: 15,
         duration: 2000
       });
+
+      // Clean up event listeners after animation completes
+      setTimeout(() => {
+        if (!userInterrupted) {
+          map.off('mousedown', stopCamera);
+          map.off('touchstart', stopCamera);
+          map.off('wheel', stopCamera);
+          map.off('dragstart', stopCamera);
+        }
+      }, 2000);
     }
 
     // Handle location error
@@ -422,12 +629,14 @@ title: Turn-by-Turn Navigation Demo
 
     // Initialize navigation when map loads
     map.on('load', () => {
+      // Get selected profile from dropdown
+      const selectedProfile = document.getElementById('profile-select').value;
+
       navigation = new TurnByTurnNavigation(map, {
-        offRouteThreshold: 30,
         advanceInstructionDistance: 50,
         voiceEnabled: true,
         cameraFollowEnabled: true,
-        profile: 'mapbox/driving-traffic',
+        profile: selectedProfile,
         cameraPitch: 60,
         cameraZoom: 17
       });
@@ -436,10 +645,47 @@ title: Turn-by-Turn Navigation Demo
       navigationUI.hide();
     });
 
+    // Update navigation profile when user changes selection
+    document.getElementById('profile-select').addEventListener('change', (e) => {
+      if (navigation) {
+        navigation.config.profile = e.target.value;
+        console.log('📝 Navigation profile changed to:', e.target.value);
+      }
+    });
+
     // Handle example selection
     document.getElementById('example-destinations').addEventListener('change', (e) => {
       if (e.target.value) {
-        document.getElementById('destination-input').value = e.target.value;
+        const coords = e.target.value;
+        document.getElementById('destination-input').value = coords;
+
+        // Parse and show marker for example destination
+        const [lng, lat] = coords.split(',').map(s => parseFloat(s.trim()));
+        if (!isNaN(lng) && !isNaN(lat)) {
+          // Remove previous destination marker if exists
+          if (destinationMarker) {
+            destinationMarker.remove();
+          }
+
+          // Add destination marker
+          destinationMarker = new mapboxgl.Marker({
+            color: '#ef4444',
+            scale: 1.2
+          })
+            .setLngLat([lng, lat])
+            .setPopup(new mapboxgl.Popup().setHTML(
+              `<strong>${e.target.options[e.target.selectedIndex].text}</strong><br>
+               ${lng.toFixed(6)}, ${lat.toFixed(6)}`
+            ))
+            .addTo(map);
+
+          // Fly to destination
+          map.flyTo({
+            center: [lng, lat],
+            zoom: 13,
+            duration: 2000
+          });
+        }
       }
     });
 
@@ -479,6 +725,12 @@ title: Turn-by-Turn Navigation Demo
         if (userMarker) {
           userMarker.remove();
           userMarker = null;
+        }
+
+        // Remove destination marker (navigation will handle it)
+        if (destinationMarker) {
+          destinationMarker.remove();
+          destinationMarker = null;
         }
 
         // Remove accuracy circle
@@ -522,20 +774,100 @@ title: Turn-by-Turn Navigation Demo
 
       document.getElementById('destination-input').value = `${nearbyLng.toFixed(6)},${nearbyLat.toFixed(6)}`;
 
+      // Remove previous destination marker if exists
+      if (destinationMarker) {
+        destinationMarker.remove();
+      }
+
+      // Add destination marker
+      destinationMarker = new mapboxgl.Marker({
+        color: '#ef4444',
+        scale: 1.2
+      })
+        .setLngLat([nearbyLng, nearbyLat])
+        .setPopup(new mapboxgl.Popup().setHTML(
+          `<strong>Nearby Destination</strong><br>
+           ${nearbyLng.toFixed(6)}, ${nearbyLat.toFixed(6)}<br>
+           <small>(~1km from your location)</small>`
+        ))
+        .addTo(map);
+
+      // Show popup briefly
+      destinationMarker.togglePopup();
+      setTimeout(() => {
+        if (destinationMarker.getPopup().isOpen()) {
+          destinationMarker.togglePopup();
+        }
+      }, 2000);
+
       // Show feedback
       const destInput = document.getElementById('destination-input');
       destInput.style.borderColor = '#10b981';
+      destInput.style.backgroundColor = '#ecfdf5';
       setTimeout(() => {
         destInput.style.borderColor = '';
+        destInput.style.backgroundColor = '';
       }, 1000);
     }
 
     // Allow clicking on map to set destination
     map.on('click', (e) => {
       const setupPanel = document.getElementById('setup-panel');
-      if (!setupPanel.classList.contains('hidden')) {
-        document.getElementById('destination-input').value =
-          `${e.lngLat.lng.toFixed(6)},${e.lngLat.lat.toFixed(6)}`;
+
+      // Check if in map picker mode or if panel is visible
+      if (isMapPickerMode || !setupPanel.classList.contains('hidden')) {
+        const lng = e.lngLat.lng;
+        const lat = e.lngLat.lat;
+
+        // Update input field
+        document.getElementById('destination-input').value = `${lng.toFixed(6)},${lat.toFixed(6)}`;
+
+        // Remove previous destination marker if exists
+        if (destinationMarker) {
+          destinationMarker.remove();
+        }
+
+        // Add new destination marker
+        destinationMarker = new mapboxgl.Marker({
+          color: '#ef4444', // Red color for destination
+          scale: 1.2
+        })
+          .setLngLat([lng, lat])
+          .setPopup(new mapboxgl.Popup().setHTML(
+            `<strong>Destination</strong><br>
+             ${lng.toFixed(6)}, ${lat.toFixed(6)}`
+          ))
+          .addTo(map);
+
+        console.log('📍 Destination set on map:', lng.toFixed(6), lat.toFixed(6));
+
+        // If in map picker mode, show confirmation and close picker
+        if (isMapPickerMode) {
+          destinationMarker.togglePopup();
+          setTimeout(() => {
+            if (destinationMarker.getPopup().isOpen()) {
+              destinationMarker.togglePopup();
+            }
+            closeMapPicker();
+          }, 1500);
+        } else {
+          // Normal mode - show popup briefly
+          destinationMarker.togglePopup();
+          setTimeout(() => {
+            if (destinationMarker.getPopup().isOpen()) {
+              destinationMarker.togglePopup();
+            }
+          }, 2000);
+
+          // Visual feedback on input field
+          const destInput = document.getElementById('destination-input');
+          destInput.style.borderColor = '#ef4444';
+          destInput.style.backgroundColor = '#fef2f2';
+          setTimeout(() => {
+            destInput.style.borderColor = '';
+            destInput.style.backgroundColor = '';
+          }, 1000);
+        }
       }
     });
   </script>
