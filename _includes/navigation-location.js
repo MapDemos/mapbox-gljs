@@ -44,14 +44,30 @@ class GLJSLocationPuckController {
             minSpeedThreshold: options.minSpeedThreshold || 0.5, // m/s
             maxAcceleration: options.maxAcceleration || 4, // m/s²
             simulationMode: options.simulationMode || false, // Skip prediction/snapping for simulation
+            // New: Movement filtering for puck (prevents jitter)
+            minPuckMovementDistance: options.minPuckMovementDistance || 3, // meters - don't animate if moved less than this
+            // New: GPS smoothing
+            gpsSmoothing: options.gpsSmoothing !== false, // Enable GPS smoothing by default
+            gpsSmoothingWindow: options.gpsSmoothingWindow || 3, // Average last N readings
+            // New: Profile-aware settings
+            navigationProfile: options.navigationProfile || 'driving', // 'walking', 'cycling', 'driving'
         };
+
+        // Apply profile-specific adjustments
+        this._applyProfileSettings();
 
         // State
         this.lastLocation = null;
         this.lastRawLocation = null;
+        this.lastAnimatedLocation = null; // Track last position we animated to
         this.currentRoute = null;
         this.smoothedVelocity = 0;
         this.currentAnimation = null;
+        this.isUsingRouteSnapping = true; // Track current snapping mode for hysteresis
+        this.lastBearing = null; // Track last bearing for fallback
+
+        // GPS smoothing buffer
+        this.gpsBuffer = []; // Store recent GPS readings for smoothing
 
         // Debug counters
         this.mapMatchingApiCount = 0;
@@ -60,6 +76,144 @@ class GLJSLocationPuckController {
         // Puck marker
         this.puckMarker = null;
         this.initializePuck();
+
+        // Debug: Map matched coordinates trail
+        this.debugMatchedCoordinates = [];
+        this.initializeDebugLayer();
+
+        // Map Matching filtering
+        this.lastMapMatchedLocation = null; // Track last position sent to Map Matching API
+        this.minMapMatchDistance = 5; // Only call Map Matching if moved > 5 meters
+    }
+
+    /**
+     * Apply profile-specific settings
+     * Adjusts behavior for walking vs cycling vs driving
+     */
+    _applyProfileSettings() {
+        const profile = this.config.navigationProfile.toLowerCase();
+
+        if (profile.includes('walking')) {
+            // Walking: Reduce jitter, less prediction, higher stationary threshold
+            this.config.minSpeedThreshold = 1.5; // Treat 0-1.5 m/s as stationary (up to 5.4 km/h)
+            this.config.predictionMillis = 500; // Less prediction (was 1000ms)
+            this.config.minPuckMovementDistance = 2; // More sensitive to movement (was 3m)
+            this.config.gpsSmoothingWindow = 4; // More smoothing (was 3)
+            console.log('🚶 Walking profile: Enhanced GPS smoothing, reduced prediction');
+
+        } else if (profile.includes('cycling')) {
+            // Cycling: Balanced settings
+            this.config.minSpeedThreshold = 1.0; // 0-1.0 m/s stationary (up to 3.6 km/h)
+            this.config.predictionMillis = 750; // Moderate prediction
+            this.config.minPuckMovementDistance = 3; // Standard threshold
+            this.config.gpsSmoothingWindow = 3; // Standard smoothing
+            console.log('🚴 Cycling profile: Balanced settings');
+
+        } else {
+            // Driving: More prediction, less smoothing
+            this.config.minSpeedThreshold = 0.5; // 0-0.5 m/s stationary (up to 1.8 km/h)
+            this.config.predictionMillis = 1000; // Full prediction for latency compensation
+            this.config.minPuckMovementDistance = 5; // Less sensitive (faster movement)
+            this.config.gpsSmoothingWindow = 2; // Less smoothing (want responsiveness)
+            console.log('🚗 Driving profile: Maximum prediction, responsive');
+        }
+    }
+
+    /**
+     * Smooth GPS readings by averaging recent positions
+     * Reduces jitter from GPS inaccuracy
+     */
+    _smoothGPS(rawGPS) {
+        if (!this.config.gpsSmoothing) {
+            return rawGPS; // Smoothing disabled
+        }
+
+        // Add to buffer
+        this.gpsBuffer.push({
+            lat: rawGPS.lat,
+            lng: rawGPS.lng,
+            speed: rawGPS.speed,
+            bearing: rawGPS.bearing,
+            accuracy: rawGPS.accuracy,
+            timestamp: rawGPS.timestamp
+        });
+
+        // Keep only last N readings
+        if (this.gpsBuffer.length > this.config.gpsSmoothingWindow) {
+            this.gpsBuffer.shift();
+        }
+
+        // Need at least 2 readings for smoothing
+        if (this.gpsBuffer.length < 2) {
+            return rawGPS;
+        }
+
+        // Calculate weighted average (more recent = higher weight)
+        let totalWeight = 0;
+        let weightedLat = 0;
+        let weightedLng = 0;
+        let weightedSpeed = 0;
+
+        for (let i = 0; i < this.gpsBuffer.length; i++) {
+            const weight = i + 1; // More recent readings have higher weight
+            const reading = this.gpsBuffer[i];
+
+            weightedLat += reading.lat * weight;
+            weightedLng += reading.lng * weight;
+            weightedSpeed += (reading.speed || 0) * weight;
+            totalWeight += weight;
+        }
+
+        // Use most recent bearing (bearing changes are intentional, not jitter)
+        const smoothed = {
+            lat: weightedLat / totalWeight,
+            lng: weightedLng / totalWeight,
+            speed: weightedSpeed / totalWeight,
+            bearing: rawGPS.bearing, // Use current bearing, don't smooth
+            accuracy: rawGPS.accuracy,
+            timestamp: rawGPS.timestamp
+        };
+
+        console.log(`📊 GPS smoothed (${this.gpsBuffer.length} readings): ` +
+            `${rawGPS.lat.toFixed(6)} → ${smoothed.lat.toFixed(6)}, ` +
+            `speed ${(rawGPS.speed || 0).toFixed(2)} → ${smoothed.speed.toFixed(2)} m/s`);
+
+        return smoothed;
+    }
+
+    /**
+     * Check if puck should animate to new location
+     * Prevents animating to tiny GPS variations (jitter)
+     */
+    _shouldAnimatePuck(newLocation) {
+        // Always animate first location
+        if (!this.lastAnimatedLocation) {
+            return true;
+        }
+
+        // Always animate in simulation mode
+        if (this.config.simulationMode) {
+            return true;
+        }
+
+        // Calculate distance from last animated position
+        const distance = this.haversineDistance(
+            this.lastAnimatedLocation.lat,
+            this.lastAnimatedLocation.lng,
+            newLocation.lat,
+            newLocation.lng
+        );
+
+        const shouldAnimate = distance >= this.config.minPuckMovementDistance;
+
+        if (!shouldAnimate) {
+            console.log(`⏸️ Puck animation skipped: only moved ${distance.toFixed(1)}m ` +
+                `(threshold: ${this.config.minPuckMovementDistance}m)`);
+        } else {
+            console.log(`✅ Puck animation triggered: moved ${distance.toFixed(1)}m`);
+        }
+
+        return shouldAnimate;
     }
 
     /**
@@ -68,19 +222,112 @@ class GLJSLocationPuckController {
     initializePuck() {
         const el = document.createElement('div');
         el.className = 'location-puck';
-        el.style.width = '20px';
-        el.style.height = '20px';
-        el.style.borderRadius = '50%';
-        el.style.backgroundColor = '#4285F4';
-        el.style.border = '3px solid white';
-        el.style.boxShadow = '0 0 10px rgba(0,0,0,0.3)';
+        el.style.width = '40px';
+        el.style.height = '40px';
+        el.style.display = 'flex';
+        el.style.alignItems = 'center';
+        el.style.justifyContent = 'center';
+
+        // Create SVG arrow that points upward (will rotate with bearing)
+        el.innerHTML = `
+            <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                <!-- Outer glow/shadow -->
+                <defs>
+                    <filter id="glow">
+                        <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                        <feMerge>
+                            <feMergeNode in="coloredBlur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
+                </defs>
+
+                <!-- White border -->
+                <circle cx="20" cy="20" r="12" fill="white"/>
+
+                <!-- Blue circle background -->
+                <circle cx="20" cy="20" r="10" fill="#4285F4"/>
+
+                <!-- Directional triangle with dented back (points upward) -->
+                <path d="M 20 10 L 26 22 L 20 18 L 14 22 Z"
+                      fill="white"
+                      stroke="none"/>
+            </svg>
+        `;
 
         this.puckMarker = new mapboxgl.Marker({
             element: el,
-            rotationAlignment: 'map'
+            rotationAlignment: 'map',
+            pitchAlignment: 'map'
         })
             .setLngLat([0, 0])
             .addTo(this.map);
+    }
+
+    /**
+     * Initialize debug layer for visualizing map-matched coordinates
+     */
+    initializeDebugLayer() {
+        // Wait for map to load before adding source/layer
+        const addDebugLayer = () => {
+            if (!this.map.getSource('debug-matched-coords')) {
+                this.map.addSource('debug-matched-coords', {
+                    type: 'geojson',
+                    data: {
+                        type: 'FeatureCollection',
+                        features: []
+                    }
+                });
+
+                this.map.addLayer({
+                    id: 'debug-matched-coords-layer',
+                    type: 'circle',
+                    source: 'debug-matched-coords',
+                    paint: {
+                        'circle-radius': 6,
+                        'circle-color': '#FF0000',
+                        'circle-opacity': 0.7,
+                        'circle-stroke-width': 2,
+                        'circle-stroke-color': '#FFFFFF'
+                    }
+                });
+
+                console.log('🔴 Debug layer initialized for map-matched coordinates');
+            }
+        };
+
+        if (this.map.loaded()) {
+            addDebugLayer();
+        } else {
+            this.map.on('load', addDebugLayer);
+        }
+    }
+
+    /**
+     * Add a map-matched coordinate to the debug visualization layer
+     */
+    addDebugMatchedCoordinate(lng, lat) {
+        this.debugMatchedCoordinates.push([lng, lat]);
+
+        // Update the source with all matched coordinates
+        const source = this.map.getSource('debug-matched-coords');
+        if (source) {
+            const features = this.debugMatchedCoordinates.map(coord => ({
+                type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    coordinates: coord
+                },
+                properties: {}
+            }));
+
+            source.setData({
+                type: 'FeatureCollection',
+                features: features
+            });
+
+            console.log(`🔴 Added debug circle at [${lng.toFixed(6)}, ${lat.toFixed(6)}] (total: ${this.debugMatchedCoordinates.length})`);
+        }
     }
 
     /**
@@ -97,8 +344,74 @@ class GLJSLocationPuckController {
 
             console.log('✅ GPS validation passed');
 
-            // Smooth velocity to handle GPS jitter
-            this.smoothVelocity(rawGPS);
+            // TESTING: Raw GPS + Map Matching ONLY (no smoothing, no prediction)
+            console.log('🧪 TEST MODE: Raw GPS + Map Matching only');
+
+            let processedLocation;
+            let keyPoints = [];
+
+            // Use raw GPS directly (no smoothing, no prediction)
+            const rawLocation = {
+                lat: rawGPS.lat,
+                lng: rawGPS.lng,
+                bearing: rawGPS.bearing,
+                speed: rawGPS.speed,
+                accuracy: rawGPS.accuracy
+            };
+            console.log('📍 Raw GPS:', rawLocation.lat, rawLocation.lng, 'accuracy:', rawGPS.accuracy);
+
+            // Apply Map Matching API with distance-based filtering
+            //const isStationary = rawGPS.speed !== null && rawGPS.speed < this.config.minSpeedThreshold;
+            const isStationary = false; // DISABLE STATIONARY CHECK FOR TESTING
+
+            // Check if we've moved enough distance since last Map Matching call
+            let distanceSinceLastMatch = Infinity;
+            if (this.lastMapMatchedLocation) {
+                distanceSinceLastMatch = this.haversineDistance(
+                    this.lastMapMatchedLocation.lat,
+                    this.lastMapMatchedLocation.lng,
+                    rawLocation.lat,
+                    rawLocation.lng
+                );
+            }
+
+            const shouldCallMapMatching = distanceSinceLastMatch >= this.minMapMatchDistance;
+
+            if (isStationary) {
+                console.log('🛑 Stationary - using raw GPS without snapping');
+                processedLocation = rawLocation;
+            } else if (!shouldCallMapMatching && this.lastMapMatchedLocation) {
+                console.log(`⏭️ Skipping Map Matching - only moved ${distanceSinceLastMatch.toFixed(1)}m (threshold: ${this.minMapMatchDistance}m)`);
+                // Use last matched position with updated bearing from raw GPS
+                processedLocation = {
+                    ...this.lastMapMatchedLocation,
+                    bearing: rawLocation.bearing,
+                    speed: rawLocation.speed
+                };
+            } else {
+                console.log(`🛣️ Calling Map Matching API (moved ${distanceSinceLastMatch.toFixed(1)}m)`);
+                // Call Map Matching API - clear route to force API call
+                const tempRoute = this.currentRoute;
+                this.currentRoute = null;
+                processedLocation = await this.mapMatchLocation(rawLocation);
+                this.currentRoute = tempRoute;
+
+                // Update last matched location
+                this.lastMapMatchedLocation = {
+                    lat: processedLocation.lat,
+                    lng: processedLocation.lng
+                };
+
+                console.log('📌 Snapped to road:', processedLocation.lat, processedLocation.lng);
+            }
+
+            // ORIGINAL CODE COMMENTED OUT FOR TESTING:
+            /*
+            // NEW: Apply GPS smoothing to reduce jitter
+            const smoothedGPS = this._smoothGPS(rawGPS);
+
+            // Smooth velocity to handle GPS jitter (use smoothed GPS)
+            this.smoothVelocity(smoothedGPS);
 
             let processedLocation;
             let keyPoints = [];
@@ -108,11 +421,11 @@ class GLJSLocationPuckController {
                 // Simulation mode: Skip prediction and snapping
                 // Coordinates are already accurate and on the route
                 processedLocation = {
-                    lat: rawGPS.lat,
-                    lng: rawGPS.lng,
-                    bearing: rawGPS.bearing,
-                    speed: rawGPS.speed,
-                    accuracy: rawGPS.accuracy,
+                    lat: smoothedGPS.lat,
+                    lng: smoothedGPS.lng,
+                    bearing: smoothedGPS.bearing,
+                    speed: smoothedGPS.speed,
+                    accuracy: smoothedGPS.accuracy,
                     isMatched: false
                 };
 
@@ -126,26 +439,38 @@ class GLJSLocationPuckController {
             } else {
                 console.log('🌍 Using real GPS mode path');
                 // Real GPS mode: Use full prediction and snapping pipeline
-                // 1. Predict forward to compensate for latency
-                const predicted = this.predictLocation(rawGPS,
-                    this.config.predictionMillis);
-                console.log('📍 Predicted location:', predicted.lat, predicted.lng);
+                // 1. PREDICTION DISABLED FOR TESTING - just use smoothed GPS
+                // const predicted = this.predictLocation(smoothedGPS,
+                //     this.config.predictionMillis);
+                // console.log('📍 Predicted location:', predicted.lat, predicted.lng);
+                const predicted = {
+                    lat: smoothedGPS.lat,
+                    lng: smoothedGPS.lng,
+                    bearing: smoothedGPS.bearing,
+                    speed: smoothedGPS.speed,
+                    accuracy: smoothedGPS.accuracy,
+                    isPredicted: false  // No prediction applied
+                };
+                console.log('📍 Using raw smoothed GPS (no prediction):', predicted.lat, predicted.lng);
 
                 // 2. Map match to snap to road network
-                // Strategy:
-                // - Stationary: Use raw GPS (no snapping to avoid stuck puck)
-                // - Close to route (<50m): Snap to route geometry
-                // - Far from route (>50m): Use Map Matching API to snap to nearest road
+                // NEW STRATEGY (fixed for walking):
+                // - Stationary: Use predicted GPS (no snapping)
+                // - Has route & close (<30m): ALWAYS snap to route (prevents toggle jitter)
+                // - Has route & far (30-60m hysteresis): Use hysteresis
+                // - No route OR very far (>60m): Snap to nearest road via API
                 let snapped;
-                const isStationary = rawGPS.speed !== null && rawGPS.speed < this.config.minSpeedThreshold;
+                const isStationary = smoothedGPS.speed !== null && smoothedGPS.speed < this.config.minSpeedThreshold;
 
                 if (isStationary) {
-                    console.log('🛑 Stationary - using predicted location without snapping');
+                    console.log('🛑 Stationary - using smoothed GPS without snapping');
                     snapped = predicted;
                 } else {
                     // Check distance from route (if we have one)
                     let distanceFromRoute = Infinity;
-                    if (this.currentRoute && this.currentRoute.coordinates) {
+                    let hasRoute = this.currentRoute && this.currentRoute.coordinates;
+
+                    if (hasRoute) {
                         // Find nearest point on route to check distance
                         const nearestPoint = this.findClosestPointOnLine(
                             this.currentRoute.coordinates,
@@ -155,22 +480,43 @@ class GLJSLocationPuckController {
                         console.log(`📏 Distance from route: ${distanceFromRoute.toFixed(1)}m`);
                     }
 
-                    const isCloseToRoute = distanceFromRoute <= 50; // Within 50m of route
+                    // Hysteresis: Different thresholds for switching modes to avoid ping-ponging
+                    // Route → Road: Switch at 60m (far threshold)
+                    // Road → Route: Switch at 30m (near threshold)
+                    const NEAR_THRESHOLD = 30; // Switch to route snapping
+                    const FAR_THRESHOLD = 60;  // Switch to road snapping
 
-                    if (isCloseToRoute) {
-                        console.log('✅ Close to route - snapping to route geometry');
-                        // Snap to route (calls mapMatchLocation which handles route snapping)
+                    let useRouteSnapping;
+                    if (!hasRoute) {
+                        // No route: must use road snapping
+                        useRouteSnapping = false;
+                    } else if (distanceFromRoute <= NEAR_THRESHOLD) {
+                        // CLOSE to route: ALWAYS snap to route (prevents speed-based toggling)
+                        useRouteSnapping = true;
+                    } else if (distanceFromRoute >= FAR_THRESHOLD) {
+                        // FAR from route: snap to nearest road
+                        useRouteSnapping = false;
+                    } else {
+                        // In hysteresis zone (30-60m): keep current mode to prevent ping-ponging
+                        useRouteSnapping = this.isUsingRouteSnapping;
+                        console.log(`↔️ Hysteresis zone (${distanceFromRoute.toFixed(1)}m) - keeping current mode: ${useRouteSnapping ? 'route' : 'road'}`);
+                    }
+
+                    if (useRouteSnapping) {
+                        console.log('✅ Snapping to route geometry');
                         snapped = await this.mapMatchLocation(predicted);
                         console.log('📌 Snapped to route:', snapped.lat, snapped.lng);
                     } else {
-                        console.log(`🚫 Far from route (${distanceFromRoute.toFixed(0)}m) - using Map Matching API for road snapping`);
-                        // Clear route temporarily so mapMatchLocation uses API instead of route snapping
+                        console.log(`🛣️ Snapping to nearest road (${hasRoute ? distanceFromRoute.toFixed(0) + 'm from route' : 'no route'})`);
+                        // Clear route temporarily so mapMatchLocation uses API
                         const tempRoute = this.currentRoute;
                         this.currentRoute = null;
                         snapped = await this.mapMatchLocation(predicted);
                         this.currentRoute = tempRoute;
                         console.log('📌 Snapped to road:', snapped.lat, snapped.lng, 'matched:', snapped.isMatched);
                     }
+
+                    this.isUsingRouteSnapping = useRouteSnapping;
                 }
 
                 // 3. Generate interpolation keyPoints
@@ -181,12 +527,55 @@ class GLJSLocationPuckController {
 
                 processedLocation = snapped;
             }
+            */
 
-            // 4. Animate puck smoothly
-            console.log('🎬 Animating puck to:', processedLocation.lat, processedLocation.lng);
-            this.animatePuckToLocation(processedLocation, keyPoints);
+            // 4. Calculate bearing from actual puck movement (not road geometry)
+            if (this.lastAnimatedLocation) {
+                const distance = this.haversineDistance(
+                    this.lastAnimatedLocation.lat,
+                    this.lastAnimatedLocation.lng,
+                    processedLocation.lat,
+                    processedLocation.lng
+                );
 
-            // Update state
+                // Only calculate bearing if moved enough (avoid noise from tiny movements)
+                if (distance >= 2) {  // 2 meters threshold
+                    const movementBearing = this.calculateBearing(
+                        this.lastAnimatedLocation.lat,
+                        this.lastAnimatedLocation.lng,
+                        processedLocation.lat,
+                        processedLocation.lng
+                    );
+                    processedLocation.bearing = movementBearing;
+                    this.lastBearing = movementBearing;
+                    console.log(`🧭 Movement-based bearing: ${movementBearing.toFixed(1)}° (moved ${distance.toFixed(1)}m)`);
+                } else {
+                    // Too small to calculate meaningful bearing - use previous
+                    processedLocation.bearing = this.lastBearing || processedLocation.bearing;
+                    console.log(`🧭 Keeping previous bearing (only moved ${distance.toFixed(1)}m)`);
+                }
+            } else {
+                // First location - use GPS bearing or matched bearing
+                this.lastBearing = processedLocation.bearing;
+                console.log(`🧭 First location - using initial bearing: ${processedLocation.bearing?.toFixed(1)}°`);
+            }
+
+            // 5. TESTING: Always animate (movement filtering disabled)
+            console.log('🎬 About to animate puck to:', processedLocation);
+            console.log('   lat:', processedLocation.lat, 'lng:', processedLocation.lng, 'bearing:', processedLocation.bearing);
+            console.log('   keyPoints:', keyPoints.length);
+
+            // Safety check before animation
+            if (processedLocation &&
+                !isNaN(processedLocation.lat) &&
+                !isNaN(processedLocation.lng)) {
+                this.animatePuckToLocation(processedLocation, keyPoints);
+                this.lastAnimatedLocation = processedLocation;
+            } else {
+                console.error('❌ Cannot animate - invalid processedLocation:', processedLocation);
+            }
+
+            // Update state (always update, even if we didn't animate)
             this.lastLocation = processedLocation;
             this.lastRawLocation = rawGPS;
 
@@ -350,16 +739,8 @@ class GLJSLocationPuckController {
 
         coordinates.push([location.lng, location.lat]);
 
-        // Add a short forward projection for better matching
-        if (location.bearing !== undefined && location.speed >
-            this.config.minSpeedThreshold) {
-            const ahead = this.projectPoint(
-                location.lat, location.lng,
-                20, // 20 meters ahead
-                location.bearing
-            );
-            coordinates.push([ahead.lng, ahead.lat]);
-        }
+        // REMOVED: Forward projection was causing API to match to wrong roads
+        // when bearing jittered. Now just using [lastLocation, currentLocation]
 
         // Need at least 2 points for matching API
         if (coordinates.length < 2) {
@@ -369,13 +750,16 @@ class GLJSLocationPuckController {
         try {
             this.mapMatchingApiCount++;
             const coordinatesStr = coordinates.map(c => c.join(',')).join(';');
+
             const url =
-                `https://api.mapbox.com/matching/v5/mapbox/driving/${coordinatesStr}` +
+                `https://api.mapbox.com/matching/v5/${this.config.navigationProfile}/${coordinatesStr}` +
                 `?geometries=geojson` +
                 `&radiuses=${Array(coordinates.length).fill(this.config.mapMatchingRadius).join(';')}` +
                 `&steps=false` +
                 `&overview=full` +
                 `&access_token=${this.accessToken}`;
+
+            console.log('🗺️ Map Matching API request:', url);
 
             const response = await fetch(url);
 
@@ -384,6 +768,7 @@ class GLJSLocationPuckController {
             }
 
             const data = await response.json();
+            console.log('🗺️ Map Matching API response:', data);
 
             if (!data.matchings || data.matchings.length === 0) {
                 return location; // No match found, return original
@@ -398,6 +783,11 @@ class GLJSLocationPuckController {
                 matchedCoords,
                 [location.lng, location.lat]
             );
+
+            console.log('📌 Matched point:', snappedPoint);
+
+            // Debug: Add matched coordinate to debug layer
+            this.addDebugMatchedCoordinate(snappedPoint.lng, snappedPoint.lat);
 
             // Calculate bearing from matched geometry
             const matchedBearing = this.calculateBearingFromGeometry(
@@ -597,7 +987,34 @@ class GLJSLocationPuckController {
             cancelAnimationFrame(this.currentAnimation);
         }
 
-        const startLocation = this.lastLocation || targetLocation;
+        // Handle first location - just set position directly without animation
+        if (!this.lastLocation) {
+            console.log('   First location - setting puck directly without animation');
+            this.puckMarker.setLngLat([targetLocation.lng, targetLocation.lat]);
+            if (targetLocation.bearing !== undefined) {
+                this.puckMarker.setRotation(targetLocation.bearing);
+            }
+            return;
+        }
+
+        const startLocation = this.lastLocation;
+
+        // Check if we're already at the target (no movement)
+        const distance = this.haversineDistance(
+            startLocation.lat,
+            startLocation.lng,
+            targetLocation.lat,
+            targetLocation.lng
+        );
+
+        if (distance < 0.1) {  // Less than 10cm - no meaningful movement
+            console.log(`   No movement detected (${distance.toFixed(2)}m) - skipping animation`);
+            // Just update bearing if it changed
+            if (targetLocation.bearing !== undefined) {
+                this.puckMarker.setRotation(targetLocation.bearing);
+            }
+            return;
+        }
         const startTime = performance.now();
         const duration = this.config.animationDuration;
 
@@ -787,37 +1204,31 @@ class GLJSLocationPuckController {
      * Find closest point on a line to a given point
      */
     findClosestPointOnLine(lineCoords, point) {
-        let minDistance = Infinity;
-        let closestPoint = null;
+        // Use Turf's nearestPointOnLine for accurate results
+        const line = turf.lineString(lineCoords);
+        const pt = turf.point(point);
+        const nearest = turf.nearestPointOnLine(line, pt, { units: 'meters' });
+
+        // Find which segment the nearest point is on
         let closestIndex = 0;
-
-        for (let i = 0; i < lineCoords.length - 1; i++) {
-            const [lng1, lat1] = lineCoords[i];
-            const [lng2, lat2] = lineCoords[i + 1];
-
-            // Find closest point on this segment
-            const closest = this.closestPointOnSegment(
-                point[0], point[1],
-                lng1, lat1,
-                lng2, lat2
+        let minDist = Infinity;
+        for (let i = 0; i < lineCoords.length; i++) {
+            const segDist = turf.distance(
+                turf.point(lineCoords[i]),
+                nearest,
+                { units: 'meters' }
             );
-
-            const distance = this.haversineDistance(
-                point[1], point[0],
-                closest.lat, closest.lng
-            );
-
-            if (distance < minDistance) {
-                minDistance = distance;
-                closestPoint = closest;
+            if (segDist < minDist) {
+                minDist = segDist;
                 closestIndex = i;
             }
         }
 
         return {
-            ...closestPoint,
+            lng: nearest.geometry.coordinates[0],
+            lat: nearest.geometry.coordinates[1],
             index: closestIndex,
-            distance: minDistance
+            distance: nearest.properties.dist * 1000 // Convert km to meters
         };
     }
 

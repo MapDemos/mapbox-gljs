@@ -97,7 +97,8 @@ class TurnByTurnNavigation {
       numKeyPoints: 15,  // Increased from 5 to better follow route curves
       mapMatchingRadius: 50,
       maxTurnRatePerSecond: 90,
-      velocitySmoothingFactor: 0.3
+      velocitySmoothingFactor: 0.3,
+      navigationProfile: this.config.profile  // Pass profile for profile-aware adjustments
     });
 
     // Event callbacks

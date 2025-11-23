@@ -998,14 +998,23 @@ title: Turn-by-Turn Navigation Demo
         const CAMERA_UPDATE_INTERVAL = 300; // ms - update camera ~3 times per second
 
         if (now - lastCameraUpdate > CAMERA_UPDATE_INTERVAL) {
+          // Mark as programmatic movement to avoid triggering user interaction handlers
+          navigation.state.isProgrammaticMovement = true;
+
           navigation.map.easeTo({
             center: [coord[0], coord[1]],
             bearing: bearing,
             pitch: navigation.config.cameraPitch || 60,
             zoom: navigation.config.cameraZoom || 17,
             duration: 500, // Fixed smooth duration
-            essential: true // Skip if user has interrupted
+            essential: false // Allow user to interrupt
           });
+
+          // Clear programmatic flag after animation duration
+          setTimeout(() => {
+            navigation.state.isProgrammaticMovement = false;
+          }, 600); // Slightly longer than animation duration
+
           lastCameraUpdate = now;
         }
       }
@@ -1351,6 +1360,13 @@ title: Turn-by-Turn Navigation Demo
       if (navigation) {
         navigation.config.profile = e.target.value;
         console.log('📝 Navigation profile changed to:', e.target.value);
+
+        // Update puck controller profile settings
+        if (navigation.puckController) {
+          navigation.puckController.config.navigationProfile = e.target.value;
+          navigation.puckController._applyProfileSettings();
+          console.log('📝 Puck controller profile updated');
+        }
       }
     });
 
