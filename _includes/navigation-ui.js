@@ -202,7 +202,7 @@ class NavigationUI {
 
       .nav-status {
         position: fixed;
-        top: 150px;
+        top: 215px;
         left: 10px;
         right: 10px;
         background: #fbbf24;
@@ -262,7 +262,7 @@ class NavigationUI {
           font-size: 14px;
         }
         .nav-status {
-          top: 140px;
+          top: 190px;
           left: 5px;
           right: 5px;
           padding: 10px;

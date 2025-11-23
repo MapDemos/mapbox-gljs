@@ -262,11 +262,8 @@ class GLJSLocationPuckController {
                 };
             } else {
                 console.log(`🛣️ Calling Map Matching API (moved ${distanceSinceLastMatch.toFixed(1)}m)`);
-                // Call Map Matching API - clear route to force API call
-                const tempRoute = this.currentRoute;
-                this.currentRoute = null;
+                // Call Map Matching API
                 processedLocation = await this.mapMatchLocation(rawLocation);
-                this.currentRoute = tempRoute;
 
                 // Update last matched location
                 this.lastMapMatchedLocation = {
@@ -358,39 +355,11 @@ class GLJSLocationPuckController {
 
     /**
      * Map match location using Mapbox Map Matching API
-     * If a route is set (navigation mode), snap to route geometry instead
+     * Always snaps to nearest road via API
      */
     async mapMatchLocation(location) {
-        // If we have an active route, snap to it directly (navigation mode)
-        if (this.currentRoute && this.currentRoute.coordinates) {
-            const routeCoords = this.currentRoute.coordinates;
-
-            // Find the point on route geometry closest to the predicted location
-            const snappedPoint = this.findClosestPointOnLine(
-                routeCoords,
-                [location.lng, location.lat]
-            );
-
-            // Calculate bearing from route geometry
-            const routeBearing = this.calculateBearingFromGeometry(
-                routeCoords,
-                snappedPoint.index
-            );
-
-            return {
-                lat: snappedPoint.lat,
-                lng: snappedPoint.lng,
-                bearing: routeBearing !== null ? routeBearing : location.bearing,
-                speed: location.speed,
-                accuracy: location.accuracy,
-                isMatched: true,
-                confidence: 1.0,
-                matchedGeometry: routeCoords
-            };
-        }
-
-        // Free-driving mode: use Map Matching API
-        // Build a mini trajectory: [previous, current, predicted]
+        // Use Map Matching API to snap to nearest road
+        // Build a mini trajectory: [previous, current]
         const coordinates = [];
 
         if (this.lastLocation) {
