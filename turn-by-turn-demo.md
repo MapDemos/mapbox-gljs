@@ -560,10 +560,10 @@ title: Turn-by-Turn Navigation Demo
     </div>
 
     <div class="input-group">
-      <label>Language / 言語</label>
+      <label>Language</label>
       <select id="language-select" class="input-group input" style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
-        <option value="ja">🇯🇵 Japanese / 日本語</option>
         <option value="en">🇺🇸 English</option>
+        <option value="ja">🇯🇵 Japanese</option>
       </select>
     </div>
 
@@ -651,7 +651,7 @@ title: Turn-by-Turn Navigation Demo
       center: [139.7671, 35.6812], // Tokyo
       zoom: 12,
       pitch: 0,
-      language: 'ja'
+      language: 'en'
     });
 
     let navigation;
