@@ -66,7 +66,7 @@ class GLJSLocationPuckController {
 
         // Map Matching filtering
         this.lastMapMatchedLocation = null; // Track last position sent to Map Matching API
-        this.minMapMatchDistance = 5; // Only call Map Matching if moved > 5 meters
+        this.minMapMatchDistance = 3; // Only call Map Matching if moved > 3 meters
     }
 
     /**
