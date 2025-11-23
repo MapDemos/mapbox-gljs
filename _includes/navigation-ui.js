@@ -7,6 +7,7 @@ class NavigationUI {
   constructor(containerId, navigation) {
     this.container = document.getElementById(containerId);
     this.navigation = navigation;
+    this.arrivalMessageShown = false; // Track if arrival message has been shown
 
     if (!this.container) {
       console.error(`Container ${containerId} not found`);
@@ -202,7 +203,7 @@ class NavigationUI {
 
       .nav-status {
         position: fixed;
-        top: 215px;
+        top: 195px;
         left: 10px;
         right: 10px;
         background: #fbbf24;
@@ -262,7 +263,7 @@ class NavigationUI {
           font-size: 14px;
         }
         .nav-status {
-          top: 190px;
+          top: 175px;
           left: 5px;
           right: 5px;
           padding: 10px;
@@ -322,12 +323,16 @@ class NavigationUI {
       }
     };
     this.navigation.callbacks.onArrival = () => {
-      console.log('🎉 Arrival callback triggered - showing status message');
-      this._showStatus('You have arrived!', 'success');
+      // Only show arrival message once to prevent flickering
+      if (!this.arrivalMessageShown) {
+        console.log('🎉 Arrival callback triggered - showing status message');
+        this._showStatus('You have arrived!', 'success', 3000);
+        this.arrivalMessageShown = true;
+      }
       // Keep navigation UI visible - user can manually return to setup
     };
     this.navigation.callbacks.onError = (data) => {
-      this._showStatus('Error: ' + data.message, 'error', 5000);
+      this._showStatus('Error: ' + data.message, 'error', 3000);
     };
   }
 
@@ -435,6 +440,7 @@ class NavigationUI {
    */
   show() {
     this.container.style.display = 'block';
+    this.arrivalMessageShown = false; // Reset for new navigation session
   }
 
   /**
