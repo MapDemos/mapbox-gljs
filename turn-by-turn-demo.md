@@ -529,10 +529,6 @@ title: Turn-by-Turn Navigation Demo
       <span class="debug-key">Map Matching:</span>
       <span class="debug-value" id="mapmatching-api-count">0</span>
     </div>
-    <div class="debug-item">
-      <span class="debug-key">Route Snaps:</span>
-      <span class="debug-value" id="route-snap-count">0</span>
-    </div>
   </div>
 
   <div id="setup-panel">
@@ -1484,7 +1480,6 @@ title: Turn-by-Turn Navigation Demo
           const stats = navigation.getDebugStats();
           document.getElementById('directions-api-count').textContent = stats.api.directions;
           document.getElementById('mapmatching-api-count').textContent = stats.api.mapMatching;
-          document.getElementById('route-snap-count').textContent = stats.processing.routeSnaps;
         }
       }, 500);
     }
