@@ -322,8 +322,9 @@ class NavigationUI {
       }
     };
     this.navigation.callbacks.onArrival = () => {
+      console.log('🎉 Arrival callback triggered - showing status message');
       this._showStatus('You have arrived!', 'success');
-      setTimeout(() => this.hide(), 3000);
+      // Keep navigation UI visible - user can manually return to setup
     };
     this.navigation.callbacks.onError = (data) => {
       this._showStatus('Error: ' + data.message, 'error', 5000);
@@ -374,18 +375,29 @@ class NavigationUI {
    * Show status message
    */
   _showStatus(message, type = 'warning', duration = null) {
+    console.log(`📢 _showStatus called: "${message}", type: ${type}, duration: ${duration}`);
+
     const statusEl = document.getElementById('nav-status');
     const statusTextEl = document.getElementById('nav-status-text');
+
+    console.log('Status elements:', { statusEl, statusTextEl });
 
     if (statusEl && statusTextEl) {
       statusEl.className = `nav-status ${type}`;
       statusTextEl.textContent = message;
+      statusEl.classList.remove('hidden');
+
+      console.log('Status element classes:', statusEl.className);
+      console.log('Status element display:', window.getComputedStyle(statusEl).display);
+      console.log('Status element visibility:', window.getComputedStyle(statusEl).visibility);
 
       if (duration) {
         setTimeout(() => {
           statusEl.classList.add('hidden');
         }, duration);
       }
+    } else {
+      console.error('❌ Status elements not found!');
     }
   }
 

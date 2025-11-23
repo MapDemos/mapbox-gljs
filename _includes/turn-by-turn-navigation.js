@@ -1,6 +1,29 @@
 /**
  * Turn-by-Turn Navigation Manager
  * Provides Navigation SDK-like features using Mapbox GL JS + Directions API
+ *
+ * RESPONSIBILITY BOUNDARIES:
+ * ========================
+ * This class handles:
+ * - Route fetching from Directions API
+ * - Navigation state management (current step, progress, arrival)
+ * - Off-route detection using RAW GPS (before snapping)
+ * - Rerouting logic and debouncing
+ * - Instruction advancement and voice guidance
+ * - Camera following with user interaction detection
+ * - Movement filtering (deciding when to update navigation state)
+ *
+ * This class DOES NOT handle:
+ * - GPS processing (filtering, prediction, snapping) → GLJSLocationPuckController
+ * - Map matching API calls → GLJSLocationPuckController
+ * - Puck animation and display → GLJSLocationPuckController
+ *
+ * INTEGRATION WITH PUCK CONTROLLER:
+ * - Receives raw GPS from geolocation API
+ * - Passes ALL GPS updates to puck controller (for smooth animation)
+ * - Gets back processed location (predicted + matched + snapped)
+ * - Uses processed location for camera and progress display
+ * - Uses RAW GPS location for off-route detection
  */
 
 class TurnByTurnNavigation {
@@ -32,7 +55,7 @@ class TurnByTurnNavigation {
       currentRoute: null,
       currentStep: 0,
       userLocation: null,
-      snappedLocation: null,
+      processedLocation: null, // GPS after prediction, map matching, and snapping by puck controller
       distanceToNextStep: null,
       distanceRemaining: null,
       durationRemaining: null,
@@ -67,6 +90,16 @@ class TurnByTurnNavigation {
     // Load voices (required for iOS)
     this._loadVoices();
 
+    // Initialize location puck controller for smooth GPS animation
+    this.puckController = new GLJSLocationPuckController(map, this.accessToken, {
+      predictionMillis: 1000,
+      animationDuration: 1000,
+      numKeyPoints: 15,  // Increased from 5 to better follow route curves
+      mapMatchingRadius: 50,
+      maxTurnRatePerSecond: 90,
+      velocitySmoothingFactor: 0.3
+    });
+
     // Event callbacks
     this.callbacks = {
       onRouteUpdate: options.onRouteUpdate || null,
@@ -76,6 +109,9 @@ class TurnByTurnNavigation {
       onArrival: options.onArrival || null,
       onError: options.onError || null,
     };
+
+    // Debug counters
+    this.directionsApiCount = 0;
 
     this._initializeLayers();
     this._setupUserInteractionListeners();
@@ -180,24 +216,7 @@ class TurnByTurnNavigation {
       });
     }
 
-    if (!this.map.getSource('nav-user')) {
-      this.map.addSource('nav-user', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] }
-      });
-
-      this.map.addLayer({
-        id: 'nav-user-circle',
-        type: 'circle',
-        source: 'nav-user',
-        paint: {
-          'circle-radius': 10,
-          'circle-color': '#4264fb',
-          'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': 3
-        }
-      });
-    }
+    // Note: User location marker is now handled by GLJSLocationPuckController
   }
 
   /**
@@ -254,6 +273,10 @@ class TurnByTurnNavigation {
       const route = await this._fetchRoute(origin, destination);
       this.state.currentRoute = route;
 
+      // Pass route to puck controller for route-aware predictions
+      // Puck controller expects geometry object with coordinates property
+      this.puckController.setRoute(route.geometry);
+
       // Display route
       this._displayRoute(route);
 
@@ -307,6 +330,7 @@ class TurnByTurnNavigation {
       language: this.config.language
     });
     console.log('🚦 Fetching route:', `${url}?${params}`);
+    this.directionsApiCount++;
     const response = await fetch(`${url}?${params}`);
     const data = await response.json();
 
@@ -335,200 +359,9 @@ class TurnByTurnNavigation {
     return route;
   }
 
-  /**
-   * Perform map matching to snap GPS trace to roads
-   */
-  async _performMapMatching() {
-    if (this.locationHistory.length < 2) return;
-    if (this.isMapMatching) return; // Prevent concurrent calls
-
-    try {
-      this.isMapMatching = true;
-      this.lastMapMatchTime = Date.now();
-
-      // Build coordinates string for API
-      const coordinates = this.locationHistory
-        .map(loc => `${loc.lng},${loc.lat}`)
-        .join(';');
-
-      // Build timestamps (optional but improves matching)
-      const timestamps = this.locationHistory
-        .map(loc => Math.floor(loc.timestamp / 1000))
-        .join(';');
-
-      const url = `https://api.mapbox.com/matching/v5/${this.config.profile}/${coordinates}`;
-      const params = new URLSearchParams({
-        access_token: this.accessToken,
-        geometries: 'geojson',
-        timestamps: timestamps,
-        radiuses: this.locationHistory.map(() => '25').join(';'), // Search radius in meters
-        steps: 'false',
-        tidy: 'false' // Don't remove outliers, we want all points
-      });
-
-      console.log(`🗺️ Map Matching API call with ${this.locationHistory.length} points`);
-      const response = await fetch(`${url}?${params}`);
-      const data = await response.json();
-      console.log('✅ Map matching response received:', data.code);
-
-      if (data.code === 'Ok' && data.matchings && data.matchings.length > 0) {
-        const matching = data.matchings[0];
-
-        // Get the matched coordinates
-        const matchedCoords = matching.geometry.coordinates;
-
-        // Use the last matched point as our snapped location
-        const lastMatched = matchedCoords[matchedCoords.length - 1];
-
-        const snappedLocation = {
-          lng: lastMatched[0],
-          lat: lastMatched[1],
-          distance: 0, // Already snapped
-          isMapMatched: true
-        };
-
-        console.log('✅ Map matched location:', snappedLocation);
-
-        // Update the snapped location
-        this.state.snappedLocation = snappedLocation;
-
-        // NOW update the marker - only after matching completes!
-        this._updateUserLocationMarker({
-          lng: snappedLocation.lng,
-          lat: snappedLocation.lat
-        });
-
-        // Calculate bearing from matched geometry
-        if (matchedCoords.length >= 2) {
-          const lastTwo = matchedCoords.slice(-2);
-          const bearing = this._calculateBearingFromPoints(lastTwo[0], lastTwo[1]);
-          this.state.bearing = bearing;
-          console.log('🧭 Updated bearing from map matching:', bearing);
-        }
-
-      } else {
-        console.warn('⚠️ Map matching failed:', data.code, data.message);
-        // Fallback: use raw GPS if matching fails
-        this._updateUserLocationMarker(this.state.userLocation);
-      }
-
-    } catch (error) {
-      console.error('❌ Map matching error:', error);
-      // Continue with regular snap-to-route fallback
-    } finally {
-      this.isMapMatching = false; // Allow next call
-    }
-  }
-
-  /**
-   * Confirm if user is off-route using Map Matching API
-   * This checks if the user is on a different road than the planned route
-   */
-  async _confirmOffRouteWithMapMatching(userLocation) {
-    if (this.state.isCheckingOffRoute) return;
-
-    try {
-      this.state.isCheckingOffRoute = true;
-
-      // Build a small trace around current location (last 3 points if available)
-      const recentPoints = this.locationHistory.length > 0
-        ? this.locationHistory.slice(-3)
-        : [userLocation];
-
-      // Add current location
-      if (recentPoints[recentPoints.length - 1] !== userLocation) {
-        recentPoints.push(userLocation);
-      }
-
-      // Need at least 2 points for map matching
-      if (recentPoints.length < 2) {
-        recentPoints.push(userLocation); // Duplicate if only one point
-      }
-
-      const coordinates = recentPoints
-        .map(loc => `${loc.lng},${loc.lat}`)
-        .join(';');
-
-      const url = `https://api.mapbox.com/matching/v5/${this.config.profile}/${coordinates}`;
-      const params = new URLSearchParams({
-        access_token: this.accessToken,
-        geometries: 'geojson',
-        radiuses: recentPoints.map(() => '50').join(';'), // Larger search radius
-        steps: 'false',
-        tidy: 'false'
-      });
-
-      console.log('🔍 Confirming off-route with Map Matching API');
-      const response = await fetch(`${url}?${params}`);
-      const data = await response.json();
-
-      if (data.code === 'Ok' && data.matchings && data.matchings.length > 0) {
-        const matching = data.matchings[0];
-        const matchedCoords = matching.geometry.coordinates;
-
-        // Check if matched road is far from our planned route
-        const lastMatched = matchedCoords[matchedCoords.length - 1];
-        const matchedPoint = turf.point(lastMatched);
-
-        // Find distance to planned route
-        const routeLine = turf.lineString(this.state.currentRoute.geometry.coordinates);
-        const nearestOnRoute = turf.nearestPointOnLine(routeLine, matchedPoint);
-        const distanceToRoute = turf.distance(matchedPoint, nearestOnRoute, { units: 'meters' });
-
-        console.log(`🗺️ Map Matching confirms: ${distanceToRoute.toFixed(1)}m from planned route`);
-
-        // If matched position is still far from route, user is truly off-route
-        const thresholds = this._getOffRouteThresholds();
-        if (distanceToRoute > thresholds.snapZone) {
-          console.log('🚨 Confirmed: User is on a different road - triggering reroute');
-          this.state.offRouteConfirmStartTime = null;
-          if (!this.state.isOffRoute) {
-            this._handleOffRoute();
-          }
-          this.state.isOffRoute = true;
-        } else {
-          console.log('✅ Map Matching confirms: Still on route (GPS drift)');
-          this.state.offRouteConfirmStartTime = null;
-          this.state.isOffRoute = false;
-        }
-
-      } else {
-        console.warn('⚠️ Map matching confirmation failed:', data.code);
-        // If Map Matching fails, assume GPS drift (don't reroute)
-        this.state.offRouteConfirmStartTime = null;
-        this.state.isOffRoute = false;
-      }
-
-    } catch (error) {
-      console.error('❌ Off-route confirmation error:', error);
-      // On error, assume GPS drift (don't reroute)
-      this.state.offRouteConfirmStartTime = null;
-      this.state.isOffRoute = false;
-    } finally {
-      this.state.isCheckingOffRoute = false;
-    }
-  }
-
-  /**
-   * Calculate bearing between two points [lng, lat]
-   */
-  _calculateBearingFromPoints(point1, point2) {
-    const lng1 = point1[0] * Math.PI / 180;
-    const lat1 = point1[1] * Math.PI / 180;
-    const lng2 = point2[0] * Math.PI / 180;
-    const lat2 = point2[1] * Math.PI / 180;
-
-    const dLng = lng2 - lng1;
-
-    const y = Math.sin(dLng) * Math.cos(lat2);
-    const x = Math.cos(lat1) * Math.sin(lat2) -
-              Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
-
-    let bearing = Math.atan2(y, x) * 180 / Math.PI;
-    bearing = (bearing + 360) % 360;
-
-    return bearing;
-  }
+  // REMOVED: _performMapMatching() - puck controller handles map matching
+  // REMOVED: _confirmOffRouteWithMapMatching() - simplified off-route detection
+  // REMOVED: _calculateBearingFromPoints() - puck controller has calculateBearing()
 
   /**
    * Decode polyline6 format to GeoJSON
@@ -625,6 +458,11 @@ class TurnByTurnNavigation {
    * Check if location update should be processed (movement filtering)
    */
   _shouldProcessLocationUpdate(position) {
+    // In simulation mode, bypass all filtering - process every update
+    if (this.config.simulationMode) {
+      return true;
+    }
+
     const userLocation = {
       lng: position.coords.longitude,
       lat: position.coords.latitude
@@ -667,15 +505,10 @@ class TurnByTurnNavigation {
   }
 
   /**
-   * Handle location updates
+   * Handle location updates - now using puck controller for all GPS processing
    */
-  _handleLocationUpdate(position) {
+  async _handleLocationUpdate(position) {
     if (!this.state.isNavigating || !this.state.currentRoute) return;
-
-    // Check if should process this update (movement filtering)
-    if (!this._shouldProcessLocationUpdate(position)) {
-      return; // Skip this update - user is stationary or GPS is poor
-    }
 
     const userLocation = {
       lng: position.coords.longitude,
@@ -683,110 +516,100 @@ class TurnByTurnNavigation {
       timestamp: position.timestamp
     };
 
-    // Update last processed location
-    this.lastProcessedLocation = userLocation;
+    // Always update state location for current position tracking
     this.state.userLocation = userLocation;
     this.locationAccuracy = position.coords.accuracy;
-
-    // Add to location history for off-route confirmation
-    this.locationHistory.push(userLocation);
-    if (this.locationHistory.length > this.maxHistoryPoints) {
-      this.locationHistory.shift(); // Remove oldest
-    }
 
     // Calculate bearing from device heading if available
     if (position.coords.heading !== null && position.coords.heading >= 0) {
       this.state.bearing = position.coords.heading;
     }
 
-    // Snap to route directly (no API call needed!)
-    console.log('📍 Snapping GPS to route geometry');
-    const snapped = this._snapToRoute(userLocation);
-    const distanceFromRoute = snapped.distance;
+    // ALWAYS pass GPS to puck controller - it needs all updates for smooth animation
+    // Puck controller has its own validation logic
+    try {
+      await this.puckController.updateLocation({
+        lat: userLocation.lat,
+        lng: userLocation.lng,
+        bearing: position.coords.heading || this.state.bearing,
+        speed: position.coords.speed || 0,
+        accuracy: position.coords.accuracy,
+        timestamp: position.timestamp
+      });
+    } catch (error) {
+      console.error('❌ Puck controller update failed:', error);
+      // Fallback: continue with raw GPS
+    }
 
-    // Get profile-specific thresholds
+    // Movement filtering: Check if we should update navigation state
+    // (progress, instructions, etc) - but puck still animates above
+    if (!this._shouldProcessLocationUpdate(position)) {
+      console.log('⏸️ Skipping navigation state update (stationary or poor GPS)');
+      return; // Skip navigation updates - user is stationary or GPS is poor
+    }
+
+    // Update last processed location for movement filtering
+    this.lastProcessedLocation = userLocation;
+
+    // Get the processed location from puck controller
+    const processedLocation = this.puckController.lastLocation;
+    if (!processedLocation) {
+      console.warn('⚠️ Puck controller has no processed location yet, using raw GPS');
+      // Use raw GPS as fallback
+      this.state.processedLocation = {
+        lng: userLocation.lng,
+        lat: userLocation.lat,
+        distance: 0
+      };
+    } else {
+      // Use puck's processed location for display and camera
+      this.state.processedLocation = {
+        lng: processedLocation.lng,
+        lat: processedLocation.lat,
+        distance: 0
+      };
+
+      // Update bearing from puck if available
+      if (processedLocation.bearing !== undefined) {
+        this.state.bearing = processedLocation.bearing;
+      }
+    }
+
+    // Off-route detection: check RAW GPS distance from route
+    // IMPORTANT: We must use RAW GPS, not snapped location, because the puck
+    // controller already snaps to the route, so snapped location would always
+    // be on the route (~0m away), making off-route detection impossible!
+    const distanceFromRoute = this._checkDistanceFromRoute(userLocation);
     const thresholds = this._getOffRouteThresholds();
 
-    console.log(`📏 Distance from route: ${distanceFromRoute.toFixed(1)}m (snap: ${thresholds.snapZone}m, confirm: ${thresholds.confirmZone}m, reroute: ${thresholds.immediateReroute}m)`);
-
-    // Hybrid off-route detection
-    if (distanceFromRoute <= thresholds.snapZone) {
-      // Zone 1: Close to route - snap and continue
-      console.log('✅ Within snap zone - staying on route');
-      this.state.snappedLocation = snapped;
-      this.state.offRouteConfirmStartTime = null; // Reset confirmation timer
-      this.state.isOffRoute = false;
-
-      // Update marker with snapped position
-      this._updateUserLocationMarker({
-        lng: snapped.lng,
-        lat: snapped.lat
-      });
-
-    } else if (distanceFromRoute > thresholds.snapZone && distanceFromRoute <= thresholds.confirmZone) {
-      // Zone 2: Confirm zone - use Map Matching to verify
-      console.log('⚠️ In confirm zone - checking if on different road');
-
-      // Keep showing snapped position for now
-      this.state.snappedLocation = snapped;
-      this._updateUserLocationMarker({
-        lng: snapped.lng,
-        lat: snapped.lat
-      });
-
-      // Check if we need to confirm with Map Matching
-      if (!this.state.offRouteConfirmStartTime) {
-        this.state.offRouteConfirmStartTime = Date.now();
-      }
-
-      // Only confirm if been in zone for 2+ seconds (sustained)
-      const timeInConfirmZone = Date.now() - this.state.offRouteConfirmStartTime;
-      if (timeInConfirmZone >= 2000 && !this.state.isCheckingOffRoute) {
-        this._confirmOffRouteWithMapMatching(userLocation);
-      }
-
-    } else {
-      // Zone 3: Far from route - immediate reroute
-      console.log('🚨 Beyond reroute threshold - immediate reroute');
-      this.state.snappedLocation = snapped;
-      this.state.offRouteConfirmStartTime = null;
-
+    if (distanceFromRoute > thresholds.immediateReroute) {
+      console.log(`🚨 Off route: ${distanceFromRoute.toFixed(1)}m from route (raw GPS)`);
       if (!this.state.isOffRoute) {
         this._handleOffRoute();
       }
       this.state.isOffRoute = true;
+    } else {
+      console.log(`✅ On route: ${distanceFromRoute.toFixed(1)}m from route (raw GPS)`);
+      this.state.isOffRoute = false;
     }
 
-    // Calculate bearing from route direction if device heading not available
-    if (position.coords.heading === null || position.coords.heading < 0) {
-      const route = this.state.currentRoute;
-      const coordinates = route.geometry.coordinates;
+    console.log('📹 Camera follow enabled:', this.config.cameraFollowEnabled);
 
-      // Find two points near the snapped location for bearing
-      if (snapped.segmentIndex < coordinates.length - 1) {
-        const current = coordinates[snapped.segmentIndex];
-        const next = coordinates[snapped.segmentIndex + 1];
-        this.state.bearing = this._calculateBearingFromPoints(current, next);
-      }
-    }
-
-    // Calculate progress (use the snapped location from state)
-    if (this.state.snappedLocation) {
-      this._calculateProgress(this.state.snappedLocation);
-    }
+    // Calculate progress
+    this._calculateProgress(this.state.processedLocation);
 
     // Check if should advance to next instruction
     this._checkInstructionAdvancement();
 
-    // Update camera
+    // Update camera to follow processed location (same as puck)
     if (this.config.cameraFollowEnabled) {
-      this._updateCamera(userLocation);
+      this._updateCamera(this.state.processedLocation);
     }
 
     // Emit progress update
     this._emit('onProgressUpdate', {
       location: userLocation,
-      snappedLocation: this.state.snappedLocation,
+      processedLocation: this.state.processedLocation,
       currentStep: this.state.currentStep,
       distanceToNextStep: this.state.distanceToNextStep,
       distanceRemaining: this.state.distanceRemaining,
@@ -796,56 +619,18 @@ class TurnByTurnNavigation {
   }
 
   /**
-   * Snap user location to route
+   * Check distance from route (simplified - puck controller handles snapping)
    */
-  _snapToRoute(userLocation) {
+  _checkDistanceFromRoute(location) {
     const route = this.state.currentRoute;
-    const coordinates = route.geometry.coordinates;
-
-    let minDistance = Infinity;
-    let closestPoint = null;
-    let segmentIndex = 0;
-
-    // Find closest point on route
-    for (let i = 0; i < coordinates.length - 1; i++) {
-      const start = coordinates[i];
-      const end = coordinates[i + 1];
-
-      const snapped = this._snapToSegment(userLocation, start, end);
-      const distance = turf.distance(
-        turf.point([userLocation.lng, userLocation.lat]),
-        turf.point([snapped.lng, snapped.lat]),
-        { units: 'meters' }
-      );
-
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestPoint = snapped;
-        segmentIndex = i;
-      }
-    }
-
-    return {
-      lng: closestPoint.lng,
-      lat: closestPoint.lat,
-      distance: minDistance,
-      segmentIndex: segmentIndex
-    };
+    const routeLine = turf.lineString(route.geometry.coordinates);
+    const point = turf.point([location.lng, location.lat]);
+    const nearest = turf.nearestPointOnLine(routeLine, point);
+    return turf.distance(point, nearest, { units: 'meters' });
   }
 
-  /**
-   * Snap point to line segment
-   */
-  _snapToSegment(point, start, end) {
-    const line = turf.lineString([start, end]);
-    const pt = turf.point([point.lng, point.lat]);
-    const snapped = turf.nearestPointOnLine(line, pt);
-
-    return {
-      lng: snapped.geometry.coordinates[0],
-      lat: snapped.geometry.coordinates[1]
-    };
-  }
+  // REMOVED: _snapToRoute() - puck controller handles snapping
+  // REMOVED: _snapToSegment() - puck controller handles snapping
 
   /**
    * Calculate navigation progress
@@ -968,22 +753,8 @@ class TurnByTurnNavigation {
       location: this.state.userLocation,
       route: this.state.currentRoute
     });
-    this.stopNavigation();
-  }
-
-  /**
-   * Update user location marker on map
-   */
-  _updateUserLocationMarker(location) {
-    const geojson = {
-      type: 'Feature',
-      geometry: {
-        type: 'Point',
-        coordinates: [location.lng, location.lat]
-      }
-    };
-
-    this.map.getSource('nav-user').setData(geojson);
+    // Don't auto-stop navigation - let user manually go back via home button
+    // this.stopNavigation();
   }
 
   /**
@@ -1001,19 +772,22 @@ class TurnByTurnNavigation {
     // Mark as programmatic movement to ignore in event listeners
     this.state.isProgrammaticMovement = true;
 
+    // Use puck controller's animation duration for synchronized movement
+    const cameraDuration = this.puckController.config.animationDuration || 1000;
+
     this.map.easeTo({
       center: [location.lng, location.lat],
       zoom: this.config.cameraZoom,
       pitch: this.config.cameraPitch,
       bearing: this.state.bearing,
-      duration: 1000,
+      duration: cameraDuration,
       essential: false  // Allow user to interrupt
     });
 
     // Clear programmatic flag after animation completes
     setTimeout(() => {
       this.state.isProgrammaticMovement = false;
-    }, 1100); // Slightly longer than animation duration
+    }, cameraDuration + 100); // Slightly longer than animation duration
   }
 
   /**
@@ -1025,9 +799,9 @@ class TurnByTurnNavigation {
     this.state.userTouchedMap = false;
     this.state.isProgrammaticMovement = true;
 
-    // Immediately center on user
-    if (this.state.userLocation) {
-      this._updateCamera(this.state.userLocation);
+    // Immediately center on processed location
+    if (this.state.processedLocation) {
+      this._updateCamera(this.state.processedLocation);
     }
 
     console.log('✅ Camera should now be following');
@@ -1096,6 +870,16 @@ class TurnByTurnNavigation {
   }
 
   /**
+   * Enable/disable simulation mode
+   * Syncs the setting across both navigation and puck controller
+   */
+  setSimulationMode(enabled) {
+    this.config.simulationMode = enabled;
+    this.puckController.config.simulationMode = enabled;
+    console.log(`🎬 Simulation mode ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+  /**
    * Stop navigation
    */
   stopNavigation() {
@@ -1114,9 +898,11 @@ class TurnByTurnNavigation {
     this.speechPrimed = false;
     this.lastSpokenInstruction = null;
 
+    // Clear route from puck controller
+    this.puckController.clearRoute();
+
     // Clear route from map
     this.map.getSource('nav-route').setData({ type: 'FeatureCollection', features: [] });
-    this.map.getSource('nav-user').setData({ type: 'FeatureCollection', features: [] });
   }
 
   /**
@@ -1133,6 +919,33 @@ class TurnByTurnNavigation {
     if (!this.state.currentRoute) return null;
     const steps = this.state.currentRoute.legs[0].steps;
     return steps[this.state.currentStep];
+  }
+
+  /**
+   * Get debug statistics (combines navigation and puck controller stats)
+   * Returns both API call counts and local processing stats
+   */
+  getDebugStats() {
+    const puckStats = this.puckController.getDebugStats();
+    return {
+      // API Call Statistics (actual network requests)
+      api: {
+        directions: this.directionsApiCount,      // Directions API calls (routing/rerouting)
+        mapMatching: puckStats.mapMatchingApiCount // Map Matching API calls (free-drive mode)
+      },
+      // Processing Statistics (local operations)
+      processing: {
+        routeSnaps: puckStats.routeSnapCount       // Route geometry snapping (no API call)
+      }
+    };
+  }
+
+  /**
+   * Reset debug counters
+   */
+  resetDebugStats() {
+    this.directionsApiCount = 0;
+    this.puckController.resetDebugStats();
   }
 
   /**

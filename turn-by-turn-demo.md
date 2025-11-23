@@ -240,6 +240,75 @@ title: Turn-by-Turn Navigation Demo
       background: rgba(255,255,255,0.3);
     }
 
+    /* Back to Setup Button - styled to match navigation control buttons */
+    #back-to-setup-btn {
+      position: fixed;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 1001;
+      background: #f3f4f6;
+      color: #374151;
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      pointer-events: auto;
+    }
+    #back-to-setup-btn.hidden {
+      display: none !important;
+    }
+    #back-to-setup-btn:hover {
+      background: #e5e7eb;
+    }
+    #back-to-setup-btn:active {
+      transform: translateY(-50%) scale(0.95);
+    }
+
+    /* Debug Panel */
+    #debug-panel {
+      position: fixed;
+      top: 155px;
+      right: 10px;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.85);
+      color: white;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 11px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+      pointer-events: auto;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+    #debug-panel.hidden {
+      display: none !important;
+    }
+    .debug-item {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      white-space: nowrap;
+    }
+    .debug-key {
+      opacity: 0.7;
+      font-size: 11px;
+    }
+    .debug-value {
+      font-weight: 700;
+      color: #60a5fa;
+      font-size: 13px;
+    }
+
     /* Simulation Controls */
     #simulation-controls {
       position: absolute;
@@ -296,7 +365,7 @@ title: Turn-by-Turn Navigation Demo
     }
     .sim-btn {
       flex: 1;
-      padding: 8px 12px;
+      padding: 6px 8px;
       border: 2px solid #e5e7eb;
       background: white;
       border-radius: 6px;
@@ -414,7 +483,29 @@ title: Turn-by-Turn Navigation Demo
       }
       .sim-btn {
         font-size: 11px;
-        padding: 6px 8px;
+        padding: 4px 6px;
+      }
+      #back-to-setup-btn {
+        left: 5px;
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+      }
+      #debug-panel {
+        top: 133px;
+        right: 5px;
+        padding: 8px 10px;
+        font-size: 10px;
+        gap: 10px;
+      }
+      .debug-item {
+        gap: 5px;
+      }
+      .debug-key {
+        font-size: 9px;
+      }
+      .debug-value {
+        font-size: 11px;
       }
     }
   </style>
@@ -422,6 +513,27 @@ title: Turn-by-Turn Navigation Demo
 <body>
   <div id="map"></div>
   <div id="nav-ui"></div>
+
+  <!-- Back to Setup Button (shown during navigation) -->
+  <button id="back-to-setup-btn" class="hidden" onclick="backToSetup()" title="Back to Setup">
+    🏠
+  </button>
+
+  <!-- Debug Panel -->
+  <div id="debug-panel" class="hidden">
+    <div class="debug-item">
+      <span class="debug-key">Directions:</span>
+      <span class="debug-value" id="directions-api-count">0</span>
+    </div>
+    <div class="debug-item">
+      <span class="debug-key">Map Matching:</span>
+      <span class="debug-value" id="mapmatching-api-count">0</span>
+    </div>
+    <div class="debug-item">
+      <span class="debug-key">Route Snaps:</span>
+      <span class="debug-value" id="route-snap-count">0</span>
+    </div>
+  </div>
 
   <div id="setup-panel">
     <h2>🧭 Turn-by-Turn Navigation</h2>
@@ -526,6 +638,7 @@ title: Turn-by-Turn Navigation Demo
   </div>
 
   <script>
+    {% include navigation-location.js %}
     {% include turn-by-turn-navigation.js %}
     {% include navigation-ui.js %}
   </script>
@@ -552,10 +665,48 @@ title: Turn-by-Turn Navigation Demo
     // Simulation variables
     let simulationMode = false;
     let simulationCoordinates = [];
+    let simulationRouteLine = null; // Turf LineString for route
+    let simulationRouteLength = 0; // Total route length in meters
+
+    // Debug variables
+    let debugUpdateInterval = null;
     let simulationIndex = 0;
-    let simulationInterval = null;
+    let simulationAnimationFrame = null; // For requestAnimationFrame
     let simulationSpeed = 1; // 1x speed
     let simulationPaused = false;
+    let lastSimulationTime = 0; // For speed control
+    let simulationAccumulator = 0; // Accumulate time to process coords
+    let lastCameraUpdate = 0; // Throttle camera updates for smooth easeTo
+
+    // Puck interpolation state (distance-based with turf.along)
+    let puckInterpolation = {
+      distanceTraveled: 0,      // Current distance along route (meters)
+      targetDistance: 0,        // Target distance for current coordinate
+      startDistance: 0,         // Distance when started interpolating to target
+      startTime: 0,             // When interpolation started
+      duration: 1000,           // How long to take (ms)
+      initialized: false        // Track if first coordinate set
+    };
+
+    // Navigation state tracking
+    let wasNavigating = false;
+    let navigationStateMonitor = null;
+
+    // Helper function to calculate bearing between two points
+    function calculateBearing(lat1, lng1, lat2, lng2) {
+      const φ1 = lat1 * Math.PI / 180;
+      const φ2 = lat2 * Math.PI / 180;
+      const Δλ = (lng2 - lng1) * Math.PI / 180;
+
+      const y = Math.sin(Δλ) * Math.cos(φ2);
+      const x = Math.cos(φ1) * Math.sin(φ2) -
+                Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+
+      const θ = Math.atan2(y, x);
+      let bearing = θ * 180 / Math.PI;
+      bearing = (bearing + 360) % 360;
+      return bearing;
+    }
 
     // Add navigation control
     map.addControl(new mapboxgl.NavigationControl());
@@ -571,8 +722,31 @@ title: Turn-by-Turn Navigation Demo
     // Simulation functions
     function startSimulation(route) {
       simulationCoordinates = route.geometry.coordinates;
+      console.log('🎬 Route geometry:', route.geometry);
+      console.log('🎬 First 3 coordinates:', simulationCoordinates.slice(0, 3));
+      console.log('🎬 Coordinate type check:', typeof simulationCoordinates[0], simulationCoordinates[0]);
+
       simulationIndex = 0;
       simulationPaused = false;
+      lastSimulationTime = performance.now();
+      simulationAccumulator = 0;
+      lastCameraUpdate = 0; // Reset so first camera update happens immediately
+
+      // Pre-calculate route line for turf.along interpolation
+      console.log('🎬 Creating lineString with', simulationCoordinates.length, 'coordinates');
+      simulationRouteLine = turf.lineString(simulationCoordinates);
+      console.log('🎬 Created simulationRouteLine:', simulationRouteLine);
+      console.log('🎬 simulationRouteLine.geometry:', simulationRouteLine.geometry);
+      console.log('🎬 simulationRouteLine.geometry.coordinates length:', simulationRouteLine.geometry.coordinates.length);
+      console.log('🎬 First coord in simulationRouteLine:', simulationRouteLine.geometry.coordinates[0]);
+      simulationRouteLength = turf.length(simulationRouteLine, { units: 'meters' });
+      console.log(`🎬 Route length: ${simulationRouteLength.toFixed(0)}m with ${simulationCoordinates.length} coordinates`);
+
+      // Reset puck interpolation state
+      puckInterpolation.distanceTraveled = 0;
+      puckInterpolation.targetDistance = 0;
+      puckInterpolation.startDistance = 0;
+      puckInterpolation.initialized = false;
 
       // Stop real GPS tracking to prevent conflicts
       if (navigation && navigation.watchId) {
@@ -583,50 +757,303 @@ title: Turn-by-Turn Navigation Demo
 
       // Show simulation controls
       document.getElementById('simulation-controls').classList.remove('hidden');
+
+      // Set play/pause button to show "Pause" since simulation is starting
+      const playPauseBtn = document.getElementById('sim-play-pause');
+      if (playPauseBtn) {
+        playPauseBtn.textContent = '⏸️ Pause';
+        playPauseBtn.classList.add('active');
+      }
+
       updateSimulationUI();
 
       console.log(`🎬 Starting simulation with ${simulationCoordinates.length} points`);
 
-      // Start the simulation loop
-      runSimulationStep();
+      // Start the requestAnimationFrame loop
+      runSimulationLoop();
     }
 
-    function runSimulationStep() {
-      if (simulationPaused || !simulationMode) return;
+    function runSimulationLoop(currentTime) {
+      // Check if should continue
+      if (simulationPaused || !simulationMode) {
+        simulationAnimationFrame = null;
+        return;
+      }
 
-      if (simulationIndex >= simulationCoordinates.length) {
-        console.log('🎬 Simulation complete');
+      // Check if navigation is still active
+      if (!navigation || !navigation.state || !navigation.state.isNavigating) {
+        console.log('🎬 Navigation stopped, ending simulation');
         stopSimulation();
         return;
       }
 
-      const coord = simulationCoordinates[simulationIndex];
-
-      // Create fake position object
-      const fakePosition = {
-        coords: {
-          longitude: coord[0],
-          latitude: coord[1],
-          accuracy: 10,
-          altitude: null,
-          altitudeAccuracy: null,
-          heading: null,
-          speed: simulationSpeed * 5 // Simulate speed based on multiplier
-        },
-        timestamp: Date.now()
-      };
-
-      // Inject into navigation system
-      if (navigation && navigation._handleLocationUpdate) {
-        navigation._handleLocationUpdate(fakePosition);
+      // Handle first call where currentTime might be undefined
+      if (!currentTime) {
+        currentTime = performance.now();
       }
 
-      simulationIndex++;
+      // INTERPOLATE PUCK ALONG ROUTE (every frame for smooth movement)
+      if (puckInterpolation.initialized && simulationRouteLine) {
+        try {
+          const elapsed = currentTime - puckInterpolation.startTime;
+          const t = Math.min(1, elapsed / puckInterpolation.duration);
+
+          // Interpolate distance traveled
+          puckInterpolation.distanceTraveled =
+            puckInterpolation.startDistance +
+            (puckInterpolation.targetDistance - puckInterpolation.startDistance) * t;
+
+          // Debug: check simulationRouteLine validity
+          if (!simulationRouteLine.geometry || !simulationRouteLine.geometry.coordinates || simulationRouteLine.geometry.coordinates.length < 2) {
+            console.error('🎬 Invalid simulationRouteLine:', simulationRouteLine);
+            return;
+          }
+
+          const distanceInKm = puckInterpolation.distanceTraveled / 1000;
+
+          // Debug: log the values being used
+          if (isNaN(distanceInKm) || distanceInKm < 0 || distanceInKm > simulationRouteLength / 1000) {
+            console.error('🎬 Invalid distance for turf.along:', {
+              distanceTraveled: puckInterpolation.distanceTraveled,
+              distanceInKm: distanceInKm,
+              routeLengthKm: simulationRouteLength / 1000,
+              startDistance: puckInterpolation.startDistance,
+              targetDistance: puckInterpolation.targetDistance,
+              t: t,
+              elapsed: elapsed,
+              duration: puckInterpolation.duration
+            });
+            return;
+          }
+
+          // Get point along route at this distance
+          const pointOnRoute = turf.along(
+            simulationRouteLine,
+            distanceInKm,
+            { units: 'kilometers' }
+          );
+
+          if (!pointOnRoute || !pointOnRoute.geometry || !pointOnRoute.geometry.coordinates) {
+            console.error('🎬 Invalid pointOnRoute from turf.along at distance', puckInterpolation.distanceTraveled);
+            return;
+          }
+
+          // Update puck position (perfectly follows route!)
+          if (navigation && navigation.puckController && navigation.puckController.puckMarker) {
+            navigation.puckController.puckMarker.setLngLat(pointOnRoute.geometry.coordinates);
+
+            // Calculate bearing from route direction
+            // Get a point slightly ahead to calculate bearing
+            const lookAheadDistance = Math.min(
+              puckInterpolation.distanceTraveled + 10, // 10m ahead
+              simulationRouteLength
+            );
+            const aheadPoint = turf.along(
+              simulationRouteLine,
+              lookAheadDistance / 1000,
+              { units: 'kilometers' }
+            );
+
+            if (aheadPoint && aheadPoint.geometry && aheadPoint.geometry.coordinates) {
+              const bearing = calculateBearing(
+                pointOnRoute.geometry.coordinates[1],
+                pointOnRoute.geometry.coordinates[0],
+                aheadPoint.geometry.coordinates[1],
+                aheadPoint.geometry.coordinates[0]
+              );
+
+              if (bearing !== null && !isNaN(bearing)) {
+                navigation.puckController.puckMarker.setRotation(bearing);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('🎬 Error interpolating puck:', error);
+        }
+      }
+
+      // Calculate time since last frame
+      const deltaTime = currentTime - lastSimulationTime;
+      lastSimulationTime = currentTime;
+
+      // Accumulate time (in seconds) scaled by speed
+      // At 1x: 1 coord per second, At 10x: 10 coords per second
+      simulationAccumulator += (deltaTime / 1000) * simulationSpeed;
+
+      // Process 1 coordinate for each full second accumulated
+      let coordsToProcess = Math.floor(simulationAccumulator);
+      simulationAccumulator -= coordsToProcess; // Keep remainder for next frame
+
+      // Process coordinates (sets interpolation targets)
+      for (let i = 0; i < coordsToProcess; i++) {
+        if (simulationIndex >= simulationCoordinates.length) {
+          // At end, keep feeding last coordinate
+          processSimulationCoordinate(simulationCoordinates.length - 1, true);
+          break;
+        } else {
+          processSimulationCoordinate(simulationIndex, false);
+          simulationIndex++;
+        }
+      }
+
       updateSimulationUI();
 
-      // Schedule next step (base interval: 1000ms / speed)
-      const interval = 1000 / simulationSpeed;
-      simulationInterval = setTimeout(runSimulationStep, interval);
+      // Continue loop
+      simulationAnimationFrame = requestAnimationFrame(runSimulationLoop);
+    }
+
+    function processSimulationCoordinate(index, isEnd) {
+      try {
+        const coord = simulationCoordinates[index];
+
+        if (!coord || coord.length !== 2) {
+          console.error(`🎬 Invalid coordinate at index ${index}:`, coord);
+          return;
+        }
+
+        // Calculate distance to this coordinate along the route
+        let distanceToThisCoord = 0;
+
+        // Special case: first coordinate is at distance 0
+        if (index === 0) {
+          distanceToThisCoord = 0;
+        } else {
+          // Need at least 2 points for a line
+          const coordSlice = simulationCoordinates.slice(0, index + 1);
+          console.log(`🎬 Coord ${index}: creating line with ${coordSlice.length} points`);
+          const coordLine = turf.lineString(coordSlice);
+          distanceToThisCoord = turf.length(coordLine, { units: 'meters' });
+          console.log(`🎬 Distance to coord ${index}: ${distanceToThisCoord.toFixed(2)}m`);
+        }
+
+      // Initialize on first coordinate
+      if (!puckInterpolation.initialized) {
+        puckInterpolation.distanceTraveled = 0;
+        puckInterpolation.startDistance = 0;
+        puckInterpolation.targetDistance = 0;
+        puckInterpolation.initialized = true;
+
+        // Set puck to start position immediately
+        if (navigation && navigation.puckController && navigation.puckController.puckMarker) {
+          navigation.puckController.puckMarker.setLngLat([coord[0], coord[1]]);
+        }
+        console.log(`🎬 Initialized puck at start`);
+      }
+
+      // Set as interpolation target
+      puckInterpolation.startDistance = puckInterpolation.distanceTraveled;
+      puckInterpolation.targetDistance = distanceToThisCoord;
+      puckInterpolation.startTime = performance.now();
+      puckInterpolation.duration = 1000 / simulationSpeed; // Match simulation speed
+
+      // Calculate bearing from route direction (look ahead 10m)
+      let bearing = 0;
+      if (simulationRouteLine && distanceToThisCoord < simulationRouteLength) {
+        try {
+          const lookAheadDistance = Math.min(
+            distanceToThisCoord + 10, // 10m ahead
+            simulationRouteLength
+          );
+
+          console.log(`🎬 Calculating bearing at ${distanceToThisCoord.toFixed(2)}m, lookahead ${lookAheadDistance.toFixed(2)}m, route length ${simulationRouteLength.toFixed(2)}m`);
+
+          const currentPoint = turf.along(
+            simulationRouteLine,
+            distanceToThisCoord / 1000,
+            { units: 'kilometers' }
+          );
+
+          if (!currentPoint || !currentPoint.geometry || !currentPoint.geometry.coordinates) {
+            console.error('🎬 Invalid currentPoint from turf.along:', currentPoint);
+            return;
+          }
+
+          const aheadPoint = turf.along(
+            simulationRouteLine,
+            lookAheadDistance / 1000,
+            { units: 'kilometers' }
+          );
+
+          if (!aheadPoint || !aheadPoint.geometry || !aheadPoint.geometry.coordinates) {
+            console.error('🎬 Invalid aheadPoint from turf.along:', aheadPoint);
+            return;
+          }
+
+          bearing = calculateBearing(
+            currentPoint.geometry.coordinates[1],
+            currentPoint.geometry.coordinates[0],
+            aheadPoint.geometry.coordinates[1],
+            aheadPoint.geometry.coordinates[0]
+          );
+
+          console.log(`🎬 Calculated bearing: ${bearing.toFixed(2)}°`);
+        } catch (error) {
+          console.error('🎬 Error calculating bearing:', error);
+        }
+      }
+
+      // Update camera with smooth easeTo (throttled to avoid too many calls)
+      if (navigation && navigation.config.cameraFollowEnabled) {
+        const now = performance.now();
+        const CAMERA_UPDATE_INTERVAL = 300; // ms - update camera ~3 times per second
+
+        if (now - lastCameraUpdate > CAMERA_UPDATE_INTERVAL) {
+          navigation.map.easeTo({
+            center: [coord[0], coord[1]],
+            bearing: bearing,
+            pitch: navigation.config.cameraPitch || 60,
+            zoom: navigation.config.cameraZoom || 17,
+            duration: 500, // Fixed smooth duration
+            essential: true // Skip if user has interrupted
+          });
+          lastCameraUpdate = now;
+        }
+      }
+
+      // Update navigation state synchronously
+      const userLocation = { lng: coord[0], lat: coord[1] };
+      navigation.state.userLocation = userLocation;
+      navigation.state.processedLocation = userLocation;
+
+      // Calculate progress
+      if (navigation._calculateProgress) {
+        navigation._calculateProgress(userLocation);
+      }
+
+      // Check instruction advancement
+      if (navigation._checkInstructionAdvancement) {
+        navigation._checkInstructionAdvancement();
+      }
+
+      // Check off-route (use raw GPS as before)
+      if (navigation._checkDistanceFromRoute) {
+        const distanceFromRoute = navigation._checkDistanceFromRoute(userLocation);
+        const thresholds = navigation._getOffRouteThresholds();
+
+        if (distanceFromRoute > thresholds.immediateReroute) {
+          if (!navigation.state.isOffRoute) {
+            navigation._handleOffRoute();
+          }
+          navigation.state.isOffRoute = true;
+        } else {
+          navigation.state.isOffRoute = false;
+        }
+      }
+
+      // Emit progress update
+      navigation._emit('onProgressUpdate', {
+        location: userLocation,
+        processedLocation: userLocation,
+        currentStep: navigation.state.currentStep,
+        distanceToNextStep: navigation.state.distanceToNextStep,
+        distanceRemaining: navigation.state.distanceRemaining,
+        durationRemaining: navigation.state.durationRemaining,
+        isOffRoute: navigation.state.isOffRoute
+      });
+      } catch (error) {
+        console.error(`🎬 Error processing coordinate ${index}:`, error);
+        console.error('🎬 Stack trace:', error.stack);
+      }
     }
 
     function toggleSimulation() {
@@ -636,10 +1063,19 @@ title: Turn-by-Turn Navigation Demo
       if (simulationPaused) {
         btn.textContent = '▶️ Play';
         btn.classList.remove('active');
+        // Cancel animation frame when paused
+        if (simulationAnimationFrame) {
+          cancelAnimationFrame(simulationAnimationFrame);
+          simulationAnimationFrame = null;
+        }
       } else {
         btn.textContent = '⏸️ Pause';
         btn.classList.add('active');
-        runSimulationStep();
+        // Resume animation loop
+        lastSimulationTime = performance.now();
+        simulationAccumulator = 0; // Reset accumulator on resume
+        lastCameraUpdate = 0; // Reset camera throttle on resume
+        runSimulationLoop();
       }
     }
 
@@ -654,6 +1090,8 @@ title: Turn-by-Turn Navigation Demo
       }
 
       simulationSpeed = speeds[currentIndex];
+
+      // Speed change takes effect immediately on next frame (no coordination needed!)
       updateSimulationUI();
       console.log(`🎬 Simulation speed: ${simulationSpeed}x`);
     }
@@ -669,9 +1107,10 @@ title: Turn-by-Turn Navigation Demo
       simulationMode = false;
       simulationPaused = true;
 
-      if (simulationInterval) {
-        clearTimeout(simulationInterval);
-        simulationInterval = null;
+      // Cancel animation frame
+      if (simulationAnimationFrame) {
+        cancelAnimationFrame(simulationAnimationFrame);
+        simulationAnimationFrame = null;
       }
 
       // Update navigation config
@@ -928,7 +1367,7 @@ title: Turn-by-Turn Navigation Demo
       if (e.target.checked) {
         // In simulation mode, location not required
         startBtn.disabled = false;
-        startBtn.textContent = '🎬 Start Simulation';
+        startBtn.textContent = 'Start Navigation';
         console.log('🎬 Simulation mode enabled - location not required');
       } else {
         // Normal mode, check if location is available
@@ -978,8 +1417,134 @@ title: Turn-by-Turn Navigation Demo
       }
     });
 
+    // Monitor navigation state to show back button when navigation stops
+    function startNavigationStateMonitoring() {
+      // Clear any existing monitor
+      if (navigationStateMonitor) {
+        clearInterval(navigationStateMonitor);
+      }
+
+      navigationStateMonitor = setInterval(() => {
+        const isNavigating = navigation && navigation.state && navigation.state.isNavigating;
+
+        // Detect transition from navigating to not navigating
+        if (wasNavigating && !isNavigating) {
+          console.log('📍 Navigation stopped - showing back button');
+          const backBtn = document.getElementById('back-to-setup-btn');
+          backBtn.classList.remove('hidden');
+          backBtn.style.display = 'flex';
+
+          // Stop monitoring after showing button
+          clearInterval(navigationStateMonitor);
+          navigationStateMonitor = null;
+        }
+
+        wasNavigating = isNavigating;
+      }, 500); // Check every 500ms
+    }
+
+    function stopNavigationStateMonitoring() {
+      if (navigationStateMonitor) {
+        clearInterval(navigationStateMonitor);
+        navigationStateMonitor = null;
+      }
+      wasNavigating = false;
+    }
+
+    // Debug panel update functions
+    function startDebugUpdate() {
+      // Show debug panel
+      const debugPanel = document.getElementById('debug-panel');
+      debugPanel.classList.remove('hidden');
+
+      // Clear any existing interval
+      if (debugUpdateInterval) {
+        clearInterval(debugUpdateInterval);
+      }
+
+      // Update every 500ms
+      debugUpdateInterval = setInterval(() => {
+        if (navigation) {
+          const stats = navigation.getDebugStats();
+          document.getElementById('directions-api-count').textContent = stats.api.directions;
+          document.getElementById('mapmatching-api-count').textContent = stats.api.mapMatching;
+          document.getElementById('route-snap-count').textContent = stats.processing.routeSnaps;
+        }
+      }, 500);
+    }
+
+    function stopDebugUpdate() {
+      // Hide debug panel
+      const debugPanel = document.getElementById('debug-panel');
+      debugPanel.classList.add('hidden');
+
+      // Clear interval
+      if (debugUpdateInterval) {
+        clearInterval(debugUpdateInterval);
+        debugUpdateInterval = null;
+      }
+    }
+
+    // Back to setup screen
+    function backToSetup() {
+      console.log('🔙 Returning to setup screen');
+
+      // Stop navigation state monitoring
+      stopNavigationStateMonitoring();
+
+      // Stop debug updates
+      stopDebugUpdate();
+
+      // Stop navigation
+      if (navigation) {
+        navigation.stopNavigation();
+      }
+
+      // Stop simulation
+      stopSimulation();
+
+      // Hide navigation UI
+      if (navigationUI) {
+        navigationUI.hide();
+      }
+
+      // Hide back button
+      const backBtn = document.getElementById('back-to-setup-btn');
+      backBtn.classList.add('hidden');
+      backBtn.style.display = 'none';
+
+      // Show setup panel
+      document.getElementById('setup-panel').classList.remove('hidden');
+
+      // Restore user location marker if available
+      if (userLocation && !userMarker) {
+        userMarker = new mapboxgl.Marker({
+          color: '#4264fb',
+          scale: 1.2
+        })
+          .setLngLat([userLocation.lng, userLocation.lat])
+          .setPopup(new mapboxgl.Popup().setHTML(
+            `<strong>Your Location</strong><br>
+             Accuracy: ±${Math.round(locationAccuracy)}m`
+          ))
+          .addTo(map);
+      }
+
+      // Reset camera
+      map.easeTo({
+        pitch: 0,
+        bearing: 0,
+        duration: 1000
+      });
+    }
+
     // Start navigation
     async function startNavigation() {
+      // Reset debug counters at the start
+      if (navigation) {
+        navigation.resetDebugStats();
+      }
+
       const destInput = document.getElementById('destination-input').value.trim();
       const isSimulationMode = document.getElementById('simulation-mode').checked;
 
@@ -1036,8 +1601,8 @@ title: Turn-by-Turn Navigation Demo
         // Check if simulation mode is enabled
         simulationMode = document.getElementById('simulation-mode').checked;
 
-        // Update navigation config with simulation mode
-        navigation.config.simulationMode = simulationMode;
+        // Set simulation mode (syncs both navigation and puck controller)
+        navigation.setSimulationMode(simulationMode);
 
         // Prime speech synthesis for iOS (must be done from user interaction)
         navigation.primeSpeechSynthesis();
@@ -1050,6 +1615,13 @@ title: Turn-by-Turn Navigation Demo
 
         // Start navigation
         await navigation.startNavigation(origin, destination);
+
+        // Start monitoring navigation state to show back button when it stops
+        wasNavigating = true;
+        startNavigationStateMonitoring();
+
+        // Start debug panel updates
+        startDebugUpdate();
 
         // If simulation mode, start simulation with route
         if (simulationMode && navigation.state && navigation.state.currentRoute) {
@@ -1064,6 +1636,11 @@ title: Turn-by-Turn Navigation Demo
           'Please check your connection and try again.<br>' +
           '<button class="btn-retry" onclick="startNavigation()">🔄 Retry Navigation</button>');
         document.getElementById('setup-panel').classList.remove('hidden');
+        const backBtn = document.getElementById('back-to-setup-btn');
+        backBtn.classList.add('hidden');
+        backBtn.style.display = 'none';
+        stopNavigationStateMonitoring();
+        stopDebugUpdate();
         navigationUI.hide();
         stopSimulation();
       }
