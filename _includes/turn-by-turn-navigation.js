@@ -734,6 +734,10 @@ class TurnByTurnNavigation {
 
       this._displayRoute(newRoute);
 
+      // Re-enable camera follow to show user the new route
+      this.enableCameraFollow();
+      console.log('📹 Camera follow re-enabled after reroute');
+
       this._emit('onRouteUpdate', { route: newRoute, isReroute: true });
 
       // Speak new instruction

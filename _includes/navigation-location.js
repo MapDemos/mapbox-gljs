@@ -62,10 +62,12 @@ class GLJSLocationPuckController {
 
         // Debug: Map matched coordinates trail
         this.debugMatchedCoordinates = [];
+        this.debugRawGPSCoordinates = []; // Raw GPS coordinates
         this.initializeDebugLayer();
 
         // Map Matching filtering
         this.lastMapMatchedLocation = null; // Track last position sent to Map Matching API
+        this.lastRawGPSForMatching = null; // Track last raw GPS position for distance comparison
         this.minMapMatchDistance = 3; // Only call Map Matching if moved > 3 meters
     }
 
@@ -166,6 +168,32 @@ class GLJSLocationPuckController {
 
                 console.log('🔴 Debug layer initialized for map-matched coordinates');
             }
+
+            // Add blue circle layer for raw GPS coordinates
+            if (!this.map.getSource('debug-raw-gps-coords')) {
+                this.map.addSource('debug-raw-gps-coords', {
+                    type: 'geojson',
+                    data: {
+                        type: 'FeatureCollection',
+                        features: []
+                    }
+                });
+
+                this.map.addLayer({
+                    id: 'debug-raw-gps-coords-layer',
+                    type: 'circle',
+                    source: 'debug-raw-gps-coords',
+                    paint: {
+                        'circle-radius': 4,
+                        'circle-color': '#0000FF',
+                        'circle-opacity': 0.6,
+                        'circle-stroke-width': 1,
+                        'circle-stroke-color': '#FFFFFF'
+                    }
+                });
+
+                console.log('🔵 Debug layer initialized for raw GPS coordinates');
+            }
         };
 
         if (this.map.loaded()) {
@@ -203,6 +231,33 @@ class GLJSLocationPuckController {
     }
 
     /**
+     * Add a raw GPS coordinate to the debug visualization layer
+     */
+    addDebugRawGPSCoordinate(lng, lat) {
+        this.debugRawGPSCoordinates.push([lng, lat]);
+
+        // Update the source with all raw GPS coordinates
+        const source = this.map.getSource('debug-raw-gps-coords');
+        if (source) {
+            const features = this.debugRawGPSCoordinates.map(coord => ({
+                type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    coordinates: coord
+                },
+                properties: {}
+            }));
+
+            source.setData({
+                type: 'FeatureCollection',
+                features: features
+            });
+
+            console.log(`🔵 Added raw GPS circle at [${lng.toFixed(6)}, ${lat.toFixed(6)}] (total: ${this.debugRawGPSCoordinates.length})`);
+        }
+    }
+
+    /**
      * Main entry point: Update location with new GPS reading
      */
     async updateLocation(rawGPS) {
@@ -232,16 +287,20 @@ class GLJSLocationPuckController {
             };
             console.log('📍 Raw GPS:', rawLocation.lat, rawLocation.lng, 'accuracy:', rawGPS.accuracy);
 
+            // Debug: Add raw GPS coordinate to blue circle layer
+            this.addDebugRawGPSCoordinate(rawLocation.lng, rawLocation.lat);
+
             // Apply Map Matching API with distance-based filtering
             //const isStationary = rawGPS.speed !== null && rawGPS.speed < this.config.minSpeedThreshold;
             const isStationary = false; // DISABLE STATIONARY CHECK FOR TESTING
 
             // Check if we've moved enough distance since last Map Matching call
+            // Compare against last RAW GPS position, not matched position
             let distanceSinceLastMatch = Infinity;
-            if (this.lastMapMatchedLocation) {
+            if (this.lastRawGPSForMatching) {
                 distanceSinceLastMatch = this.haversineDistance(
-                    this.lastMapMatchedLocation.lat,
-                    this.lastMapMatchedLocation.lng,
+                    this.lastRawGPSForMatching.lat,
+                    this.lastRawGPSForMatching.lng,
                     rawLocation.lat,
                     rawLocation.lng
                 );
@@ -269,6 +328,12 @@ class GLJSLocationPuckController {
                 this.lastMapMatchedLocation = {
                     lat: processedLocation.lat,
                     lng: processedLocation.lng
+                };
+
+                // Update last raw GPS position used for matching
+                this.lastRawGPSForMatching = {
+                    lat: rawLocation.lat,
+                    lng: rawLocation.lng
                 };
 
                 console.log('📌 Snapped to road:', processedLocation.lat, processedLocation.lng);
@@ -543,6 +608,8 @@ class GLJSLocationPuckController {
      */
     setRoute(route) {
         this.currentRoute = route;
+        // Clear debug layers for new navigation session
+        this.clearDebugLayers();
     }
 
     /**
@@ -550,6 +617,34 @@ class GLJSLocationPuckController {
      */
     clearRoute() {
         this.currentRoute = null;
+    }
+
+    /**
+     * Clear debug visualization layers (for new navigation session)
+     */
+    clearDebugLayers() {
+        // Clear arrays
+        this.debugMatchedCoordinates = [];
+        this.debugRawGPSCoordinates = [];
+
+        // Clear map layers
+        const matchedSource = this.map.getSource('debug-matched-coords');
+        if (matchedSource) {
+            matchedSource.setData({
+                type: 'FeatureCollection',
+                features: []
+            });
+        }
+
+        const rawGPSSource = this.map.getSource('debug-raw-gps-coords');
+        if (rawGPSSource) {
+            rawGPSSource.setData({
+                type: 'FeatureCollection',
+                features: []
+            });
+        }
+
+        console.log('🧹 Debug layers cleared');
     }
 
     /**
