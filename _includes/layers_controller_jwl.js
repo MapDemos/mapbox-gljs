@@ -12,6 +12,12 @@ let tilesettype = tilesets[firsttileset].type;
 let tilesetvectortype = null;
 let tilesetvectorsource = null;
 let mapstyle = tilesets[firsttileset].mapstyle || defaultStyle;
+let tilesetsuffix = '';
+let tilesetresampling = 'nearest';
+let bandlist = [];
+let lastBandIndex = 0;
+let layers = {};
+let currentLayer = null;
 
 let map = new mapboxgl.Map({
     container: 'map',
@@ -379,9 +385,7 @@ const interpolateexpression = [
 
 //let colorscaleExpressiontemplate = interpolateexpression
 let colorscaleExpressiontemplate = stepexpression;
-let tilesetsuffix = '';
-//let tilesetresampling = 'linear'
-let tilesetresampling = 'nearest';
+// tilesetsuffix and tilesetresampling are now declared at the top of the file
 
 function getColorScale(colorRange) {
     let colorscale = null;
@@ -451,8 +455,7 @@ function updateLegendBar(colorRange) {
 }
 
 let initOption;
-
-let bandlist = [];
+// bandlist is now declared at the top of the file
 
 function showAllOptions() {
     sourceSetStart = Date.now();
@@ -683,8 +686,8 @@ async function getTilejson() {
         throw error; // Re-throw so callers can handle the error
     }
 }
+// lastBandIndex is now declared at the top of the file
 
-let lastBandIndex = 0;
 async function changeBand(index) {
     lastBandIndex = index;
     initTimeSlider(lastBandIndex);
@@ -795,9 +798,7 @@ function oneTwoFive(range, maxSteps = 15) {
     if (oneSteps < twoSteps) return oneSteps < fiveSteps ? oneSize : fiveSize;
     return twoSteps < fiveSteps ? twoSize : fiveSize;
 }
-
-let layers = {
-};
+// layers is now declared at the top of the file
 
 function setLayerOptions() {
     const select = document.getElementById('layer-selector');
@@ -814,8 +815,8 @@ function setLayerOptions() {
         showLayer(this.value);
     });
 }
-
-let currentLayer = initOption;
+// currentLayer is now declared at the top of the file (initialized to null, will be set later)
+currentLayer = initOption;
 const layerAboveDefault = tilesets[firsttileset].maplayer_above || 'road-exit-shield';
 let layerAbove = layerAboveDefault;
 const showLayer = (layer) => {
