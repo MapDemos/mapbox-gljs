@@ -206,11 +206,11 @@ class TimeManager {
     }
 }
 
-// window.TimeManager = TimeManager;
-// window.toJST = toJST;
-// window.toUTC = toUTC;
-// window.utcStringToJST = utcStringToJST;
-// window.jstStringToUnixTimestamp = jstStringToUnixTimestamp;
-// window.getLastHalfOrExactHour = getLastHalfOrExactHour;
-// window.getLastExactHour = getLastExactHour;
-// window.datetimeToJapanese = datetimeToJapanese;
+window.TimeManager = TimeManager;
+window.toJST = toJST;
+window.toUTC = toUTC;
+window.utcStringToJST = utcStringToJST;
+window.jstStringToUnixTimestamp = jstStringToUnixTimestamp;
+window.getLastHalfOrExactHour = getLastHalfOrExactHour;
+window.getLastExactHour = getLastExactHour;
+window.datetimeToJapanese = datetimeToJapanese;

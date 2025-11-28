@@ -21,6 +21,7 @@
   },
   "homepage": "https://github.com/MapDemos/mapbox-gljs#readme",
   "devDependencies": {
+    "chrome-devtools-mcp": "^0.10.2",
     "eslint": "^9.39.1"
   }
 }
