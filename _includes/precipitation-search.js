@@ -6,25 +6,29 @@ lng = 130.83813780004073;
 const tilesets = {
     nowcast: {
         //value: 'mapbox://mapbox.weather-jp-nowcast',
-        value: 'mapbox://kenji-shima.nowcast-r-20240620195000',
+        //value: 'mapbox://kenji-shima.nowcast-r-20240620195000',
+        value: 'mapbox://mapbox.weather-jp-nowcast-sample',
         label: 'Current Precipitation',
         colorscale: 'Rain'
     },
     nowcast_last60min: {
         //value: 'mapbox://mapbox.weather-jp-nowcast-last-60m',
-        value: 'mapbox://kenji-shima.nowcast-last60m-20240620195000',
+        //value: 'mapbox://mapbox.weather-jp-nowcast-last-60m',
+        value: 'mapbox://mapbox.weather-jp-nowcast-last-60m-samp',
         label: 'Past 60 Minutes',
         colorscale: 'Rain'
     },
     rain_6: {
         //value: 'mapbox://mapbox.weather-jp-rain-1-6',
-        value: 'mapbox://kenji-shima.forecast-20240620203000-6h',
+        //value: 'mapbox://kenji-shima.forecast-20240620203000-6h',
+        value: 'mapbox://mapbox.weather-jp-rain-1-6-sample',
         label: '1-6 Hour Forecast',
         colorscale: 'Rain'
     },
     rain_15: {
         //value: 'mapbox://mapbox.weather-jp-rain-7-15',
-        value: 'mapbox://kenji-shima.forecast-20240620200000-15h',
+        // value: 'mapbox://kenji-shima.forecast-20240620200000-15h',
+        value: 'mapbox://mapbox.weather-jp-rain-7-15-sample',
         label: '7-15 Hour Forecast',
         colorscale: 'Rain'
     }
@@ -360,58 +364,58 @@ function createRainColorScale() {
         39.9, 40.5, 41.1, 41.7, 42.3, 42.9, 43.5, 44.1, 44.7, 45.3, 45.9, 46.5
     ];
     const range = [
-        // --- 青系（51色, opacity 0.7, 最深色=0,65,255） ---
-        "rgba(242, 242, 255, 0.7)",
-        "rgba(236, 239, 255, 0.7)",
-        "rgba(230, 236, 255, 0.7)",
-        "rgba(224, 233, 255, 0.7)",
-        "rgba(218, 230, 255, 0.7)",
-        "rgba(212, 227, 255, 0.7)",
-        "rgba(206, 224, 255, 0.7)",
-        "rgba(200, 221, 255, 0.7)",
-        "rgba(194, 218, 255, 0.7)",
-        "rgba(188, 215, 255, 0.7)",
-        "rgba(182, 212, 255, 0.7)",
-        "rgba(176, 209, 255, 0.7)",
-        "rgba(170, 206, 255, 0.7)",
-        "rgba(164, 203, 255, 0.7)",
-        "rgba(158, 200, 255, 0.7)",
-        "rgba(152, 197, 255, 0.7)",
-        "rgba(146, 194, 255, 0.7)",
-        "rgba(140, 191, 255, 0.7)",
-        "rgba(134, 188, 255, 0.7)",
-        "rgba(128, 185, 255, 0.7)",
-        "rgba(122, 182, 255, 0.7)",
-        "rgba(116, 179, 255, 0.7)",
-        "rgba(110, 176, 255, 0.7)",
-        "rgba(104, 173, 255, 0.7)",
-        "rgba(98, 170, 255, 0.7)",
-        "rgba(92, 167, 255, 0.7)",
-        "rgba(86, 164, 255, 0.7)",
-        "rgba(80, 161, 255, 0.7)",
-        "rgba(74, 158, 255, 0.7)",
-        "rgba(68, 155, 255, 0.7)",
-        "rgba(62, 152, 255, 0.7)",
-        "rgba(56, 149, 255, 0.7)",
-        "rgba(50, 146, 255, 0.7)",
-        "rgba(44, 143, 255, 0.7)",
-        "rgba(38, 140, 255, 0.7)",
-        "rgba(32, 137, 255, 0.7)",
-        "rgba(26, 134, 255, 0.7)",
-        "rgba(20, 131, 255, 0.7)",
-        "rgba(14, 128, 255, 0.7)",
-        "rgba(8, 125, 255, 0.7)",
-        "rgba(4, 112, 255, 0.7)",
-        "rgba(2, 102, 255, 0.7)",
-        "rgba(0, 95, 255, 0.7)",
-        "rgba(0, 90, 255, 0.7)",
-        "rgba(0, 85, 255, 0.7)",
-        "rgba(0, 80, 255, 0.7)",
-        "rgba(0, 75, 255, 0.7)",
-        "rgba(0, 70, 255, 0.7)",
-        "rgba(0, 68, 255, 0.7)",
-        "rgba(0, 66, 255, 0.7)",
-        "rgba(0, 65, 255, 0.7)",
+        // --- 青系（51色, opacity 0.9, 最深色=0,65,255） ---
+        "rgba(242, 242, 255, 0.9)",
+        "rgba(236, 239, 255, 0.9)",
+        "rgba(230, 236, 255, 0.9)",
+        "rgba(224, 233, 255, 0.9)",
+        "rgba(218, 230, 255, 0.9)",
+        "rgba(212, 227, 255, 0.9)",
+        "rgba(206, 224, 255, 0.9)",
+        "rgba(200, 221, 255, 0.9)",
+        "rgba(194, 218, 255, 0.9)",
+        "rgba(188, 215, 255, 0.9)",
+        "rgba(182, 212, 255, 0.9)",
+        "rgba(176, 209, 255, 0.9)",
+        "rgba(170, 206, 255, 0.9)",
+        "rgba(164, 203, 255, 0.9)",
+        "rgba(158, 200, 255, 0.9)",
+        "rgba(152, 197, 255, 0.9)",
+        "rgba(146, 194, 255, 0.9)",
+        "rgba(140, 191, 255, 0.9)",
+        "rgba(134, 188, 255, 0.9)",
+        "rgba(128, 185, 255, 0.9)",
+        "rgba(122, 182, 255, 0.9)",
+        "rgba(116, 179, 255, 0.9)",
+        "rgba(110, 176, 255, 0.9)",
+        "rgba(104, 173, 255, 0.9)",
+        "rgba(98, 170, 255, 0.9)",
+        "rgba(92, 167, 255, 0.9)",
+        "rgba(86, 164, 255, 0.9)",
+        "rgba(80, 161, 255, 0.9)",
+        "rgba(74, 158, 255, 0.9)",
+        "rgba(68, 155, 255, 0.9)",
+        "rgba(62, 152, 255, 0.9)",
+        "rgba(56, 149, 255, 0.9)",
+        "rgba(50, 146, 255, 0.9)",
+        "rgba(44, 143, 255, 0.9)",
+        "rgba(38, 140, 255, 0.9)",
+        "rgba(32, 137, 255, 0.9)",
+        "rgba(26, 134, 255, 0.9)",
+        "rgba(20, 131, 255, 0.9)",
+        "rgba(14, 128, 255, 0.9)",
+        "rgba(8, 125, 255, 0.9)",
+        "rgba(4, 112, 255, 0.9)",
+        "rgba(2, 102, 255, 0.9)",
+        "rgba(0, 95, 255, 0.9)",
+        "rgba(0, 90, 255, 0.9)",
+        "rgba(0, 85, 255, 0.9)",
+        "rgba(0, 80, 255, 0.9)",
+        "rgba(0, 75, 255, 0.9)",
+        "rgba(0, 70, 255, 0.9)",
+        "rgba(0, 68, 255, 0.9)",
+        "rgba(0, 66, 255, 0.9)",
+        "rgba(0, 65, 255, 0.9)",
         // --- 暖色（26色, opacity 0.85, アンカー固定） ---
         "rgba(250, 245, 0, 0.85)",  // 31.5  ← 指定
         "rgba(251, 227, 0, 0.85)",  // 32.1
@@ -861,7 +865,7 @@ async function initMap() {
     map = new mapboxgl.Map({
         container: 'map',
         //style: 'mapbox://styles/kenji-shima/cmfurpm8w00j101r86qp530c8',
-        style: 'mapbox://styles/kenji-shima/clnxv0r9k003b01rff933dq05',
+        //style: 'mapbox://styles/kenji-shima/clnxv0r9k003b01rff933dq05',
         style: 'mapbox://styles/mapbox/light-v11',
         center: [lng, lat],
         zoom: 4,
@@ -1001,9 +1005,7 @@ function addUserLocationMarker(coordinates) {
 // Initialize user location
 async function initUserLocation() {
     try {
-        // Comment out actual geolocation - use default coordinates instead
-        // const coords = await getUserLocation();
-        const coords = { lng: lng, lat: lat }; // Use default coordinates set at top of file
+        const coords = await getUserLocation();
         console.log('User location obtained:', coords);
 
         // Add marker to map
@@ -1017,8 +1019,8 @@ async function initUserLocation() {
         });
     } catch (error) {
         console.error('Could not get user location:', error.message);
-        // Fallback to default location
-        console.log('Using default location');
+        // Fallback to default Kagoshima location
+        console.log('Using default location (Kagoshima)');
     }
 }
 
