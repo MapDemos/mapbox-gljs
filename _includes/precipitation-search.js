@@ -1,26 +1,30 @@
-// Initial location (Tokyo)
-lat = 35.681236;
-lng = 139.767125;
+// Initial location (Kagoshima)
+lat = 31.32847624803003;
+lng = 130.83813780004073;
 
 // Define precipitation tilesets
 const tilesets = {
     nowcast: {
-        value: 'mapbox://mapbox.weather-jp-nowcast',
+        //value: 'mapbox://mapbox.weather-jp-nowcast',
+        value: 'mapbox://kenji-shima.nowcast-r-20240620195000',
         label: 'Current Precipitation',
         colorscale: 'Rain'
     },
     nowcast_last60min: {
-        value: 'mapbox://mapbox.weather-jp-nowcast-last-60m',
+        //value: 'mapbox://mapbox.weather-jp-nowcast-last-60m',
+        value: 'mapbox://kenji-shima.nowcast-last60m-20240620195000',
         label: 'Past 60 Minutes',
         colorscale: 'Rain'
     },
     rain_6: {
-        value: 'mapbox://mapbox.weather-jp-rain-1-6',
+        //value: 'mapbox://mapbox.weather-jp-rain-1-6',
+        value: 'mapbox://kenji-shima.forecast-20240620203000-6h',
         label: '1-6 Hour Forecast',
         colorscale: 'Rain'
     },
     rain_15: {
-        value: 'mapbox://mapbox.weather-jp-rain-7-15',
+        //value: 'mapbox://mapbox.weather-jp-rain-7-15',
+        value: 'mapbox://kenji-shima.forecast-20240620200000-15h',
         label: '7-15 Hour Forecast',
         colorscale: 'Rain'
     }
@@ -39,10 +43,13 @@ let userCoordinates = null;
 let suggestionMarkers = [];
 let selectedMarker = null;
 let sessionToken = null;
+let routeLayers = []; // Track route layer IDs for cleanup
+let originalBounds = null; // Store original bounds showing all results
+let clickedMarkerId = null; // Track which marker is currently clicked/highlighted
 
 // Generate UUIDv4 for session token
 function generateSessionToken() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         const r = Math.random() * 16 | 0;
         const v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
@@ -59,40 +66,382 @@ function clearSuggestionMarkers() {
         selectedMarker.remove();
         selectedMarker = null;
     }
+
+    // Clear clicked marker tracking
+    clickedMarkerId = null;
+
+    // Clear all routes
+    clearRoutes();
 }
 
-// Highlight marker for a specific suggestion
+// Highlight marker and route for a specific suggestion
 function highlightMarkerForSuggestion(mapboxId) {
     const marker = suggestionMarkers.find(m => m.suggestionData?.mapbox_id === mapboxId);
     if (marker) {
-        marker.getElement().classList.add('highlighted');
+        const markerElement = marker.getElement();
+        markerElement.classList.add('highlighted');
+
+        // Change marker color to red (all path elements)
+        const svg = markerElement.querySelector('svg');
+        if (svg) {
+            // Change all path elements to red (Mapbox markers may have multiple paths)
+            const paths = svg.querySelectorAll('path');
+            paths.forEach(path => {
+                path.setAttribute('fill', '#FF0000');  // Red
+            });
+        }
+
+        // Zoom to route (user location + marker location)
+        if (userCoordinates) {
+            const markerLngLat = marker.getLngLat();
+            const bounds = [
+                [
+                    Math.min(userCoordinates.lng, markerLngLat.lng),
+                    Math.min(userCoordinates.lat, markerLngLat.lat)
+                ],
+                [
+                    Math.max(userCoordinates.lng, markerLngLat.lng),
+                    Math.max(userCoordinates.lat, markerLngLat.lat)
+                ]
+            ];
+
+            map.fitBounds(bounds, {
+                padding: { top: 80, bottom: 120, left: 80, right: 400 },
+                duration: 800,
+                maxZoom: 14
+            });
+        }
     }
+    // Also highlight the route
+    highlightRoute(mapboxId);
 }
 
-// Remove highlight from marker
+// Remove highlight from marker and route
 function unhighlightMarkerForSuggestion(mapboxId) {
     const marker = suggestionMarkers.find(m => m.suggestionData?.mapbox_id === mapboxId);
     if (marker) {
-        marker.getElement().classList.remove('highlighted');
+        const markerElement = marker.getElement();
+        markerElement.classList.remove('highlighted');
+
+        // Change marker color back to orange (all path elements)
+        const svg = markerElement.querySelector('svg');
+        if (svg) {
+            // Change all path elements back to orange
+            const paths = svg.querySelectorAll('path');
+            paths.forEach(path => {
+                path.setAttribute('fill', '#FF9800');  // Orange
+            });
+        }
+
+        // Restore original bounds (showing all results)
+        if (originalBounds) {
+            map.fitBounds(originalBounds, {
+                padding: { top: 100, bottom: 150, left: 100, right: 420 },
+                duration: 800
+            });
+        }
     }
+    // Also unhighlight the route
+    unhighlightRoute(mapboxId);
+}
+
+// Decode polyline string to GeoJSON coordinates
+function decodePolyline(str, precision = 5) {
+    let index = 0;
+    let lat = 0;
+    let lng = 0;
+    const coordinates = [];
+    let shift = 0;
+    let result = 0;
+    let byte = null;
+    let latitude_change;
+    let longitude_change;
+    const factor = Math.pow(10, precision);
+
+    while (index < str.length) {
+        byte = null;
+        shift = 0;
+        result = 0;
+
+        do {
+            byte = str.charCodeAt(index++) - 63;
+            result |= (byte & 0x1f) << shift;
+            shift += 5;
+        } while (byte >= 0x20);
+
+        latitude_change = ((result & 1) ? ~(result >> 1) : (result >> 1));
+        shift = result = 0;
+
+        do {
+            byte = str.charCodeAt(index++) - 63;
+            result |= (byte & 0x1f) << shift;
+            shift += 5;
+        } while (byte >= 0x20);
+
+        longitude_change = ((result & 1) ? ~(result >> 1) : (result >> 1));
+
+        lat += latitude_change;
+        lng += longitude_change;
+
+        coordinates.push([lng / factor, lat / factor]);
+    }
+
+    return coordinates;
+}
+
+// Fetch route from Directions API
+async function getDirections(fromLng, fromLat, toLng, toLat) {
+    try {
+        const url = `https://api.mapbox.com/directions/v5/mapbox.tmp.valhalla-zenrin/driving/${fromLng},${fromLat};${toLng},${toLat}?geometries=polyline&overview=full&access_token=${mapboxgl.accessToken}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.routes && data.routes.length > 0) {
+            // Decode polyline to GeoJSON LineString coordinates
+            const coordinates = decodePolyline(data.routes[0].geometry);
+
+            return {
+                geometry: {
+                    type: 'LineString',
+                    coordinates: coordinates
+                },
+                duration: data.routes[0].duration // Duration in seconds
+            };
+        }
+        return null;
+    } catch (error) {
+        console.error('Error fetching directions:', error);
+        return null;
+    }
+}
+
+// Format duration from seconds to readable format
+function formatDuration(seconds) {
+    if (seconds === null || seconds === undefined) {
+        return 'N/A';
+    }
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 60) {
+        return `${minutes}分`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    if (remainingMinutes === 0) {
+        return `${hours}時間`;
+    }
+    return `${hours}時間${remainingMinutes}分`;
+}
+
+// Calculate arrival time in JST from duration, based on first nowcast band timestamp
+function formatArrivalTime(seconds) {
+    if (seconds === null || seconds === undefined) {
+        return 'N/A';
+    }
+
+    // Get the timestamp of the first nowcast band
+    const firstNowcastBand = unifiedBands[nowBandIndex];
+
+    if (!firstNowcastBand || !firstNowcastBand.band) {
+        return 'N/A';
+    }
+
+    // Band is Unix timestamp in seconds, convert to milliseconds
+    const startTime = new Date(firstNowcastBand.band * 1000);
+    const arrivalTime = new Date(startTime.getTime() + seconds * 1000);
+
+    // Format in JST
+    const formatter = new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+
+    const arrivalTimeStr = formatter.format(arrivalTime);
+    const durationStr = formatDuration(seconds);
+    const formatted = `${arrivalTimeStr} (${durationStr})`;
+
+    return formatted;
+}
+
+// Draw route on map
+function drawRoute(routeGeometry, mapboxId) {
+    if (!routeGeometry) return;
+
+    const sourceId = `route-${mapboxId}`;
+    const layerId = `route-layer-${mapboxId}`;
+
+    // Add source
+    if (!map.getSource(sourceId)) {
+        map.addSource(sourceId, {
+            type: 'geojson',
+            data: {
+                type: 'Feature',
+                geometry: routeGeometry
+            }
+        });
+    }
+
+    // Add layer
+    if (!map.getLayer(layerId)) {
+        map.addLayer({
+            id: layerId,
+            type: 'line',
+            source: sourceId,
+            paint: {
+                'line-color': '#FF9800',  // Orange
+                'line-width': 3,
+                'line-opacity': 0.7
+            }
+        });
+
+        // Track for cleanup
+        routeLayers.push({ sourceId, layerId });
+    }
+}
+
+// Clear all routes from map
+function clearRoutes() {
+    routeLayers.forEach(({ sourceId, layerId }) => {
+        if (map.getLayer(layerId)) {
+            map.removeLayer(layerId);
+        }
+        if (map.getSource(sourceId)) {
+            map.removeSource(sourceId);
+        }
+    });
+    routeLayers = [];
+}
+
+// Highlight route by changing color to red
+function highlightRoute(mapboxId) {
+    const layerId = `route-layer-${mapboxId}`;
+    if (map.getLayer(layerId)) {
+        map.setPaintProperty(layerId, 'line-color', '#FF0000');  // Red
+        map.setPaintProperty(layerId, 'line-width', 4);
+    }
+
+    // Set opacity of all other routes to 0.2
+    routeLayers.forEach(route => {
+        if (route.layerId !== layerId && map.getLayer(route.layerId)) {
+            map.setPaintProperty(route.layerId, 'line-opacity', 0.2);
+        }
+    });
+}
+
+// Unhighlight route by changing color back to orange
+function unhighlightRoute(mapboxId) {
+    const layerId = `route-layer-${mapboxId}`;
+    if (map.getLayer(layerId)) {
+        map.setPaintProperty(layerId, 'line-color', '#FF9800');  // Orange
+        map.setPaintProperty(layerId, 'line-width', 3);
+    }
+
+    // Restore opacity of all routes to 1
+    routeLayers.forEach(route => {
+        if (map.getLayer(route.layerId)) {
+            map.setPaintProperty(route.layerId, 'line-opacity', 1);
+        }
+    });
 }
 
 // Create color scale for precipitation
 function createRainColorScale() {
-    const domain = [2, 10, 20, 30, 40, 50, 60, 70, 80];
-    const colors = [
-        'rgba(102, 255, 255, 0.7)',
-        'rgba(0, 204, 255, 0.7)',
-        'rgba(51, 102, 255, 0.7)',
-        'rgba(51, 255, 0, 0.7)',
-        'rgba(255, 255, 0, 0.7)',
-        'rgba(255, 153, 0, 0.7)',
-        'rgba(255, 0, 0, 0.7)',
-        'rgba(183, 0, 16, 0.7)',
-        'rgba(183, 0, 16, 0.9)'
+    const domain = [
+        1.5, 2.1, 2.7, 3.3, 3.9, 4.5, 5.1, 5.7, 6.3, 6.9,
+        7.5, 8.1, 8.7, 9.3, 9.9, 10.5, 11.1, 11.7, 12.3, 12.9,
+        13.5, 14.1, 14.7, 15.3, 15.9, 16.5, 17.1, 17.7, 18.3, 18.9,
+        19.5, 20.1, 20.7, 21.3, 21.9, 22.5, 23.1, 23.7, 24.3, 24.9,
+        25.5, 26.1, 26.7, 27.3, 27.9, 28.5, 29.1, 29.7, 30.3, 30.9,
+        31.2,
+        31.5, 32.1, 32.7, 33.3, 33.9, 34.5,
+        35.1, 35.7, 36.3, 36.9, 37.5, 38.1, 38.7, 39.3,
+        39.9, 40.5, 41.1, 41.7, 42.3, 42.9, 43.5, 44.1, 44.7, 45.3, 45.9, 46.5
+    ];
+    const range = [
+        // --- 青系（51色, opacity 0.7, 最深色=0,65,255） ---
+        "rgba(242, 242, 255, 0.7)",
+        "rgba(236, 239, 255, 0.7)",
+        "rgba(230, 236, 255, 0.7)",
+        "rgba(224, 233, 255, 0.7)",
+        "rgba(218, 230, 255, 0.7)",
+        "rgba(212, 227, 255, 0.7)",
+        "rgba(206, 224, 255, 0.7)",
+        "rgba(200, 221, 255, 0.7)",
+        "rgba(194, 218, 255, 0.7)",
+        "rgba(188, 215, 255, 0.7)",
+        "rgba(182, 212, 255, 0.7)",
+        "rgba(176, 209, 255, 0.7)",
+        "rgba(170, 206, 255, 0.7)",
+        "rgba(164, 203, 255, 0.7)",
+        "rgba(158, 200, 255, 0.7)",
+        "rgba(152, 197, 255, 0.7)",
+        "rgba(146, 194, 255, 0.7)",
+        "rgba(140, 191, 255, 0.7)",
+        "rgba(134, 188, 255, 0.7)",
+        "rgba(128, 185, 255, 0.7)",
+        "rgba(122, 182, 255, 0.7)",
+        "rgba(116, 179, 255, 0.7)",
+        "rgba(110, 176, 255, 0.7)",
+        "rgba(104, 173, 255, 0.7)",
+        "rgba(98, 170, 255, 0.7)",
+        "rgba(92, 167, 255, 0.7)",
+        "rgba(86, 164, 255, 0.7)",
+        "rgba(80, 161, 255, 0.7)",
+        "rgba(74, 158, 255, 0.7)",
+        "rgba(68, 155, 255, 0.7)",
+        "rgba(62, 152, 255, 0.7)",
+        "rgba(56, 149, 255, 0.7)",
+        "rgba(50, 146, 255, 0.7)",
+        "rgba(44, 143, 255, 0.7)",
+        "rgba(38, 140, 255, 0.7)",
+        "rgba(32, 137, 255, 0.7)",
+        "rgba(26, 134, 255, 0.7)",
+        "rgba(20, 131, 255, 0.7)",
+        "rgba(14, 128, 255, 0.7)",
+        "rgba(8, 125, 255, 0.7)",
+        "rgba(4, 112, 255, 0.7)",
+        "rgba(2, 102, 255, 0.7)",
+        "rgba(0, 95, 255, 0.7)",
+        "rgba(0, 90, 255, 0.7)",
+        "rgba(0, 85, 255, 0.7)",
+        "rgba(0, 80, 255, 0.7)",
+        "rgba(0, 75, 255, 0.7)",
+        "rgba(0, 70, 255, 0.7)",
+        "rgba(0, 68, 255, 0.7)",
+        "rgba(0, 66, 255, 0.7)",
+        "rgba(0, 65, 255, 0.7)",
+        // --- 暖色（26色, opacity 0.85, アンカー固定） ---
+        "rgba(250, 245, 0, 0.85)",  // 31.5  ← 指定
+        "rgba(251, 227, 0, 0.85)",  // 32.1
+        "rgba(252, 208, 0, 0.85)",  // 32.7
+        "rgba(253, 190, 0, 0.85)",  // 33.3
+        "rgba(254, 171, 0, 0.85)",  // 33.9
+        "rgba(255, 153, 0, 0.85)",  // 34.5  ← 指定
+        "rgba(255, 139, 0, 0.85)",  // 35.1
+        "rgba(255, 125, 0, 0.85)",  // 35.7
+        "rgba(255, 111, 0, 0.85)",  // 36.3
+        "rgba(255, 96, 0, 0.85)",   // 36.9
+        "rgba(255, 82, 0, 0.85)",   // 37.5
+        "rgba(255, 68, 0, 0.85)",   // 38.1
+        "rgba(255, 54, 0, 0.85)",   // 38.7
+        "rgba(255, 40, 0, 0.85)",   // 39.3  ← 指定
+        "rgba(249, 37, 9, 0.85)",   // 39.9
+        "rgba(242, 33, 17, 0.85)",  // 40.5
+        "rgba(236, 30, 26, 0.85)",  // 41.1
+        "rgba(230, 27, 35, 0.85)",  // 41.7
+        "rgba(224, 23, 43, 0.85)",  // 42.3
+        "rgba(218, 20, 52, 0.85)",  // 42.9
+        "rgba(211, 17, 61, 0.85)",  // 43.5
+        "rgba(205, 13, 69, 0.85)",  // 44.1
+        "rgba(199, 10, 78, 0.85)",  // 44.7
+        "rgba(192, 7, 87, 0.85)",   // 45.3
+        "rgba(186, 3, 95, 0.85)",   // 45.9
+        "rgba(180, 0, 104, 0.85)"   // 46.5  ← 指定
     ];
 
-    return ['step', ['raster-value'], 'rgba(0, 0, 0, 0)', ...domain.flatMap((d, i) => [d, colors[i]])];
+    return ['step', ['raster-value'], 'rgba(0, 0, 0, 0)', ...domain.flatMap((d, i) => [d, range[i]])];
 }
 
 // Convert band timestamp to JST date/time
@@ -197,22 +546,17 @@ async function loadAllTilesets() {
 
     console.log(`Loaded ${unifiedBands.length} bands total`);
 
-    // Find current time band (timestamps are Unix timestamps in seconds)
-    const now = new Date();
-    const nowValue = Math.floor(now.getTime() / 1000);
-
-    let minDiff = Infinity;
-    unifiedBands.forEach((item, idx) => {
-        const diff = Math.abs(item.timestamp - nowValue);
-        if (diff < minDiff) {
-            minDiff = diff;
-            nowBandIndex = idx;
+    // Find the first band of the 'nowcast' tileset
+    let foundNowBandIndex = 0;
+    for (let idx = 0; idx < unifiedBands.length; idx++) {
+        if (unifiedBands[idx].tilesetId === 'nowcast') {
+            foundNowBandIndex = idx;
+            break; // Take the first nowcast band
         }
-    });
+    }
 
-    currentBandIndex = nowBandIndex; // Start at current time
-
-    console.log(`Current band index: ${currentBandIndex}, time: ${formatBandTime(unifiedBands[currentBandIndex].band).time}`);
+    nowBandIndex = foundNowBandIndex; // Set global nowBandIndex
+    currentBandIndex = nowBandIndex; // Start at first nowcast band
 
     return unifiedBands[0]; // Return first band info
 }
@@ -273,7 +617,8 @@ function initializePrecipitationLayers() {
                 'raster-emissive-strength': 1.0,
                 'raster-fade-duration': 0
             }
-        }, 'road-label');
+        //}, 'road-label');
+        }, 'airport-label');
     });
 
     console.log('Initialized all precipitation layers');
@@ -515,7 +860,9 @@ function generateTimelineTicks() {
 async function initMap() {
     map = new mapboxgl.Map({
         container: 'map',
-        style: 'mapbox://styles/kenji-shima/cmfurpm8w00j101r86qp530c8',
+        //style: 'mapbox://styles/kenji-shima/cmfurpm8w00j101r86qp530c8',
+        style: 'mapbox://styles/kenji-shima/clnxv0r9k003b01rff933dq05',
+        style: 'mapbox://styles/mapbox/light-v11',
         center: [lng, lat],
         zoom: 4,
         projection: 'mercator',
@@ -574,6 +921,12 @@ async function initMap() {
         });
 
         console.log('Initialization complete');
+    });
+
+    map.on('click', async (e) => {
+        const lng = e.lngLat.lng;
+        const lat = e.lngLat.lat;
+        console.log(`Map clicked at: ${lng}, ${lat}`);
     });
 }
 
@@ -648,7 +1001,9 @@ function addUserLocationMarker(coordinates) {
 // Initialize user location
 async function initUserLocation() {
     try {
-        const coords = await getUserLocation();
+        // Comment out actual geolocation - use default coordinates instead
+        // const coords = await getUserLocation();
+        const coords = { lng: lng, lat: lat }; // Use default coordinates set at top of file
         console.log('User location obtained:', coords);
 
         // Add marker to map
@@ -662,42 +1017,69 @@ async function initUserLocation() {
         });
     } catch (error) {
         console.error('Could not get user location:', error.message);
-        // Fallback to default Tokyo location
-        console.log('Using default location (Tokyo)');
+        // Fallback to default location
+        console.log('Using default location');
     }
 }
 
 // Get precipitation value at a specific coordinate using queryRasterValue
-function getPrecipitationAtLocation(lng, lat) {
-    return new Promise((resolve) => {
-        try {
-            // Get the current active band
-            const bandInfo = unifiedBands[currentBandIndex];
-            if (!bandInfo) {
-                resolve(null);
-                return;
-            }
-
-            const sourceId = `precipitation-source-${bandInfo.tilesetId}`;
-            const sourceLayer = bandInfo.layer;
-
-            // Query raster value at the coordinate
-            const features = map.queryRasterValue(sourceId, [lng, lat], {
-                sourceLayer: sourceLayer
-            });
-
-            if (features && features.length > 0) {
-                const value = features[0];
-                // The value should be the precipitation amount
-                resolve(value);
-            } else {
-                resolve(null);
-            }
-        } catch (error) {
-            console.error('Error querying raster value:', error);
-            resolve(null);
+async function getPrecipitationAtLocation(lng, lat, bandIndex = null) {
+    try {
+        // Use provided bandIndex or default to current active band
+        const targetBandIndex = bandIndex !== null ? bandIndex : currentBandIndex;
+        const bandInfo = unifiedBands[targetBandIndex];
+        if (!bandInfo) {
+            return null;
         }
-    });
+
+        const sourceId = `precipitation-source-${bandInfo.tilesetId}`;
+        const sourceLayer = bandInfo.layer;
+
+        // Query raster value at the coordinate - await the Promise
+        const result = await map.queryRasterValue(sourceId, { lon: lng, lat: lat }, {
+            bands: [bandInfo.band]
+        });
+
+        // Parse nested structure: { "precipitation": { "1718913000": [30] } }
+        if (result && typeof result === 'object') {
+            // Get the layer name (e.g., "precipitation")
+            const layerData = result[sourceLayer];
+
+            if (layerData && typeof layerData === 'object') {
+                // Get the band data (keyed by band timestamp)
+                const bandData = layerData[bandInfo.band];
+
+                if (Array.isArray(bandData) && bandData.length > 0) {
+                    const value = bandData[0];
+                    return value;
+                }
+            }
+        }
+        return null;
+    } catch (error) {
+        console.error('Error querying raster value:', error);
+        return null;
+    }
+}
+
+// Find the band index closest to a given timestamp
+function findBandIndexForTimestamp(targetTimestamp) {
+    if (unifiedBands.length === 0) {
+        return null;
+    }
+
+    let closestIndex = 0;
+    let minDiff = Math.abs(unifiedBands[0].band - targetTimestamp);
+
+    for (let i = 1; i < unifiedBands.length; i++) {
+        const diff = Math.abs(unifiedBands[i].band - targetTimestamp);
+        if (diff < minDiff) {
+            minDiff = diff;
+            closestIndex = i;
+        }
+    }
+
+    return closestIndex;
 }
 
 // Format precipitation value for display
@@ -708,7 +1090,7 @@ function formatPrecipitation(value) {
     if (value < 0.5) {
         return '降水なし';
     }
-    return `降水量: ${value.toFixed(1)} mm/h`;
+    return `${value.toFixed(1)} mm/h`;
 }
 
 // Initialize search functionality
@@ -716,6 +1098,7 @@ function initSearch() {
     try {
         const searchInput = document.getElementById('search-box');
         const searchResults = document.getElementById('search-results');
+        const clearBtn = document.getElementById('clear-search');
 
         // Generate initial session token
         sessionToken = generateSessionToken();
@@ -726,6 +1109,9 @@ function initSearch() {
 
         searchInput.addEventListener('input', async (e) => {
             const query = e.target.value.trim();
+
+            // Show/hide clear button based on input
+            clearBtn.style.display = e.target.value ? 'flex' : 'none';
 
             // Clear previous timeout
             if (searchTimeout) {
@@ -746,6 +1132,16 @@ function initSearch() {
             }, 300);
         });
 
+        // Clear button handler
+        clearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            clearBtn.style.display = 'none';
+            searchResults.classList.remove('visible');
+            searchResults.innerHTML = '';
+            clearSuggestionMarkers();
+            searchInput.focus();
+        });
+
         // Note: Results will stay visible until user types again or selects a result
         // This allows users to click on the map or interact with markers without losing results
 
@@ -753,6 +1149,44 @@ function initSearch() {
     } catch (error) {
         console.error('Error initializing search:', error);
     }
+}
+
+// Fit map to show all suggestion markers
+function fitMapToBounds(coordinates) {
+    if (coordinates.length === 0) return;
+
+    // Calculate bounding box
+    const lngs = coordinates.map(c => c.lng);
+    const lats = coordinates.map(c => c.lat);
+
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+
+    // Create bounds
+    const bounds = [
+        [minLng, minLat], // Southwest
+        [maxLng, maxLat]  // Northeast
+    ];
+
+    // Include user location in bounds if available
+    if (userCoordinates) {
+        bounds[0][0] = Math.min(bounds[0][0], userCoordinates.lng);
+        bounds[0][1] = Math.min(bounds[0][1], userCoordinates.lat);
+        bounds[1][0] = Math.max(bounds[1][0], userCoordinates.lng);
+        bounds[1][1] = Math.max(bounds[1][1], userCoordinates.lat);
+    }
+
+    // Fit map to bounds with padding
+    map.fitBounds(bounds, {
+        padding: { top: 100, bottom: 150, left: 100, right: 420 }, // Extra right padding for search box
+        duration: 1000,
+        maxZoom: 12
+    });
+
+    // Save these bounds as the original bounds to restore on unhighlight
+    originalBounds = bounds;
 }
 
 // Perform search using SearchBox API /suggest endpoint
@@ -765,12 +1199,12 @@ async function performSearch(query) {
 
         // Build SearchBox API suggest URL
         const encodedQuery = encodeURIComponent(query);
-        let url = `https://api.mapbox.com/search/searchbox/v1/suggest?q=${encodedQuery}&access_token=${mapboxgl.accessToken}&session_token=${sessionToken}&language=ja&country=JP&limit=10`;
+        let url = `https://api.mapbox.com/search/searchbox/v1/suggest?q=${encodedQuery}&access_token=${mapboxgl.accessToken}&session_token=${sessionToken}&language=ja&country=JP&limit=10&types=poi`;
 
-        // Add proximity if user location is available
-        if (userCoordinates) {
-            url += `&proximity=${userCoordinates.lng},${userCoordinates.lat}`;
-        }
+        // Add proximity - use user location if available, otherwise use map center
+        const proximityCoords = userCoordinates || map.getCenter();
+        url += `&proximity=${proximityCoords.lng},${proximityCoords.lat}`;
+        console.log('Search URL:', url);
 
         const response = await fetch(url);
         const data = await response.json();
@@ -784,6 +1218,9 @@ async function performSearch(query) {
         // Display results
         searchResults.innerHTML = '';
         searchResults.classList.add('visible');
+
+        // Collect coordinates for bounding box
+        const coordinatesPromises = [];
 
         // Process each suggestion
         for (const suggestion of data.suggestions) {
@@ -799,13 +1236,29 @@ async function performSearch(query) {
             addressDiv.className = 'result-address';
             addressDiv.textContent = suggestion.place_formatted || '';
 
-            const precipDiv = document.createElement('div');
-            precipDiv.className = 'result-precipitation';
-            precipDiv.textContent = '読み込み中...';
+            const currentPrecipDiv = document.createElement('div');
+            currentPrecipDiv.className = 'result-precipitation';
+            currentPrecipDiv.textContent = '現在降水量: 読み込み中...';
+
+            // Container for arrival time and precipitation on same row
+            const arrivalRowDiv = document.createElement('div');
+            arrivalRowDiv.className = 'result-arrival-row';
+
+            const etaDiv = document.createElement('span');
+            etaDiv.className = 'result-eta';
+            etaDiv.textContent = '到着時間: 計算中...';
+
+            const arrivalPrecipDiv = document.createElement('span');
+            arrivalPrecipDiv.className = 'result-precipitation';
+            arrivalPrecipDiv.textContent = '予想降水量: 読み込み中...';
+
+            arrivalRowDiv.appendChild(etaDiv);
+            arrivalRowDiv.appendChild(arrivalPrecipDiv);
 
             resultItem.appendChild(nameDiv);
             resultItem.appendChild(addressDiv);
-            resultItem.appendChild(precipDiv);
+            resultItem.appendChild(currentPrecipDiv);
+            resultItem.appendChild(arrivalRowDiv);
 
             // Store the suggestion data for retrieval
             resultItem.dataset.mapboxId = suggestion.mapbox_id;
@@ -817,18 +1270,47 @@ async function performSearch(query) {
 
             // Add hover handlers to highlight marker
             resultItem.addEventListener('mouseenter', () => {
+                // If there's a clicked marker that's different, temporarily unhighlight it
+                if (clickedMarkerId && clickedMarkerId !== suggestion.mapbox_id) {
+                    unhighlightMarkerForSuggestion(clickedMarkerId);
+                    const clickedResultItem = document.querySelector(`[data-mapbox-id="${clickedMarkerId}"]`);
+                    if (clickedResultItem) {
+                        clickedResultItem.classList.remove('marker-hovered');
+                    }
+                }
+
+                // Highlight the hovered suggestion
                 highlightMarkerForSuggestion(suggestion.mapbox_id);
             });
 
             resultItem.addEventListener('mouseleave', () => {
+                // Unhighlight the hovered suggestion
                 unhighlightMarkerForSuggestion(suggestion.mapbox_id);
+
+                // Restore the clicked marker if there was one and it's different from what we just unhovered
+                if (clickedMarkerId && clickedMarkerId !== suggestion.mapbox_id) {
+                    highlightMarkerForSuggestion(clickedMarkerId);
+                    const clickedResultItem = document.querySelector(`[data-mapbox-id="${clickedMarkerId}"]`);
+                    if (clickedResultItem) {
+                        clickedResultItem.classList.add('marker-hovered');
+                    }
+                }
             });
 
             searchResults.appendChild(resultItem);
 
             // Retrieve full details to get coordinates, add marker, and query precipitation
-            retrieveAndAddMarker(suggestion, precipDiv);
+            const coordPromise = retrieveAndAddMarker(suggestion, currentPrecipDiv, etaDiv, arrivalPrecipDiv);
+            coordinatesPromises.push(coordPromise);
         }
+
+        // Wait for all coordinates to be retrieved, then fit bounds
+        Promise.all(coordinatesPromises).then(coordinates => {
+            const validCoords = coordinates.filter(coord => coord !== null);
+            if (validCoords.length > 0) {
+                fitMapToBounds(validCoords);
+            }
+        });
     } catch (error) {
         console.error('Search error:', error);
         searchResults.innerHTML = '<div class="search-result-item">検索エラーが発生しました</div>';
@@ -836,10 +1318,61 @@ async function performSearch(query) {
     }
 }
 
-// Retrieve feature details, add marker, and query precipitation
-async function retrieveAndAddMarker(suggestion, precipDiv) {
+// Create popup HTML for suggestions
+function createSuggestionPopupHTML(suggestion, currentPrecipText, etaText, arrivalPrecipText) {
+    return `
+        <div style="
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 16px;
+            min-width: 350px;
+            background: #2c2c2c;
+            border-radius: 4px;
+            box-sizing: border-box;
+        ">
+            <div style="font-weight: 600; font-size: 16px; margin-bottom: 4px; color: #ffffff;">
+                ${suggestion.name}
+            </div>
+            <div style="font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 16px;">
+                ${suggestion.place_formatted || ''}
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="
+                    background: rgba(102, 187, 106, 0.15);
+                    padding: 8px 12px;
+                    border-radius: 6px;
+                    border-left: 3px solid #66BB6A;
+                ">
+                    <span style="font-size: 11px; color: #81C784; font-weight: 500;">${currentPrecipText}</span>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <div style="
+                        flex: 1;
+                        background: rgba(66, 165, 245, 0.15);
+                        padding: 8px 12px;
+                        border-radius: 6px;
+                        border-left: 3px solid #42A5F5;
+                    ">
+                        <span style="font-size: 11px; color: #64B5F6; font-weight: 500;">${etaText}</span>
+                    </div>
+                    <div style="
+                        flex: 1;
+                        background: rgba(102, 187, 106, 0.15);
+                        padding: 8px 12px;
+                        border-radius: 6px;
+                        border-left: 3px solid #66BB6A;
+                    ">
+                        <span style="font-size: 11px; color: #81C784; font-weight: 500;">${arrivalPrecipText}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Retrieve feature details, add marker, draw route, and query precipitation
+async function retrieveAndAddMarker(suggestion, currentPrecipDiv, etaDiv, arrivalPrecipDiv) {
     try {
-        const url = `https://api.mapbox.com/search/searchbox/v1/retrieve/${suggestion.mapbox_id}?access_token=${mapboxgl.accessToken}&session_token=${sessionToken}`;
+        const url = `https://api.mapbox.com/search/searchbox/v1/retrieve/${suggestion.mapbox_id}?access_token=${mapboxgl.accessToken}&session_token=${sessionToken}&language=ja`;
 
         const response = await fetch(url);
         const data = await response.json();
@@ -848,28 +1381,125 @@ async function retrieveAndAddMarker(suggestion, precipDiv) {
             const feature = data.features[0];
             const [lng, lat] = feature.geometry.coordinates;
 
-            // Add marker for this suggestion
-            const marker = new mapboxgl.Marker({ color: '#2196F3' })
+            // Add marker for this suggestion (popup will be set later with full data)
+            const marker = new mapboxgl.Marker({ color: '#FF9800' })  // Orange
                 .setLngLat([lng, lat])
-                .setPopup(
-                    new mapboxgl.Popup({ offset: 25 })
-                        .setHTML(`<strong>${suggestion.name}</strong><br>${suggestion.place_formatted || ''}`)
-                )
                 .addTo(map);
 
             // Store marker reference with suggestion data
             marker.suggestionData = suggestion;
             suggestionMarkers.push(marker);
 
-            // Query precipitation value
-            const value = await getPrecipitationAtLocation(lng, lat);
-            precipDiv.textContent = formatPrecipitation(value);
+            // Add click handler to marker element - same as selecting from list
+            const markerElement = marker.getElement();
+            markerElement.style.cursor = 'pointer';
+            markerElement.addEventListener('click', async (e) => {
+                e.stopPropagation(); // Prevent map click from triggering
+
+                // Call the same function as when selecting from the list
+                await handleResultSelection(suggestion);
+            });
+
+            // Add hover handlers to show/hide popup
+            markerElement.addEventListener('mouseenter', () => {
+                marker.togglePopup(); // Open popup on hover
+            });
+            markerElement.addEventListener('mouseleave', () => {
+                marker.togglePopup(); // Close popup on mouse leave
+            });
+
+            // Draw route from user location to this suggestion and get route data
+            let routeData = null;
+            if (userCoordinates) {
+                routeData = await getDirections(
+                    userCoordinates.lng,
+                    userCoordinates.lat,
+                    lng,
+                    lat
+                );
+                if (routeData) {
+                    drawRoute(routeData.geometry, suggestion.mapbox_id);
+                    etaDiv.textContent = `到着時間: ${formatArrivalTime(routeData.duration)}`;
+                } else {
+                    etaDiv.textContent = '到着時間: N/A';
+                }
+            } else {
+                etaDiv.textContent = '到着時間: N/A';
+            }
+
+            // Query current precipitation value
+            const currentValue = await getPrecipitationAtLocation(lng, lat, nowBandIndex);
+            currentPrecipDiv.textContent = `現在降水量: ${formatPrecipitation(currentValue)}`;
+
+            // Query arrival precipitation value
+            if (routeData && routeData.duration) {
+                // Calculate arrival timestamp
+                const firstNowcastBand = unifiedBands[nowBandIndex];
+                const arrivalTimestamp = Number(firstNowcastBand.band) + Number(routeData.duration);
+
+                // Format the target arrival time for logging
+                const targetArrivalTime = formatBandTime(arrivalTimestamp);
+
+                console.log('=== Arrival Calculation ===');
+                console.log('Current band timestamp:', firstNowcastBand.band);
+                console.log('Current band JST:', formatBandTime(firstNowcastBand.band).time);
+                console.log('Travel duration (seconds):', routeData.duration);
+                console.log('Calculated arrival timestamp:', arrivalTimestamp);
+                console.log('Target arrival JST:', targetArrivalTime.time, targetArrivalTime.date);
+
+                // Find the band closest to arrival time
+                const arrivalBandIndex = findBandIndexForTimestamp(arrivalTimestamp);
+
+                if (arrivalBandIndex !== null) {
+                    const arrivalBand = unifiedBands[arrivalBandIndex];
+                    const arrivalBandTime = formatBandTime(arrivalBand.band);
+
+                    console.log('--- Selected Band ---');
+                    console.log('Arrival band index:', arrivalBandIndex);
+                    console.log('Arrival band tileset:', arrivalBand.tilesetId);
+                    console.log('Arrival band timestamp:', arrivalBand.band);
+                    console.log('Arrival band JST time:', arrivalBandTime.time);
+                    console.log('Arrival band JST date:', arrivalBandTime.date);
+                    console.log('Time difference (seconds):', Math.abs(arrivalBand.band - arrivalTimestamp));
+
+                    const arrivalValue = await getPrecipitationAtLocation(lng, lat, arrivalBandIndex);
+                    console.log('Arrival precipitation value:', arrivalValue);
+                    console.log('===================================');
+
+                    arrivalPrecipDiv.textContent = `予想降水量: ${formatPrecipitation(arrivalValue)}`;
+                } else {
+                    arrivalPrecipDiv.textContent = '予想降水量: データなし';
+                }
+            } else {
+                arrivalPrecipDiv.textContent = '予想降水量: N/A';
+            }
+
+            // Build detailed popup HTML with all the information
+            const currentPrecipText = currentPrecipDiv.textContent;
+            // Transform ETA text to add line break for popup: "14:30 (25分)" -> "14:30<br>(25分)"
+            const etaTextWithBreak = etaDiv.textContent.replace(/\s+\(/g, '<br>(');
+            const arrivalPrecipText = arrivalPrecipDiv.textContent;
+
+            const popupHTML = createSuggestionPopupHTML(suggestion, currentPrecipText, etaTextWithBreak, arrivalPrecipText);
+
+            // Set the popup on the marker with the detailed information
+            marker.setPopup(
+                new mapboxgl.Popup({ offset: 25 })
+                    .setHTML(popupHTML)
+            );
+
+            // Return coordinates for bounding box calculation
+            return { lng, lat };
         } else {
-            precipDiv.textContent = '位置情報なし';
+            currentPrecipDiv.textContent = '現在降水量: 位置情報なし';
+            arrivalPrecipDiv.textContent = '予想降水量: 位置情報なし';
+            return null;
         }
     } catch (error) {
         console.error('Error retrieving feature:', error);
-        precipDiv.textContent = 'エラー';
+        currentPrecipDiv.textContent = '現在降水量: エラー';
+        arrivalPrecipDiv.textContent = '予想降水量: エラー';
+        return null;
     }
 }
 
@@ -888,6 +1518,77 @@ async function handleResultSelection(suggestion) {
     const marker = suggestionMarkers.find(m => m.suggestionData?.mapbox_id === suggestion.mapbox_id);
 
     if (marker) {
+        // Get the result item from the dropdown to extract calculated data
+        const resultItem = document.querySelector(`[data-mapbox-id="${suggestion.mapbox_id}"]`);
+        let currentPrecipText = '現在降水量: N/A';
+        let etaText = '到着時間: N/A';
+        let arrivalPrecipText = '予想降水量: N/A';
+
+        if (resultItem) {
+            const currentPrecipDiv = resultItem.querySelector('.result-precipitation');
+            const arrivalRow = resultItem.querySelector('.result-arrival-row');
+
+            if (currentPrecipDiv) {
+                currentPrecipText = currentPrecipDiv.textContent;
+            }
+
+            if (arrivalRow) {
+                const etaSpan = arrivalRow.querySelector('.result-eta');
+                const arrivalPrecipSpan = arrivalRow.querySelector('.result-precipitation');
+
+                if (etaSpan) {
+                    etaText = etaSpan.textContent;
+                }
+                if (arrivalPrecipSpan) {
+                    arrivalPrecipText = arrivalPrecipSpan.textContent;
+                }
+            }
+        }
+
+        // Clear originalBounds so we don't restore to the all-suggestions view
+        originalBounds = null;
+
+        // Remove ALL other suggestion markers except this one
+        suggestionMarkers.forEach(m => {
+            if (m !== marker) {
+                m.remove();
+            }
+        });
+        suggestionMarkers = [marker]; // Keep only the selected marker
+
+        // Remove ALL routes except the selected one
+        const selectedRouteLayerId = `route-layer-${suggestion.mapbox_id}`;
+        routeLayers.forEach(route => {
+            if (route.layerId !== selectedRouteLayerId) {
+                if (map.getLayer(route.layerId)) {
+                    map.removeLayer(route.layerId);
+                }
+                if (map.getSource(route.sourceId)) {
+                    map.removeSource(route.sourceId);
+                }
+            }
+        });
+        // Keep only the selected route in the array
+        routeLayers = routeLayers.filter(route => route.layerId === selectedRouteLayerId);
+
+        // Change the selected route to red and thicker (without calling highlightRoute which dims other routes)
+        if (map.getLayer(selectedRouteLayerId)) {
+            map.setPaintProperty(selectedRouteLayerId, 'line-color', '#FF0000');  // Red
+            map.setPaintProperty(selectedRouteLayerId, 'line-width', 4);
+        }
+
+        // Get the marker element and change it to red with scale
+        const markerElement = marker.getElement();
+        markerElement.classList.add('highlighted');
+        const svg = markerElement.querySelector('svg');
+        if (svg) {
+            // Change all path elements to red (Mapbox markers may have multiple paths)
+            const paths = svg.querySelectorAll('path');
+            paths.forEach(path => {
+                path.setAttribute('fill', '#FF0000');  // Red
+            });
+        }
+
         // Remove previous selected marker if any
         if (selectedMarker && selectedMarker !== marker) {
             selectedMarker.remove();
@@ -896,24 +1597,49 @@ async function handleResultSelection(suggestion) {
         // Create a highlighted marker at the same location
         const lngLat = marker.getLngLat();
 
-        // Remove the blue marker
+        // Remove the orange marker (now highlighted red)
         marker.remove();
+
+        // Build popup HTML with all information
+        // Transform ETA text to add line break for popup: "14:30 (25分)" -> "14:30<br>(25分)"
+        const etaTextWithBreak = etaText.replace(/\s+\(/g, '<br>(');
+        const popupHTML = createSuggestionPopupHTML(suggestion, currentPrecipText, etaTextWithBreak, arrivalPrecipText);
 
         // Add orange/red selected marker
         selectedMarker = new mapboxgl.Marker({ color: '#FF5722' })
             .setLngLat(lngLat)
             .setPopup(
                 new mapboxgl.Popup({ offset: 25 })
-                    .setHTML(`<strong>${suggestion.name}</strong><br>${suggestion.place_formatted || ''}`)
+                    .setHTML(popupHTML)
             )
             .addTo(map);
 
-        // Fly to location
-        map.flyTo({
-            center: lngLat,
-            zoom: 12,
-            duration: 1500
-        });
+        // Zoom to bounding box that includes start (user location), end (destination), and route
+        if (userCoordinates) {
+            const bounds = [
+                [
+                    Math.min(userCoordinates.lng, lngLat.lng),
+                    Math.min(userCoordinates.lat, lngLat.lat)
+                ],
+                [
+                    Math.max(userCoordinates.lng, lngLat.lng),
+                    Math.max(userCoordinates.lat, lngLat.lat)
+                ]
+            ];
+
+            map.fitBounds(bounds, {
+                padding: { top: 80, bottom: 120, left: 80, right: 80 },
+                duration: 1500,
+                maxZoom: 14
+            });
+        } else {
+            // Fallback if no user coordinates - just fly to destination
+            map.flyTo({
+                center: lngLat,
+                zoom: 12,
+                duration: 1500
+            });
+        }
 
         // Show popup
         selectedMarker.togglePopup();
