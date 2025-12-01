@@ -454,13 +454,13 @@ js: precipitation-search.js
             position: absolute;
             top: 20px;
             right: 20px;
-            width: 320px;
+            width: 480px;
             z-index: 1000;
         }
 
         .search-box {
             width: 100%;
-            padding: 12px 16px;
+            padding: 12px 40px 12px 16px;
             background: linear-gradient(135deg, rgba(30, 30, 40, 0.95), rgba(20, 20, 30, 0.95));
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -480,6 +480,31 @@ js: precipitation-search.js
         .search-box:focus {
             border-color: rgba(76, 175, 80, 0.5);
             box-shadow: 0 4px 20px rgba(76, 175, 80, 0.3);
+        }
+
+        .clear-search-btn {
+            position: absolute;
+            right: 8px;
+            top: 8px;
+            width: 28px;
+            height: 28px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 50%;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            padding: 0;
+        }
+
+        .clear-search-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
         }
 
         .search-results {
@@ -510,7 +535,8 @@ js: precipitation-search.js
             border-bottom: none;
         }
 
-        .search-result-item:hover {
+        .search-result-item:hover,
+        .search-result-item.marker-hovered {
             background: rgba(76, 175, 80, 0.2);
         }
 
@@ -530,6 +556,37 @@ js: precipitation-search.js
             font-size: 11px;
             color: #4CAF50;
             font-weight: 500;
+        }
+
+        .result-arrival-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .result-eta {
+            font-size: 11px;
+            color: #2196F3;
+            font-weight: 500;
+        }
+
+        /* Mapbox Popup Styling */
+        .mapboxgl-popup-content {
+            background: transparent !important;
+            padding: 0 !important;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5) !important;
+            position: relative !important;
+            overflow: visible !important;
+            display: block !important;
+        }
+
+        .mapboxgl-popup-tip {
+            border-top-color: #2c2c2c !important;
+            border-bottom-color: #2c2c2c !important;
+        }
+
+        .mapboxgl-popup-close-button {
+            display: none !important;
         }
 
         /* User Location Marker */
@@ -559,16 +616,17 @@ js: precipitation-search.js
         /* Highlighted marker on hover */
         .mapboxgl-marker.highlighted svg {
             transform: scale(1.3);
-            filter: drop-shadow(0 0 8px rgba(33, 150, 243, 0.8));
             transition: all 0.2s ease;
         }
 
         /* Mobile Responsive Styles */
         @media (max-width: 768px) {
             .search-container {
-                top: 10px;
+                top: 70px;
                 right: 10px;
-                width: 280px;
+                left: 10px;
+                width: auto;
+                max-width: 100%;
             }
 
             .search-box {
@@ -666,10 +724,11 @@ js: precipitation-search.js
 
         @media (max-width: 480px) {
             .search-container {
-                top: 5px;
+                top: 60px;
                 right: 5px;
-                width: calc(100% - 10px);
-                max-width: 300px;
+                left: 5px;
+                width: auto;
+                max-width: 100%;
             }
 
             .search-box {
@@ -760,6 +819,7 @@ js: precipitation-search.js
                class="search-box"
                placeholder="場所を検索..."
                autocomplete="off">
+        <button id="clear-search" class="clear-search-btn" style="display: none;">×</button>
         <div id="search-results" class="search-results"></div>
     </div>
 
