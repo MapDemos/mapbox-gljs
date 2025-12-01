@@ -76,6 +76,9 @@ function clearSuggestionMarkers() {
 
     // Clear all routes
     clearRoutes();
+
+    // Reset original bounds so new search results get fresh bounds
+    originalBounds = null;
 }
 
 // Highlight marker and route for a specific suggestion
