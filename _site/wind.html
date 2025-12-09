@@ -783,6 +783,14 @@ map.on('style.load', () => {
                 });
             }
             try {
+                // Check if the source exists before querying
+                if (!map.getSource('rastersource')) {
+                    if (popup) {
+                        popup.remove();
+                    }
+                    return;
+                }
+
                 const result = await map.queryRasterValue('rastersource', e.lngLat, {
                     layerName: currentLayer,
                     bands: bandlist.length > 0 ? [bandlist[lastBandIndex].toString()] : undefined
@@ -1248,6 +1256,10 @@ function showAllOptions() {
 
 function setTimeFromTileJson() {
     getTilejson().then(tilejson => {
+        if (!tilejson.description) {
+            return;
+        }
+
         const utcTimestamp = tilejson.description.split(':: ')[1];
 
         // Convert UTC yyyyMMddHHmmSS to JST yyyyMMddHHmmSS
@@ -1350,6 +1362,11 @@ function initTimeSlider(val) {
 
 const baseDate = new Date(Date.UTC(1990, 0, 1));
 function convertTimeValue(timeValue) {
+    // Check if timeValue is a string (band name) rather than a numeric time value
+    if (typeof timeValue === 'string' && isNaN(Number(timeValue))) {
+        return '  '; // Return two spaces so split(' ') produces valid array
+    }
+
     const millisecondsInDay = 24 * 60 * 60 * 1000;
     const totalMilliseconds = Math.round(timeValue * millisecondsInDay);
     const date = new Date(baseDate.getTime() + totalMilliseconds);
@@ -1375,14 +1392,50 @@ function convertTimeValue(timeValue) {
 
 async function getCurrentBands() {
     const tilejson = await getTilejson();
-    currentLayer = tilejson.raster_layers[0].fields.name; // Default to the first layer if none is set
-    if (currentLayer === 'wind' || currentLayer === 'winds' || currentLayer === '10winds') {
+
+    // If particlelayerid is already set from tileset config, use it
+    if (particlelayerid && tilesettype === 'raster-array-particle') {
+        return tilejson;
+    }
+
+    // If currentLayer is set from speedLayer config, find it
+    if (currentLayer && tilesettype === 'raster-array') {
+        let foundLayer = false;
+        tilejson.raster_layers.forEach(layer => {
+            if (layer.id === currentLayer || layer.fields.name === currentLayer) {
+                bandlist = layer.fields.bands || [];
+                initTimeSlider(lastBandIndex);
+                initOption = layer.fields.name;
+                currentLayer = layer.fields.name;
+
+                layers[layer.fields.name] = {
+                    label: layer.fields.name,
+                    layer: layer.fields.name,
+                    color_range: layer.fields.range,
+                    minzoom: tilejson.minzoom,
+                    maxzoom: tilejson.maxzoom,
+                };
+                foundLayer = true;
+            }
+        });
+        if (foundLayer) {
+            return tilejson;
+        }
+    }
+
+    // Otherwise, check for default particle layer names
+    if (!currentLayer) {
+        currentLayer = tilejson.raster_layers[0].fields.name; // Default to the first layer if none is set
+    }
+
+    if (currentLayer === 'wind' || currentLayer === 'winds' || currentLayer === '10winds' || currentLayer.includes('wind_vector')) {
         particlelayerid = currentLayer;
         return tilejson;
     }
+
     tilejson.raster_layers.forEach(layer => {
-        if (layer.id === currentLayer) {
-            bandlist = layer.fields.bands;
+        if (layer.id === currentLayer || layer.fields.name === currentLayer) {
+            bandlist = layer.fields.bands || [];
             initTimeSlider(lastBandIndex);
             initOption = layer.fields.name;
             currentLayer = layer.fields.name;
@@ -1472,6 +1525,21 @@ function changeTileset(t) {
     layerAbove = tilesets[t].maplayer_above || layerAboveDefault;
     tilesetsuffix = tilesets[t].suffix || '';
     tilesetresampling = tilesets[t].resampling || 'nearest';
+
+    // Reset layer-specific variables
+    particlelayerid = null;
+    currentLayer = null;
+
+    // Set particle layer ID if specified
+    if (tilesets[t].particleLayer) {
+        particlelayerid = tilesets[t].particleLayer;
+    }
+
+    // Set current layer if speedLayer is specified
+    if (tilesets[t].speedLayer) {
+        currentLayer = tilesets[t].speedLayer;
+    }
+
     if (tilesettype === 'vector') {
         tilesetvectortype = tilesets[t].vector_layer_type;
         tilesetvectorsource = tilesets[t].vector_layer_source;
@@ -2102,6 +2170,11 @@ window.getLastHalfOrExactHour = getLastHalfOrExactHour;
 window.getLastExactHour = getLastExactHour;
 window.datetimeToJapanese = datetimeToJapanese;
 function convertTimeValue(timeValue) {
+    // Check if timeValue is a string (band name) rather than a numeric time value
+    if (typeof timeValue === 'string' && isNaN(Number(timeValue))) {
+        return '  '; // Return two spaces so split(' ') produces valid array
+    }
+
     const dateString = toJST(timeValue, false)
     const year = dateString.substring(0, 4);
     const month = dateString.substring(4, 6);

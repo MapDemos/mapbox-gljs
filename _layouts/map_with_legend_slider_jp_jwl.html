@@ -21,6 +21,11 @@
   {% include layers_controller_jwl.js %}
   {% include timeManager.js %}
 function convertTimeValue(timeValue) {
+    // Check if timeValue is a string (band name) rather than a numeric time value
+    if (typeof timeValue === 'string' && isNaN(Number(timeValue))) {
+        return '  '; // Return two spaces so split(' ') produces valid array
+    }
+
     const dateString = toJST(timeValue, false)
     const year = dateString.substring(0, 4);
     const month = dateString.substring(4, 6);
