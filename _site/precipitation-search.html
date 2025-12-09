@@ -971,12 +971,19 @@ function highlightMarkerForSuggestion(mapboxId) {
         const markerElement = marker.getElement();
         markerElement.classList.add('highlighted');
 
-        // Change marker color to red (all path elements)
+        // Bring marker to front by re-appending it to the DOM
+        // This makes it appear on top of all other markers
+        if (markerElement.parentNode) {
+            markerElement.parentNode.appendChild(markerElement);
+        }
+
+        // Change marker color to red (only the colored marker paths, not shadow or white center)
         const svg = markerElement.querySelector('svg');
         if (svg) {
-            // Change all path elements to red (Mapbox markers may have multiple paths)
-            const paths = svg.querySelectorAll('path');
+            // Change only path elements that have the orange color
+            const paths = svg.querySelectorAll('path[fill="#FF9800"]');
             paths.forEach(path => {
+                path.style.fill = '#FF0000';  // Red
                 path.setAttribute('fill', '#FF0000');  // Red
             });
         }
@@ -995,8 +1002,10 @@ function highlightMarkerForSuggestion(mapboxId) {
                 ]
             ];
 
+            // Use dynamic padding
+            const padding = calculateDynamicPadding();
             map.fitBounds(bounds, {
-                padding: { top: 80, bottom: 120, left: 80, right: 400 },
+                padding: padding,
                 duration: 800,
                 maxZoom: 14
             });
@@ -1013,20 +1022,23 @@ function unhighlightMarkerForSuggestion(mapboxId) {
         const markerElement = marker.getElement();
         markerElement.classList.remove('highlighted');
 
-        // Change marker color back to orange (all path elements)
+        // Change marker color back to orange (only the colored marker paths)
         const svg = markerElement.querySelector('svg');
         if (svg) {
-            // Change all path elements back to orange
-            const paths = svg.querySelectorAll('path');
+            // Change path elements that are currently red back to orange
+            const paths = svg.querySelectorAll('path[fill="#FF0000"]');
             paths.forEach(path => {
+                path.style.fill = '#FF9800';  // Orange
                 path.setAttribute('fill', '#FF9800');  // Orange
             });
         }
 
         // Restore original bounds (showing all results)
         if (originalBounds) {
+            // Use dynamic padding
+            const padding = calculateDynamicPadding();
             map.fitBounds(originalBounds, {
-                padding: { top: 100, bottom: 150, left: 100, right: 420 },
+                padding: padding,
                 duration: 800
             });
         }
@@ -1676,7 +1688,8 @@ async function initMap() {
         center: [lng, lat],
         zoom: 4,
         projection: 'mercator',
-        language: 'ja'
+        language: 'ja',
+        maxTileCacheSize: 12
     });
 
     map.on('load', async () => {
@@ -1986,15 +1999,68 @@ function fitMapToBounds(coordinates) {
         bounds[1][1] = Math.max(bounds[1][1], userCoordinates.lat);
     }
 
-    // Fit map to bounds with padding
+    // Calculate dynamic padding based on UI element dimensions
+    const padding = calculateDynamicPadding();
+
+    // Fit map to bounds with dynamic padding
     map.fitBounds(bounds, {
-        padding: { top: 100, bottom: 150, left: 100, right: 420 }, // Extra right padding for search box
+        padding: padding,
         duration: 1000,
         maxZoom: 12
     });
 
     // Save these bounds as the original bounds to restore on unhighlight
     originalBounds = bounds;
+}
+
+// Calculate dynamic padding based on UI element dimensions
+function calculateDynamicPadding() {
+    const padding = {
+        top: 20,
+        bottom: 20,
+        left: 20,
+        right: 20
+    };
+
+    // Add padding for date/time display at top
+    const dateTimeDisplay = document.querySelector('.date-time-display');
+    if (dateTimeDisplay) {
+        const rect = dateTimeDisplay.getBoundingClientRect();
+        padding.top = Math.max(padding.top, rect.bottom + 20); // 20px extra margin
+    }
+
+    // Add padding for timeline controls at bottom
+    const timeControls = document.getElementById('time-controls');
+    if (timeControls && !timeControls.classList.contains('collapsed')) {
+        const rect = timeControls.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        padding.bottom = Math.max(padding.bottom, viewportHeight - rect.top + 20);
+    }
+
+    // Add padding for legend on left
+    const legend = document.getElementById('legend');
+    if (legend && !legend.classList.contains('collapsed')) {
+        const rect = legend.getBoundingClientRect();
+        padding.left = Math.max(padding.left, rect.width + 40); // 40px extra margin (20px on each side)
+    }
+
+    // Add padding for search box on right
+    const searchContainer = document.querySelector('.search-container');
+    if (searchContainer) {
+        const rect = searchContainer.getBoundingClientRect();
+        // Include search box width + search results dropdown if visible
+        const searchResults = document.getElementById('search-results');
+        const resultsVisible = searchResults && searchResults.classList.contains('visible');
+
+        if (resultsVisible) {
+            const resultsRect = searchResults.getBoundingClientRect();
+            padding.right = Math.max(padding.right, window.innerWidth - resultsRect.left + 20);
+        } else {
+            padding.right = Math.max(padding.right, window.innerWidth - rect.left + 20);
+        }
+    }
+
+    return padding;
 }
 
 // Perform search using SearchBox API /suggest endpoint
@@ -2390,9 +2456,10 @@ async function handleResultSelection(suggestion) {
         markerElement.classList.add('highlighted');
         const svg = markerElement.querySelector('svg');
         if (svg) {
-            // Change all path elements to red (Mapbox markers may have multiple paths)
-            const paths = svg.querySelectorAll('path');
+            // Change only path elements that have the orange color
+            const paths = svg.querySelectorAll('path[fill="#FF9800"]');
             paths.forEach(path => {
+                path.style.fill = '#FF0000';  // Red
                 path.setAttribute('fill', '#FF0000');  // Red
             });
         }
@@ -2435,8 +2502,10 @@ async function handleResultSelection(suggestion) {
                 ]
             ];
 
+            // Use dynamic padding
+            const padding = calculateDynamicPadding();
             map.fitBounds(bounds, {
-                padding: { top: 80, bottom: 120, left: 80, right: 80 },
+                padding: padding,
                 duration: 1500,
                 maxZoom: 14
             });
