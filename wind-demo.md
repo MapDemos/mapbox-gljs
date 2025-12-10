@@ -7,8 +7,7 @@ layout: none
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Wind Speed and Particles Demo</title>
-    <script src='https://api.mapbox.com/mapbox-gl-js/v3.15.0/mapbox-gl.js'></script>
-    <link href='https://api.mapbox.com/mapbox-gl-js/v3.15.0/mapbox-gl.css' rel='stylesheet' />
+    {% include common_head.html %}
     <style>
         * {
             margin: 0;
@@ -175,8 +174,6 @@ layout: none
     </div>
 
     <script>
-        mapboxgl.accessToken = 'pk.eyJ1Ijoia2Vuamktc2hpbWEiLCJhIjoiY2xpd2RwaHhzMGJoYjNlbnduYjJmMm5xNyJ9.Zi2lDBa9rXEAj6KyhLrINA';
-
         const TILESET = 'mapbox://kenji-shima.wvs2025111018v6';
         const HEATMAP_LAYER = 'wind_speed';
         const PARTICLE_LAYER = 'wind_vector';
