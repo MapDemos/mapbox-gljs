@@ -1,6 +1,6 @@
-// Initial location (Kagoshima)
-lat = 31.32847624803003;
-lng = 130.83813780004073;
+// Initial location (Tokyo Station)
+lat = 35.681236;
+lng = 139.767125;
 
 // Define precipitation tilesets
 const tilesets = {
@@ -940,23 +940,52 @@ function addUserLocationMarker(coordinates) {
 
 // Initialize user location
 async function initUserLocation() {
+    // Start with default location (Tokyo Station)
+    const defaultCoords = {
+        lng: 139.767125,
+        lat: 35.681236
+    };
+
+    console.log('Setting default location (Tokyo Station):', defaultCoords);
+
+    // Set default coordinates immediately
+    userCoordinates = defaultCoords;
+    addUserLocationMarker(defaultCoords);
+
+    // Fly to default location
+    map.flyTo({
+        center: [defaultCoords.lng, defaultCoords.lat],
+        zoom: 8,
+        duration: 2000
+    });
+
+    // Try to get actual user location in the background
     try {
+        console.log('Requesting user location...');
         const coords = await getUserLocation();
         console.log('User location obtained:', coords);
 
-        // Add marker to map
-        addUserLocationMarker(coords);
+        // Update to real location
+        userCoordinates = coords;
 
-        // Optionally fly to user location
+        // Update marker position
+        if (userLocationMarker) {
+            userLocationMarker.setLngLat([coords.lng, coords.lat]);
+        } else {
+            addUserLocationMarker(coords);
+        }
+
+        // Smoothly transition to real location
         map.flyTo({
             center: [coords.lng, coords.lat],
             zoom: 8,
             duration: 2000
         });
+
+        console.log('Updated to actual user location');
     } catch (error) {
-        console.error('Could not get user location:', error.message);
-        // Fallback to default Kagoshima location
-        console.log('Using default location (Kagoshima)');
+        console.log('Could not get user location, using default (Tokyo Station):', error.message);
+        // Keep using default location (already set above)
     }
 }
 
