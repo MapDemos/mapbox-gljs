@@ -1003,9 +1003,13 @@ async function getPrecipitationAtLocation(lng, lat, bandIndex = null) {
         const sourceLayer = bandInfo.layer;
 
         // Query raster value at the coordinate - await the Promise
+        const bandString = String(bandInfo.band);
         const result = await map.queryRasterValue(sourceId, { lon: lng, lat: lat }, {
-            bands: [bandInfo.band]
+            bands: [bandString]
         });
+
+        console.log(`Querying precipitation at [${lng}, ${lat}] for band ${bandString} (tileset: ${bandInfo.tilesetId})`);
+        console.log('Query result:', result);
 
         // Parse nested structure: { "precipitation": { "1718913000": [30] } }
         if (result && typeof result === 'object') {
@@ -1013,15 +1017,17 @@ async function getPrecipitationAtLocation(lng, lat, bandIndex = null) {
             const layerData = result[sourceLayer];
 
             if (layerData && typeof layerData === 'object') {
-                // Get the band data (keyed by band timestamp)
-                const bandData = layerData[bandInfo.band];
+                // Get the band data (keyed by band timestamp as string)
+                const bandData = layerData[bandString];
 
                 if (Array.isArray(bandData) && bandData.length > 0) {
                     const value = bandData[0];
+                    console.log(`Precipitation value: ${value} mm/h`);
                     return value;
                 }
             }
         }
+        console.log('No precipitation data found');
         return null;
     } catch (error) {
         console.error('Error querying raster value:', error);
