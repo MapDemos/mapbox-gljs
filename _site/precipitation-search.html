@@ -1872,8 +1872,8 @@ async function initUserLocation() {
     }
 }
 
-// Get precipitation value at a specific coordinate using queryRasterValue
-async function getPrecipitationAtLocation(lng, lat, bandIndex = null) {
+// Get precipitation value at a specific coordinate using Tilequery API
+async function getPrecipitationAtLocation(lng, lat, bandIndex = null, retryCount = 0) {
     try {
         // Use provided bandIndex or default to current active band
         const targetBandIndex = bandIndex !== null ? bandIndex : currentBandIndex;
@@ -1882,38 +1882,50 @@ async function getPrecipitationAtLocation(lng, lat, bandIndex = null) {
             return null;
         }
 
-        const sourceId = `precipitation-source-${bandInfo.tilesetId}`;
-        const sourceLayer = bandInfo.layer;
-
-        // Query raster value at the coordinate - await the Promise
+        // Get the tileset ID from the source configuration
+        const tilesetConfig = tilesets[bandInfo.tilesetId];
+        const tilesetId = tilesetConfig.value.replace('mapbox://', '');
         const bandString = String(bandInfo.band);
-        const result = await map.queryRasterValue(sourceId, { lon: lng, lat: lat }, {
-            bands: [bandString]
-        });
 
-        console.log(`Querying precipitation at [${lng}, ${lat}] for band ${bandString} (tileset: ${bandInfo.tilesetId})`);
-        console.log('Query result:', result);
+        // Construct Tilequery API URL
+        // Format: https://api.mapbox.com/v4/{tileset_id}/tilequery/{lng},{lat}.json
+        // The layers parameter specifies which raster layer to query
+        const url = `https://api.mapbox.com/v4/${tilesetId}/tilequery/${lng},${lat}.json?access_token=${mapboxgl.accessToken}&layers=${bandInfo.layer}`;
 
-        // Parse nested structure: { "precipitation": { "1718913000": [30] } }
-        if (result && typeof result === 'object') {
-            // Get the layer name (e.g., "precipitation")
-            const layerData = result[sourceLayer];
+        const response = await fetch(url);
 
-            if (layerData && typeof layerData === 'object') {
-                // Get the band data (keyed by band timestamp as string)
-                const bandData = layerData[bandString];
+        if (!response.ok) {
+            console.error(`Tilequery API error: ${response.status} ${response.statusText}`);
+            return null;
+        }
 
-                if (Array.isArray(bandData) && bandData.length > 0) {
-                    const value = bandData[0];
-                    console.log(`Precipitation value: ${value} mm/h`);
-                    return value;
-                }
+        const data = await response.json();
+
+        // Parse the Tilequery API response
+        // The API returns all bands at the location, we need to find the matching band
+        if (data.features && data.features.length > 0) {
+            // Find the feature that matches our target band
+            const matchingFeature = data.features.find(feature => {
+                return feature.properties?.tilequery?.band === bandString;
+            });
+
+            if (matchingFeature && matchingFeature.properties?.val) {
+                const value = matchingFeature.properties.val[0];
+                return value;
             }
         }
-        console.log('No precipitation data found');
+
+        // If no data found and we haven't retried too many times, retry after a delay
+        // Increase retry count to 5 and longer delays for tile loading
+        if (retryCount < 5) {
+            const delay = 500 * (retryCount + 1); // 500ms, 1000ms, 1500ms, 2000ms, 2500ms
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return await getPrecipitationAtLocation(lng, lat, bandIndex, retryCount + 1);
+        }
+
         return null;
     } catch (error) {
-        console.error('Error querying raster value:', error);
+        console.error('Error querying via Tilequery API:', error);
         return null;
     }
 }
