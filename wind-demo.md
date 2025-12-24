@@ -130,6 +130,15 @@ layout: none
         </div>
 
         <div class="control-group">
+            <label class="control-label">Heatmap Transition Mode</label>
+            <select id="transition-mode">
+                <option value="none">No fade (instant)</option>
+                <option value="fadein">Fade-in (1 layer)</option>
+                <option value="crossfade" selected>Cross-fade (2 layers)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
             <label class="control-label">Color Scale</label>
             <select id="color-scale">
                 <option value="turbo" selected>Turbo</option>
@@ -188,6 +197,8 @@ layout: none
         };
 
         let map, bandlist = [], currentBandIndex = 0, isPlaying = false, playInterval;
+        let transitionMode = 'crossfade'; // 'crossfade' or 'fadein'
+        let currentActiveLayer = 'heatmap-a';
 
         // Initialize map
         map = new mapboxgl.Map({
@@ -219,7 +230,7 @@ layout: none
                 url: TILESET
             });
 
-            // Add heatmap layer
+            // Add single-layer heatmap for fade-in mode
             map.addLayer({
                 id: 'heatmap',
                 type: 'raster',
@@ -227,10 +238,48 @@ layout: none
                 'source-layer': HEATMAP_LAYER,
                 paint: {
                     'raster-opacity': 0.7,
+                    'raster-opacity-transition': { duration: 450 },
                     'raster-array-band': bandlist[0],
                     'raster-color-range': heatmapLayer.fields.range,
                     'raster-color': createColorRamp('turbo', heatmapLayer.fields.range),
-                    'raster-resampling': 'linear'
+                    'raster-resampling': 'linear',
+                    'raster-fade-duration': 0
+                },
+                layout: {
+                    'visibility': 'none' // Hidden by default, show when fadein mode is selected
+                }
+            });
+
+            // Add dual-layer heatmap for cross-fade mode
+            map.addLayer({
+                id: 'heatmap-a',
+                type: 'raster',
+                source: 'wind-source',
+                'source-layer': HEATMAP_LAYER,
+                paint: {
+                    'raster-opacity': 0.7,
+                    'raster-opacity-transition': { duration: 900 },
+                    'raster-array-band': bandlist[0],
+                    'raster-color-range': heatmapLayer.fields.range,
+                    'raster-color': createColorRamp('turbo', heatmapLayer.fields.range),
+                    'raster-resampling': 'linear',
+                    'raster-fade-duration': 0
+                }
+            });
+
+            map.addLayer({
+                id: 'heatmap-b',
+                type: 'raster',
+                source: 'wind-source',
+                'source-layer': HEATMAP_LAYER,
+                paint: {
+                    'raster-opacity': 0,
+                    'raster-opacity-transition': { duration: 900 },
+                    'raster-array-band': bandlist[0],
+                    'raster-color-range': heatmapLayer.fields.range,
+                    'raster-color': createColorRamp('turbo', heatmapLayer.fields.range),
+                    'raster-resampling': 'linear',
+                    'raster-fade-duration': 0
                 }
             });
 
@@ -315,9 +364,35 @@ layout: none
         function updateBand(index) {
             currentBandIndex = index;
             const band = bandlist[index];
+            const targetOpacity = parseFloat(document.getElementById('heatmap-opacity').value);
 
-            // Update heatmap layer
-            if (map.getLayer('heatmap')) {
+            if (transitionMode === 'crossfade') {
+                // Cross-fade mode: use two layers
+                const nextLayer = currentActiveLayer === 'heatmap-a' ? 'heatmap-b' : 'heatmap-a';
+                const currentOpacity = map.getPaintProperty(currentActiveLayer, 'raster-opacity');
+
+                // Set the new band on the hidden layer
+                map.setPaintProperty(nextLayer, 'raster-array-band', band);
+
+                // Cross-fade: show next layer, hide current layer
+                map.setPaintProperty(nextLayer, 'raster-opacity', currentOpacity);
+                map.setPaintProperty(currentActiveLayer, 'raster-opacity', 0);
+
+                // Swap active layer reference
+                currentActiveLayer = nextLayer;
+            } else if (transitionMode === 'fadein') {
+                // Fade-in mode: use single layer
+                // Fade to 0
+                map.setPaintProperty('heatmap', 'raster-opacity', 0);
+
+                // Wait for fade-out to complete, then change band and fade in
+                setTimeout(() => {
+                    map.setPaintProperty('heatmap', 'raster-array-band', band);
+                    // Fade back to target opacity
+                    map.setPaintProperty('heatmap', 'raster-opacity', targetOpacity);
+                }, 450); // Match the transition duration
+            } else {
+                // No fade mode: instant band switch
                 map.setPaintProperty('heatmap', 'raster-array-band', band);
             }
 
@@ -351,14 +426,52 @@ layout: none
                 }
             });
 
+            // Transition mode toggle
+            document.getElementById('transition-mode').addEventListener('change', (e) => {
+                transitionMode = e.target.value;
+                const band = bandlist[currentBandIndex];
+                const opacity = parseFloat(document.getElementById('heatmap-opacity').value);
+
+                if (transitionMode === 'crossfade') {
+                    // Switch to cross-fade mode
+                    map.setLayoutProperty('heatmap', 'visibility', 'none');
+                    map.setLayoutProperty('heatmap-a', 'visibility', 'visible');
+                    map.setLayoutProperty('heatmap-b', 'visibility', 'visible');
+                    // Sync current band
+                    map.setPaintProperty('heatmap-a', 'raster-array-band', band);
+                    map.setPaintProperty('heatmap-a', 'raster-opacity', opacity);
+                    map.setPaintProperty('heatmap-b', 'raster-opacity', 0);
+                    currentActiveLayer = 'heatmap-a';
+                } else {
+                    // Switch to single-layer mode (fadein or none)
+                    map.setLayoutProperty('heatmap-a', 'visibility', 'none');
+                    map.setLayoutProperty('heatmap-b', 'visibility', 'none');
+                    map.setLayoutProperty('heatmap', 'visibility', 'visible');
+                    // Sync current band
+                    map.setPaintProperty('heatmap', 'raster-array-band', band);
+                    map.setPaintProperty('heatmap', 'raster-opacity', opacity);
+                }
+            });
+
             // Heatmap controls
             document.getElementById('show-heatmap').addEventListener('change', (e) => {
-                map.setLayoutProperty('heatmap', 'visibility', e.target.checked ? 'visible' : 'none');
+                const visibility = e.target.checked ? 'visible' : 'none';
+                if (transitionMode === 'crossfade') {
+                    map.setLayoutProperty('heatmap-a', 'visibility', visibility);
+                    map.setLayoutProperty('heatmap-b', 'visibility', visibility);
+                } else {
+                    map.setLayoutProperty('heatmap', 'visibility', visibility);
+                }
             });
 
             document.getElementById('heatmap-opacity').addEventListener('input', (e) => {
                 const value = parseFloat(e.target.value);
-                map.setPaintProperty('heatmap', 'raster-opacity', value);
+                if (transitionMode === 'crossfade') {
+                    // Update opacity on the currently visible layer
+                    map.setPaintProperty(currentActiveLayer, 'raster-opacity', value);
+                } else {
+                    map.setPaintProperty('heatmap', 'raster-opacity', value);
+                }
                 document.getElementById('heatmap-opacity-value').textContent = value.toFixed(1);
             });
 
@@ -369,8 +482,13 @@ layout: none
                 const tilejson = await response.json();
                 const heatmapLayer = tilejson.raster_layers.find(l => l.fields.name === HEATMAP_LAYER);
 
-                map.setPaintProperty('heatmap', 'raster-color',
-                    createColorRamp(e.target.value, heatmapLayer.fields.range));
+                const colorRamp = createColorRamp(e.target.value, heatmapLayer.fields.range);
+                if (transitionMode === 'crossfade') {
+                    map.setPaintProperty('heatmap-a', 'raster-color', colorRamp);
+                    map.setPaintProperty('heatmap-b', 'raster-color', colorRamp);
+                } else {
+                    map.setPaintProperty('heatmap', 'raster-color', colorRamp);
+                }
             });
 
             // Particle controls
