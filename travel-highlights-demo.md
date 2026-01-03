@@ -1,0 +1,755 @@
+---
+layout: null
+title: Travel Highlights 2024
+---
+
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Travel Highlights 2024</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% include common_head.html %}
+  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    /* Destination label */
+    #destination-label {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 20px 40px;
+      border-radius: 12px;
+      font-size: 32px;
+      font-weight: 700;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.5s;
+      pointer-events: none;
+      text-align: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    }
+
+    #destination-label.show {
+      opacity: 1;
+    }
+
+    /* Control panel */
+    #control-panel {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      padding: 15px 25px;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      z-index: 1000;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="destination-label"></div>
+  <div id="control-panel">
+    <button id="start-btn" class="btn" onclick="startTour()">Start Tour</button>
+  </div>
+
+  <script>
+    // Asset helper function
+    function asset(uri) {
+      return `https://docs.mapbox.com/mapbox-gl-js/assets/${uri}`;
+    }
+
+    const airplaneModelUri = asset('airplane.glb');
+    const trainModelUri = 'https://kenji-shima.github.io/resource-files/models/train_white.glb';
+
+    // Define your travel destinations in order
+    // vehicle: 'plane' (default) or 'train'
+    const destinations = [
+      { name: 'Narita', coords: [140.3929, 35.7719], flag: '🇯🇵', vehicle: 'plane' },
+      { name: 'San Francisco', coords: [-122.4194, 37.7749], flag: '🇺🇸', vehicle: 'plane' },
+      { name: 'Phoenix', coords: [-112.0740, 33.4484], flag: '🇺🇸', vehicle: 'plane' },
+      { name: 'Mexico City', coords: [-99.1332, 19.4326], flag: '🇲🇽', vehicle: 'plane' },
+      { name: 'San Francisco', coords: [-122.4194, 37.7749], flag: '🇺🇸', vehicle: 'plane' },
+      { name: 'Narita', coords: [140.3929, 35.7719], flag: '🇯🇵', vehicle: 'plane' },
+      { name: 'Bangkok', coords: [100.5018, 13.7563], flag: '🇹🇭', vehicle: 'plane' },
+      { name: 'Haneda', coords: [139.7798, 35.5494], flag: '🇯🇵', vehicle: 'plane' },
+      { name: 'Hanoi', coords: [105.8542, 21.0285], flag: '🇻🇳', vehicle: 'train' },
+      { name: 'Da Nang', coords: [108.2022, 16.0544], flag: '🇻🇳', vehicle: 'plane' },
+      { name: 'Saigon', coords: [106.6297, 10.8231], flag: '🇻🇳', vehicle: 'plane' },
+      { name: 'Haneda', coords: [139.7798, 35.5494], flag: '🇯🇵', vehicle: 'plane' },
+      { name: 'Prague', coords: [14.4378, 50.0755], flag: '🇨🇿', vehicle: 'train' },
+      { name: 'Budapest', coords: [19.0402, 47.4979], flag: '🇭🇺', vehicle: 'train' },
+      { name: 'Vienna', coords: [16.3738, 48.2082], flag: '🇦🇹', vehicle: 'train' },
+      { name: 'Prague', coords: [14.4378, 50.0755], flag: '🇨🇿', vehicle: 'plane' },
+      { name: 'Haneda', coords: [139.7798, 35.5494], flag: '🇯🇵', vehicle: 'plane' },
+      { name: 'Osaka', coords: [135.5023, 34.6937], flag: '🇯🇵', vehicle: 'plane' }
+    ];
+
+    // Helper functions
+    function clamp(v) {
+      return Math.max(0.0, Math.min(v, 1.0));
+    }
+
+    function mix(a, b, mixFactor) {
+      const f = clamp(mixFactor);
+      return a * (1 - f) + b * f;
+    }
+
+    function rad2deg(angRad) {
+      return (angRad * 180.0) / Math.PI;
+    }
+
+    // Generate a simple flight route between two points
+    function generateFlightRoute(from, to) {
+      const numPoints = 200; // More points for smoother long-distance flights
+      const coordinates = [];
+      const elevationData = [];
+
+      // Use greatCircle for proper long-distance routing
+      // turf.greatCircle expects Point features, not raw arrays
+      const startPoint = turf.point(from);
+      const endPoint = turf.point(to);
+
+      const greatCircleLine = turf.greatCircle(startPoint, endPoint, { npoints: numPoints + 1 });
+
+      // Handle MultiLineString (when crossing antimeridian) or LineString
+      let gcCoordinates;
+      if (greatCircleLine.geometry.type === 'MultiLineString') {
+        // Flatten the multi-line string into a single array
+        gcCoordinates = greatCircleLine.geometry.coordinates.flat();
+      } else {
+        gcCoordinates = greatCircleLine.geometry.coordinates;
+      }
+
+      for (let i = 0; i <= numPoints; i++) {
+        const fraction = i / numPoints;
+        // Map fraction to the actual coordinate array
+        const coordIndex = Math.floor(fraction * (gcCoordinates.length - 1));
+        coordinates.push(gcCoordinates[coordIndex]);
+
+        // Parabolic elevation profile - arc shape
+        // Use inverted parabola: peak in the middle, lower at start/end
+        const parabola = -4 * (fraction - 0.5) * (fraction - 0.5) + 1; // Peak at 0.5, value 0-1
+        const minAltitude = 0; // Ground level at start/end
+        const maxAltitude = 11000; // 11km at peak (typical cruise altitude)
+        const elevation = minAltitude + parabola * (maxAltitude - minAltitude);
+
+        elevationData.push(elevation);
+      }
+
+      return {
+        coordinates: coordinates,
+        elevationData: elevationData
+      };
+    }
+
+    // FlightRoute class (simplified)
+    class FlightRoute {
+      constructor(routeData) {
+        this.coordinates = routeData.coordinates;
+        this.elevationData = routeData.elevationData;
+        this.distances = [0];
+
+        for (let i = 1; i < this.coordinates.length; i++) {
+          const segmentDistance =
+            turf.distance(
+              turf.point(this.coordinates[i - 1]),
+              turf.point(this.coordinates[i]),
+              { units: 'kilometers' }
+            ) * 1000.0;
+          this.distances.push(this.distances[i - 1] + segmentDistance);
+        }
+      }
+
+      get totalLength() {
+        if (!this.distances || this.distances.length === 0) return 0;
+        return this.distances[this.distances.length - 1];
+      }
+
+      sample(currentDistance) {
+        if (!this.distances || this.distances.length === 0) return null;
+
+        let segmentIndex =
+          this.distances.findIndex((d) => d >= currentDistance) - 1;
+        if (segmentIndex < 0) segmentIndex = 0;
+        if (segmentIndex >= this.coordinates.length - 1) {
+          segmentIndex = this.coordinates.length - 2;
+        }
+
+        const p1 = this.coordinates[segmentIndex];
+        const p2 = this.coordinates[segmentIndex + 1];
+        const segmentLength =
+          this.distances[segmentIndex + 1] - this.distances[segmentIndex];
+        const segmentRatio =
+          (currentDistance - this.distances[segmentIndex]) / segmentLength;
+
+        const e1 = this.elevationData[segmentIndex];
+        const e2 = this.elevationData[segmentIndex + 1];
+        const bearing = turf.bearing(turf.point(p1), turf.point(p2));
+        const altitude = e1 + (e2 - e1) * segmentRatio;
+        const pitch = rad2deg(Math.atan2(e2 - e1, segmentLength));
+
+        return {
+          position: [
+            p1[0] + (p2[0] - p1[0]) * segmentRatio,
+            p1[1] + (p2[1] - p1[1]) * segmentRatio
+          ],
+          altitude: altitude,
+          bearing: bearing,
+          pitch: pitch
+        };
+      }
+    }
+
+    // Airplane class
+    class Airplane {
+      constructor(startPos) {
+        this.position = startPos || [0, 0];
+        this.altitude = 5000;
+        this.bearing = 0;
+        this.pitch = 0;
+        this.roll = 0;
+        this.frontGearRotation = 90; // Retracted
+        this.rearGearRotation = -90; // Retracted
+        this.animTimeS = 0;
+      }
+
+      update(target, dtimeMs) {
+        this.position[0] = target.position[0];
+        this.position[1] = target.position[1];
+        this.altitude = target.altitude;
+        this.bearing = target.bearing;
+        this.pitch = target.pitch;
+        this.roll = rad2deg(Math.sin(this.animTimeS * Math.PI * 0.3) * 0.05);
+        this.frontGearRotation = 90; // Always retracted
+        this.rearGearRotation = -90; // Always retracted
+        this.animTimeS += dtimeMs / 1000.0;
+      }
+    }
+
+    // Map style with model sources and layers
+    const style = {
+      'version': 8,
+      'imports': [
+        {
+          'id': 'basemap',
+          'url': 'mapbox://styles/mapbox/standard',
+          'config': {
+            'lightPreset': 'night',
+            'showPointOfInterestLabels': false,
+            'showRoadLabels': false
+          }
+        }
+      ],
+      'sources': {
+        'plane-model-source': {
+          'type': 'model',
+          'models': {
+            'plane': {
+              'uri': airplaneModelUri,
+              'position': [140.3929, 35.7719],
+              'orientation': [0, 0, 0]
+            }
+          }
+        },
+        'train-model-source': {
+          'type': 'model',
+          'models': {
+            'train': {
+              'uri': trainModelUri,
+              'position': [-180, -90],
+              'orientation': [0, 0, 0]
+            }
+          }
+        }
+      },
+      'layers': [
+        {
+          'id': 'plane-model-layer',
+          'type': 'model',
+          'source': 'plane-model-source',
+          'slot': 'top',
+          'layout': {
+            'visibility': 'visible'
+          },
+          'paint': {
+            'model-translation': [0, 0, ['feature-state', 'z-elevation']],
+            'model-scale': [
+              'interpolate',
+              ['exponential', 0.5],
+              ['zoom'],
+              2, ['literal', [20000, 20000, 20000]],
+              14, ['literal', [1, 1, 1]]
+            ],
+            'model-type': 'location-indicator',
+            'model-rotation': [
+              ['feature-state', 'pitch'],
+              ['feature-state', 'roll'],
+              ['feature-state', 'bearing']
+            ],
+            'model-emissive-strength': 2
+          }
+        },
+        {
+          'id': 'train-model-layer',
+          'type': 'model',
+          'source': 'train-model-source',
+          'slot': 'top',
+          'layout': {
+            'visibility': 'none'
+          },
+          'paint': {
+            'model-translation': [0, 0, ['feature-state', 'z-elevation']],
+            'model-scale': [
+              'interpolate',
+              ['exponential', 0.5],
+              ['zoom'],
+              2, ['literal', [480, 480, 480]],
+              14, ['literal', [0.012, 0.012, 0.012]]
+            ],
+            'model-type': 'location-indicator',
+            'model-rotation': [
+              ['feature-state', 'pitch'],
+              ['feature-state', 'roll'],
+              ['feature-state', 'bearing']
+            ],
+            'model-emissive-strength': 2
+          }
+        }
+      ]
+    };
+
+    // Update 3D model source and feature state
+    function updateModelSourceAndFeatureState(airplane) {
+      const isUsingTrain = (currentModelUri === trainModelUri);
+      const activeLayerId = isUsingTrain ? 'train-model-layer' : 'plane-model-layer';
+      const activeSourceId = isUsingTrain ? 'train-model-source' : 'plane-model-source';
+      const activeModelId = isUsingTrain ? 'train' : 'plane';
+      const inactiveLayerId = isUsingTrain ? 'plane-model-layer' : 'train-model-layer';
+
+      if (needsModelUpdate) {
+        console.log('Switching to:', isUsingTrain ? 'train' : 'plane');
+
+        // Show active layer, hide inactive layer
+        map.setLayoutProperty(activeLayerId, 'visibility', 'visible');
+        map.setLayoutProperty(inactiveLayerId, 'visibility', 'none');
+
+        needsModelUpdate = false;
+      }
+
+      // Update model position
+      const source = map.getSource(activeSourceId);
+      if (source) {
+        source.setModels({
+          [activeModelId]: {
+            'uri': currentModelUri,
+            'position': airplane.position,
+            'orientation': [0, 0, 0]
+          }
+        });
+      }
+
+      // Update feature state for rotation and elevation
+      map.setFeatureState(
+        { source: activeSourceId, id: activeModelId },
+        {
+          'z-elevation': airplane.altitude,
+          'pitch': airplane.pitch,
+          'roll': airplane.roll,
+          'bearing': airplane.bearing + (isUsingTrain ? 90 : 90)
+        }
+      );
+    }
+
+    // Initialize map
+    const map = new mapboxgl.Map({
+      container: 'map',
+      projection: 'globe',
+      style,
+      center: [140.3929, 35.7719], // Start at Narita
+      zoom: 4,
+      bearing: 0,
+      pitch: 30
+    });
+
+
+    let currentLegIndex = 0;
+    let isAnimating = false;
+    let flightRoute = null;
+    let airplane = null;
+    let phase = 0;
+    let lastFrameTime = null;
+    let animationFrameId = null;
+    let currentFlightDuration = 5000; // Will be calculated based on distance
+    let currentSegmentTrailCoordinates = []; // Store current segment trail coordinates
+    let trailAltitudes = []; // Store altitudes separately
+    let segmentCounter = 0; // Counter for unique segment IDs
+    // Initialize with the first destination's vehicle
+    let currentModelUri = (destinations[0].vehicle === 'train') ? trainModelUri : airplaneModelUri;
+    let lastModelUri = null; // Track last loaded model to avoid unnecessary updates
+    let needsModelUpdate = true; // Flag to trigger model switch
+
+    // Show destination label
+    function showDestinationLabel(destination) {
+      const label = document.getElementById('destination-label');
+      label.innerHTML = `${destination.flag}<br>${destination.name}`;
+      label.classList.add('show');
+
+      setTimeout(() => {
+        label.classList.remove('show');
+      }, 2000);
+    }
+
+    // Animation frame
+    function frame(time) {
+      if (!isAnimating) return;
+
+      if (!lastFrameTime) lastFrameTime = time;
+      const frameDeltaTime = time - lastFrameTime;
+
+      phase += frameDeltaTime / currentFlightDuration;
+      lastFrameTime = time;
+
+      if (phase >= 1) {
+        // Flight leg complete
+        phase = 0;
+        currentLegIndex++;
+
+        if (currentLegIndex >= destinations.length - 1) {
+          // Tour complete
+          isAnimating = false;
+          document.getElementById('start-btn').disabled = false;
+          document.getElementById('start-btn').textContent = 'Restart Tour';
+
+          // Show final destination
+          showDestinationLabel(destinations[destinations.length - 1]);
+          return;
+        }
+
+        // Start next leg
+        const from = destinations[currentLegIndex];
+        const to = destinations[currentLegIndex + 1];
+
+        // Switch vehicle based on the 'from' destination's vehicle attribute
+        const vehicle = from.vehicle || 'plane'; // Default to plane if not specified
+        const previousModelUri = currentModelUri;
+        if (vehicle === 'train') {
+          currentModelUri = trainModelUri;
+          console.log('Switching to TRAIN for', from.name, 'to', to.name);
+        } else {
+          currentModelUri = airplaneModelUri;
+          console.log('Switching to AIRPLANE for', from.name, 'to', to.name);
+        }
+
+        // Set flag if vehicle changed
+        if (previousModelUri !== currentModelUri) {
+          needsModelUpdate = true;
+        }
+
+        const routeData = generateFlightRoute(from.coords, to.coords);
+        flightRoute = new FlightRoute(routeData);
+
+        // Create new segment source and layer for this route
+        segmentCounter++;
+        currentSegmentTrailCoordinates = []; // Reset for new segment
+
+        const isUsingTrain = (currentModelUri === trainModelUri);
+        const trailColor = isUsingTrain ? '#00ff00' : '#ff0000';
+        const sourceId = `trail-segment-${segmentCounter}`;
+        const layerId = `trail-segment-layer-${segmentCounter}`;
+
+        // Add source for this segment
+        map.addSource(sourceId, {
+          'type': 'geojson',
+          'data': {
+            'type': 'Feature',
+            'geometry': {
+              'type': 'LineString',
+              'coordinates': []
+            }
+          }
+        });
+
+        // Add layer for this segment
+        map.addLayer({
+          'id': layerId,
+          'type': 'line',
+          'source': sourceId,
+          'layout': {
+            'line-cap': 'round',
+            'line-join': 'round'
+          },
+          'paint': {
+            'line-color': trailColor,
+            'line-width': 5,
+            'line-opacity': 0.8,
+            'line-emissive-strength': 1.5,
+            'line-dasharray': isUsingTrain ? [1, 0] : [2, 4] // Solid line for train, dashed for plane
+          }
+        });
+
+        // Fixed 1.5-second duration for each flight
+        currentFlightDuration = 1500; // milliseconds
+
+        // Fit viewport to show both start and end points
+        // For trans-Pacific routes, use the great circle path coordinates
+        const bounds = new mapboxgl.LngLatBounds();
+
+        // Use all route coordinates to get proper bounds including great circle path
+        for (const coord of routeData.coordinates) {
+          bounds.extend(coord);
+        }
+
+        map.fitBounds(bounds, {
+          padding: { top: 10, bottom: 10, left: 10, right: 10 },
+          duration: 2000,
+          pitch: 30,
+          bearing: 0,
+          maxZoom: 5
+        });
+
+        // Show destination label
+        showDestinationLabel(to);
+      }
+
+      // Update airplane position
+      const alongRoute = flightRoute.sample(flightRoute.totalLength * phase);
+      if (alongRoute) {
+        airplane.update(alongRoute, frameDeltaTime);
+
+        // Add current position to trail (2D coordinates)
+        currentSegmentTrailCoordinates.push([airplane.position[0], airplane.position[1]]);
+        trailAltitudes.push(airplane.altitude);
+
+        if (currentSegmentTrailCoordinates.length === 1) {
+          console.log('First trail point added:', currentSegmentTrailCoordinates[0]);
+        }
+
+        // Determine vehicle type for color
+        const isUsingTrain = (currentModelUri === trainModelUri);
+        const trailSourceId = `trail-segment-${segmentCounter}`;
+
+        // Update current segment trail using simple Mapbox line (only if we have at least 2 points)
+        const trailSource = map.getSource(trailSourceId);
+        if (trailSource && currentSegmentTrailCoordinates.length >= 2) {
+          // Split trail into segments when crossing antimeridian
+          const trailSegments = [];
+          let currentSegment = [currentSegmentTrailCoordinates[0]];
+
+          for (let i = 1; i < currentSegmentTrailCoordinates.length; i++) {
+            const prev = currentSegmentTrailCoordinates[i - 1];
+            const curr = currentSegmentTrailCoordinates[i];
+            const lonDiff = Math.abs(curr[0] - prev[0]);
+
+            // If longitude difference > 180, we crossed the antimeridian
+            if (lonDiff > 180) {
+              // Close current segment and start new one
+              trailSegments.push(currentSegment);
+              currentSegment = [curr];
+            } else {
+              currentSegment.push(curr);
+            }
+          }
+
+          // Add the last segment
+          if (currentSegment.length > 0) {
+            trailSegments.push(currentSegment);
+          }
+
+          // Create MultiLineString geometry
+          trailSource.setData({
+            'type': 'Feature',
+            'geometry': {
+              'type': 'MultiLineString',
+              'coordinates': trailSegments
+            }
+          });
+        }
+      }
+
+      updateModelSourceAndFeatureState(airplane);
+
+      animationFrameId = window.requestAnimationFrame(frame);
+    }
+
+    // Start tour
+    function startTour() {
+      currentLegIndex = 0;
+      phase = 0;
+      lastFrameTime = null;
+      isAnimating = true;
+      currentSegmentTrailCoordinates = []; // Reset current segment trail
+      trailAltitudes = []; // Reset altitudes
+
+      console.log('Starting tour, trails cleared');
+
+      // Clean up all existing segment layers and sources
+      const style = map.getStyle();
+      if (style && style.layers) {
+        const segmentLayers = style.layers.filter(layer => layer.id.startsWith('trail-segment-layer-'));
+        segmentLayers.forEach(layer => {
+          if (map.getLayer(layer.id)) {
+            map.removeLayer(layer.id);
+          }
+        });
+      }
+      if (style && style.sources) {
+        const segmentSources = Object.keys(style.sources).filter(source => source.startsWith('trail-segment-'));
+        segmentSources.forEach(source => {
+          if (map.getSource(source)) {
+            map.removeSource(source);
+          }
+        });
+      }
+
+      segmentCounter = 0; // Reset segment counter after cleanup
+
+      document.getElementById('start-btn').disabled = true;
+
+      // Generate first route
+      const from = destinations[0];
+      const to = destinations[1];
+
+      // Switch vehicle based on the 'from' destination's vehicle attribute
+      const vehicle = from.vehicle || 'plane'; // Default to plane if not specified
+      if (vehicle === 'train') {
+        currentModelUri = trainModelUri;
+        console.log('Switching to TRAIN for', from.name, 'to', to.name);
+      } else {
+        currentModelUri = airplaneModelUri;
+        console.log('Switching to AIRPLANE for', from.name, 'to', to.name);
+      }
+
+      // Set flag for initial model load
+      needsModelUpdate = true;
+
+      const routeData = generateFlightRoute(from.coords, to.coords);
+      flightRoute = new FlightRoute(routeData);
+      airplane = new Airplane(from.coords);
+
+      // Create first segment source and layer
+      segmentCounter++;
+      const isUsingTrain = (currentModelUri === trainModelUri);
+      const trailColor = isUsingTrain ? '#00ff00' : '#ff0000';
+      const sourceId = `trail-segment-${segmentCounter}`;
+      const layerId = `trail-segment-layer-${segmentCounter}`;
+
+      // Add source for first segment
+      map.addSource(sourceId, {
+        'type': 'geojson',
+        'data': {
+          'type': 'Feature',
+          'geometry': {
+            'type': 'LineString',
+            'coordinates': []
+          }
+        }
+      });
+
+      // Add layer for first segment
+      map.addLayer({
+        'id': layerId,
+        'type': 'line',
+        'source': sourceId,
+        'layout': {
+          'line-cap': 'round',
+          'line-join': 'round'
+        },
+        'paint': {
+          'line-color': trailColor,
+          'line-width': 5,
+          'line-opacity': 0.8,
+          'line-emissive-strength': 1.5,
+          'line-dasharray': isUsingTrain ? [1, 0] : [2, 4] // Solid line for train, dashed for plane
+        }
+      });
+
+      // Fixed 1.5-second duration for each flight
+      currentFlightDuration = 1500; // milliseconds
+
+      // Fit viewport to show both start and end points for first leg
+      // For trans-Pacific routes, use the great circle path coordinates
+      const bounds = new mapboxgl.LngLatBounds();
+
+      // Use all route coordinates to get proper bounds including great circle path
+      for (const coord of routeData.coordinates) {
+        bounds.extend(coord);
+      }
+
+      map.fitBounds(bounds, {
+        padding: { top: 120, bottom: 120, left: 120, right: 120 },
+        duration: 2000,
+        pitch: 20,
+        bearing: 0,
+        maxZoom: 5
+      });
+
+      // Initialize plane at starting position
+      const startPoint = flightRoute.sample(0);
+      console.log('Start point:', startPoint);
+      console.log('Airplane initial position:', airplane.position);
+      if (startPoint) {
+        airplane.update(startPoint, 0);
+        console.log('Airplane after update:', airplane.position);
+        updateModelSourceAndFeatureState(airplane);
+      }
+
+      // Show first destination
+      showDestinationLabel(from);
+      setTimeout(() => showDestinationLabel(to), 500);
+
+      animationFrameId = window.requestAnimationFrame(frame);
+    }
+
+    map.on('style.load', () => {
+      console.log('Map loaded - ready for segment trails');
+    });
+
+    // Cleanup on page unload to free WebGL contexts
+    window.addEventListener('beforeunload', () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      if (map) {
+        map.remove();
+      }
+    });
+  </script>
+</body>
+</html>
