@@ -80,13 +80,60 @@ title: Travel Highlights 2024
       cursor: not-allowed;
       transform: none;
     }
+
+    /* Edit mode styles */
+    .edit-mode-info {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.95);
+      padding: 12px 24px;
+      border-radius: 8px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+      z-index: 1000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      font-size: 14px;
+      color: #333;
+    }
+
+    /* Control point marker styles */
+    .control-point-marker {
+      width: 20px;
+      height: 20px;
+      background: white;
+      border: 3px solid #667eea;
+      border-radius: 50%;
+      cursor: move;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      transition: all 0.2s;
+    }
+
+    .control-point-marker:hover {
+      width: 24px;
+      height: 24px;
+      border-width: 4px;
+      box-shadow: 0 3px 12px rgba(102, 126, 234, 0.5);
+    }
+
+    .control-point-marker.train {
+      border-color: #00ff00;
+    }
+
+    .control-point-marker.plane {
+      border-color: #ff0000;
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
   <div id="destination-label"></div>
+  <div id="edit-mode-info" class="edit-mode-info" style="display: none;">
+    Drag the markers to adjust route curves
+  </div>
   <div id="control-panel">
-    <button id="start-btn" class="btn" onclick="startTour()">Start Tour</button>
+    <button id="edit-btn" class="btn" onclick="enterEditMode()" style="display: none;">Edit Routes</button>
+    <button id="start-btn" class="btn" onclick="saveAndStartTour()">Save & Start Tour</button>
   </div>
 
   <script>
@@ -135,48 +182,188 @@ title: Travel Highlights 2024
       return (angRad * 180.0) / Math.PI;
     }
 
-    // Generate a simple flight route between two points
-    function generateFlightRoute(from, to) {
-      const numPoints = 200; // More points for smoother long-distance flights
+    // Catmull-Rom spline interpolation
+    function catmullRomSpline(p0, p1, p2, p3, t) {
+      const t2 = t * t;
+      const t3 = t2 * t;
+
+      return 0.5 * (
+        (2 * p1) +
+        (-p0 + p2) * t +
+        (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
+        (-p0 + 3 * p1 - 3 * p2 + p3) * t3
+      );
+    }
+
+    // Helper to create GeoJSON geometry from coordinates, handling antimeridian crossing
+    function makeLineGeometry(coordinates) {
+      if (!coordinates || coordinates.length === 0) {
+        return { type: 'LineString', coordinates: [] };
+      }
+
+      const segments = [];
+      let currentSegment = [coordinates[0]];
+
+      for (let i = 1; i < coordinates.length; i++) {
+        const prev = coordinates[i - 1];
+        const curr = coordinates[i];
+
+        // Check for antimeridian crossing (big longitude jump)
+        if (Math.abs(curr[0] - prev[0]) > 180) {
+          segments.push(currentSegment);
+          currentSegment = [curr];
+        } else {
+          currentSegment.push(curr);
+        }
+      }
+      segments.push(currentSegment);
+
+      if (segments.length === 1) {
+        return { type: 'LineString', coordinates: segments[0] };
+      } else {
+        return { type: 'MultiLineString', coordinates: segments };
+      }
+    }
+
+    // Generate a curved route with optional control points (can be array or single point)
+    function generateCurvedRoute(from, to, controlPoints = null, vehicle = 'plane') {
+      const numPoints = 200;
       const coordinates = [];
       const elevationData = [];
 
-      // Use greatCircle for proper long-distance routing
-      // turf.greatCircle expects Point features, not raw arrays
-      const startPoint = turf.point(from);
-      const endPoint = turf.point(to);
-
-      const greatCircleLine = turf.greatCircle(startPoint, endPoint, { npoints: numPoints + 1 });
-
-      // Handle MultiLineString (when crossing antimeridian) or LineString
-      let gcCoordinates;
-      if (greatCircleLine.geometry.type === 'MultiLineString') {
-        // Flatten the multi-line string into a single array
-        gcCoordinates = greatCircleLine.geometry.coordinates.flat();
-      } else {
-        gcCoordinates = greatCircleLine.geometry.coordinates;
+      // Normalize controlPoints to always be an array of coordinate arrays
+      let controlPointsArray = [];
+      if (controlPoints) {
+        if (Array.isArray(controlPoints)) {
+          // Array of control points
+          controlPointsArray = controlPoints.map(cp => {
+            // Handle both object format {coords: [lng, lat]} and array format [lng, lat]
+            if (cp.coords) {
+              return cp.coords;
+            } else {
+              return cp;
+            }
+          });
+        } else if (controlPoints.coords) {
+          // Single control point object
+          controlPointsArray = [controlPoints.coords];
+        } else {
+          // Single control point array
+          controlPointsArray = [controlPoints];
+        }
       }
 
-      for (let i = 0; i <= numPoints; i++) {
-        const fraction = i / numPoints;
-        // Map fraction to the actual coordinate array
-        const coordIndex = Math.floor(fraction * (gcCoordinates.length - 1));
-        coordinates.push(gcCoordinates[coordIndex]);
+      if (controlPointsArray.length > 0) {
+        // Build full path: start -> control points -> end
+        const allPoints = [from, ...controlPointsArray, to];
 
-        // Parabolic elevation profile - arc shape
-        // Use inverted parabola: peak in the middle, lower at start/end
-        const parabola = -4 * (fraction - 0.5) * (fraction - 0.5) + 1; // Peak at 0.5, value 0-1
-        const minAltitude = 0; // Ground level at start/end
-        const maxAltitude = 11000; // 11km at peak (typical cruise altitude)
-        const elevation = minAltitude + parabola * (maxAltitude - minAltitude);
+        // Normalize for Catmull-Rom: make all points use the shortest path
+        // If we're going west (like Japan to SF), adjust coordinates to not wrap around
+        const normalizedPoints = [];
+        normalizedPoints.push([allPoints[0][0], allPoints[0][1]]);
 
-        elevationData.push(elevation);
+        for (let i = 1; i < allPoints.length; i++) {
+          let currLng = allPoints[i][0];
+          const currLat = allPoints[i][1];
+          const prevLng = normalizedPoints[i - 1][0];
+
+          // Find the shortest path between prevLng and currLng
+          // Consider three options: currLng, currLng+360, currLng-360
+          const options = [currLng, currLng + 360, currLng - 360];
+          let bestLng = currLng;
+          let minDist = Math.abs(currLng - prevLng);
+
+          for (const opt of options) {
+            const dist = Math.abs(opt - prevLng);
+            if (dist < minDist) {
+              minDist = dist;
+              bestLng = opt;
+            }
+          }
+
+          normalizedPoints.push([bestLng, currLat]);
+        }
+
+        // Use Catmull-Rom spline for smooth curve through all points
+        const segments = normalizedPoints.length - 1;
+        const pointsPerSegment = Math.floor(numPoints / segments);
+
+        for (let seg = 0; seg < segments; seg++) {
+          // Get four points for Catmull-Rom (with padding at ends)
+          const p0 = seg > 0 ? normalizedPoints[seg - 1] : normalizedPoints[seg];
+          const p1 = normalizedPoints[seg];
+          const p2 = normalizedPoints[seg + 1];
+          const p3 = seg < segments - 1 ? normalizedPoints[seg + 2] : normalizedPoints[seg + 1];
+
+          const segmentPoints = seg === segments - 1 ? pointsPerSegment + (numPoints % segments) : pointsPerSegment;
+
+          for (let i = 0; i <= segmentPoints; i++) {
+            const t = i / segmentPoints;
+            let lng = catmullRomSpline(p0[0], p1[0], p2[0], p3[0], t);
+            const lat = catmullRomSpline(p0[1], p1[1], p2[1], p3[1], t);
+
+            // Normalize back to -180 to 180 range (may need multiple adjustments for far values)
+            while (lng > 180) lng -= 360;
+            while (lng < -180) lng += 360;
+
+            if (seg === 0 || i > 0) { // Avoid duplicate points at segment boundaries
+              coordinates.push([lng, lat]);
+
+              // Parabolic elevation profile
+              const overallT = (seg * pointsPerSegment + i) / numPoints;
+              const parabola = -4 * (overallT - 0.5) * (overallT - 0.5) + 1;
+              const minAltitude = 0;
+              const maxAltitude = (vehicle === 'plane') ? 11000 : 0;
+              const elevation = minAltitude + parabola * (maxAltitude - minAltitude);
+              elevationData.push(elevation);
+            }
+          }
+        }
+      } else {
+        // Use great circle (original behavior)
+        console.log(`Great circle from [${from}] to [${to}]`);
+        const startPoint = turf.point(from);
+        const endPoint = turf.point(to);
+
+        // Turf's greatCircle always takes the shorter path
+        const greatCircleLine = turf.greatCircle(startPoint, endPoint, { npoints: numPoints + 1 });
+
+        console.log(`Great circle type: ${greatCircleLine.geometry.type}`);
+
+        let gcCoordinates;
+        if (greatCircleLine.geometry.type === 'MultiLineString') {
+          // Turf splits at antimeridian into multiple segments
+          // Use flat() to combine them into a single array for sampling
+          // The jump between segments (e.g. 180 to -180) will be preserved
+          gcCoordinates = greatCircleLine.geometry.coordinates.flat();
+          console.log(`MultiLineString flattened to ${gcCoordinates.length} points`);
+        } else {
+          gcCoordinates = greatCircleLine.geometry.coordinates;
+          console.log(`LineString with ${gcCoordinates.length} points`);
+        }
+
+        for (let i = 0; i <= numPoints; i++) {
+          const fraction = i / numPoints;
+          const coordIndex = Math.floor(fraction * (gcCoordinates.length - 1));
+          coordinates.push(gcCoordinates[coordIndex]);
+
+          const parabola = -4 * (fraction - 0.5) * (fraction - 0.5) + 1;
+          const minAltitude = 0;
+          const maxAltitude = (vehicle === 'plane') ? 11000 : 0;
+          const elevation = minAltitude + parabola * (maxAltitude - minAltitude);
+          elevationData.push(elevation);
+        }
       }
 
       return {
         coordinates: coordinates,
         elevationData: elevationData
       };
+    }
+
+    // Generate a simple flight route between two points
+    function generateFlightRoute(from, to, controlPoint = null) {
+      return generateCurvedRoute(from, to, controlPoint);
     }
 
     // FlightRoute class (simplified)
@@ -225,11 +412,27 @@ title: Travel Highlights 2024
         const altitude = e1 + (e2 - e1) * segmentRatio;
         const pitch = rad2deg(Math.atan2(e2 - e1, segmentLength));
 
+        // Handle longitude interpolation across antimeridian
+        let lng1 = p1[0];
+        let lng2 = p2[0];
+
+        if (Math.abs(lng2 - lng1) > 180) {
+          if (lng2 > lng1) {
+            lng1 += 360;
+          } else {
+            lng2 += 360;
+          }
+        }
+
+        let lng = lng1 + (lng2 - lng1) * segmentRatio;
+        const lat = p1[1] + (p2[1] - p1[1]) * segmentRatio;
+
+        // Normalize longitude back to -180 to 180
+        while (lng > 180) lng -= 360;
+        while (lng < -180) lng += 360;
+
         return {
-          position: [
-            p1[0] + (p2[0] - p1[0]) * segmentRatio,
-            p1[1] + (p2[1] - p1[1]) * segmentRatio
-          ],
+          position: [lng, lat],
           altitude: altitude,
           bearing: bearing,
           pitch: pitch
@@ -425,6 +628,12 @@ title: Travel Highlights 2024
     let lastModelUri = null; // Track last loaded model to avoid unnecessary updates
     let needsModelUpdate = true; // Flag to trigger model switch
 
+    // Route editor state
+    let isEditMode = true; // Start in edit mode
+    let routeControlPoints = {}; // Store arrays of control points for each route segment: { '0': [[lng, lat], [lng, lat], ...], '1': [...], ... }
+    let controlPointMarkers = []; // Store marker objects with metadata
+    let previewRoutes = {}; // Store generated preview routes
+
     // Show destination label
     function showDestinationLabel(destination) {
       const label = document.getElementById('destination-label');
@@ -434,6 +643,288 @@ title: Travel Highlights 2024
       setTimeout(() => {
         label.classList.remove('show');
       }, 2000);
+    }
+
+    // Update route with control points
+    function updateRoutePreview(segmentKey) {
+      const i = parseInt(segmentKey);
+      const from = destinations[i];
+      const to = destinations[i + 1];
+      const vehicle = from.vehicle || 'plane';
+      const previewSourceId = `preview-route-${i}`;
+
+      // Regenerate route with control points
+      const controlPoints = routeControlPoints[segmentKey] || [];
+      console.log(`Updating route ${segmentKey} with ${controlPoints.length} control points:`, controlPoints);
+      const updatedRoute = generateCurvedRoute(from.coords, to.coords, controlPoints.length > 0 ? controlPoints : null, vehicle);
+      previewRoutes[segmentKey] = updatedRoute;
+
+      // Update preview line
+      const source = map.getSource(previewSourceId);
+      if (source) {
+        source.setData({
+          'type': 'Feature',
+          'geometry': makeLineGeometry(updatedRoute.coordinates)
+        });
+      }
+    }
+
+    // Add control point to route
+    function addControlPoint(segmentKey, lngLat) {
+      if (!routeControlPoints[segmentKey]) {
+        routeControlPoints[segmentKey] = [];
+      }
+
+      const i = parseInt(segmentKey);
+      const from = destinations[i];
+      const to = destinations[i + 1];
+      const vehicle = from.vehicle || 'plane';
+      const isUsingTrain = (vehicle === 'train');
+      const markerClass = isUsingTrain ? 'train' : 'plane';
+
+      // Create the control point object with a unique ID
+      const controlPoint = {
+        coords: [lngLat.lng, lngLat.lat],
+        id: Date.now() + Math.random() // Unique ID
+      };
+
+      routeControlPoints[segmentKey].push(controlPoint);
+
+      console.log(`Added control point with id ${controlPoint.id} for segment ${segmentKey}`);
+
+      // Create draggable marker
+      const markerEl = document.createElement('div');
+      markerEl.className = `control-point-marker ${markerClass}`;
+
+      const marker = new mapboxgl.Marker({
+        element: markerEl,
+        draggable: true,
+        anchor: 'center',
+        pitchAlignment: 'viewport',
+        rotationAlignment: 'viewport'
+      })
+        .setLngLat(lngLat)
+        .addTo(map);
+
+      // Store marker metadata with reference to the control point object
+      const markerData = { marker, segmentKey, controlPoint };
+      controlPointMarkers.push(markerData);
+
+      // Handle drag to update route
+      marker.on('drag', () => {
+        const newLngLat = marker.getLngLat();
+        // Update the control point coordinates directly
+        controlPoint.coords[0] = newLngLat.lng;
+        controlPoint.coords[1] = newLngLat.lat;
+        console.log(`Dragging point ${controlPoint.id} in segment ${segmentKey} to`, controlPoint.coords);
+        updateRoutePreview(segmentKey);
+      });
+
+      // Handle right-click to delete
+      markerEl.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        console.log(`Deleting control point ${controlPoint.id} from segment ${segmentKey}`);
+
+        // Find and remove from control points array
+        const pointIndex = routeControlPoints[segmentKey].indexOf(controlPoint);
+        if (pointIndex > -1) {
+          routeControlPoints[segmentKey].splice(pointIndex, 1);
+        }
+
+        // Remove marker from tracking array
+        const markerIndex = controlPointMarkers.indexOf(markerData);
+        if (markerIndex > -1) {
+          controlPointMarkers.splice(markerIndex, 1);
+        }
+
+        marker.remove();
+        updateRoutePreview(segmentKey);
+      });
+
+      updateRoutePreview(segmentKey);
+    }
+
+    // Initialize route editor
+    function initializeRouteEditor() {
+      // Show edit mode info
+      document.getElementById('edit-mode-info').innerHTML = 'Click on a route line to add control points. Right-click markers to delete them.';
+      document.getElementById('edit-mode-info').style.display = 'block';
+
+      // Create preview routes for all segments
+      for (let i = 0; i < destinations.length - 1; i++) {
+        const from = destinations[i];
+        const to = destinations[i + 1];
+        const segmentKey = `${i}`;
+
+        // Initialize empty control points array
+        if (!routeControlPoints[segmentKey]) {
+          routeControlPoints[segmentKey] = [];
+        }
+
+        // Generate preview route (straight line initially)
+        const routeData = generateCurvedRoute(from.coords, to.coords, null);
+        previewRoutes[segmentKey] = routeData;
+
+        // Determine vehicle type for dash pattern
+        const vehicle = from.vehicle || 'plane';
+        const isUsingTrain = (vehicle === 'train');
+
+        // Add preview line layer
+        const previewSourceId = `preview-route-${i}`;
+        const previewLayerId = `preview-route-layer-${i}`;
+
+        map.addSource(previewSourceId, {
+          'type': 'geojson',
+          'data': {
+            'type': 'Feature',
+            'properties': { segmentKey },
+            'geometry': makeLineGeometry(routeData.coordinates)
+          }
+        });
+
+        map.addLayer({
+          'id': previewLayerId,
+          'type': 'line',
+          'source': previewSourceId,
+          'layout': {
+            'line-cap': 'round',
+            'line-join': 'round'
+          },
+          'paint': {
+            'line-color': '#ffffff',
+            'line-width': 6,
+            'line-opacity': 0.8,
+            'line-emissive-strength': 5,
+            'line-dasharray': isUsingTrain ? [1, 0] : [2, 4]
+          }
+        });
+
+        // Make line clickable to add control points
+        map.on('click', previewLayerId, (e) => {
+          e.preventDefault();
+          const lngLat = e.lngLat;
+          addControlPoint(segmentKey, lngLat);
+        });
+
+        // Change cursor on hover
+        map.on('mouseenter', previewLayerId, () => {
+          map.getCanvas().style.cursor = 'crosshair';
+        });
+
+        map.on('mouseleave', previewLayerId, () => {
+          map.getCanvas().style.cursor = '';
+        });
+      }
+
+      // Fit bounds to show all destinations
+      const bounds = new mapboxgl.LngLatBounds();
+      destinations.forEach(dest => bounds.extend(dest.coords));
+      map.fitBounds(bounds, {
+        padding: 100,
+        duration: 1000
+      });
+    }
+
+    // Clean up route editor
+    function cleanupRouteEditor() {
+      // Hide edit mode info
+      document.getElementById('edit-mode-info').style.display = 'none';
+
+      // Remove all control point markers
+      controlPointMarkers.forEach(({ marker }) => {
+        marker.remove();
+      });
+      controlPointMarkers = [];
+
+      // Remove preview layers and their event listeners
+      for (let i = 0; i < destinations.length - 1; i++) {
+        const previewLayerId = `preview-route-layer-${i}`;
+        const previewSourceId = `preview-route-${i}`;
+
+        // Remove event listeners
+        map.off('click', previewLayerId);
+        map.off('mouseenter', previewLayerId);
+        map.off('mouseleave', previewLayerId);
+
+        // Remove layer and source
+        if (map.getLayer(previewLayerId)) {
+          map.removeLayer(previewLayerId);
+        }
+        if (map.getSource(previewSourceId)) {
+          map.removeSource(previewSourceId);
+        }
+      }
+    }
+
+    // Save routes and start tour
+    function saveAndStartTour() {
+      if (isEditMode) {
+        // Clean up editor and start animation
+        cleanupRouteEditor();
+        isEditMode = false;
+        document.getElementById('start-btn').textContent = 'Restart Tour';
+        document.getElementById('edit-btn').style.display = 'inline-block';
+        startTour();
+      } else {
+        // Restart from beginning
+        startTour();
+      }
+    }
+
+    // Enter edit mode
+    function enterEditMode() {
+      isEditMode = true;
+      document.getElementById('edit-btn').style.display = 'none';
+      document.getElementById('start-btn').textContent = 'Save & Start Tour';
+
+      // Stop animation if running
+      if (isAnimating) {
+        isAnimating = false;
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+        }
+      }
+
+      // Clean up animation layers
+      const style = map.getStyle();
+      if (style && style.layers) {
+        const segmentLayers = style.layers.filter(layer => layer.id.startsWith('trail-segment-layer-'));
+        segmentLayers.forEach(layer => {
+          if (map.getLayer(layer.id)) {
+            map.removeLayer(layer.id);
+          }
+        });
+      }
+      if (style && style.sources) {
+        const segmentSources = Object.keys(style.sources).filter(source => source.startsWith('trail-segment-'));
+        segmentSources.forEach(source => {
+          if (map.getSource(source)) {
+            map.removeSource(source);
+          }
+        });
+      }
+
+      // Re-initialize editor with saved control points
+      initializeRouteEditor();
+
+      // Re-add all saved control points as markers
+      Object.keys(routeControlPoints).forEach(segmentKey => {
+        const points = routeControlPoints[segmentKey];
+        if (points && points.length > 0) {
+          // Clear the array temporarily to avoid duplicates
+          const savedPoints = [...points];
+          routeControlPoints[segmentKey] = [];
+
+          // Re-add each point
+          savedPoints.forEach(point => {
+            // Handle both object format and array format
+            const coords = point.coords || point;
+            addControlPoint(segmentKey, { lng: coords[0], lat: coords[1] });
+          });
+        }
+      });
     }
 
     // Animation frame
@@ -482,7 +973,11 @@ title: Travel Highlights 2024
           needsModelUpdate = true;
         }
 
-        const routeData = generateFlightRoute(from.coords, to.coords);
+        // Use saved control point if available
+        const segmentKey = `${currentLegIndex}`;
+        const controlPoint = routeControlPoints[segmentKey] || null;
+        console.log(`Segment ${segmentKey} (${from.name} -> ${to.name}):`, controlPoint);
+        const routeData = generateFlightRoute(from.coords, to.coords, controlPoint, vehicle);
         flightRoute = new FlightRoute(routeData);
 
         // Create new segment source and layer for this route
@@ -659,7 +1154,10 @@ title: Travel Highlights 2024
       // Set flag for initial model load
       needsModelUpdate = true;
 
-      const routeData = generateFlightRoute(from.coords, to.coords);
+      // Use saved control point if available
+      const segmentKey = `${currentLegIndex}`;
+      const controlPoint = routeControlPoints[segmentKey] || null;
+      const routeData = generateFlightRoute(from.coords, to.coords, controlPoint, vehicle);
       flightRoute = new FlightRoute(routeData);
       airplane = new Airplane(from.coords);
 
@@ -739,6 +1237,9 @@ title: Travel Highlights 2024
 
     map.on('style.load', () => {
       console.log('Map loaded - ready for segment trails');
+
+      // Initialize route editor on load
+      initializeRouteEditor();
     });
 
     // Cleanup on page unload to free WebGL contexts
