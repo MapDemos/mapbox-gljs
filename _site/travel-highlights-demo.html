@@ -22,12 +22,49 @@
     body {
       margin: 0;
       padding: 0;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
     }
+
+    /* Left menu panel */
+    #left-menu {
+      width: 300px;
+      background: rgba(30, 30, 40, 0.95);
+      backdrop-filter: blur(10px);
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      box-shadow: 2px 0 20px rgba(0,0,0,0.3);
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
     #map {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 100%;
+      flex: 1;
+      position: relative;
+    }
+
+    #left-menu h2 {
+      color: white;
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0 0 20px 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    }
+
+    #left-menu .menu-section {
+      margin-bottom: 20px;
+    }
+
+    #left-menu .menu-section h3 {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 14px;
+      font-weight: 600;
+      margin: 0 0 10px 0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
     }
 
     /* Destination label */
@@ -53,21 +90,9 @@
       opacity: 1;
     }
 
-    /* Control panel */
-    #control-panel {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: white;
-      padding: 15px 25px;
-      border-radius: 8px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-      z-index: 1000;
-    }
-
     .btn {
-      padding: 10px 20px;
+      width: 100%;
+      padding: 12px 20px;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
       border: none;
@@ -76,6 +101,8 @@
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
+      margin-bottom: 10px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
     }
 
     .btn:hover {
@@ -89,20 +116,16 @@
       transform: none;
     }
 
-    /* Edit mode styles */
-    .edit-mode-info {
-      position: absolute;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(255, 255, 255, 0.95);
-      padding: 12px 24px;
-      border-radius: 8px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
-      z-index: 1000;
+    /* Edit mode info in menu */
+    #edit-mode-info {
+      background: rgba(102, 126, 234, 0.15);
+      padding: 12px;
+      border-radius: 6px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-      font-size: 14px;
-      color: #333;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.9);
+      line-height: 1.5;
+      border-left: 3px solid #667eea;
     }
 
     /* Control point marker styles */
@@ -125,24 +148,34 @@
     }
 
     .control-point-marker.train {
-      border-color: #00ff00;
+      border-color: #ff0000;
     }
 
     .control-point-marker.plane {
-      border-color: #ff0000;
+      border-color: #ffffff;
+    }
+
+    .control-point-marker.car {
+      border-color: #ff8800;
     }
   </style>
 </head>
 <body>
+  <div id="left-menu">
+    <h2>Travel Highlights</h2>
+
+    <div class="menu-section">
+      <h3>Controls</h3>
+      <button id="start-btn" class="btn" onclick="saveAndStartTour()">Save &amp; Start Tour</button>
+      <button id="edit-btn" class="btn" onclick="enterEditMode()" style="display: none;">Edit Routes</button>
+    </div>
+
+    <div id="edit-mode-info" style="display: none;">
+      Click on a route line to add control points. Right-click markers to delete them.
+    </div>
+  </div>
   <div id="map"></div>
   <div id="destination-label"></div>
-  <div id="edit-mode-info" class="edit-mode-info" style="display: none;">
-    Drag the markers to adjust route curves
-  </div>
-  <div id="control-panel">
-    <button id="edit-btn" class="btn" onclick="enterEditMode()" style="display: none;">Edit Routes</button>
-    <button id="start-btn" class="btn" onclick="saveAndStartTour()">Save &amp; Start Tour</button>
-  </div>
 
   <script>
     // Asset helper function
@@ -151,10 +184,11 @@
     }
 
     const airplaneModelUri = asset('airplane.glb');
-    const trainModelUri = 'https://kenji-shima.github.io/resource-files/models/train_white.glb';
+    const trainModelUri = 'https://kenji-shima.github.io/resource-files/models/tram.glb';
+    const carModelUri = asset('ego_car.glb');
 
     // Define your travel destinations in order
-    // vehicle: 'plane' (default) or 'train'
+    // vehicle: 'plane' (default), 'train', or 'car'
     const destinations = [
       { name: 'Narita', coords: [140.3929, 35.7719], flag: '🇯🇵', vehicle: 'plane' },
       { name: 'San Francisco', coords: [-122.4194, 37.7749], flag: '🇺🇸', vehicle: 'plane' },
@@ -164,7 +198,9 @@
       { name: 'Narita', coords: [140.3929, 35.7719], flag: '🇯🇵', vehicle: 'plane' },
       { name: 'Bangkok', coords: [100.5018, 13.7563], flag: '🇹🇭', vehicle: 'plane' },
       { name: 'Haneda', coords: [139.7798, 35.5494], flag: '🇯🇵', vehicle: 'plane' },
-      { name: 'Hanoi', coords: [105.8542, 21.0285], flag: '🇻🇳', vehicle: 'train' },
+      { name: 'Hanoi', coords: [105.8542, 21.0285], flag: '🇻🇳', vehicle: 'car' },
+      { name: 'Ha Long', coords: [107.0843, 20.9101], flag: '🇻🇳', vehicle: 'car' },
+      { name: 'Hanoi', coords: [105.8542, 21.0285], flag: '🇻🇳', vehicle: 'car' },
       { name: 'Da Nang', coords: [108.2022, 16.0544], flag: '🇻🇳', vehicle: 'plane' },
       { name: 'Saigon', coords: [106.6297, 10.8231], flag: '🇻🇳', vehicle: 'plane' },
       { name: 'Haneda', coords: [139.7798, 35.5494], flag: '🇯🇵', vehicle: 'plane' },
@@ -329,14 +365,12 @@
         }
       } else {
         // Use great circle (original behavior)
-        console.log(`Great circle from [${from}] to [${to}]`);
         const startPoint = turf.point(from);
         const endPoint = turf.point(to);
 
         // Turf's greatCircle always takes the shorter path
         const greatCircleLine = turf.greatCircle(startPoint, endPoint, { npoints: numPoints + 1 });
 
-        console.log(`Great circle type: ${greatCircleLine.geometry.type}`);
 
         let gcCoordinates;
         if (greatCircleLine.geometry.type === 'MultiLineString') {
@@ -344,10 +378,8 @@
           // Use flat() to combine them into a single array for sampling
           // The jump between segments (e.g. 180 to -180) will be preserved
           gcCoordinates = greatCircleLine.geometry.coordinates.flat();
-          console.log(`MultiLineString flattened to ${gcCoordinates.length} points`);
         } else {
           gcCoordinates = greatCircleLine.geometry.coordinates;
-          console.log(`LineString with ${gcCoordinates.length} points`);
         }
 
         for (let i = 0; i <= numPoints; i++) {
@@ -484,7 +516,7 @@
           'config': {
             'lightPreset': 'night',
             'showPointOfInterestLabels': false,
-            'showRoadLabels': false
+            'showRoadLabels': false,
           }
         }
       ],
@@ -505,7 +537,25 @@
             'train': {
               'uri': trainModelUri,
               'position': [-180, -90],
-              'orientation': [0, 0, 0]
+              'orientation': [0, 0, 0],
+              'position': [140.3929, 35.7719],
+            }
+          }
+        },
+        'car-model-source': {
+          'type': 'model',
+          'models': {
+            'car': {
+              'uri': carModelUri,
+              'position': [140.3929, 35.7719],
+              'orientation': [0, 0, 0],
+              'materialOverrides': {
+                'body': {
+                  'model-color': [1.0, 0.5, 0.0],
+                  'model-color-mix-intensity': 1.0,
+                  'model-emissive-strength': 5.0
+                }
+              }
             }
           }
         }
@@ -517,7 +567,7 @@
           'source': 'plane-model-source',
           'slot': 'top',
           'layout': {
-            'visibility': 'visible'
+            'visibility': 'none'
           },
           'paint': {
             'model-translation': [0, 0, ['feature-state', 'z-elevation']],
@@ -551,8 +601,8 @@
               'interpolate',
               ['exponential', 0.5],
               ['zoom'],
-              2, ['literal', [480, 480, 480]],
-              14, ['literal', [0.012, 0.012, 0.012]]
+              2, ['literal', [60000, 60000, 60000]],
+              14, ['literal', [1000, 1000, 1000]]
             ],
             'model-type': 'location-indicator',
             'model-rotation': [
@@ -562,6 +612,32 @@
             ],
             'model-emissive-strength': 2
           }
+        },
+        {
+          'id': 'car-model-layer',
+          'type': 'model',
+          'source': 'car-model-source',
+          'slot': 'top',
+          'layout': {
+            'visibility': 'none'
+          },
+          'paint': {
+            'model-translation': [0, 0, ['feature-state', 'z-elevation']],
+            'model-scale': [
+              'interpolate',
+              ['exponential', 0.5],
+              ['zoom'],
+              2, ['literal', [200000, 200000, 200000]],
+              14, ['literal', [5, 5, 5]]
+            ],
+            'model-type': 'location-indicator',
+            'model-rotation': [
+              ['feature-state', 'pitch'],
+              ['feature-state', 'roll'],
+              ['feature-state', 'bearing']
+            ],
+            'model-emissive-strength': 5
+          }
         }
       ]
     };
@@ -569,17 +645,32 @@
     // Update 3D model source and feature state
     function updateModelSourceAndFeatureState(airplane) {
       const isUsingTrain = (currentModelUri === trainModelUri);
-      const activeLayerId = isUsingTrain ? 'train-model-layer' : 'plane-model-layer';
-      const activeSourceId = isUsingTrain ? 'train-model-source' : 'plane-model-source';
-      const activeModelId = isUsingTrain ? 'train' : 'plane';
-      const inactiveLayerId = isUsingTrain ? 'plane-model-layer' : 'train-model-layer';
+      const isUsingCar = (currentModelUri === carModelUri);
+
+      let activeLayerId, activeSourceId, activeModelId, vehicleType;
+      if (isUsingTrain) {
+        activeLayerId = 'train-model-layer';
+        activeSourceId = 'train-model-source';
+        activeModelId = 'train';
+        vehicleType = 'train';
+      } else if (isUsingCar) {
+        activeLayerId = 'car-model-layer';
+        activeSourceId = 'car-model-source';
+        activeModelId = 'car';
+        vehicleType = 'car';
+      } else {
+        activeLayerId = 'plane-model-layer';
+        activeSourceId = 'plane-model-source';
+        activeModelId = 'plane';
+        vehicleType = 'plane';
+      }
 
       if (needsModelUpdate) {
-        console.log('Switching to:', isUsingTrain ? 'train' : 'plane');
 
-        // Show active layer, hide inactive layer
-        map.setLayoutProperty(activeLayerId, 'visibility', 'visible');
-        map.setLayoutProperty(inactiveLayerId, 'visibility', 'none');
+        // Show active layer, hide all other layers
+        map.setLayoutProperty('plane-model-layer', 'visibility', vehicleType === 'plane' ? 'visible' : 'none');
+        map.setLayoutProperty('train-model-layer', 'visibility', vehicleType === 'train' ? 'visible' : 'none');
+        map.setLayoutProperty('car-model-layer', 'visibility', vehicleType === 'car' ? 'visible' : 'none');
 
         needsModelUpdate = false;
       }
@@ -597,13 +688,14 @@
       }
 
       // Update feature state for rotation and elevation
+      // Trains and cars stay level (pitch 0), planes use calculated pitch
       map.setFeatureState(
         { source: activeSourceId, id: activeModelId },
         {
           'z-elevation': airplane.altitude,
-          'pitch': airplane.pitch,
+          'pitch': (isUsingTrain || isUsingCar) ? 0 : airplane.pitch,
           'roll': airplane.roll,
-          'bearing': airplane.bearing + (isUsingTrain ? 90 : 90)
+          'bearing': airplane.bearing + (isUsingTrain ? 90 : (isUsingCar ? 0 : 90))
         }
       );
     }
@@ -613,10 +705,10 @@
       container: 'map',
       projection: 'globe',
       style,
-      center: [140.3929, 35.7719], // Start at Narita
-      zoom: 4,
+      center: destinations[0].coords, // Start at first destination
+      zoom: 2,
       bearing: 0,
-      pitch: 30
+      pitch: 0
     });
 
 
@@ -632,7 +724,8 @@
     let trailAltitudes = []; // Store altitudes separately
     let segmentCounter = 0; // Counter for unique segment IDs
     // Initialize with the first destination's vehicle
-    let currentModelUri = (destinations[0].vehicle === 'train') ? trainModelUri : airplaneModelUri;
+    let currentModelUri = destinations[0].vehicle === 'train' ? trainModelUri :
+                          destinations[0].vehicle === 'car' ? carModelUri : airplaneModelUri;
     let lastModelUri = null; // Track last loaded model to avoid unnecessary updates
     let needsModelUpdate = true; // Flag to trigger model switch
 
@@ -663,7 +756,6 @@
 
       // Regenerate route with control points
       const controlPoints = routeControlPoints[segmentKey] || [];
-      console.log(`Updating route ${segmentKey} with ${controlPoints.length} control points:`, controlPoints);
       const updatedRoute = generateCurvedRoute(from.coords, to.coords, controlPoints.length > 0 ? controlPoints : null, vehicle);
       previewRoutes[segmentKey] = updatedRoute;
 
@@ -687,8 +779,7 @@
       const from = destinations[i];
       const to = destinations[i + 1];
       const vehicle = from.vehicle || 'plane';
-      const isUsingTrain = (vehicle === 'train');
-      const markerClass = isUsingTrain ? 'train' : 'plane';
+      const markerClass = vehicle === 'train' ? 'train' : (vehicle === 'car' ? 'car' : 'plane');
 
       // Create the control point object with a unique ID
       const controlPoint = {
@@ -698,7 +789,6 @@
 
       routeControlPoints[segmentKey].push(controlPoint);
 
-      console.log(`Added control point with id ${controlPoint.id} for segment ${segmentKey}`);
 
       // Create draggable marker
       const markerEl = document.createElement('div');
@@ -724,7 +814,6 @@
         // Update the control point coordinates directly
         controlPoint.coords[0] = newLngLat.lng;
         controlPoint.coords[1] = newLngLat.lat;
-        console.log(`Dragging point ${controlPoint.id} in segment ${segmentKey} to`, controlPoint.coords);
         updateRoutePreview(segmentKey);
       });
 
@@ -733,7 +822,6 @@
         e.preventDefault();
         e.stopPropagation();
 
-        console.log(`Deleting control point ${controlPoint.id} from segment ${segmentKey}`);
 
         // Find and remove from control points array
         const pointIndex = routeControlPoints[segmentKey].indexOf(controlPoint);
@@ -812,6 +900,7 @@
         // Make line clickable to add control points
         map.on('click', previewLayerId, (e) => {
           e.preventDefault();
+          e.originalEvent.stopPropagation();
           const lngLat = e.lngLat;
           addControlPoint(segmentKey, lngLat);
         });
@@ -825,14 +914,6 @@
           map.getCanvas().style.cursor = '';
         });
       }
-
-      // Fit bounds to show all destinations
-      const bounds = new mapboxgl.LngLatBounds();
-      destinations.forEach(dest => bounds.extend(dest.coords));
-      map.fitBounds(bounds, {
-        padding: 100,
-        duration: 1000
-      });
     }
 
     // Clean up route editor
@@ -935,6 +1016,108 @@
       });
     }
 
+    // Smoke effect animation
+    let smokeCounter = 0;
+    function addSmokeEffect(position) {
+      const smokeId = `smoke-${smokeCounter++}`;
+      const sourceId = `${smokeId}-source`;
+      const layerId = `${smokeId}-layer`;
+
+      // Add source with initial small circle
+      map.addSource(sourceId, {
+        'type': 'geojson',
+        'data': {
+          'type': 'Feature',
+          'geometry': {
+            'type': 'Point',
+            'coordinates': position
+          }
+        }
+      });
+
+      // Add circle layer
+      map.addLayer({
+        'id': layerId,
+        'type': 'circle',
+        'source': sourceId,
+        'paint': {
+          'circle-radius': 30,
+          'circle-color': '#888888',
+          'circle-opacity': 0.8,
+          'circle-blur': 0.5,
+          'circle-emissive-strength': 3
+        }
+      });
+
+      // Animate the smoke
+      const startTime = Date.now();
+      const duration = 500; // Match the delay duration
+
+      function animateSmoke() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        if (progress >= 1) {
+          // Remove smoke layer and source
+          if (map.getLayer(layerId)) map.removeLayer(layerId);
+          if (map.getSource(sourceId)) map.removeSource(sourceId);
+          return;
+        }
+
+        // Expand radius and fade out
+        const radius = 30 + (progress * 120); // Expand from 30 to 150
+        const opacity = 0.8 * (1 - progress); // Fade from 0.8 to 0
+
+        map.setPaintProperty(layerId, 'circle-radius', radius);
+        map.setPaintProperty(layerId, 'circle-opacity', opacity);
+
+        requestAnimationFrame(animateSmoke);
+      }
+
+      animateSmoke();
+    }
+
+    // Vehicle pulse effect
+    function addVehiclePulseEffect() {
+      const isUsingTrain = (currentModelUri === trainModelUri);
+      const isUsingCar = (currentModelUri === carModelUri);
+
+      let activeLayerId;
+      if (isUsingTrain) {
+        activeLayerId = 'train-model-layer';
+      } else if (isUsingCar) {
+        activeLayerId = 'car-model-layer';
+      } else {
+        activeLayerId = 'plane-model-layer';
+      }
+
+      const startTime = Date.now();
+      const duration = 500; // Match the delay duration
+      const baseEmissive = 2; // Base emissive strength
+      const maxEmissive = 5; // Peak emissive strength (max allowed)
+
+      function animatePulse() {
+        const elapsed = Date.now() - startTime;
+        const progress = elapsed / duration;
+
+        if (progress >= 1) {
+          // Reset to base emissive
+          map.setPaintProperty(activeLayerId, 'model-emissive-strength', baseEmissive);
+          return;
+        }
+
+        // Create a sine wave pulse effect (0 -> 1 -> 0)
+        const pulse = Math.sin(progress * Math.PI * 2); // 2 full cycles
+        const emissive = baseEmissive + (pulse * (maxEmissive - baseEmissive));
+
+        map.setPaintProperty(activeLayerId, 'model-emissive-strength', Math.abs(emissive));
+
+        requestAnimationFrame(animatePulse);
+      }
+
+      animatePulse();
+    }
+
     // Animation frame
     function frame(time) {
       if (!isAnimating) return;
@@ -970,10 +1153,10 @@
         const previousModelUri = currentModelUri;
         if (vehicle === 'train') {
           currentModelUri = trainModelUri;
-          console.log('Switching to TRAIN for', from.name, 'to', to.name);
+        } else if (vehicle === 'car') {
+          currentModelUri = carModelUri;
         } else {
           currentModelUri = airplaneModelUri;
-          console.log('Switching to AIRPLANE for', from.name, 'to', to.name);
         }
 
         // Set flag if vehicle changed
@@ -984,7 +1167,6 @@
         // Use saved control point if available
         const segmentKey = `${currentLegIndex}`;
         const controlPoint = routeControlPoints[segmentKey] || null;
-        console.log(`Segment ${segmentKey} (${from.name} -> ${to.name}):`, controlPoint);
         const routeData = generateFlightRoute(from.coords, to.coords, controlPoint, vehicle);
         flightRoute = new FlightRoute(routeData);
 
@@ -993,7 +1175,8 @@
         currentSegmentTrailCoordinates = []; // Reset for new segment
 
         const isUsingTrain = (currentModelUri === trainModelUri);
-        const trailColor = isUsingTrain ? '#00ff00' : '#ff0000';
+        const isUsingCar = (currentModelUri === carModelUri);
+        const trailColor = isUsingTrain ? '#ff0000' : (isUsingCar ? '#ff8800' : '#ffffff');
         const sourceId = `trail-segment-${segmentCounter}`;
         const layerId = `trail-segment-layer-${segmentCounter}`;
 
@@ -1023,12 +1206,18 @@
             'line-width': 5,
             'line-opacity': 0.8,
             'line-emissive-strength': 1.5,
-            'line-dasharray': isUsingTrain ? [1, 0] : [2, 4] // Solid line for train, dashed for plane
+            'line-dasharray': (isUsingTrain || isUsingCar) ? [1, 0] : [2, 4] // Solid line for train/car, dashed for plane
           }
         });
 
-        // Fixed 1.5-second duration for each flight
-        currentFlightDuration = 1500; // milliseconds
+        // Vehicle-specific duration: train 2.5s, car 3s, plane 1.5s
+        if (isUsingTrain) {
+          currentFlightDuration = 2500; // 2.5 seconds
+        } else if (isUsingCar) {
+          currentFlightDuration = 3000; // 3 seconds
+        } else {
+          currentFlightDuration = 1500; // 1.5 seconds
+        }
 
         // Fit viewport to show both start and end points
         // For trans-Pacific routes, use the great circle path coordinates
@@ -1039,16 +1228,27 @@
           bounds.extend(coord);
         }
 
+        // Vehicle-specific camera pitch: plane 30°, train/car 70°
+        const cameraPitch = (isUsingTrain || isUsingCar) ? 70 : 30;
+
         map.fitBounds(bounds, {
           padding: { top: 10, bottom: 10, left: 10, right: 10 },
           duration: 2000,
-          pitch: 30,
-          bearing: 0,
-          maxZoom: 5
+          pitch: cameraPitch,
+          bearing: 0
         });
 
         // Show destination label
         showDestinationLabel(to);
+
+        // Pause before next leg
+        isAnimating = false;
+        setTimeout(() => {
+          isAnimating = true;
+          lastFrameTime = null;
+          animationFrameId = window.requestAnimationFrame(frame);
+        }, 0);
+        return;
       }
 
       // Update airplane position
@@ -1056,16 +1256,21 @@
       if (alongRoute) {
         airplane.update(alongRoute, frameDeltaTime);
 
+        // For trains and cars, keep at sea level
+        const isUsingTrain = (currentModelUri === trainModelUri);
+        const isUsingCar = (currentModelUri === carModelUri);
+        if (isUsingTrain || isUsingCar) {
+          airplane.altitude = 0; // Sea level
+        }
+
         // Add current position to trail (2D coordinates)
         currentSegmentTrailCoordinates.push([airplane.position[0], airplane.position[1]]);
         trailAltitudes.push(airplane.altitude);
 
         if (currentSegmentTrailCoordinates.length === 1) {
-          console.log('First trail point added:', currentSegmentTrailCoordinates[0]);
         }
 
-        // Determine vehicle type for color
-        const isUsingTrain = (currentModelUri === trainModelUri);
+        // Update trail source
         const trailSourceId = `trail-segment-${segmentCounter}`;
 
         // Update current segment trail using simple Mapbox line (only if we have at least 2 points)
@@ -1120,7 +1325,6 @@
       currentSegmentTrailCoordinates = []; // Reset current segment trail
       trailAltitudes = []; // Reset altitudes
 
-      console.log('Starting tour, trails cleared');
 
       // Clean up all existing segment layers and sources
       const style = map.getStyle();
@@ -1149,14 +1353,25 @@
       const from = destinations[0];
       const to = destinations[1];
 
+      // First, center camera on starting point and wait 1 second before starting
+      map.flyTo({
+        center: from.coords,
+        zoom: 2,
+        pitch: 0,
+        bearing: 0,
+        duration: 1500
+      });
+
+      // Wait 1 second after camera movement, then start the route
+      setTimeout(() => {
       // Switch vehicle based on the 'from' destination's vehicle attribute
       const vehicle = from.vehicle || 'plane'; // Default to plane if not specified
       if (vehicle === 'train') {
         currentModelUri = trainModelUri;
-        console.log('Switching to TRAIN for', from.name, 'to', to.name);
+      } else if (vehicle === 'car') {
+        currentModelUri = carModelUri;
       } else {
         currentModelUri = airplaneModelUri;
-        console.log('Switching to AIRPLANE for', from.name, 'to', to.name);
       }
 
       // Set flag for initial model load
@@ -1172,7 +1387,8 @@
       // Create first segment source and layer
       segmentCounter++;
       const isUsingTrain = (currentModelUri === trainModelUri);
-      const trailColor = isUsingTrain ? '#00ff00' : '#ff0000';
+      const isUsingCar = (currentModelUri === carModelUri);
+      const trailColor = isUsingTrain ? '#ff0000' : (isUsingCar ? '#ff8800' : '#ffffff');
       const sourceId = `trail-segment-${segmentCounter}`;
       const layerId = `trail-segment-layer-${segmentCounter}`;
 
@@ -1202,12 +1418,18 @@
           'line-width': 5,
           'line-opacity': 0.8,
           'line-emissive-strength': 1.5,
-          'line-dasharray': isUsingTrain ? [1, 0] : [2, 4] // Solid line for train, dashed for plane
+          'line-dasharray': (isUsingTrain || isUsingCar) ? [1, 0] : [2, 4] // Solid line for train/car, dashed for plane
         }
       });
 
-      // Fixed 1.5-second duration for each flight
-      currentFlightDuration = 1500; // milliseconds
+      // Vehicle-specific duration: train 2.5s, car 3s, plane 1.5s
+      if (isUsingTrain) {
+        currentFlightDuration = 2500; // 2.5 seconds
+      } else if (isUsingCar) {
+        currentFlightDuration = 3000; // 3 seconds
+      } else {
+        currentFlightDuration = 1500; // 1.5 seconds
+      }
 
       // Fit viewport to show both start and end points for first leg
       // For trans-Pacific routes, use the great circle path coordinates
@@ -1218,21 +1440,20 @@
         bounds.extend(coord);
       }
 
+      // Vehicle-specific camera pitch: plane 30°, train/car 70°
+      const cameraPitch = (isUsingTrain || isUsingCar) ? 70 : 30;
+
       map.fitBounds(bounds, {
         padding: { top: 120, bottom: 120, left: 120, right: 120 },
         duration: 2000,
-        pitch: 20,
-        bearing: 0,
-        maxZoom: 5
+        pitch: cameraPitch,
+        bearing: 0
       });
 
       // Initialize plane at starting position
       const startPoint = flightRoute.sample(0);
-      console.log('Start point:', startPoint);
-      console.log('Airplane initial position:', airplane.position);
       if (startPoint) {
         airplane.update(startPoint, 0);
-        console.log('Airplane after update:', airplane.position);
         updateModelSourceAndFeatureState(airplane);
       }
 
@@ -1241,11 +1462,10 @@
       setTimeout(() => showDestinationLabel(to), 500);
 
       animationFrameId = window.requestAnimationFrame(frame);
+      }, 1000); // Wait 1 second before starting route
     }
 
     map.on('style.load', () => {
-      console.log('Map loaded - ready for segment trails');
-
       // Initialize route editor on load
       initializeRouteEditor();
     });
