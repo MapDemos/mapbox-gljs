@@ -1848,7 +1848,8 @@ const addParticles = () => {
         const particlesource = {
             id: 'particlesource',
             type: 'raster-array',
-            url: tileset
+            url: tileset,
+            maxzoom: 16
         };
         map.addSource('particlesource', particlesource);
         const particlelayer = {
