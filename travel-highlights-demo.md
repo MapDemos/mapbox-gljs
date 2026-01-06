@@ -11,10 +11,14 @@ title: Travel Highlights 2024
   {% include common_head.html %}
   <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/country-code-emoji@latest/dist/country-code-emoji.umd.min.js"></script>
   <style>
-    body {
+    html, body {
       margin: 0;
       padding: 0;
+    }
+
+    body {
       display: flex;
       height: 100vh;
       overflow: hidden;
@@ -23,6 +27,7 @@ title: Travel Highlights 2024
     /* Left menu panel */
     #left-menu {
       width: 300px;
+      height: 100vh;
       background: rgba(30, 30, 40, 0.95);
       backdrop-filter: blur(10px);
       display: flex;
@@ -31,11 +36,13 @@ title: Travel Highlights 2024
       box-shadow: 2px 0 20px rgba(0,0,0,0.3);
       overflow-y: auto;
       flex-shrink: 0;
+      box-sizing: border-box;
     }
 
     #map {
       flex: 1;
       position: relative;
+      height: 100vh;
     }
 
     #left-menu h2 {
@@ -67,7 +74,15 @@ title: Travel Highlights 2024
     }
 
     #left-menu .menu-section {
-      margin-bottom: 20px;
+      margin-bottom: 15px;
+    }
+
+    #routes-list {
+      margin-bottom: 10px;
+    }
+
+    #add-route-btn {
+      margin-bottom: 0;
     }
 
     #left-menu .menu-section h3 {
@@ -80,27 +95,55 @@ title: Travel Highlights 2024
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
     }
 
-    /* Destination label */
-    #destination-label {
+    /* Route info panel */
+    #route-info-panel {
       position: absolute;
       top: 20px;
       left: 20px;
-      background: rgba(0, 0, 0, 0.8);
-      color: white;
-      padding: 20px 40px;
+      background: rgba(0, 0, 0, 0.85);
+      padding: 20px 25px;
       border-radius: 12px;
-      font-size: 32px;
-      font-weight: 700;
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
       z-index: 1000;
       opacity: 0;
       transition: opacity 0.5s;
       pointer-events: none;
-      text-align: center;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
 
-    #destination-label.show {
+    #route-info-panel.show {
       opacity: 1;
+    }
+
+    .route-info-line {
+      display: flex;
+      align-items: center;
+      margin-bottom: 15px;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .route-info-flag {
+      font-size: 20px;
+      margin-right: 8px;
+    }
+
+    .route-info-name {
+      color: white;
+      margin-right: 12px;
+    }
+
+    .route-info-arrow {
+      color: rgba(255, 255, 255, 0.5);
+      margin: 0 12px;
+    }
+
+    .route-info-distance {
+      color: #667eea;
+      font-size: 28px;
+      font-weight: 700;
+      text-align: center;
     }
 
     #distance-counter {
@@ -139,7 +182,7 @@ title: Travel Highlights 2024
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
       z-index: 2000;
       display: none;
-      max-width: 550px;
+      width: 550px;
       max-height: 80vh;
       overflow-y: auto;
       border: 1px solid rgba(255, 255, 255, 0.1);
@@ -313,18 +356,6 @@ title: Travel Highlights 2024
       transform: none;
     }
 
-    /* Edit mode info in menu */
-    #edit-mode-info {
-      background: rgba(102, 126, 234, 0.15);
-      padding: 12px;
-      border-radius: 6px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-      font-size: 13px;
-      color: rgba(255, 255, 255, 0.9);
-      line-height: 1.5;
-      border-left: 3px solid #667eea;
-    }
-
     /* Control point marker styles */
     .control-point-marker {
       width: 20px;
@@ -395,11 +426,36 @@ title: Travel Highlights 2024
       border-left-color: #ff8800;
     }
 
+    /* Route actions container */
+    .route-actions-container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    /* Insert route button */
+    .insert-route-btn {
+      padding: 4px 8px;
+      background: rgba(102, 126, 234, 0.08);
+      border: 1px solid rgba(102, 126, 234, 0.3);
+      border-radius: 4px;
+      color: #667eea;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .insert-route-btn:hover {
+      background: rgba(102, 126, 234, 0.15);
+      border-color: rgba(102, 126, 234, 0.5);
+      color: #8b9ef8;
+    }
+
     .route-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 8px;
     }
 
     .route-info {
@@ -674,10 +730,334 @@ title: Travel Highlights 2024
       color: rgba(255, 255, 255, 0.7);
       margin-top: 2px;
     }
+
+    /* Mobile menu toggle button */
+    #mobile-menu-toggle {
+      display: none;
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 1001;
+      background: rgba(30, 30, 40, 0.95);
+      border: none;
+      color: white;
+      font-size: 24px;
+      width: 45px;
+      height: 45px;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+
+    #mobile-menu-toggle:hover {
+      background: rgba(40, 40, 50, 0.95);
+    }
+
+    /* Mobile menu close button */
+    #mobile-menu-close {
+      display: none;
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: white;
+      font-size: 24px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      z-index: 1;
+      transition: all 0.2s;
+    }
+
+    #mobile-menu-close:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: rotate(90deg);
+    }
+
+    /* Edit mode overlay on map */
+    #edit-mode-overlay {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.85);
+      color: white;
+      padding: 14px 28px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      z-index: 999; /* Below mobile menu (1000) */
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      max-width: 90%;
+      text-align: center;
+      pointer-events: none; /* Don't block map interactions */
+    }
+
+    /* Map selection overlay */
+    #map-select-overlay {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 100, 200, 0.95);
+      color: white;
+      padding: 14px 28px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      z-index: 999;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      max-width: 90%;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Show/hide instructions based on device */
+    .mobile-info {
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .desktop-info {
+        display: none;
+      }
+      .mobile-info {
+        display: inline;
+      }
+
+      #edit-mode-overlay {
+        top: 80px; /* Below hamburger menu */
+        font-size: 13px;
+        padding: 10px 16px;
+      }
+
+      #map-select-overlay {
+        top: 80px; /* Below hamburger menu */
+        font-size: 13px;
+        padding: 10px 16px;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      #map-select-overlay button {
+        margin-left: 0;
+        width: 100%;
+      }
+    }
+
+    /* Mobile styles */
+    @media (max-width: 768px) {
+      body {
+        flex-direction: column;
+      }
+
+      #mobile-menu-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #mobile-menu-close {
+        display: block;
+      }
+
+      #left-menu {
+        position: fixed;
+        left: -100%;
+        top: 0;
+        height: 100vh;
+        width: 100% !important; /* Override the 300px from desktop */
+        max-width: 100%;
+        z-index: 1000;
+        transition: left 0.3s ease-in-out;
+        box-sizing: border-box;
+        overflow-y: auto;
+        padding: 60px 20px 20px 20px; /* Add top padding for close button */
+      }
+
+      #left-menu.active {
+        left: 0;
+      }
+
+      /* Overlay for mobile menu */
+      #menu-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+      }
+
+      #menu-overlay.active {
+        display: block;
+      }
+
+      #map {
+        width: 100%;
+        height: 100vh;
+      }
+
+      /* Adjust route info panel for mobile */
+      #route-info-panel {
+        top: 80px;
+        left: 10px;
+        right: 10px;
+        padding: 12px 15px;
+      }
+
+      .route-info-line {
+        font-size: 14px;
+      }
+
+      .route-info-flag {
+        font-size: 16px;
+        margin-right: 6px;
+      }
+
+      .route-info-name {
+        margin-right: 8px;
+      }
+
+      .route-info-arrow {
+        margin: 0 8px;
+      }
+
+      .route-info-distance {
+        font-size: 22px;
+      }
+
+      /* Adjust distance counter for mobile */
+      #distance-counter {
+        top: 20px;
+        right: 10px;
+        padding: 10px 20px;
+        font-size: 20px;
+      }
+
+      #distance-counter span {
+        font-size: 14px;
+      }
+
+      /* Adjust completion modal for mobile */
+      #completion-modal {
+        width: 90%;
+        max-width: 400px;
+        padding: 30px 20px;
+        max-height: 90vh;
+      }
+
+      #completion-modal h2 {
+        font-size: 24px;
+      }
+
+      .total-summary-value {
+        font-size: 28px;
+      }
+
+      /* Adjust edit modal for mobile */
+      .modal {
+        width: 90%;
+        max-width: 400px;
+        padding: 20px;
+        max-height: 85vh;
+      }
+
+      /* Touch-friendly button sizes */
+      .btn {
+        padding: 14px 20px;
+        font-size: 16px;
+        min-height: 48px;
+      }
+
+      .route-card {
+        padding: 12px;
+      }
+
+      /* Adjust vehicle buttons for mobile */
+      .vehicle-btn {
+        width: 60px;
+        height: 60px;
+        font-size: 24px;
+      }
+    }
+
+    /* Tablet styles */
+    @media (max-width: 1024px) and (min-width: 769px) {
+      #left-menu {
+        width: 280px;
+      }
+
+      #route-info-panel {
+        padding: 18px 22px;
+      }
+
+      .route-info-line {
+        font-size: 17px;
+      }
+
+      .route-info-distance {
+        font-size: 26px;
+      }
+
+      #distance-counter {
+        font-size: 24px;
+      }
+    }
+
+    /* Small mobile styles */
+    @media (max-width: 480px) {
+      #left-menu {
+        width: 100%;
+        max-width: 100%;
+      }
+
+      #route-info-panel {
+        padding: 10px 12px;
+      }
+
+      .route-info-line {
+        font-size: 13px;
+        margin-bottom: 10px;
+      }
+
+      .route-info-flag {
+        font-size: 14px;
+      }
+
+      .route-info-distance {
+        font-size: 20px;
+      }
+
+      #tour-title-input {
+        font-size: 18px;
+      }
+
+      .route-summary-name {
+        font-size: 13px;
+      }
+
+      .total-summary-value {
+        font-size: 24px;
+      }
+    }
   </style>
 </head>
 <body>
+  <!-- Mobile menu toggle button -->
+  <button id="mobile-menu-toggle" onclick="toggleMobileMenu()">☰</button>
+
+  <!-- Overlay for mobile menu -->
+  <div id="menu-overlay" onclick="closeMobileMenu()"></div>
+
   <div id="left-menu">
+    <button id="mobile-menu-close" onclick="closeMobileMenu()">✕</button>
     <input type="text" id="tour-title-input" value="Travel Highlights" placeholder="Enter tour title...">
 
     <div class="menu-section">
@@ -692,9 +1072,6 @@ title: Travel Highlights 2024
       <button id="edit-btn" class="btn" onclick="enterEditMode()" style="display: none;">Edit Routes</button>
     </div>
 
-    <div id="edit-mode-info" style="display: none;">
-      Click on a route line to add control points. Right-click markers to delete them.
-    </div>
 
     <div class="menu-section">
       <h3>Routes</h3>
@@ -703,8 +1080,20 @@ title: Travel Highlights 2024
     </div>
   </div>
   <div id="map">
-    <div id="destination-label"></div>
+    <div id="route-info-panel"></div>
     <div id="distance-counter">0 <span>km</span></div>
+
+    <!-- Edit Mode Instructions Overlay -->
+    <div id="edit-mode-overlay" style="display: none;">
+      <span class="desktop-info">Click on a route line to add control points. Right-click markers to delete them.</span>
+      <span class="mobile-info">Tap on a route line to add waypoints. Long-press markers to delete them.</span>
+    </div>
+
+    <!-- Map Selection Mode Overlay -->
+    <div id="map-select-overlay" style="display: none;">
+      <span>Click on the map to select: <strong id="selection-type">Origin</strong></span>
+      <button onclick="cancelMapSelection()" style="margin-left: 20px; padding: 5px 10px; background: #ff4444; color: white; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+    </div>
 
     <!-- Completion Modal -->
     <div id="completion-modal">
@@ -712,7 +1101,6 @@ title: Travel Highlights 2024
       <h2 id="completion-modal-title" style="color: white; margin: 0 0 24px 0; font-size: 28px; text-align: center;">Tour Complete!</h2>
       <div id="routes-summary"></div>
       <div class="total-summary">
-        <div style="color: rgba(255, 255, 255, 0.8); font-size: 14px; font-weight: 600; margin-bottom: 8px;">TOTAL DISTANCE</div>
         <div id="total-distance" style="color: white; font-size: 32px; font-weight: bold;"></div>
       </div>
     </div>
@@ -722,6 +1110,9 @@ title: Travel Highlights 2024
   <div id="edit-route-modal" class="modal-overlay">
     <div class="modal">
       <h3 id="modal-title">Edit Route</h3>
+      <button id="map-select-btn" class="btn" onclick="startMapSelectionFromModal()" style="width: 100%; margin-bottom: 15px; background: #0066cc;">
+        📍 Select Locations on Map
+      </button>
       <div class="form-group">
         <label>Origin Location</label>
         <div class="city-input-wrapper">
@@ -754,6 +1145,7 @@ title: Travel Highlights 2024
           <option value="plane">Plane</option>
           <option value="train">Train</option>
           <option value="car">Car</option>
+          <option value="ship">Ship</option>
         </select>
       </div>
       <div class="modal-actions">
@@ -764,6 +1156,76 @@ title: Travel Highlights 2024
   </div>
 
   <script>
+    // Mobile menu functions
+    function toggleMobileMenu() {
+      const menu = document.getElementById('left-menu');
+      const overlay = document.getElementById('menu-overlay');
+      const distanceCounter = document.getElementById('distance-counter');
+      const routeInfoPanel = document.getElementById('route-info-panel');
+      const editModeOverlay = document.getElementById('edit-mode-overlay');
+
+      menu.classList.toggle('active');
+      overlay.classList.toggle('active');
+
+      // Hide map overlays when menu is open on mobile
+      if (window.innerWidth <= 768) {
+        if (menu.classList.contains('active')) {
+          distanceCounter.style.display = 'none';
+          if (routeInfoPanel) {
+            routeInfoPanel.style.display = 'none';
+          }
+          // Hide edit mode overlay when menu is open
+          if (editModeOverlay && editModeOverlay.style.display === 'block') {
+            editModeOverlay.dataset.wasVisible = 'true';
+            editModeOverlay.style.display = 'none';
+          }
+        } else {
+          distanceCounter.style.display = '';
+          if (routeInfoPanel) {
+            routeInfoPanel.style.display = '';
+          }
+          // Restore edit mode overlay if it was visible before
+          if (editModeOverlay && editModeOverlay.dataset.wasVisible === 'true') {
+            editModeOverlay.style.display = 'block';
+            delete editModeOverlay.dataset.wasVisible;
+          }
+        }
+      }
+    }
+
+    function closeMobileMenu() {
+      const menu = document.getElementById('left-menu');
+      const overlay = document.getElementById('menu-overlay');
+      const distanceCounter = document.getElementById('distance-counter');
+      const routeInfoPanel = document.getElementById('route-info-panel');
+      const editModeOverlay = document.getElementById('edit-mode-overlay');
+
+      menu.classList.remove('active');
+      overlay.classList.remove('active');
+
+      // Show map overlays when menu is closed on mobile
+      if (window.innerWidth <= 768) {
+        if (totalAccumulatedDistance > 0) {
+          distanceCounter.style.display = '';
+        }
+        if (routeInfoPanel) {
+          routeInfoPanel.style.display = '';
+        }
+        // Restore edit mode overlay if it was visible before
+        if (editModeOverlay && editModeOverlay.dataset.wasVisible === 'true') {
+          editModeOverlay.style.display = 'block';
+          delete editModeOverlay.dataset.wasVisible;
+        }
+      }
+    }
+
+    // Close mobile menu when window is resized to desktop
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 768) {
+        closeMobileMenu();
+      }
+    });
+
     // Asset helper function
     function asset(uri) {
       return `https://docs.mapbox.com/mapbox-gl-js/assets/${uri}`;
@@ -772,30 +1234,45 @@ title: Travel Highlights 2024
     const airplaneModelUri = asset('airplane.glb');
     const trainModelUri = 'https://kenji-shima.github.io/resource-files/models/tram.glb';
     const carModelUri = asset('ego_car.glb');
+    const shipModelUri = 'https://kenji-shima.github.io/resource-files/models/cruiser.glb';
 
     // Define your travel routes - each route is independent with explicit origin and destination
     // Each route has: origin (name, coords), destination (name, coords), vehicle type
     const destinations = [
-      { origin: { name: 'Narita', coords: [140.3929, 35.7719] }, name: 'San Francisco', coords: [-122.4194, 37.7749], flag: '🇺🇸', vehicle: 'plane' },
-      { origin: { name: 'San Francisco', coords: [-122.4194, 37.7749] }, name: 'Phoenix', coords: [-112.0740, 33.4484], flag: '🇺🇸', vehicle: 'plane' },
-      { origin: { name: 'Phoenix', coords: [-112.0740, 33.4484] }, name: 'Mexico City', coords: [-99.1332, 19.4326], flag: '🇲🇽', vehicle: 'plane' },
-      { origin: { name: 'Mexico City', coords: [-99.1332, 19.4326] }, name: 'San Francisco', coords: [-122.4194, 37.7749], flag: '🇺🇸', vehicle: 'plane' },
-      { origin: { name: 'San Francisco', coords: [-122.4194, 37.7749] }, name: 'Narita', coords: [140.3929, 35.7719], flag: '🇯🇵', vehicle: 'plane' },
-      { origin: { name: 'Narita', coords: [140.3929, 35.7719] }, name: 'Bangkok', coords: [100.5018, 13.7563], flag: '🇹🇭', vehicle: 'plane' },
-      { origin: { name: 'Bangkok', coords: [100.5018, 13.7563] }, name: 'Haneda', coords: [139.7798, 35.5494], flag: '🇯🇵', vehicle: 'plane' },
-      { origin: { name: 'Haneda', coords: [139.7798, 35.5494] }, name: 'Hanoi', coords: [105.8542, 21.0285], flag: '🇻🇳', vehicle: 'car' },
-      { origin: { name: 'Hanoi', coords: [105.8542, 21.0285] }, name: 'Ha Long', coords: [107.0843, 20.9101], flag: '🇻🇳', vehicle: 'car' },
-      { origin: { name: 'Ha Long', coords: [107.0843, 20.9101] }, name: 'Hanoi', coords: [105.8542, 21.0285], flag: '🇻🇳', vehicle: 'car' },
-      { origin: { name: 'Hanoi', coords: [105.8542, 21.0285] }, name: 'Da Nang', coords: [108.2022, 16.0544], flag: '🇻🇳', vehicle: 'plane' },
-      { origin: { name: 'Da Nang', coords: [108.2022, 16.0544] }, name: 'Saigon', coords: [106.6297, 10.8231], flag: '🇻🇳', vehicle: 'plane' },
-      { origin: { name: 'Saigon', coords: [106.6297, 10.8231] }, name: 'Haneda', coords: [139.7798, 35.5494], flag: '🇯🇵', vehicle: 'plane' },
-      { origin: { name: 'Haneda', coords: [139.7798, 35.5494] }, name: 'Prague', coords: [14.4378, 50.0755], flag: '🇨🇿', vehicle: 'train' },
-      { origin: { name: 'Prague', coords: [14.4378, 50.0755] }, name: 'Budapest', coords: [19.0402, 47.4979], flag: '🇭🇺', vehicle: 'train' },
-      { origin: { name: 'Budapest', coords: [19.0402, 47.4979] }, name: 'Vienna', coords: [16.3738, 48.2082], flag: '🇦🇹', vehicle: 'train' },
-      { origin: { name: 'Vienna', coords: [16.3738, 48.2082] }, name: 'Prague', coords: [14.4378, 50.0755], flag: '🇨🇿', vehicle: 'plane' },
-      { origin: { name: 'Prague', coords: [14.4378, 50.0755] }, name: 'Haneda', coords: [139.7798, 35.5494], flag: '🇯🇵', vehicle: 'plane' },
-      { origin: { name: 'Haneda', coords: [139.7798, 35.5494] }, name: 'Osaka', coords: [135.5023, 34.6937], flag: '🇯🇵', vehicle: 'plane' }
-    ];
+  { origin: { name: 'Osaka', coords: [135.50078, 34.683594], flag: '🇯🇵' }, name: 'Tokyo', coords: [139.692912, 35.688985], flag: '🇯🇵', vehicle: 'train' },
+  { origin: { name: 'Tokyo', coords: [139.692912, 35.688985], flag: '🇯🇵' }, name: 'San Francisco', coords: [-122.419359, 37.779238], flag: '🇺🇸', vehicle: 'plane' },
+  { origin: { name: 'San Francisco', coords: [-122.419359, 37.779238], flag: '🇺🇸' }, name: 'Phoenix', coords: [-112.075098, 33.44823], flag: '🇺🇸', vehicle: 'plane' },
+  { origin: { name: 'Phoenix', coords: [-112.075098, 33.44823], flag: '🇺🇸' }, name: 'Mexico City', coords: [-99.133178, 19.43263], flag: '🇲🇽', vehicle: 'plane' },
+  { origin: { name: 'Mexico City', coords: [-99.133178, 19.43263], flag: '🇲🇽' }, name: 'San Francisco', coords: [-122.419359, 37.779238], flag: '🇺🇸', vehicle: 'plane' },
+  { origin: { name: 'San Francisco', coords: [-122.419359, 37.779238], flag: '🇺🇸' }, name: 'Tokyo', coords: [139.692912, 35.688985], flag: '🇯🇵', vehicle: 'plane' },
+  { origin: { name: 'Tokyo', coords: [139.692912, 35.688985], flag: '🇯🇵' }, name: 'Bangkok', coords: [100.493509, 13.752494], flag: '🇹🇭', vehicle: 'plane' },
+  { origin: { name: 'Bangkok', coords: [100.493509, 13.752494], flag: '🇹🇭' }, name: 'Pattaya', coords: [100.88204, 12.931045], flag: '🇹🇭', vehicle: 'car' },
+  { origin: { name: 'Pattaya', coords: [100.88204, 12.931045], flag: '🇹🇭' }, name: 'Bangkok', coords: [100.493509, 13.752494], flag: '🇹🇭', vehicle: 'car' },
+  { origin: { name: 'Bangkok', coords: [100.493509, 13.752494], flag: '🇹🇭' }, name: 'Phra Nakhon Si Ayutthaya', coords: [100.566666, 14.350473], flag: '🇹🇭', vehicle: 'car' },
+  { origin: { name: 'Phra Nakhon Si Ayutthaya', coords: [100.566666, 14.350473], flag: '🇹🇭' }, name: 'Bangkok', coords: [100.493509, 13.752494], flag: '🇹🇭', vehicle: 'car' },
+  // { origin: { name: 'Bangkok', coords: [100.493509, 13.752494], flag: '🇹🇭' }, name: 'Kanchanaburi', coords: [99.532317, 14.022707], flag: '🇹🇭', vehicle: 'car' },
+  // { origin: { name: 'Kanchanaburi', coords: [99.532317, 14.022707], flag: '🇹🇭' }, name: 'Bangkok', coords: [100.493509, 13.752494], flag: '🇹🇭', vehicle: 'car' },
+  { origin: { name: 'Bangkok', coords: [100.493509, 13.752494], flag: '🇹🇭' }, name: 'Tokyo', coords: [139.692912, 35.688985], flag: '🇯🇵', vehicle: 'plane' },
+  { origin: { name: 'Tokyo', coords: [139.692912, 35.688985], flag: '🇯🇵' }, name: 'Hanoi', coords: [105.854444, 21.02945], flag: '🇻🇳', vehicle: 'plane' },
+  { origin: { name: 'Hanoi', coords: [105.854444, 21.02945], flag: '🇻🇳' }, name: 'Hạ Long', coords: [107.079765, 20.952133], flag: '🇻🇳', vehicle: 'car' },
+  // { origin: { name: 'Hạ Long', coords: [107.079765, 20.952133], flag: '🇻🇳' }, name: 'Hạ Long', coords: [107.079766, 20.952134], flag: '🇻🇳', vehicle: 'ship' },
+  { origin: { name: 'Hạ Long', coords: [107.079765, 20.952133], flag: '🇻🇳' }, name: 'Hanoi', coords: [105.854444, 21.02945], flag: '🇻🇳', vehicle: 'car' },
+  { origin: { name: 'Hanoi', coords: [105.854444, 21.02945], flag: '🇻🇳' }, name: 'Ninh Bình', coords: [105.97167, 20.257044], flag: '🇻🇳', vehicle: 'train' },
+  { origin: { name: 'Ninh Bình', coords: [105.97167, 20.257044], flag: '🇻🇳' }, name: 'Đồng Hới', coords: [106.59825, 17.466604], flag: '🇻🇳', vehicle: 'train' },
+  { origin: { name: 'Đồng Hới', coords: [106.59825, 17.466604], flag: '🇻🇳' }, name: 'Da Nang', coords: [108.212, 16.068], flag: '🇻🇳', vehicle: 'train' },
+  // { origin: { name: 'Da Nang', coords: [108.212, 16.068], flag: '🇻🇳' }, name: 'Hội An', coords: [108.32781, 15.879843], flag: '🇻🇳', vehicle: 'car' },
+  // { origin: { name: 'Hội An', coords: [108.32781, 15.879843], flag: '🇻🇳' }, name: 'Da Nang', coords: [108.212, 16.068], flag: '🇻🇳', vehicle: 'car' },
+  { origin: { name: 'Da Nang', coords: [108.212, 16.068], flag: '🇻🇳' }, name: 'Ho Chi Minh', coords: [106.701756, 10.775844], flag: '🇻🇳', vehicle: 'plane' },
+  { origin: { name: 'Ho Chi Minh', coords: [106.701756, 10.775844], flag: '🇻🇳' }, name: 'Tokyo', coords: [139.692912, 35.688985], flag: '🇯🇵', vehicle: 'plane' },
+  { origin: { name: 'Tokyo', coords: [139.692912, 35.688985], flag: '🇯🇵' }, name: 'Praha', coords: [14.422954, 50.08584], flag: '🇨🇿', vehicle: 'plane' },
+  { origin: { name: 'Praha', coords: [14.422954, 50.08584], flag: '🇨🇿' }, name: 'Budapest', coords: [19.040359, 47.497994], flag: '🇭🇺', vehicle: 'train' },
+  { origin: { name: 'Budapest', coords: [19.040359, 47.497994], flag: '🇭🇺' }, name: 'Vienna', coords: [16.372504, 48.208354], flag: '🇦🇹', vehicle: 'train' },
+  { origin: { name: 'Vienna', coords: [16.372504, 48.208354], flag: '🇦🇹' }, name: 'Praha', coords: [14.422954, 50.08584], flag: '🇨🇿', vehicle: 'train' },
+  { origin: { name: 'Praha', coords: [14.422954, 50.08584], flag: '🇨🇿' }, name: 'Tokyo', coords: [139.692912, 35.688985], flag: '🇯🇵', vehicle: 'plane' },
+  // { origin: { name: 'Tokyo', coords: [139.692912, 35.688985], flag: '🇯🇵' }, name: 'Yamanakako Mura', coords: [138.86226, 35.41016], flag: '🇯🇵', vehicle: 'car' },
+  // { origin: { name: 'Yamanakako Mura', coords: [138.86226, 35.41016], flag: '🇯🇵' }, name: 'Tokyo', coords: [139.692912, 35.688985], flag: '🇯🇵', vehicle: 'car' },
+  { origin: { name: 'Tokyo', coords: [139.692912, 35.688985], flag: '🇯🇵' }, name: 'Osaka', coords: [135.50078, 34.683594], flag: '🇯🇵', vehicle: 'train' },
+];
 
     // Route management state
     let editingRouteIndex = null;
@@ -820,6 +1297,12 @@ title: Travel Highlights 2024
     let destinationSessionToken = null;
     let originSuggestions = [];
     let destinationSuggestions = [];
+
+    // Route editor state
+    let isEditMode = true; // Start in edit mode
+    let routeControlPoints = {}; // Store arrays of control points for each route segment: { '0': [[lng, lat], [lng, lat], ...], '1': [...], ... }
+    let controlPointMarkers = []; // Store marker objects with metadata
+    let previewRoutes = {}; // Store generated preview routes
 
     // Generate a random session token for search
     function generateSessionToken() {
@@ -1028,9 +1511,14 @@ title: Travel Highlights 2024
               <div class="route-destinations">${origin} → ${destination}</div>
               <div class="route-vehicle">${vehicle} ${route.flag || ''}</div>
             </div>
-            <div class="route-actions">
-              <button class="route-btn" onclick="editRoute(${i})">Edit</button>
-              <button class="route-btn delete" onclick="deleteRoute(${i})">Delete</button>
+            <div class="route-actions-container">
+              <div class="route-actions">
+                <button class="route-btn" onclick="editRoute(${i})">Edit</button>
+                <button class="route-btn delete" onclick="deleteRoute(${i})">Delete</button>
+              </div>
+              <button class="insert-route-btn" onclick="insertRouteAfter(${i})" title="Insert new route after this one">
+                + Insert After
+              </button>
             </div>
           </div>
         `;
@@ -1144,9 +1632,48 @@ title: Travel Highlights 2024
       document.getElementById('edit-route-modal').classList.add('show');
     }
 
+    // Variable to track where to insert new route
+    let insertAfterIndex = null;
+
+    // Open modal to insert route after specific index
+    window.insertRouteAfter = function(index) {
+      editingRouteIndex = null;
+      insertAfterIndex = index;
+
+      document.getElementById('modal-title').textContent = `Insert Route After #${index + 1}`;
+
+      // Pre-fill origin with the destination of the previous route
+      const previousRoute = destinations[index];
+      if (previousRoute) {
+        document.getElementById('route-origin-input').value = previousRoute.name;
+        document.getElementById('route-origin-name').value = previousRoute.name;
+        document.getElementById('route-origin-coords').value = previousRoute.coords.join(',');
+        document.getElementById('route-origin-flag').textContent = previousRoute.flag || '';
+        document.getElementById('route-origin-flag-value').value = previousRoute.flag || '';
+        selectedOriginCoords = previousRoute.coords;
+      }
+
+      // Clear destination
+      document.getElementById('route-destination-input').value = '';
+      document.getElementById('route-destination').value = '';
+      document.getElementById('route-coords').value = '';
+      document.getElementById('route-destination-flag').textContent = '';
+      document.getElementById('route-destination-flag-value').value = '';
+      document.getElementById('route-vehicle').value = 'plane';
+
+      selectedDestinationCoords = null;
+
+      // Reset session tokens
+      originSessionToken = null;
+      destinationSessionToken = null;
+
+      document.getElementById('edit-route-modal').classList.add('show');
+    }
+
     // Open modal to add new route
     function addNewRoute() {
       editingRouteIndex = null;
+      insertAfterIndex = null;
 
       document.getElementById('modal-title').textContent = 'Add New Route';
 
@@ -1184,16 +1711,60 @@ title: Travel Highlights 2024
     // Start recording - canvas only (automatic, no prompts)
     async function startRecording() {
       try {
-        const canvas = map.getCanvas();
-        const stream = canvas.captureStream(30); // 30 fps
+        // Enable canvas overlays for recording
+        canvasOverlaysVisible = true;
+
+        // Hide DOM overlays during recording
+        const distanceCounter = document.getElementById('distance-counter');
+        const routeInfoPanel = document.getElementById('route-info-panel');
+        const completionModal = document.getElementById('completion-modal');
+        distanceCounter.style.display = 'none';
+        routeInfoPanel.style.display = 'none';
+        completionModal.style.display = 'none';
+
+        // Create and show overlay canvas
+        createOverlayCanvas();
+        if (overlayCanvas) {
+          overlayCanvas.style.display = 'block';
+        }
+        drawOverlayUI();
+
+        // Create a composite canvas to merge both canvases
+        const mapCanvas = map.getCanvas();
+        recordingCanvas = document.createElement('canvas');
+        recordingCanvas.width = mapCanvas.width;
+        recordingCanvas.height = mapCanvas.height;
+        recordingContext = recordingCanvas.getContext('2d', { willReadFrequently: true });
+
+        // Set recording flag BEFORE starting capture loop
+        recordedChunks = [];
+        isRecording = true;
+
+        // Continuously draw both canvases onto the recording canvas
+        function captureFrame() {
+          if (!isRecording) return;
+
+          // Draw map canvas
+          recordingContext.drawImage(mapCanvas, 0, 0);
+          // Draw overlay canvas on top
+          recordingContext.drawImage(overlayCanvas, 0, 0);
+
+          requestAnimationFrame(captureFrame);
+        }
+
+        // Start capturing frames
+        captureFrame();
+
+        // Small delay to ensure first frame is drawn
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Capture stream from the recording canvas
+        const stream = recordingCanvas.captureStream(30);
 
         mediaRecorder = new MediaRecorder(stream, {
           mimeType: 'video/webm;codecs=vp9',
           videoBitsPerSecond: 5000000
         });
-
-        recordedChunks = [];
-        isRecording = true;
 
         mediaRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
@@ -1206,7 +1777,7 @@ title: Travel Highlights 2024
         };
 
         mediaRecorder.start();
-        console.log('Recording started (map canvas only)');
+        console.log('Recording started with canvas overlays');
 
         // Show notification
         const notification = document.createElement('div');
@@ -1224,6 +1795,7 @@ title: Travel Highlights 2024
         console.error('Error starting recording:', error);
         alert('Could not start recording: ' + error.message);
         isRecording = false;
+        canvasOverlaysVisible = false;
       }
     }
 
@@ -1233,6 +1805,22 @@ title: Travel Highlights 2024
         isRecording = false;
         mediaRecorder.stop();
         console.log('Recording stopped');
+
+        // Disable canvas overlays
+        canvasOverlaysVisible = false;
+
+        // Hide overlay canvas
+        if (overlayCanvas) {
+          overlayCanvas.style.display = 'none';
+        }
+
+        // Restore DOM overlays
+        const distanceCounter = document.getElementById('distance-counter');
+        const routeInfoPanel = document.getElementById('route-info-panel');
+        const completionModal = document.getElementById('completion-modal');
+        distanceCounter.style.display = '';
+        routeInfoPanel.style.display = '';
+        completionModal.style.display = '';
 
         // Remove recording indicator
         const indicator = document.getElementById('recording-indicator');
@@ -1299,6 +1887,20 @@ title: Travel Highlights 2024
 
     // Show completion modal with route summary
     function showCompletionModal() {
+      // Hide all vehicle models when tour completes
+      if (map.getLayer('plane-model-layer')) {
+        map.setLayoutProperty('plane-model-layer', 'visibility', 'none');
+      }
+      if (map.getLayer('train-model-layer')) {
+        map.setLayoutProperty('train-model-layer', 'visibility', 'none');
+      }
+      if (map.getLayer('car-model-layer')) {
+        map.setLayoutProperty('car-model-layer', 'visibility', 'none');
+      }
+      if (map.getLayer('ship-model-layer')) {
+        map.setLayoutProperty('ship-model-layer', 'visibility', 'none');
+      }
+
       const modal = document.getElementById('completion-modal');
       const summary = document.getElementById('routes-summary');
       const totalDistanceEl = document.getElementById('total-distance');
@@ -1315,29 +1917,41 @@ title: Travel Highlights 2024
       const vehicleEmoji = {
         'plane': '✈️',
         'train': '🚆',
-        'car': '🚗'
+        'car': '🚗',
+        'ship': '🚢'
       };
 
       // Calculate total distance and create route summaries
       let totalDistance = 0;
+      const routesData = [];
       destinations.forEach((route, index) => {
         const distance = route.actualDistance || 0;
         totalDistance += distance;
         const vehicle = route.vehicle || 'plane';
 
+        routesData.push({
+          origin: route.origin,
+          flag: route.flag,
+          name: route.name,
+          distance: distance,
+          vehicle: vehicle
+        });
+
         const routeDiv = document.createElement('div');
         routeDiv.className = 'route-summary';
         routeDiv.innerHTML = `
-          <div>
-            <span style="font-size: 18px; margin-right: 8px;">${route.origin.flag || ''}</span>
-            <span style="color: white; font-weight: 600;">${route.origin.name}</span>
-            <span style="color: rgba(255,255,255,0.5); margin: 0 8px;">→</span>
-            <span style="font-size: 18px; margin-right: 8px;">${route.flag || ''}</span>
-            <span style="color: white; font-weight: 600;">${route.name}</span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <span style="font-size: 20px;">${vehicleEmoji[vehicle]}</span>
-            <span style="color: #667eea; font-weight: 700;">${formatNumberWithCommas(distance)} km</span>
+          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+            <div style="display: flex; align-items: center; flex: 1;">
+              <span style="font-size: 20px; margin-right: 12px;">${vehicleEmoji[vehicle]}</span>
+              <div>
+                <span style="font-size: 18px; margin-right: 8px;">${route.origin.flag || ''}</span>
+                <span style="color: white; font-weight: 600;">${route.origin.name}</span>
+                <span style="color: rgba(255,255,255,0.5); margin: 0 8px;">→</span>
+                <span style="font-size: 18px; margin-right: 8px;">${route.flag || ''}</span>
+                <span style="color: white; font-weight: 600;">${route.name}</span>
+              </div>
+            </div>
+            <span style="color: #667eea; font-weight: 700; text-align: right; white-space: nowrap;">${formatNumberWithCommas(distance)} km</span>
           </div>
         `;
         summary.appendChild(routeDiv);
@@ -1346,14 +1960,36 @@ title: Travel Highlights 2024
       // Set total distance
       totalDistanceEl.textContent = `${formatNumberWithCommas(totalDistance)} km`;
 
-      // Show modal with fade-in
-      modal.style.display = 'block';
-      setTimeout(() => {
-        modal.style.opacity = '1';
-      }, 10);
+      // Update canvas overlay data for recording
+      modalData = {
+        title: tourTitle,
+        routes: routesData,
+        totalDistance: totalDistance
+      };
+
+      // Modal is now dynamically sized - no scrolling needed
+
+      // Show modal with fade-in (unless recording, canvas overlay handles it)
+      if (!canvasOverlaysVisible) {
+        // Hide the distance counter when showing DOM modal
+        const distanceCounter = document.getElementById('distance-counter');
+        if (distanceCounter) {
+          distanceCounter.style.display = 'none';
+        }
+
+        modal.style.display = 'block';
+        setTimeout(() => {
+          modal.style.opacity = '1';
+        }, 10);
+      }
 
       // Trigger confetti
       createConfetti();
+
+      // Also trigger canvas confetti if recording
+      if (canvasOverlaysVisible && overlayCanvas) {
+        startConfetti(overlayCanvas.width, overlayCanvas.height);
+      }
 
       // Auto-scroll to bottom smoothly after modal appears
       setTimeout(() => {
@@ -1366,7 +2002,7 @@ title: Travel Highlights 2024
         if (isRecording) {
           setTimeout(() => {
             stopRecording();
-          }, 3000); // 3 seconds after scroll to show final state
+          }, 3000); // 6 seconds after scroll to show final state (2x longer)
         }
       }, 500);
     }
@@ -1375,8 +2011,18 @@ title: Travel Highlights 2024
     function closeCompletionModal() {
       const modal = document.getElementById('completion-modal');
       modal.style.opacity = '0';
+
+      // Restore the distance counter visibility
+      const distanceCounter = document.getElementById('distance-counter');
+      if (distanceCounter && totalAccumulatedDistance > 0) {
+        distanceCounter.style.display = '';
+      }
+
       setTimeout(() => {
         modal.style.display = 'none';
+        modalData = null; // Clear canvas overlay data
+        confettiActive = false; // Stop confetti
+        confettiParticles = []; // Clear confetti particles
       }, 300);
     }
 
@@ -1451,13 +2097,62 @@ title: Travel Highlights 2024
       if (editingRouteIndex !== null) {
         // Update existing route
         destinations[editingRouteIndex] = newRoute;
+      } else if (insertAfterIndex !== null) {
+        // Insert new route after specific index
+        destinations.splice(insertAfterIndex + 1, 0, newRoute);
+        insertAfterIndex = null; // Reset
       } else {
-        // Add new route
+        // Add new route at the end
         destinations.push(newRoute);
       }
 
       renderRoutesList();
       closeEditModal();
+
+      // If we're in edit mode, reinitialize the editor to show the new route as editable
+      if (isEditMode) {
+        // Save existing control points before cleanup
+        const savedControlPoints = { ...routeControlPoints };
+
+        // If we inserted a route, shift control points for routes after the insertion point
+        let adjustedControlPoints = {};
+        if (insertAfterIndex !== null) {
+          Object.keys(savedControlPoints).forEach(key => {
+            const keyIndex = parseInt(key);
+            if (keyIndex > insertAfterIndex) {
+              // Shift up by 1 for routes after insertion point
+              adjustedControlPoints[`${keyIndex + 1}`] = savedControlPoints[key];
+            } else {
+              adjustedControlPoints[key] = savedControlPoints[key];
+            }
+          });
+        } else {
+          adjustedControlPoints = savedControlPoints;
+        }
+
+        // Clean up existing editor
+        cleanupRouteEditor();
+
+        // Reinitialize with the new route included
+        initializeRouteEditor();
+
+        // Restore saved control points
+        Object.keys(adjustedControlPoints).forEach(segmentKey => {
+          const points = adjustedControlPoints[segmentKey];
+          if (points && points.length > 0) {
+            // Clear the array temporarily to avoid duplicates
+            const savedPoints = [...points];
+            routeControlPoints[segmentKey] = [];
+
+            // Re-add each point
+            savedPoints.forEach(point => {
+              // Handle both object format and array format
+              const coords = point.coords || point;
+              addControlPoint(segmentKey, { lng: coords[0], lat: coords[1] });
+            });
+          }
+        });
+      }
     }
 
     // Delete a route
@@ -1467,10 +2162,51 @@ title: Travel Highlights 2024
         return;
       }
 
-      if (confirm(`Delete route to ${destinations[index].name}?`)) {
-        destinations.splice(index, 1);
-        renderRoutesList();
-      }
+      // Delete without confirmation
+      destinations.splice(index, 1);
+      renderRoutesList();
+
+      // If we're in edit mode, reinitialize the editor to remove the deleted route
+      if (isEditMode) {
+        // Save existing control points before cleanup (excluding the deleted route)
+        const savedControlPoints = { ...routeControlPoints };
+        // Remove control points for the deleted route
+        delete savedControlPoints[`${index}`];
+        // Shift control points for routes after the deleted one
+        const shiftedControlPoints = {};
+        Object.keys(savedControlPoints).forEach(key => {
+          const keyIndex = parseInt(key);
+          if (keyIndex > index) {
+            // Shift down by 1
+            shiftedControlPoints[`${keyIndex - 1}`] = savedControlPoints[key];
+          } else {
+            shiftedControlPoints[key] = savedControlPoints[key];
+          }
+        });
+
+        // Clean up existing editor
+        cleanupRouteEditor();
+
+          // Reinitialize without the deleted route
+          initializeRouteEditor();
+
+          // Restore saved control points
+          Object.keys(shiftedControlPoints).forEach(segmentKey => {
+            const points = shiftedControlPoints[segmentKey];
+            if (points && points.length > 0) {
+              // Clear the array temporarily to avoid duplicates
+              const savedPoints = [...points];
+              routeControlPoints[segmentKey] = [];
+
+              // Re-add each point
+              savedPoints.forEach(point => {
+                // Handle both object format and array format
+                const coords = point.coords || point;
+                addControlPoint(segmentKey, { lng: coords[0], lat: coords[1] });
+              });
+            }
+          });
+        }
     }
 
     // Calculate distances for all routes that don't have actualDistance
@@ -1830,6 +2566,23 @@ title: Travel Highlights 2024
               }
             }
           }
+        },
+        'ship-model-source': {
+          'type': 'model',
+          'models': {
+            'ship': {
+              'uri': shipModelUri,
+              'position': [140.3929, 35.7719],
+              'orientation': [0, 0, 0],
+              'materialOverrides': {
+                'body': {
+                  'model-color': [0.0, 0.5, 1.0],
+                  'model-color-mix-intensity': 1.0,
+                  'model-emissive-strength': 5.0
+                }
+              }
+            }
+          }
         }
       },
       'layers': [
@@ -1910,6 +2663,32 @@ title: Travel Highlights 2024
             ],
             'model-emissive-strength': 5
           }
+        },
+        {
+          'id': 'ship-model-layer',
+          'type': 'model',
+          'source': 'ship-model-source',
+          'slot': 'top',
+          'layout': {
+            'visibility': 'none'
+          },
+          'paint': {
+            'model-translation': [0, 0, ['feature-state', 'z-elevation']],
+            'model-scale': [
+              'interpolate',
+              ['exponential', 0.5],
+              ['zoom'],
+              2, ['literal', [15000, 15000, 15000]],
+              14, ['literal', [20, 20, 20]]
+            ],
+            'model-type': 'location-indicator',
+            'model-rotation': [
+              ['feature-state', 'pitch'],
+              ['feature-state', 'roll'],
+              ['feature-state', 'bearing']
+            ],
+            'model-emissive-strength': 1.5
+          }
         }
       ]
     };
@@ -1918,6 +2697,7 @@ title: Travel Highlights 2024
     function updateModelSourceAndFeatureState(airplane) {
       const isUsingTrain = (currentModelUri === trainModelUri);
       const isUsingCar = (currentModelUri === carModelUri);
+      const isUsingShip = (currentModelUri === shipModelUri);
 
       let activeLayerId, activeSourceId, activeModelId, vehicleType;
       if (isUsingTrain) {
@@ -1930,6 +2710,11 @@ title: Travel Highlights 2024
         activeSourceId = 'car-model-source';
         activeModelId = 'car';
         vehicleType = 'car';
+      } else if (isUsingShip) {
+        activeLayerId = 'ship-model-layer';
+        activeSourceId = 'ship-model-source';
+        activeModelId = 'ship';
+        vehicleType = 'ship';
       } else {
         activeLayerId = 'plane-model-layer';
         activeSourceId = 'plane-model-source';
@@ -1943,6 +2728,7 @@ title: Travel Highlights 2024
         map.setLayoutProperty('plane-model-layer', 'visibility', vehicleType === 'plane' ? 'visible' : 'none');
         map.setLayoutProperty('train-model-layer', 'visibility', vehicleType === 'train' ? 'visible' : 'none');
         map.setLayoutProperty('car-model-layer', 'visibility', vehicleType === 'car' ? 'visible' : 'none');
+        map.setLayoutProperty('ship-model-layer', 'visibility', vehicleType === 'ship' ? 'visible' : 'none');
 
         needsModelUpdate = false;
       }
@@ -1960,14 +2746,14 @@ title: Travel Highlights 2024
       }
 
       // Update feature state for rotation and elevation
-      // Trains and cars stay level (pitch 0), planes use calculated pitch
+      // Trains, cars, and ships stay level (pitch 0), planes use calculated pitch
       map.setFeatureState(
         { source: activeSourceId, id: activeModelId },
         {
           'z-elevation': airplane.altitude,
-          'pitch': (isUsingTrain || isUsingCar) ? 0 : airplane.pitch,
+          'pitch': (isUsingTrain || isUsingCar || isUsingShip) ? 0 : airplane.pitch,
           'roll': airplane.roll,
-          'bearing': airplane.bearing + (isUsingTrain ? 90 : (isUsingCar ? 0 : 90))
+          'bearing': airplane.bearing + (isUsingTrain ? 90 : (isUsingCar ? 0 : (isUsingShip ? 270 : 90)))
         }
       );
     }
@@ -1977,13 +2763,589 @@ title: Travel Highlights 2024
       container: 'map',
       projection: 'globe',
       style,
-      center: destinations[0].origin.coords, // Start at first route's origin 
+      center: destinations[0].origin.coords, // Start at first route's origin
       zoom: 2,
       bearing: 0,
       pitch: 0,
-      preserveDrawingBuffer: true // Required for video recording
+      preserveDrawingBuffer: true, // Required for video recording
+      touchZoomRotate: true, // Enable pinch-to-zoom and rotation on mobile
+      touchPitch: true, // Enable two-finger tilt gesture
+      dragRotate: true, // Enable drag to rotate
+      doubleClickZoom: true // Enable double-tap to zoom
     });
 
+    // Navigation and scale controls removed for cleaner interface
+    // Users can still zoom with scroll/pinch and rotate with right-click/drag or touch gestures
+
+    // Map selection mode variables
+    let mapSelectionMode = false;
+    let selectingOrigin = true;
+    let tempOriginData = null;
+    let tempDestinationData = null;
+    let mapSelectionMarkers = [];
+
+    // Start map selection from modal
+    window.startMapSelectionFromModal = function() {
+      // Hide the modal temporarily
+      document.getElementById('edit-route-modal').classList.remove('show');
+
+      // Start map selection
+      startMapSelection();
+    }
+
+    // Start map selection mode
+    function startMapSelection() {
+      mapSelectionMode = true;
+      selectingOrigin = true;
+      tempOriginData = null;
+      tempDestinationData = null;
+
+      // Show overlay
+      document.getElementById('map-select-overlay').style.display = 'flex';
+      document.getElementById('selection-type').textContent = 'Origin';
+
+      // Change cursor
+      map.getCanvas().style.cursor = 'crosshair';
+
+      // Close mobile menu if open
+      if (window.innerWidth <= 768) {
+        closeMobileMenu();
+      }
+    }
+
+    // Cancel map selection mode
+    window.cancelMapSelection = function() {
+      mapSelectionMode = false;
+
+      // Hide overlay
+      document.getElementById('map-select-overlay').style.display = 'none';
+
+      // Reset cursor
+      map.getCanvas().style.cursor = '';
+
+      // Remove temporary markers
+      mapSelectionMarkers.forEach(marker => marker.remove());
+      mapSelectionMarkers = [];
+
+      // Clear temporary data
+      tempOriginData = null;
+      tempDestinationData = null;
+
+      // Reopen the modal
+      document.getElementById('edit-route-modal').classList.add('show');
+    }
+
+    // Reverse geocode using Mapbox Geocoding API v6
+    async function reverseGeocode(lng, lat) {
+      const accessToken = mapboxgl.accessToken;
+      const url = `https://api.mapbox.com/search/geocode/v6/reverse?longitude=${lng}&latitude=${lat}&language=en&access_token=${accessToken}`;
+
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.features && data.features.length > 0) {
+          const feature = data.features[0];
+          const properties = feature.properties || {};
+
+          // Debug: log the response to see structure
+          console.log('Geocoding v6 response:', properties);
+
+          // Get the most appropriate name
+          let name = properties.name ||
+                    properties.place_formatted ||
+                    properties.full_address ||
+                    `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
+          // Extract country code for flag - v6 API structure
+          let flag = '';
+
+          // Try different ways to get country code from v6 response
+          let countryCode = properties.country_code ||
+                           properties.country_code_alpha_2 ||
+                           properties.country_code_alpha_3;
+
+          // If not found in properties, check context
+          if (!countryCode && properties.context) {
+            if (properties.context.country) {
+              countryCode = properties.context.country.country_code ||
+                           properties.context.country.country_code_alpha_2 ||
+                           properties.context.country.country_code_alpha_3;
+            }
+          }
+
+          // Get flag using the library (handles both 2 and 3 letter codes)
+          if (countryCode) {
+            flag = getCountryFlag(countryCode);
+          }
+
+          return {
+            name: name,
+            coords: [lng, lat],
+            flag: flag
+          };
+        }
+      } catch (error) {
+        console.error('Reverse geocoding failed:', error);
+      }
+
+      // Fallback to coordinates if geocoding fails
+      return {
+        name: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+        coords: [lng, lat],
+        flag: ''
+      };
+    }
+
+    // Get country flag emoji from country code
+    function getCountryFlag(countryCode) {
+      if (!countryCode) return '';
+
+      // Use the country-code-emoji library if available
+      if (typeof countryCodeEmoji !== 'undefined') {
+        try {
+          // The library accepts both 2-letter and 3-letter codes
+          const flag = countryCodeEmoji(countryCode.toUpperCase());
+          if (flag) return flag;
+        } catch (e) {
+          console.log('Flag not found for:', countryCode);
+        }
+      }
+
+      // Fallback: Convert 2-letter country code to flag emoji using Unicode
+      if (countryCode.length === 2) {
+        const codePoints = countryCode
+          .toUpperCase()
+          .split('')
+          .map(char => 127397 + char.charCodeAt(0));
+        return String.fromCodePoint(...codePoints);
+      }
+
+      // Fallback mapping for 3-letter codes
+      const alpha3ToEmoji = {
+        'USA': '🇺🇸', 'MEX': '🇲🇽', 'JPN': '🇯🇵', 'THA': '🇹🇭',
+        'VNM': '🇻🇳', 'CZE': '🇨🇿', 'HUN': '🇭🇺', 'AUT': '🇦🇹',
+        'GBR': '🇬🇧', 'FRA': '🇫🇷', 'DEU': '🇩🇪', 'ITA': '🇮🇹',
+        'ESP': '🇪🇸', 'CAN': '🇨🇦', 'AUS': '🇦🇺', 'CHN': '🇨🇳',
+        'KOR': '🇰🇷', 'IND': '🇮🇳', 'BRA': '🇧🇷', 'RUS': '🇷🇺'
+      };
+
+      return alpha3ToEmoji[countryCode.toUpperCase()] || '';
+    }
+
+    // Handle map click during selection mode
+    map.on('click', async (e) => {
+      if (!mapSelectionMode) return;
+
+      const { lng, lat } = e.lngLat;
+
+      // Add a temporary marker
+      const marker = new mapboxgl.Marker({ color: selectingOrigin ? '#00ff00' : '#ff0000' })
+        .setLngLat([lng, lat])
+        .addTo(map);
+      mapSelectionMarkers.push(marker);
+
+      // Reverse geocode the location
+      const locationData = await reverseGeocode(lng, lat);
+
+      if (selectingOrigin) {
+        tempOriginData = locationData;
+
+        // Switch to destination selection
+        selectingOrigin = false;
+        document.getElementById('selection-type').textContent = 'Destination';
+
+        // Show popup with origin info
+        new mapboxgl.Popup({ offset: 25, closeButton: false })
+          .setLngLat([lng, lat])
+          .setHTML(`<strong>Origin:</strong> ${locationData.name}`)
+          .addTo(map);
+      } else {
+        tempDestinationData = locationData;
+
+        // Set the values in the form
+        document.getElementById('route-origin-input').value = tempOriginData.name;
+        document.getElementById('route-origin-name').value = tempOriginData.name;
+        document.getElementById('route-origin-coords').value = tempOriginData.coords.join(',');
+        document.getElementById('route-origin-flag').textContent = tempOriginData.flag;
+        document.getElementById('route-origin-flag-value').value = tempOriginData.flag;
+
+        document.getElementById('route-destination-input').value = tempDestinationData.name;
+        document.getElementById('route-destination').value = tempDestinationData.name;
+        document.getElementById('route-coords').value = tempDestinationData.coords.join(',');
+        document.getElementById('route-destination-flag').textContent = tempDestinationData.flag;
+        document.getElementById('route-destination-flag-value').value = tempDestinationData.flag;
+
+        // Set selected coordinates
+        selectedOriginCoords = tempOriginData.coords;
+        selectedDestinationCoords = tempDestinationData.coords;
+
+        // Clean up map selection mode
+        mapSelectionMode = false;
+        document.getElementById('map-select-overlay').style.display = 'none';
+        map.getCanvas().style.cursor = '';
+
+        // Remove temporary markers
+        mapSelectionMarkers.forEach(marker => marker.remove());
+        mapSelectionMarkers = [];
+
+        // Show popup with destination info
+        new mapboxgl.Popup({ offset: 25, closeButton: false })
+          .setLngLat([lng, lat])
+          .setHTML(`<strong>Destination:</strong> ${locationData.name}`)
+          .addTo(map);
+
+        // Reopen the modal with the selected data
+        setTimeout(() => {
+          document.getElementById('edit-route-modal').classList.add('show');
+        }, 500);
+      }
+    });
+
+    // Add custom overlay layers after map loads
+    map.on('load', () => {
+      map.addLayer(distanceOverlayLayer);
+      map.addLayer(destinationLabelLayer);
+      map.addLayer(modalOverlayLayer);
+    });
+
+    // Custom overlay layers for canvas recording
+    let canvasOverlaysVisible = false; // Show overlays only when recording
+    let currentRouteInfo = null;
+    let modalData = null;
+    let overlayCanvas = null;
+    let overlayCtx = null;
+
+    // Confetti system for recording
+    let confettiParticles = [];
+    let confettiActive = false;
+
+    // Modal scrolling for long route lists
+    let modalScrollY = 0;
+    let modalScrollSpeed = 1; // Pixels per frame
+    let modalScrollDirection = 1; // 1 for down, -1 for up
+    let modalContentHeight = 0;
+    let modalVisibleHeight = 0;
+    let modalScrollPaused = 0; // Pause counter at top/bottom
+
+    // Confetti particle class
+    class ConfettiParticle {
+      constructor(x, y, width, height) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 10;
+        this.vy = Math.random() * 1 + 0.5; // Slower initial velocity (downward)
+        this.gravity = 0.075; // Half the gravity for slower falling
+        this.opacity = 1;
+        this.rotation = Math.random() * Math.PI * 2;
+        this.rotationSpeed = (Math.random() - 0.5) * 0.2;
+        this.size = Math.random() * 10 + 5;
+        this.color = `hsl(${Math.random() * 360}, 100%, 50%)`;
+        this.width = width;
+        this.height = height;
+      }
+
+      update() {
+        // Only update if not on ground
+        if (this.y < this.height - this.size) {
+          this.x += this.vx;
+          this.y += this.vy;
+          this.vy += this.gravity;
+          this.rotation += this.rotationSpeed;
+
+          // Stop at ground level
+          if (this.y >= this.height - this.size) {
+            this.y = this.height - this.size;
+            this.vy = 0;
+            this.vx *= 0.5; // Reduce horizontal movement when landed
+            this.rotationSpeed *= 0.5;
+          }
+        } else {
+          // On ground - slow fade
+          this.opacity *= 0.995;
+          this.vx *= 0.98; // Friction
+        }
+
+        // Bounce off side edges
+        if (this.x < 0 || this.x > this.width) {
+          this.vx *= -0.5;
+        }
+      }
+
+      draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = this.opacity;
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(-this.size/2, -this.size/2, this.size, this.size);
+        ctx.restore();
+      }
+    }
+
+    // Initialize confetti
+    function startConfetti(width, height) {
+      confettiActive = true;
+      confettiParticles = [];
+
+      // Create 200 confetti particles starting from the top
+      for (let i = 0; i < 200; i++) {
+        confettiParticles.push(new ConfettiParticle(
+          Math.random() * width,
+          -Math.random() * 150, // Triple the vertical spacing above the visible area
+          width,
+          height
+        ));
+      }
+
+      // Stop confetti after 5 seconds
+      setTimeout(() => {
+        confettiActive = false;
+      }, 5000);
+    }
+
+    // Update and draw confetti
+    function updateConfetti(ctx, width, height) {
+      if (!confettiActive && confettiParticles.length === 0) return;
+
+      // Update particles
+      confettiParticles = confettiParticles.filter(particle => {
+        particle.update();
+        return particle.opacity > 0.01; // Only remove when fully faded
+      });
+
+      // Draw particles
+      confettiParticles.forEach(particle => {
+        particle.draw(ctx);
+      });
+    }
+
+    // Create overlay canvas for drawing UI elements
+    function createOverlayCanvas() {
+      if (overlayCanvas) return;
+
+      const mapCanvas = map.getCanvas();
+      overlayCanvas = document.createElement('canvas');
+      overlayCanvas.width = mapCanvas.width;
+      overlayCanvas.height = mapCanvas.height;
+      overlayCanvas.style.position = 'absolute';
+      overlayCanvas.style.top = '0';
+      overlayCanvas.style.left = '0';
+      overlayCanvas.style.pointerEvents = 'none';
+      overlayCanvas.style.display = 'none';
+      overlayCanvas.style.zIndex = '1000';
+      document.getElementById('map').appendChild(overlayCanvas);
+      overlayCtx = overlayCanvas.getContext('2d');
+    }
+
+    // Draw overlay UI elements on the overlay canvas
+    function drawOverlayUI() {
+      if (!canvasOverlaysVisible || !overlayCanvas || !overlayCtx) return;
+
+      const mapCanvas = map.getCanvas();
+      overlayCanvas.width = mapCanvas.width;
+      overlayCanvas.height = mapCanvas.height;
+      overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+      // Calculate scale factor based on canvas dimensions (using 1920x1080 as base)
+      const baseWidth = 1920;
+      const baseHeight = 1080;
+      const scaleX = overlayCanvas.width / baseWidth;
+      const scaleY = overlayCanvas.height / baseHeight;
+      const scale = Math.min(scaleX, scaleY); // Use the smaller scale to ensure everything fits
+
+      // Helper function to scale font sizes
+      const scaledFont = (size) => Math.round(size * scale);
+
+      // Helper function to draw rounded rectangle
+      const drawRoundedRect = (x, y, width, height, radius) => {
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(x + radius, y);
+        overlayCtx.lineTo(x + width - radius, y);
+        overlayCtx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        overlayCtx.lineTo(x + width, y + height - radius);
+        overlayCtx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        overlayCtx.lineTo(x + radius, y + height);
+        overlayCtx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        overlayCtx.lineTo(x, y + radius);
+        overlayCtx.quadraticCurveTo(x, y, x + radius, y);
+        overlayCtx.closePath();
+        overlayCtx.fill();
+      };
+
+      // Draw distance counter (hide when modal is showing)
+      if (totalAccumulatedDistance > 0 && !modalData) {
+        const distanceText = Math.round(totalAccumulatedDistance).toLocaleString() + ' km';
+        overlayCtx.save();
+        overlayCtx.font = `700 ${scaledFont(67)}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto`;
+        const metrics = overlayCtx.measureText(distanceText);
+        const padding = scaledFont(30);
+        const boxWidth = metrics.width + padding * 2;
+        const boxHeight = scaledFont(60);
+        const x = overlayCanvas.width - boxWidth - scaledFont(20);
+        const y = scaledFont(20);
+
+        overlayCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        drawRoundedRect(x, y, boxWidth, boxHeight, scaledFont(15));
+
+        overlayCtx.fillStyle = 'white';
+        overlayCtx.textAlign = 'center';
+        overlayCtx.textBaseline = 'middle';
+        overlayCtx.fillText(distanceText, x + boxWidth / 2, y + boxHeight / 2);
+        overlayCtx.restore();
+      }
+
+      // Draw route info panel
+      if (currentRouteInfo) {
+        overlayCtx.save();
+
+        const panelX = scaledFont(30);
+        const panelY = scaledFont(30);
+        const padding = scaledFont(35);
+
+        // Measure text to determine panel width
+        overlayCtx.font = `600 ${scaledFont(34)}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto`;
+        const routeText = `${currentRouteInfo.from.name}    →    ${currentRouteInfo.to.name}`;
+        const textWidth = overlayCtx.measureText(routeText).width;
+
+        // Add space for flags
+        const flagSpace = scaledFont(100); // Space for 2 flags
+        const panelWidth = Math.max(textWidth + flagSpace + (padding * 2), scaledFont(450));
+        const panelHeight = scaledFont(140);
+
+        // Draw panel background
+        overlayCtx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        drawRoundedRect(panelX, panelY, panelWidth, panelHeight, scaledFont(15));
+
+        // Draw route line (origin -> destination)
+        let xOffset = panelX + padding;
+        const yOffset = panelY + scaledFont(50);
+
+        // Origin flag
+        overlayCtx.font = `${scaledFont(36)}px sans-serif`;
+        overlayCtx.textAlign = 'left';
+        overlayCtx.fillText(currentRouteInfo.from.flag, xOffset, yOffset);
+        xOffset += scaledFont(45);
+
+        // Origin name
+        overlayCtx.fillStyle = 'white';
+        overlayCtx.font = `600 ${scaledFont(34)}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto`;
+        overlayCtx.fillText(currentRouteInfo.from.name, xOffset, yOffset);
+        xOffset += overlayCtx.measureText(currentRouteInfo.from.name).width;
+
+        // Arrow
+        overlayCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        overlayCtx.font = `${scaledFont(34)}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto`;
+        const arrow = '  →  ';
+        overlayCtx.fillText(arrow, xOffset, yOffset);
+        xOffset += overlayCtx.measureText(arrow).width;
+
+        // Destination flag
+        overlayCtx.font = `${scaledFont(36)}px sans-serif`;
+        overlayCtx.fillText(currentRouteInfo.to.flag, xOffset, yOffset);
+        xOffset += scaledFont(45);
+
+        // Destination name
+        overlayCtx.fillStyle = 'white';
+        overlayCtx.font = `600 ${scaledFont(34)}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto`;
+        overlayCtx.fillText(currentRouteInfo.to.name, xOffset, yOffset);
+
+        // Route distance (centered below)
+        overlayCtx.fillStyle = '#667eea';
+        overlayCtx.font = `700 ${scaledFont(48)}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto`;
+        overlayCtx.textAlign = 'center';
+        const distanceText = formatNumberWithCommas(Math.round(currentRouteInfo.routeDistance)) + ' km';
+        overlayCtx.fillText(distanceText, panelX + panelWidth / 2, panelY + scaledFont(100));
+
+        overlayCtx.restore();
+      }
+
+      // Draw modal (celebratory version for canvas/recording)
+      if (modalData) {
+        overlayCtx.save();
+
+        // Earth's circumference at equator
+        const earthCircumference = 40075; // km
+        const timesAroundEarth = (modalData.totalDistance / earthCircumference).toFixed(2);
+
+        // Smaller, centered celebratory modal
+        const modalWidth = scaledFont(700);
+        const modalHeight = scaledFont(400);
+        const x = (overlayCanvas.width - modalWidth) / 2;
+        const y = (overlayCanvas.height - modalHeight) / 2;
+
+        // Draw modal background with gradient
+        const gradient = overlayCtx.createLinearGradient(x, y, x, y + modalHeight);
+        gradient.addColorStop(0, 'rgba(102, 126, 234, 0.95)');
+        gradient.addColorStop(1, 'rgba(67, 56, 202, 0.95)');
+        overlayCtx.fillStyle = gradient;
+        drawRoundedRect(x, y, modalWidth, modalHeight, scaledFont(20));
+
+        // Draw tour name at top
+        overlayCtx.font = `700 ${scaledFont(56)}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto`;
+        overlayCtx.fillStyle = 'white';
+        overlayCtx.textAlign = 'center';
+        overlayCtx.fillText(modalData.title, x + modalWidth / 2, y + scaledFont(100));
+
+        // Draw total distance (big and bold)
+        overlayCtx.fillStyle = 'white';
+        overlayCtx.font = `900 ${scaledFont(100)}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto`;
+        overlayCtx.textAlign = 'center';
+        overlayCtx.fillText(formatNumberWithCommas(modalData.totalDistance), x + modalWidth / 2, y + scaledFont(230));
+
+        // Draw "kilometers" label
+        overlayCtx.font = `400 ${scaledFont(32)}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto`;
+        overlayCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        overlayCtx.fillText('kilometers', x + modalWidth / 2, y + scaledFont(270));
+
+        // Draw Earth comparison
+        overlayCtx.fillStyle = '#FFD700'; // Gold color
+        overlayCtx.font = `600 ${scaledFont(38)}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto`;
+        overlayCtx.textAlign = 'center';
+        const earthText = timesAroundEarth >= 1
+          ? `${timesAroundEarth}x around Earth`
+          : `${(parseFloat(timesAroundEarth) * 100).toFixed(0)}% around Earth`;
+        overlayCtx.fillText(earthText, x + modalWidth / 2, y + scaledFont(340));
+
+        overlayCtx.restore();
+      }
+
+      // Draw confetti on top of everything
+      updateConfetti(overlayCtx, overlayCanvas.width, overlayCanvas.height);
+
+      requestAnimationFrame(drawOverlayUI);
+    }
+
+    // Distance counter overlay layer (dummy - just triggers repaints)
+    const distanceOverlayLayer = {
+      id: 'distance-overlay',
+      type: 'custom',
+      renderingMode: '2d',
+      onAdd: function() {},
+      render: function() {
+        if (canvasOverlaysVisible) {
+          map.triggerRepaint();
+        }
+      }
+    };
+
+    // Destination label overlay layer (dummy)
+    const destinationLabelLayer = {
+      id: 'destination-label-overlay',
+      type: 'custom',
+      renderingMode: '2d',
+      onAdd: function() {},
+      render: function() {}
+    };
+
+    // Modal overlay layer (dummy)
+    const modalOverlayLayer = {
+      id: 'modal-overlay',
+      type: 'custom',
+      renderingMode: '2d',
+      onAdd: function() {},
+      render: function() {}
+    };
 
     let currentLegIndex = 0;
     let isAnimating = false;
@@ -1998,25 +3360,53 @@ title: Travel Highlights 2024
     let segmentCounter = 0; // Counter for unique segment IDs
     // Initialize with the first destination's vehicle
     let currentModelUri = destinations[0].vehicle === 'train' ? trainModelUri :
-                          destinations[0].vehicle === 'car' ? carModelUri : airplaneModelUri;
+                          destinations[0].vehicle === 'car' ? carModelUri :
+                          destinations[0].vehicle === 'ship' ? shipModelUri : airplaneModelUri;
     let lastModelUri = null; // Track last loaded model to avoid unnecessary updates
     let needsModelUpdate = true; // Flag to trigger model switch
 
-    // Route editor state
-    let isEditMode = true; // Start in edit mode
-    let routeControlPoints = {}; // Store arrays of control points for each route segment: { '0': [[lng, lat], [lng, lat], ...], '1': [...], ... }
-    let controlPointMarkers = []; // Store marker objects with metadata
-    let previewRoutes = {}; // Store generated preview routes
+    // Show route info panel
+    function showRouteInfo(from, to, routeDistance) {
+      const panel = document.getElementById('route-info-panel');
+      if (!panel) return;
 
-    // Show destination label
-    function showDestinationLabel(destination) {
-      const label = document.getElementById('destination-label');
-      label.innerHTML = `${destination.flag}<br>${destination.name}`;
-      label.classList.add('show');
+      // Format the distance for display
+      const distanceDisplay = routeDistance ? formatNumberWithCommas(Math.round(routeDistance)) : '0';
 
-      setTimeout(() => {
-        label.classList.remove('show');
-      }, 2000);
+      panel.innerHTML = `
+        <div class="route-info-line">
+          <span class="route-info-flag">${from.flag || ''}</span>
+          <span class="route-info-name">${from.name}</span>
+          <span class="route-info-arrow">→</span>
+          <span class="route-info-flag">${to.flag || ''}</span>
+          <span class="route-info-name">${to.name}</span>
+        </div>
+        <div class="route-info-distance">${distanceDisplay} km</div>
+      `;
+
+      panel.classList.add('show');
+
+      // Update canvas overlay data for recording
+      currentRouteInfo = {
+        from: {
+          flag: from.flag || '',
+          name: from.name
+        },
+        to: {
+          flag: to.flag || '',
+          name: to.name
+        },
+        routeDistance: routeDistance || 0
+      };
+    }
+
+    // Hide route info panel
+    function hideRouteInfo() {
+      const panel = document.getElementById('route-info-panel');
+      if (panel) {
+        panel.classList.remove('show');
+      }
+      currentRouteInfo = null;
     }
 
     // Update distance counter display
@@ -2024,6 +3414,16 @@ title: Travel Highlights 2024
       const counter = document.getElementById('distance-counter');
       const formattedDistance = Math.round(totalAccumulatedDistance).toLocaleString();
       counter.innerHTML = `${formattedDistance} <span>km</span>`;
+
+      // Hide distance counter when mobile menu is open
+      if (window.innerWidth <= 768) {
+        const menu = document.getElementById('left-menu');
+        if (menu.classList.contains('active')) {
+          counter.style.display = 'none';
+        } else {
+          counter.style.display = '';
+        }
+      }
     }
 
     // Update route with control points
@@ -2068,6 +3468,8 @@ title: Travel Highlights 2024
       };
 
       routeControlPoints[segmentKey].push(controlPoint);
+      console.log(`Added control point to route ${segmentKey}:`, controlPoint);
+      console.log('Current routeControlPoints:', routeControlPoints);
 
 
       // Create draggable marker
@@ -2097,12 +3499,47 @@ title: Travel Highlights 2024
         updateRoutePreview(segmentKey);
       });
 
-      // Handle right-click to delete
+      // Handle right-click to delete (desktop)
       markerEl.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         e.stopPropagation();
 
+        deleteControlPoint();
+      });
 
+      // Handle long-press to delete (mobile)
+      let longPressTimer = null;
+      let isLongPress = false;
+
+      markerEl.addEventListener('touchstart', (e) => {
+        isLongPress = false;
+        longPressTimer = setTimeout(() => {
+          isLongPress = true;
+          e.preventDefault();
+          e.stopPropagation();
+
+          // Vibrate if supported
+          if (navigator.vibrate) {
+            navigator.vibrate(50);
+          }
+
+          // Show confirmation or directly delete
+          if (confirm('Delete this waypoint?')) {
+            deleteControlPoint();
+          }
+        }, 500); // 500ms for long press
+      });
+
+      markerEl.addEventListener('touchend', () => {
+        clearTimeout(longPressTimer);
+      });
+
+      markerEl.addEventListener('touchmove', () => {
+        clearTimeout(longPressTimer);
+      });
+
+      // Function to delete the control point
+      function deleteControlPoint() {
         // Find and remove from control points array
         const pointIndex = routeControlPoints[segmentKey].indexOf(controlPoint);
         if (pointIndex > -1) {
@@ -2117,16 +3554,15 @@ title: Travel Highlights 2024
 
         marker.remove();
         updateRoutePreview(segmentKey);
-      });
+      }
 
       updateRoutePreview(segmentKey);
     }
 
     // Initialize route editor
     function initializeRouteEditor() {
-      // Show edit mode info
-      document.getElementById('edit-mode-info').innerHTML = 'Click on a route line to add control points. Right-click markers to delete them.';
-      document.getElementById('edit-mode-info').style.display = 'block';
+      // Show edit mode overlay on map
+      document.getElementById('edit-mode-overlay').style.display = 'block';
 
       // Create preview routes for all segments
       for (let i = 0; i < destinations.length; i++) {
@@ -2199,8 +3635,8 @@ title: Travel Highlights 2024
 
     // Clean up route editor
     function cleanupRouteEditor() {
-      // Hide edit mode info
-      document.getElementById('edit-mode-info').style.display = 'none';
+      // Hide edit mode overlay on map
+      document.getElementById('edit-mode-overlay').style.display = 'none';
 
       // Remove all control point markers
       controlPointMarkers.forEach(({ marker }) => {
@@ -2208,34 +3644,69 @@ title: Travel Highlights 2024
       });
       controlPointMarkers = [];
 
-      // Remove preview layers and their event listeners
-      for (let i = 0; i < destinations.length - 1; i++) {
-        const previewLayerId = `preview-route-layer-${i}`;
-        const previewSourceId = `preview-route-${i}`;
+      // Remove ALL preview layers and sources (not just current destinations.length)
+      // This ensures we clean up layers from deleted routes too
+      const style = map.getStyle();
+      if (style && style.layers) {
+        // Find all preview route layers
+        const previewLayers = style.layers.filter(layer =>
+          layer.id.startsWith('preview-route-layer-')
+        );
 
-        // Remove event listeners
-        map.off('click', previewLayerId);
-        map.off('mouseenter', previewLayerId);
-        map.off('mouseleave', previewLayerId);
+        previewLayers.forEach(layer => {
+          // Remove event listeners
+          map.off('click', layer.id);
+          map.off('mouseenter', layer.id);
+          map.off('mouseleave', layer.id);
 
-        // Remove layer and source
-        if (map.getLayer(previewLayerId)) {
-          map.removeLayer(previewLayerId);
-        }
-        if (map.getSource(previewSourceId)) {
-          map.removeSource(previewSourceId);
-        }
+          // Remove layer
+          if (map.getLayer(layer.id)) {
+            map.removeLayer(layer.id);
+          }
+        });
       }
+
+      if (style && style.sources) {
+        // Find all preview route sources
+        const previewSources = Object.keys(style.sources).filter(source =>
+          source.startsWith('preview-route-')
+        );
+
+        previewSources.forEach(source => {
+          if (map.getSource(source)) {
+            map.removeSource(source);
+          }
+        });
+      }
+
+      // Clear preview routes object
+      previewRoutes = {};
+      routeControlPoints = {};
     }
 
     // Save routes and start tour
     function saveAndStartTour() {
+      // Close mobile menu if open
+      if (window.innerWidth <= 768) {
+        closeMobileMenu();
+      }
+
       if (isEditMode) {
+        // Save control points before cleanup
+        const savedControlPoints = { ...routeControlPoints };
+
         // Clean up editor and start animation
         cleanupRouteEditor();
         isEditMode = false;
         document.getElementById('start-btn').textContent = 'Restart Tour';
         document.getElementById('edit-btn').style.display = 'inline-block';
+
+        // Hide edit mode overlay
+        document.getElementById('edit-mode-overlay').style.display = 'none';
+
+        // Restore the control points for the tour
+        routeControlPoints = savedControlPoints;
+        console.log('Restored control points for tour:', routeControlPoints);
 
         // Start recording if checkbox is checked
         const recordCheckbox = document.getElementById('record-checkbox');
@@ -2245,14 +3716,67 @@ title: Travel Highlights 2024
 
         startTour();
       } else {
-        // Restart from beginning
-        // Start recording if checkbox is checked
-        const recordCheckbox = document.getElementById('record-checkbox');
-        if (recordCheckbox && recordCheckbox.checked) {
-          startRecording();
+        // Restart from beginning - properly stop and reset everything first
+
+        // 1. Stop the animation loop
+        isAnimating = false;
+        if (animationFrameId) {
+          window.cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
         }
 
-        startTour();
+        // 2. Reset state variables immediately
+        currentLegIndex = 0;
+        phase = 0;
+        lastFrameTime = null;
+        totalAccumulatedDistance = 0;
+        completedLegsDistance = 0;
+        currentSegmentTrailCoordinates = [];
+        trailAltitudes = [];
+        confettiActive = false;
+        confettiParticles = [];
+
+        // 3. Close any open modals
+        const completionModal = document.getElementById('completion-modal');
+        if (completionModal && completionModal.style.display === 'block') {
+          completionModal.style.display = 'none';
+          completionModal.style.opacity = '0';
+          modalData = null;
+        }
+
+        // 4. Clean up all trail segments from previous tour
+        const style = map.getStyle();
+        if (style && style.layers) {
+          const segmentLayers = style.layers.filter(layer => layer.id.startsWith('trail-segment-layer-'));
+          segmentLayers.forEach(layer => {
+            if (map.getLayer(layer.id)) {
+              map.removeLayer(layer.id);
+            }
+          });
+        }
+        if (style && style.sources) {
+          const segmentSources = Object.keys(style.sources).filter(source => source.startsWith('trail-segment-'));
+          segmentSources.forEach(source => {
+            if (map.getSource(source)) {
+              map.removeSource(source);
+            }
+          });
+        }
+        segmentCounter = 0;
+
+        // 5. Update distance display
+        updateDistanceDisplay();
+
+        // 6. Wait a bit longer for cleanup, then restart
+        setTimeout(() => {
+          // Start recording if checkbox is checked
+          const recordCheckbox = document.getElementById('record-checkbox');
+          if (recordCheckbox && recordCheckbox.checked) {
+            startRecording();
+          }
+
+          startTour();
+        }, 300);
       }
     }
 
@@ -2376,12 +3900,15 @@ title: Travel Highlights 2024
     function addVehiclePulseEffect() {
       const isUsingTrain = (currentModelUri === trainModelUri);
       const isUsingCar = (currentModelUri === carModelUri);
+      const isUsingShip = (currentModelUri === shipModelUri);
 
       let activeLayerId;
       if (isUsingTrain) {
         activeLayerId = 'train-model-layer';
       } else if (isUsingCar) {
         activeLayerId = 'car-model-layer';
+      } else if (isUsingShip) {
+        activeLayerId = 'ship-model-layer';
       } else {
         activeLayerId = 'plane-model-layer';
       }
@@ -2441,9 +3968,8 @@ title: Travel Highlights 2024
           document.getElementById('start-btn').disabled = false;
           document.getElementById('start-btn').textContent = 'Restart Tour';
 
-          // Show final destination
-          const lastRoute = destinations[destinations.length - 1];
-          showDestinationLabel({ name: lastRoute.name, coords: lastRoute.coords, flag: lastRoute.flag });
+          // Hide route info when tour completes
+          hideRouteInfo();
 
           // Show completion modal with confetti
           showCompletionModal();
@@ -2463,6 +3989,8 @@ title: Travel Highlights 2024
           currentModelUri = trainModelUri;
         } else if (vehicle === 'car') {
           currentModelUri = carModelUri;
+        } else if (vehicle === 'ship') {
+          currentModelUri = shipModelUri;
         } else {
           currentModelUri = airplaneModelUri;
         }
@@ -2472,10 +4000,12 @@ title: Travel Highlights 2024
           needsModelUpdate = true;
         }
 
-        // Use saved control point if available
+        // Use saved control points if available
         const segmentKey = `${currentLegIndex}`;
-        const controlPoint = routeControlPoints[segmentKey] || null;
-        const routeData = generateFlightRoute(from.coords, to.coords, controlPoint, vehicle);
+        const controlPoints = routeControlPoints[segmentKey] || [];
+        console.log(`Route ${currentLegIndex}: segmentKey=${segmentKey}, controlPoints=`, controlPoints);
+        console.log('All routeControlPoints:', routeControlPoints);
+        const routeData = generateFlightRoute(from.coords, to.coords, controlPoints.length > 0 ? controlPoints : null, vehicle);
         flightRoute = new FlightRoute(routeData);
 
         // Create new segment source and layer for this route
@@ -2484,7 +4014,8 @@ title: Travel Highlights 2024
 
         const isUsingTrain = (currentModelUri === trainModelUri);
         const isUsingCar = (currentModelUri === carModelUri);
-        const trailColor = isUsingTrain ? '#ff0000' : (isUsingCar ? '#ff8800' : '#ffffff');
+        const isUsingShip = (currentModelUri === shipModelUri);
+        const trailColor = isUsingTrain ? '#ff0000' : (isUsingCar ? '#ff8800' : (isUsingShip ? '#aaaaaa' : '#ffffff'));
         const sourceId = `trail-segment-${segmentCounter}`;
         const layerId = `trail-segment-layer-${segmentCounter}`;
 
@@ -2514,15 +4045,17 @@ title: Travel Highlights 2024
             'line-width': 5,
             'line-opacity': 0.8,
             'line-emissive-strength': 1.5,
-            'line-dasharray': (isUsingTrain || isUsingCar) ? [1, 0] : [2, 4] // Solid line for train/car, dashed for plane
+            'line-dasharray': (isUsingTrain || isUsingCar || isUsingShip) ? [1, 0] : [2, 4] // Solid line for train/car/ship, dashed for plane
           }
         });
 
-        // Vehicle-specific duration: train 2.5s, car 3s, plane 1.5s
+        // Vehicle-specific duration: train 2.5s, car 3s, ship 3.5s, plane 1.5s
         if (isUsingTrain) {
           currentFlightDuration = 2500; // 2.5 seconds
         } else if (isUsingCar) {
           currentFlightDuration = 3000; // 3 seconds
+        } else if (isUsingShip) {
+          currentFlightDuration = 3500; // 3.5 seconds
         } else {
           currentFlightDuration = 1500; // 1.5 seconds
         }
@@ -2537,17 +4070,17 @@ title: Travel Highlights 2024
         }
 
         // Vehicle-specific camera pitch: plane 30°, train/car 70°
-        const cameraPitch = (isUsingTrain || isUsingCar) ? 70 : 30;
+        const cameraPitch = (isUsingTrain || isUsingCar || isUsingShip) ? 70 : 30;
 
         map.fitBounds(bounds, {
-          padding: { top: 10, bottom: 10, left: 10, right: 10 },
+          padding: { top: 30, bottom: 30, left: 30, right: 30 },
           duration: 2000,
           pitch: cameraPitch,
           bearing: 0
         });
 
-        // Show destination label
-        showDestinationLabel(to);
+        // Update route info for the new leg with this route's distance
+        showRouteInfo(from, to, route.actualDistance || 0);
 
         // Pause before next leg
         isAnimating = false;
@@ -2564,10 +4097,11 @@ title: Travel Highlights 2024
       if (alongRoute) {
         airplane.update(alongRoute, frameDeltaTime);
 
-        // For trains and cars, keep at sea level
+        // For trains, cars, and ships, keep at sea level
         const isUsingTrain = (currentModelUri === trainModelUri);
         const isUsingCar = (currentModelUri === carModelUri);
-        if (isUsingTrain || isUsingCar) {
+        const isUsingShip = (currentModelUri === shipModelUri);
+        if (isUsingTrain || isUsingCar || isUsingShip) {
           airplane.altitude = 0; // Sea level
         }
 
@@ -2699,10 +4233,10 @@ title: Travel Highlights 2024
       // Set flag for initial model load
       needsModelUpdate = true;
 
-      // Use saved control point if available
+      // Use saved control points if available
       const segmentKey = `${currentLegIndex}`;
-      const controlPoint = routeControlPoints[segmentKey] || null;
-      const routeData = generateFlightRoute(from.coords, to.coords, controlPoint, vehicle);
+      const controlPoints = routeControlPoints[segmentKey] || [];
+      const routeData = generateFlightRoute(from.coords, to.coords, controlPoints.length > 0 ? controlPoints : null, vehicle);
       flightRoute = new FlightRoute(routeData);
       airplane = new Airplane(from.coords);
 
@@ -2710,7 +4244,8 @@ title: Travel Highlights 2024
       segmentCounter++;
       const isUsingTrain = (currentModelUri === trainModelUri);
       const isUsingCar = (currentModelUri === carModelUri);
-      const trailColor = isUsingTrain ? '#ff0000' : (isUsingCar ? '#ff8800' : '#ffffff');
+      const isUsingShip = (currentModelUri === shipModelUri);
+      const trailColor = isUsingTrain ? '#ff0000' : (isUsingCar ? '#ff8800' : (isUsingShip ? '#aaaaaa' : '#ffffff'));
       const sourceId = `trail-segment-${segmentCounter}`;
       const layerId = `trail-segment-layer-${segmentCounter}`;
 
@@ -2740,15 +4275,17 @@ title: Travel Highlights 2024
           'line-width': 5,
           'line-opacity': 0.8,
           'line-emissive-strength': 1.5,
-          'line-dasharray': (isUsingTrain || isUsingCar) ? [1, 0] : [2, 4] // Solid line for train/car, dashed for plane
+          'line-dasharray': (isUsingTrain || isUsingCar || isUsingShip) ? [1, 0] : [2, 4] // Solid line for train/car/ship, dashed for plane
         }
       });
 
-      // Vehicle-specific duration: train 2.5s, car 3s, plane 1.5s
+      // Vehicle-specific duration: train 2.5s, car 3s, ship 3.5s, plane 1.5s
       if (isUsingTrain) {
         currentFlightDuration = 2500; // 2.5 seconds
       } else if (isUsingCar) {
         currentFlightDuration = 3000; // 3 seconds
+      } else if (isUsingShip) {
+        currentFlightDuration = 3500; // 3.5 seconds
       } else {
         currentFlightDuration = 1500; // 1.5 seconds
       }
@@ -2766,7 +4303,7 @@ title: Travel Highlights 2024
       const cameraPitch = (isUsingTrain || isUsingCar) ? 70 : 30;
 
       map.fitBounds(bounds, {
-        padding: { top: 120, bottom: 120, left: 120, right: 120 },
+        padding: { top: 30, bottom: 30, left: 30, right: 30 },
         duration: 2000,
         pitch: cameraPitch,
         bearing: 0
@@ -2779,9 +4316,8 @@ title: Travel Highlights 2024
         updateModelSourceAndFeatureState(airplane);
       }
 
-      // Show first destination
-      showDestinationLabel(from);
-      setTimeout(() => showDestinationLabel(to), 500);
+      // Show route info panel with this route's distance
+      showRouteInfo(from, to, firstRoute.actualDistance || 0);
 
       animationFrameId = window.requestAnimationFrame(frame);
       }, 1000); // Wait 1 second before starting route
