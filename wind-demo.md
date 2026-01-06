@@ -227,7 +227,8 @@ layout: none
             // Add source
             map.addSource('wind-source', {
                 type: 'raster-array',
-                url: TILESET
+                url: TILESET,
+                maxzoom: 16
             });
 
             // Add single-layer heatmap for fade-in mode
@@ -286,7 +287,8 @@ layout: none
             // Add particle source (separate from heatmap source for band control)
             map.addSource('particle-source', {
                 type: 'raster-array',
-                url: TILESET
+                url: TILESET,
+                maxzoom: 16
             });
 
             // Add particle layer
