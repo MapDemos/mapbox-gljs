@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Style Check Demo</title>
+  <link href="https://fonts.googleapis.com/css2?family=Raleway&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header>
+    <h1>Mapbox Demos</h1> 
+  </header>
+  <main>
+    <p>&lt;!DOCTYPE html&gt;</p>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Style Check Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-language/v1.0.0/mapbox-gl-language.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.17.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.17.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/d3@7.8.5/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.min.js"></script>
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.css" type="text/css" />
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<script src="https://kenji-shima.github.io/resource-files/polyline.js" type="module"></script>
+<script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    }
+
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    /* Info panel */
+    #info-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      min-width: 300px;
+      z-index: 1000;
+    }
+
+    #info-panel h2 {
+      margin-top: 0;
+      margin-bottom: 15px;
+      color: #333;
+      font-size: 20px;
+    }
+
+    #info-panel p {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding: 10px;
+      background: #f9fafb;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+    }
+
+    .info-label {
+      color: #6b7280;
+      font-weight: 500;
+      font-size: 13px;
+    }
+
+    .info-value {
+      color: #374151;
+      font-weight: 600;
+      font-size: 13px;
+      font-family: monospace;
+    }
+
+    /* Zoom and coordinates display */
+    #coords-display {
+      position: absolute;
+      bottom: 40px;
+      left: 10px;
+      background: white;
+      padding: 10px 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      z-index: 999;
+    }
+
+    #coords-display .coord-item {
+      margin-bottom: 5px;
+    }
+
+    #coords-display .coord-item:last-child {
+      margin-bottom: 0;
+    }
+
+    #coords-display .coord-label {
+      color: #6b7280;
+      font-weight: 500;
+      margin-right: 6px;
+    }
+
+    #coords-display .coord-value {
+      color: #667eea;
+      font-weight: 700;
+      font-family: monospace;
+    }
+
+    /* Location presets */
+    .location-buttons {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .location-buttons h3 {
+      margin-top: 0;
+      margin-bottom: 12px;
+      color: #333;
+      font-size: 16px;
+    }
+
+    .location-btn {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 8px;
+      border: 2px solid #e5e7eb;
+      background: white;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: left;
+    }
+
+    .location-btn:hover {
+      border-color: #667eea;
+      background: #f9fafb;
+    }
+
+    .location-btn:active {
+      background: #e5e7eb;
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+      #info-panel {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        min-width: unset;
+        padding: 15px;
+      }
+
+      #coords-display {
+        bottom: 30px;
+        left: 5px;
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- Coordinates and zoom display -->
+  <div id="coords-display">
+    <div class="coord-item">
+      <span class="coord-label">Zoom:</span>
+      <span class="coord-value" id="zoom-value">10.00</span>
+    </div>
+    <div class="coord-item">
+      <span class="coord-label">Lat:</span>
+      <span class="coord-value" id="lat-value">35.6812</span>
+    </div>
+    <div class="coord-item">
+      <span class="coord-label">Lng:</span>
+      <span class="coord-value" id="lng-value">139.7671</span>
+    </div>
+  </div>
+
+  <div id="info-panel">
+    <h2>🗺️ Style Check Demo</h2>
+    <p>This demo displays your custom Mapbox style for easy viewing and testing.</p>
+
+    <div class="info-item">
+      <span class="info-label">Style URL:</span>
+      <span class="info-value">kenji-shima/cmk529xm...</span>
+    </div>
+
+    <div class="info-item">
+      <span class="info-label">Map Bearing:</span>
+      <span class="info-value" id="bearing-value">0°</span>
+    </div>
+
+    <div class="info-item">
+      <span class="info-label">Map Pitch:</span>
+      <span class="info-value" id="pitch-value">0°</span>
+    </div>
+
+    <div class="location-buttons">
+      <h3>Quick Locations</h3>
+      <button class="location-btn" data-lng="139.7671" data-lat="35.6812" data-zoom="10">
+        📍 Tokyo
+      </button>
+      <button class="location-btn" data-lng="-73.9866" data-lat="40.7484" data-zoom="10">
+        📍 New York
+      </button>
+      <button class="location-btn" data-lng="-0.1276" data-lat="51.5074" data-zoom="10">
+        📍 London
+      </button>
+      <button class="location-btn" data-lng="2.3522" data-lat="48.8566" data-zoom="10">
+        📍 Paris
+      </button>
+      <button class="location-btn" data-lng="-122.4194" data-lat="37.7749" data-zoom="10">
+        📍 San Francisco
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // Initialize the map with your custom style
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/kenji-shima/cmk529xm0005i01sl7amhawgu',
+      center: [139.7671, 35.6812], // Tokyo
+      zoom: 10,
+      pitch: 0,
+      bearing: 0
+    });
+
+    // Add navigation control
+    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    // Add scale control
+    map.addControl(new mapboxgl.ScaleControl({
+      maxWidth: 200,
+      unit: 'metric'
+    }), 'bottom-right');
+
+    // Add fullscreen control
+    map.addControl(new mapboxgl.FullscreenControl(), 'top-right');
+
+    // Update display values
+    function updateDisplayValues() {
+      const center = map.getCenter();
+      const zoom = map.getZoom();
+      const bearing = map.getBearing();
+      const pitch = map.getPitch();
+
+      document.getElementById('zoom-value').textContent = zoom.toFixed(2);
+      document.getElementById('lat-value').textContent = center.lat.toFixed(4);
+      document.getElementById('lng-value').textContent = center.lng.toFixed(4);
+      document.getElementById('bearing-value').textContent = Math.round(bearing) + '°';
+      document.getElementById('pitch-value').textContent = Math.round(pitch) + '°';
+    }
+
+    // Update on map movement
+    map.on('move', updateDisplayValues);
+    map.on('zoom', updateDisplayValues);
+    map.on('rotate', updateDisplayValues);
+    map.on('pitch', updateDisplayValues);
+
+    // Map loaded event
+    map.on('load', () => {
+      console.log('✅ Map loaded successfully with custom style');
+      console.log('Style URL: mapbox://styles/kenji-shima/cmk529xm0005i01sl7amhawgu');
+      updateDisplayValues();
+    });
+
+    // Handle location button clicks
+    document.querySelectorAll('.location-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const lng = parseFloat(btn.dataset.lng);
+        const lat = parseFloat(btn.dataset.lat);
+        const zoom = parseFloat(btn.dataset.zoom);
+
+        map.flyTo({
+          center: [lng, lat],
+          zoom: zoom,
+          duration: 2000,
+          essential: true
+        });
+      });
+    });
+
+    // Add click handler to show clicked location
+    map.on('click', (e) => {
+      const coords = e.lngLat;
+
+      // Create a popup showing the clicked coordinates
+      new mapboxgl.Popup()
+        .setLngLat(coords)
+        .setHTML(`
+          <div style="padding: 8px;">
+            <strong>Clicked Location</strong><br>
+            Lat: ${coords.lat.toFixed(4)}<br>
+            Lng: ${coords.lng.toFixed(4)}
+          </div>
+        `)
+        .addTo(map);
+    });
+
+    // Log style details when loaded
+    map.on('style.load', () => {
+      const style = map.getStyle();
+      console.log('Style loaded:', {
+        name: style.name,
+        sources: Object.keys(style.sources),
+        layers: style.layers.length + ' layers',
+        version: style.version
+      });
+    });
+
+    // Error handling
+    map.on('error', (e) => {
+      console.error('Map error:', e.error);
+    });
+  </script>
+</body>
+</html>
+
+  </main>
+  <footer>
+    <p>© 2024, Mapbox Demos</p>
+  </footer>
+</body>
+</html>
