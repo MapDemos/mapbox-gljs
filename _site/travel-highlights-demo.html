@@ -1737,12 +1737,31 @@
         }
         drawOverlayUI();
 
-        // Create a composite canvas to merge both canvases
+        // Resolution capping for better performance
+        const MAX_RECORDING_WIDTH = 1920;
+        const MAX_RECORDING_HEIGHT = 1080;
+
+        // Get actual map dimensions
         const mapCanvas = map.getCanvas();
+        const actualWidth = mapCanvas.width;
+        const actualHeight = mapCanvas.height;
+
+        // Calculate scale factor to fit within max dimensions while maintaining aspect ratio
+        const scaleX = actualWidth > MAX_RECORDING_WIDTH ? MAX_RECORDING_WIDTH / actualWidth : 1;
+        const scaleY = actualHeight > MAX_RECORDING_HEIGHT ? MAX_RECORDING_HEIGHT / actualHeight : 1;
+        const recordingScale = Math.min(scaleX, scaleY);
+
+        // Store scale globally for use in overlay drawing
+        window.recordingScale = recordingScale;
+
+        // Create a composite canvas to merge both canvases at capped resolution
         recordingCanvas = document.createElement('canvas');
-        recordingCanvas.width = mapCanvas.width;
-        recordingCanvas.height = mapCanvas.height;
+        recordingCanvas.width = Math.floor(actualWidth * recordingScale);
+        recordingCanvas.height = Math.floor(actualHeight * recordingScale);
         recordingContext = recordingCanvas.getContext('2d', { willReadFrequently: true });
+
+        // Log recording resolution info
+        console.log(`Recording at ${recordingCanvas.width}x${recordingCanvas.height} (original: ${actualWidth}x${actualHeight}, scale: ${recordingScale.toFixed(2)})`);
 
         // Set recording flag BEFORE starting capture loop
         recordedChunks = [];
@@ -1752,10 +1771,18 @@
         function captureFrame() {
           if (!isRecording) return;
 
-          // Draw map canvas
-          recordingContext.drawImage(mapCanvas, 0, 0);
-          // Draw overlay canvas on top
-          recordingContext.drawImage(overlayCanvas, 0, 0);
+          // Draw map canvas scaled to recording resolution
+          recordingContext.drawImage(
+            mapCanvas,
+            0, 0, actualWidth, actualHeight,
+            0, 0, recordingCanvas.width, recordingCanvas.height
+          );
+          // Draw overlay canvas on top scaled to recording resolution
+          recordingContext.drawImage(
+            overlayCanvas,
+            0, 0, overlayCanvas.width, overlayCanvas.height,
+            0, 0, recordingCanvas.width, recordingCanvas.height
+          );
 
           requestAnimationFrame(captureFrame);
         }
@@ -1766,12 +1793,15 @@
         // Small delay to ensure first frame is drawn
         await new Promise(resolve => setTimeout(resolve, 100));
 
-        // Capture stream from the recording canvas
+        // Capture stream from the recording canvas at 30fps
         const stream = recordingCanvas.captureStream(30);
+
+        // Adjust bitrate based on resolution
+        const bitrate = recordingCanvas.width > 1280 ? 5000000 : 2500000;
 
         mediaRecorder = new MediaRecorder(stream, {
           mimeType: 'video/webm;codecs=vp9',
-          videoBitsPerSecond: 5000000
+          videoBitsPerSecond: bitrate
         });
 
         mediaRecorder.ondataavailable = (event) => {
@@ -1816,6 +1846,9 @@
 
         // Disable canvas overlays
         canvasOverlaysVisible = false;
+
+        // Clean up recording scale
+        delete window.recordingScale;
 
         // Hide overlay canvas
         if (overlayCanvas) {
