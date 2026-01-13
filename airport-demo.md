@@ -286,7 +286,7 @@ title: Airport Explorer Demo
 
       try {
         // Load the GeoJSON file
-        const response = await fetch('japan_airports_merged_z13.geojson');
+        const response = await fetch('japan_airports_merged_categorybased_z13.geojson');
         const geojsonData = await response.json();
 
         console.log('GeoJSON loaded:', geojsonData);

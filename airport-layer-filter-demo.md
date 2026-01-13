@@ -1,0 +1,605 @@
+---
+layout: default
+title: Airport Layer Filter Demo
+---
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Airport Layer Filter Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% include common_head.html %}
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    }
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    /* Layer filter panel */
+    #layer-filter {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      min-width: 320px;
+      max-width: 400px;
+      z-index: 1000;
+    }
+
+    #layer-filter h2 {
+      margin-top: 0;
+      margin-bottom: 15px;
+      color: #333;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #layer-filter p {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .filter-group {
+      margin-bottom: 20px;
+    }
+
+    .filter-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #555;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    #layer-dropdown {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #e5e7eb;
+      border-radius: 6px;
+      font-size: 14px;
+      background: white;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    #layer-dropdown:hover {
+      border-color: #3b82f6;
+    }
+
+    #layer-dropdown:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    /* Statistics display */
+    #stats-container {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f0f9ff;
+      border-radius: 8px;
+      border: 1px solid #bfdbfe;
+    }
+
+    .stat-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    .stat-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .stat-label {
+      color: #1e40af;
+      font-weight: 500;
+    }
+
+    .stat-value {
+      color: #1e3a8a;
+      font-weight: 700;
+    }
+
+    /* Selected airport info */
+    #selected-airport {
+      margin-top: 20px;
+      padding: 15px;
+      background: #fef3c7;
+      border-radius: 8px;
+      border: 1px solid #fcd34d;
+      display: none;
+    }
+
+    #selected-airport.visible {
+      display: block;
+    }
+
+    #selected-airport h3 {
+      margin: 0 0 10px 0;
+      font-size: 16px;
+      color: #92400e;
+    }
+
+    .airport-detail {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .detail-label {
+      color: #92400e;
+      font-weight: 500;
+    }
+
+    .detail-value {
+      color: #78350f;
+      font-weight: 600;
+      text-align: right;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Legend */
+    #legend {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f9fafb;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+    }
+
+    #legend h4 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: #374151;
+      font-weight: 600;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .legend-color {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      margin-right: 10px;
+      border: 2px solid white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+
+    /* Loading state */
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f4f6;
+      border-top: 3px solid #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-left: 10px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .status-message {
+      color: #3b82f6;
+      font-size: 13px;
+      font-style: italic;
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+      #layer-filter {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        min-width: unset;
+        padding: 15px;
+      }
+
+      #layer-filter h2 {
+        font-size: 18px;
+        margin-bottom: 10px;
+      }
+
+      #layer-filter p {
+        font-size: 13px;
+        margin-bottom: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <div id="layer-filter">
+    <h2>🗺️ Airport Layer Filter</h2>
+    <p>Filter airports based on their closest map layer. This shows what type of map feature each airport is associated with.</p>
+
+    <div class="filter-group">
+      <label for="layer-dropdown">Filter by Closest Layer:</label>
+      <select id="layer-dropdown">
+        <option value="">All Airports</option>
+        <option value="aeroway">Aeroway (Helipads, Runways)</option>
+        <option value="landuse">Landuse (Airport areas, Military)</option>
+        <option value="road">Road (Street proximity)</option>
+        <option value="building">Building</option>
+        <option value="water">Water</option>
+        <option value="waterway">Waterway</option>
+        <option value="structure">Structure</option>
+        <option value="admin">Administrative</option>
+        <option value="airport_label">Airport Label</option>
+        <option value="natural_label">Natural Label</option>
+        <option value="place_label">Place Label</option>
+        <option value="poi_label">POI Label</option>
+        <option value="transit_stop_label">Transit Stop Label</option>
+        <option value="NONE">None</option>
+      </select>
+    </div>
+
+    <div id="stats-container">
+      <div class="stat-item">
+        <span class="stat-label">Total Airports:</span>
+        <span class="stat-value" id="total-airports">-</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Filtered Airports:</span>
+        <span class="stat-value" id="filtered-airports">-</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Selected Layer:</span>
+        <span class="stat-value" id="selected-layer">All</span>
+      </div>
+    </div>
+
+    <div id="selected-airport">
+      <h3>Selected Airport</h3>
+      <div class="airport-detail">
+        <span class="detail-label">Name:</span>
+        <span class="detail-value" id="airport-name">-</span>
+      </div>
+      <div class="airport-detail">
+        <span class="detail-label">Type:</span>
+        <span class="detail-value" id="airport-type">-</span>
+      </div>
+      <div class="airport-detail">
+        <span class="detail-label">Layer:</span>
+        <span class="detail-value" id="airport-layer">-</span>
+      </div>
+      <div class="airport-detail">
+        <span class="detail-label">Distance:</span>
+        <span class="detail-value" id="airport-distance">-</span>
+      </div>
+    </div>
+
+    <div id="legend">
+      <h4>Airport Types</h4>
+      <div class="legend-item">
+        <div class="legend-color" style="background-color: #3b82f6;"></div>
+        <span>Small Airport</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background-color: #10b981;"></div>
+        <span>Heliport</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background-color: #f59e0b;"></div>
+        <span>Seaplane Base</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background-color: #ef4444;"></div>
+        <span>Closed</span>
+      </div>
+    </div>
+
+    <div id="status-container"></div>
+  </div>
+
+  <script>
+    
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [139.7671, 35.6812], // Tokyo Station
+      zoom: 5 // Wider view to see more airports
+    });
+
+    let allAirports = [];
+    let currentPopup = null;
+
+    // Add navigation control
+    map.addControl(new mapboxgl.NavigationControl());
+
+    // Color mapping for airport types
+    const typeColors = {
+      'small_airport': '#3b82f6',
+      'heliport': '#10b981',
+      'seaplane_base': '#f59e0b',
+      'closed': '#ef4444'
+    };
+
+    // Show status message
+    function showStatus(message, isLoading = false) {
+      const statusContainer = document.getElementById('status-container');
+      if (message) {
+        statusContainer.innerHTML = `
+          <div class="status-message">
+            ${message}
+            ${isLoading ? '<span class="loading"></span>' : ''}
+          </div>
+        `;
+      } else {
+        statusContainer.innerHTML = '';
+      }
+    }
+
+    // Update statistics
+    function updateStats(total, filtered, layerName) {
+      document.getElementById('total-airports').textContent = total;
+      document.getElementById('filtered-airports').textContent = filtered;
+      document.getElementById('selected-layer').textContent = layerName || 'All';
+    }
+
+    // Load the GeoJSON file
+    map.on('load', async () => {
+      console.log('Map loaded, loading airport data...');
+      showStatus('Loading airports', true);
+
+      try {
+        // Load the airports_analysis.geojson file
+        const response = await fetch('airports_analysis.geojson');
+        const geojsonData = await response.json();
+
+        console.log('GeoJSON loaded:', geojsonData);
+
+        // Store all airports
+        allAirports = geojsonData.features;
+
+        // Add color property based on airport type
+        geojsonData.features.forEach(feature => {
+          const type = feature.properties.airport_type;
+          feature.properties.color = typeColors[type] || '#6b7280';
+        });
+
+        // Add the GeoJSON as a source
+        map.addSource('airports', {
+          type: 'geojson',
+          data: geojsonData
+        });
+
+        // Add a layer to visualize the airports as circles
+        map.addLayer({
+          id: 'airport-points',
+          type: 'circle',
+          source: 'airports',
+          paint: {
+            'circle-radius': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              3, 2,
+              10, 6,
+              15, 10
+            ],
+            'circle-color': ['get', 'color'],
+            'circle-opacity': 0.8,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-opacity': 0.9
+          }
+        });
+
+        // Add a highlighted layer for hover effects
+        map.addLayer({
+          id: 'airport-points-highlighted',
+          type: 'circle',
+          source: 'airports',
+          paint: {
+            'circle-radius': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              3, 4,
+              10, 10,
+              15, 16
+            ],
+            'circle-color': ['get', 'color'],
+            'circle-opacity': 1,
+            'circle-stroke-width': 3,
+            'circle-stroke-color': '#ffffff'
+          },
+          filter: ['==', ['get', 'ident'], ''] // Initially hide all
+        });
+
+        // Update initial stats
+        updateStats(allAirports.length, allAirports.length, 'All');
+
+        showStatus('');
+        console.log(`Loaded ${allAirports.length} airports`);
+
+      } catch (error) {
+        console.error('Error loading GeoJSON:', error);
+        showStatus('Error loading airport data');
+      }
+    });
+
+    // Handle dropdown selection
+    document.getElementById('layer-dropdown').addEventListener('change', (e) => {
+      const selectedLayer = e.target.value;
+
+      if (selectedLayer === '') {
+        // Show all airports
+        map.setFilter('airport-points', null);
+        updateStats(allAirports.length, allAirports.length, 'All');
+      } else {
+        // Filter by selected layer
+        const filter = ['==', ['get', 'closest_layer'], selectedLayer];
+        map.setFilter('airport-points', filter);
+
+        // Count filtered airports
+        const filteredCount = allAirports.filter(f =>
+          f.properties.closest_layer === selectedLayer
+        ).length;
+
+        updateStats(allAirports.length, filteredCount, selectedLayer);
+      }
+
+      // Clear any selected airport
+      document.getElementById('selected-airport').classList.remove('visible');
+      map.setFilter('airport-points-highlighted', ['==', ['get', 'ident'], '']);
+    });
+
+    // Add click interaction on airport points
+    map.on('click', 'airport-points', (e) => {
+      if (e.features.length > 0) {
+        const feature = e.features[0];
+        const props = feature.properties;
+
+        // Update selected airport info
+        const selectedDiv = document.getElementById('selected-airport');
+        selectedDiv.classList.add('visible');
+
+        document.getElementById('airport-name').textContent = props.name || 'Unknown';
+        document.getElementById('airport-name').title = props.name || 'Unknown';
+        document.getElementById('airport-type').textContent =
+          (props.airport_type || 'unknown').replace(/_/g, ' ');
+        document.getElementById('airport-layer').textContent = props.closest_layer || 'N/A';
+        document.getElementById('airport-distance').textContent =
+          props.distance_meters ? `${props.distance_meters.toFixed(2)} m` : '0 m';
+
+        // Highlight the selected airport
+        map.setFilter('airport-points-highlighted',
+          ['==', ['get', 'ident'], props.ident]
+        );
+
+        // Create popup with all properties
+        if (currentPopup) currentPopup.remove();
+
+        // Build properties list HTML
+        let propertiesHtml = '';
+        for (const [key, value] of Object.entries(props)) {
+          if (key !== 'color' && value !== null && value !== undefined && value !== '') {
+            const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            let formattedValue = value;
+
+            // Special formatting for certain fields
+            if (key === 'distance_meters') {
+              formattedValue = `${parseFloat(value).toFixed(2)} m`;
+            } else if (key === 'airport_type') {
+              formattedValue = value.replace(/_/g, ' ');
+            }
+
+            propertiesHtml += `<tr>
+              <td style="font-weight: 600; padding-right: 10px; vertical-align: top;">${formattedKey}:</td>
+              <td style="color: #666;">${formattedValue}</td>
+            </tr>`;
+          }
+        }
+
+        const popupContent = `
+          <div style="padding: 8px; max-width: 300px;">
+            <h3 style="margin: 0 0 10px 0; font-size: 14px; color: #1e40af;">${props.name || 'Unknown'}</h3>
+            <table style="font-size: 12px; line-height: 1.4;">
+              ${propertiesHtml}
+            </table>
+          </div>
+        `;
+
+        currentPopup = new mapboxgl.Popup({ offset: 25 })
+          .setLngLat(feature.geometry.coordinates)
+          .setHTML(popupContent)
+          .addTo(map);
+
+        // Fly to the airport
+        map.flyTo({
+          center: feature.geometry.coordinates,
+          zoom: Math.max(map.getZoom(), 10),
+          duration: 1500,
+          essential: true
+        });
+      }
+    });
+
+    // Add hover effects
+    let hoverTooltip = null;
+
+    map.on('mouseenter', 'airport-points', (e) => {
+      map.getCanvas().style.cursor = 'pointer';
+
+      if (e.features.length > 0) {
+        const feature = e.features[0];
+        const props = feature.properties;
+
+        // Remove previous tooltip if exists
+        if (hoverTooltip) {
+          hoverTooltip.remove();
+        }
+
+        // Build a summary for the hover tooltip
+        let tooltipHtml = `
+          <div style="padding: 8px; font-size: 12px;">
+            <strong style="color: #1e40af;">${props.name || 'Unknown'}</strong><br>
+            <span style="color: #666;">
+              Type: ${(props.airport_type || 'unknown').replace(/_/g, ' ')}<br>
+              Layer: ${props.closest_layer || 'N/A'}<br>
+              Distance: ${props.distance_meters ? props.distance_meters.toFixed(2) + ' m' : '0 m'}
+              ${props.closest_type ? '<br>Closest: ' + props.closest_type : ''}
+            </span>
+          </div>
+        `;
+
+        // Show tooltip on hover
+        hoverTooltip = new mapboxgl.Popup({
+          closeButton: false,
+          closeOnClick: false,
+          offset: 15
+        });
+
+        hoverTooltip.setLngLat(feature.geometry.coordinates)
+          .setHTML(tooltipHtml)
+          .addTo(map);
+      }
+    });
+
+    map.on('mouseleave', 'airport-points', () => {
+      map.getCanvas().style.cursor = '';
+
+      // Remove hover tooltip
+      if (hoverTooltip) {
+        hoverTooltip.remove();
+        hoverTooltip = null;
+      }
+    });
+  </script>
+</body>
+</html>
