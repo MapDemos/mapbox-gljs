@@ -479,13 +479,17 @@ title: Airport Layer Filter Demo
       map.setFilter('airport-points-highlighted', ['==', ['get', 'ident'], '']);
     });
 
-    // Add click interaction on airport points
-    map.on('click', 'airport-points', (e) => {
+    // Add hover effects - show full information on mouseover
+    let hoverTooltip = null;
+
+    map.on('mouseenter', 'airport-points', (e) => {
+      map.getCanvas().style.cursor = 'pointer';
+
       if (e.features.length > 0) {
         const feature = e.features[0];
         const props = feature.properties;
 
-        // Update selected airport info
+        // Update selected airport info panel
         const selectedDiv = document.getElementById('selected-airport');
         selectedDiv.classList.add('visible');
 
@@ -502,10 +506,12 @@ title: Airport Layer Filter Demo
           ['==', ['get', 'ident'], props.ident]
         );
 
-        // Create popup with all properties
-        if (currentPopup) currentPopup.remove();
+        // Remove previous tooltip if exists
+        if (hoverTooltip) {
+          hoverTooltip.remove();
+        }
 
-        // Build properties list HTML
+        // Build properties list HTML for popup
         let propertiesHtml = '';
         for (const [key, value] of Object.entries(props)) {
           if (key !== 'color' && value !== null && value !== undefined && value !== '') {
@@ -535,64 +541,27 @@ title: Airport Layer Filter Demo
           </div>
         `;
 
-        currentPopup = new mapboxgl.Popup({ offset: 25 })
-          .setLngLat(feature.geometry.coordinates)
-          .setHTML(popupContent)
-          .addTo(map);
-
-        // Fly to the airport
-        map.flyTo({
-          center: feature.geometry.coordinates,
-          zoom: Math.max(map.getZoom(), 10),
-          duration: 1500,
-          essential: true
-        });
-      }
-    });
-
-    // Add hover effects
-    let hoverTooltip = null;
-
-    map.on('mouseenter', 'airport-points', (e) => {
-      map.getCanvas().style.cursor = 'pointer';
-
-      if (e.features.length > 0) {
-        const feature = e.features[0];
-        const props = feature.properties;
-
-        // Remove previous tooltip if exists
-        if (hoverTooltip) {
-          hoverTooltip.remove();
-        }
-
-        // Build a summary for the hover tooltip
-        let tooltipHtml = `
-          <div style="padding: 8px; font-size: 12px;">
-            <strong style="color: #1e40af;">${props.name || 'Unknown'}</strong><br>
-            <span style="color: #666;">
-              Type: ${(props.airport_type || 'unknown').replace(/_/g, ' ')}<br>
-              Layer: ${props.closest_layer || 'N/A'}<br>
-              Distance: ${props.distance_meters ? props.distance_meters.toFixed(2) + ' m' : '0 m'}
-              ${props.closest_type ? '<br>Closest: ' + props.closest_type : ''}
-            </span>
-          </div>
-        `;
-
-        // Show tooltip on hover
+        // Show tooltip on hover with all properties
         hoverTooltip = new mapboxgl.Popup({
           closeButton: false,
           closeOnClick: false,
-          offset: 15
+          offset: 25
         });
 
         hoverTooltip.setLngLat(feature.geometry.coordinates)
-          .setHTML(tooltipHtml)
+          .setHTML(popupContent)
           .addTo(map);
       }
     });
 
     map.on('mouseleave', 'airport-points', () => {
       map.getCanvas().style.cursor = '';
+
+      // Hide the selected airport info panel
+      document.getElementById('selected-airport').classList.remove('visible');
+
+      // Clear the highlight
+      map.setFilter('airport-points-highlighted', ['==', ['get', 'ident'], '']);
 
       // Remove hover tooltip
       if (hoverTooltip) {
