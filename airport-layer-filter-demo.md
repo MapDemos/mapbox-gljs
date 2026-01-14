@@ -635,6 +635,7 @@ title: Airport Layer Filter Demo
 
     // Re-add layers after style change
     map.on('style.load', () => {
+      map.showTileBoundaries = true;
       if (airportsData || map.loaded()) {
         addAirportLayers();
 
