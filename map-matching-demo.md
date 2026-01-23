@@ -293,12 +293,12 @@ title: マップマッチングデモ
 
   <div class="info-panel">
     <h2>🛣️ マップマッチングデモ</h2>
-    <p>地図上の任意の場所をクリックすると、最寄りの道路にスナップします。</p>
+    <p>地図上で複数の地点をクリックして、道路に沿ったルートを作成します。</p>
 
     <div id="status-box" class="status-box">
       <div class="status-title">
         <span id="status-icon">👆</span>
-        <span id="status-text">準備完了 - 地図をクリックしてください</span>
+        <span id="status-text">準備完了 - 地図をクリックして地点を追加</span>
       </div>
       <div id="status-content" class="status-content"></div>
     </div>
@@ -339,9 +339,14 @@ title: マップマッチングデモ
       </div>
     </div>
 
-    <button class="btn btn-clear" onclick="clearPoints()">
-      🗑️ すべてクリア
-    </button>
+    <div style="display: flex; gap: 8px; margin-top: 10px;">
+      <button class="btn btn-clear" onclick="matchRoute()" id="match-btn" style="background: #10b981; color: white; flex: 1;" disabled>
+        🛣️ ルートをマッチング
+      </button>
+      <button class="btn btn-clear" onclick="clearPoints()">
+        🗑️ クリア
+      </button>
+    </div>
   </div>
 
   <div class="legend">
@@ -350,12 +355,12 @@ title: マップマッチングデモ
       <span>クリック地点</span>
     </div>
     <div class="legend-item">
-      <div class="legend-dot" style="background: #10b981;"></div>
-      <span>道路上の地点</span>
+      <div class="legend-line" style="background: #ef4444; opacity: 0.5; border: 1px dashed #ef4444; height: 2px;"></div>
+      <span>選択順路</span>
     </div>
     <div class="legend-item">
-      <div class="legend-line" style="background: #3b82f6;"></div>
-      <span>接続線</span>
+      <div class="legend-line" style="background: #10b981; height: 4px;"></div>
+      <span>マッチングルート</span>
     </div>
   </div>
 
@@ -374,48 +379,83 @@ title: マップマッチングデモ
       defaultLanguage: 'ja'
     }));
 
+    let clickedPoints = [];
     let clickedMarkers = [];
-    let matchedMarkers = [];
+    let matchedRoute = null;
     let currentProfile = 'driving';
-    let requestCounter = 0;
 
     // Add navigation controls
     map.addControl(new mapboxgl.NavigationControl());
 
     // Initialize map layers on load
     map.on('load', () => {
-      // Add source for connection lines
-      map.addSource('connections', {
+      // Add source for clicked points line
+      map.addSource('clicked-line', {
         type: 'geojson',
         data: {
-          type: 'FeatureCollection',
-          features: []
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: []
+          }
         }
       });
 
-      // Add layer for connection lines
+      // Add layer for clicked points line (dashed)
       map.addLayer({
-        id: 'connection-lines',
+        id: 'clicked-line-layer',
         type: 'line',
-        source: 'connections',
+        source: 'clicked-line',
         layout: {
           'line-cap': 'round',
           'line-join': 'round'
         },
         paint: {
-          'line-color': '#3b82f6',
+          'line-color': '#ef4444',
           'line-width': 2,
           'line-dasharray': [2, 2],
-          'line-opacity': 0.7
+          'line-opacity': 0.5
+        }
+      });
+
+      // Add source for matched route
+      map.addSource('matched-route', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: []
+          }
+        }
+      });
+
+      // Add layer for matched route (solid, thick line)
+      map.addLayer({
+        id: 'matched-route-layer',
+        type: 'line',
+        source: 'matched-route',
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round'
+        },
+        paint: {
+          'line-color': '#10b981',
+          'line-width': 4,
+          'line-opacity': 0.8
         }
       });
     });
 
     // Handle map clicks
-    map.on('click', async (e) => {
+    map.on('click', (e) => {
       const clickedPoint = [e.lngLat.lng, e.lngLat.lat];
 
-      // Add clicked point marker
+      // Add clicked point to array
+      clickedPoints.push(clickedPoint);
+
+      // Add clicked point marker with number
+      const markerNumber = clickedPoints.length;
       const clickedMarker = new mapboxgl.Marker({
         color: '#ef4444',
         scale: 0.8
@@ -423,7 +463,7 @@ title: マップマッチングデモ
         .setLngLat(clickedPoint)
         .setPopup(new mapboxgl.Popup({ offset: 25 })
           .setHTML(`
-            <strong>クリック地点</strong><br>
+            <strong>地点 ${markerNumber}</strong><br>
             <span style="font-family: monospace; font-size: 11px;">
               ${clickedPoint[0].toFixed(6)}, ${clickedPoint[1].toFixed(6)}
             </span>
@@ -432,66 +472,64 @@ title: マップマッチングデモ
 
       clickedMarkers.push(clickedMarker);
 
-      // Update status
-      updateStatus('loading', '道路にマッチング中...',
-        `<span class="coordinates">${clickedPoint[0].toFixed(6)}, ${clickedPoint[1].toFixed(6)}</span>`);
+      // Update clicked line
+      updateClickedLine();
 
-      // Perform map matching
-      await matchPointToRoad(clickedPoint, clickedMarker);
+      // Update status
+      if (clickedPoints.length === 1) {
+        updateStatus('', `${clickedPoints.length} 地点を追加しました`,
+          `もう1地点以上追加してルートを作成してください`);
+      } else {
+        updateStatus('success', `${clickedPoints.length} 地点を追加しました`,
+          `「ルートをマッチング」をクリックして道路にスナップします`);
+        // Enable match button
+        document.getElementById('match-btn').disabled = false;
+      }
     });
 
-    async function matchPointToRoad(point, clickedMarker) {
-      const currentRequest = ++requestCounter;
+    function updateClickedLine() {
+      if (clickedPoints.length > 1) {
+        map.getSource('clicked-line').setData({
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: clickedPoints
+          }
+        });
+      }
+    }
+
+    async function matchRoute() {
+      if (clickedPoints.length < 2) {
+        updateStatus('error', 'エラー', '少なくとも2地点を選択してください');
+        return;
+      }
 
       try {
-        // Create a GeoJSON LineString with the single point (duplicated to create a minimal path)
-        // Map Matching API requires at least 2 points, so we create a tiny line
-        const coordinates = [
-          point,
-          [point[0] + 0.00001, point[1] + 0.00001] // Slight offset to create a line
-        ];
+        updateStatus('loading', 'ルートマッチング中...',
+          `${clickedPoints.length} 地点を道路にマッチングしています...`);
 
-        // Construct Map Matching API URL with Valhalla-Zenrin profile
-        const coordinatesString = coordinates.map(coord => coord.join(',')).join(';');
-        const url = `https://api.mapbox.com/matching/v5/mapbox.tmp.valhalla-zenrin/${currentProfile}/${coordinatesString}?access_token=${mapboxgl.accessToken}&geometries=geojson&radiuses=50;50&overview=full`;
+        // Construct Map Matching API URL with all points
+        const coordinatesString = clickedPoints.map(coord => coord.join(',')).join(';');
+        const radiuses = clickedPoints.map(() => '25').join(';'); // 25m radius for each point
+        const url = `https://api.mapbox.com/matching/v5/mapbox.tmp.valhalla-zenrin/${currentProfile}/${coordinatesString}?access_token=${mapboxgl.accessToken}&geometries=geojson&radiuses=${radiuses}&overview=full&tidy=true`;
 
         const response = await fetch(url);
         const data = await response.json();
 
-        // Check if this is still the latest request
-        if (currentRequest !== requestCounter) {
-          return; // A newer request has been made, ignore this one
-        }
-
         if (data.matchings && data.matchings.length > 0) {
           const matching = data.matchings[0];
-          const matchedGeometry = matching.geometry;
+          matchedRoute = matching.geometry;
 
-          // Get the first coordinate of the matched route (closest to our clicked point)
-          const matchedPoint = matchedGeometry.coordinates[0];
+          // Update matched route on map
+          map.getSource('matched-route').setData({
+            type: 'Feature',
+            geometry: matchedRoute
+          });
 
-          // Add matched point marker
-          const matchedMarker = new mapboxgl.Marker({
-            color: '#10b981',
-            scale: 0.8
-          })
-            .setLngLat(matchedPoint)
-            .setPopup(new mapboxgl.Popup({ offset: 25 })
-              .setHTML(`
-                <strong>道路上にマッチング</strong><br>
-                <span style="font-family: monospace; font-size: 11px;">
-                  ${matchedPoint[0].toFixed(6)}, ${matchedPoint[1].toFixed(6)}
-                </span>
-              `))
-            .addTo(map);
-
-          matchedMarkers.push(matchedMarker);
-
-          // Draw connection line
-          drawConnectionLine(point, matchedPoint);
-
-          // Calculate distance
-          const distance = calculateDistance(point, matchedPoint);
+          // Calculate total distance
+          const distance = matching.distance || 0;
+          const duration = matching.duration || 0;
 
           // Profile names in Japanese
           const profileNames = {
@@ -501,21 +539,21 @@ title: マップマッチングデモ
           };
 
           // Update status
-          updateStatus('success', '道路にマッチングしました！',
-            `最寄りの${profileNames[currentProfile]}ルートへ <strong>${distance.toFixed(1)}m</strong> スナップしました<br>` +
-            `<span class="coordinates">${matchedPoint[0].toFixed(6)}, ${matchedPoint[1].toFixed(6)}</span>`);
+          updateStatus('success', 'ルートマッチング完了！',
+            `${profileNames[currentProfile]}ルートで道路にマッチングしました<br>` +
+            `総距離: <strong>${(distance / 1000).toFixed(2)} km</strong><br>` +
+            `推定時間: <strong>${Math.round(duration / 60)} 分</strong>`);
 
-          // Show popup briefly (keep auto-close for popups)
-          matchedMarker.togglePopup();
-          setTimeout(() => {
-            if (matchedMarker.getPopup().isOpen()) {
-              matchedMarker.togglePopup();
-            }
-          }, 3000);
+          // Fit map to show entire route
+          const bounds = new mapboxgl.LngLatBounds();
+          matchedRoute.coordinates.forEach(coord => {
+            bounds.extend(coord);
+          });
+          map.fitBounds(bounds, { padding: 50 });
 
         } else {
-          updateStatus('error', '近くに道路が見つかりません',
-            '道路に近い場所をクリックするか、ルーティングプロファイルを変更してください。');
+          updateStatus('error', 'ルートが見つかりません',
+            '選択した地点間でルートを作成できませんでした。地点を道路の近くに配置してください。');
         }
 
       } catch (error) {
@@ -525,35 +563,6 @@ title: マップマッチングデモ
       }
     }
 
-    function drawConnectionLine(point1, point2) {
-      const currentData = map.getSource('connections')._data;
-
-      currentData.features.push({
-        type: 'Feature',
-        geometry: {
-          type: 'LineString',
-          coordinates: [point1, point2]
-        }
-      });
-
-      map.getSource('connections').setData(currentData);
-    }
-
-    function calculateDistance(point1, point2) {
-      // Haversine formula for distance between two points
-      const R = 6371000; // Earth's radius in meters
-      const lat1 = point1[1] * Math.PI / 180;
-      const lat2 = point2[1] * Math.PI / 180;
-      const deltaLat = (point2[1] - point1[1]) * Math.PI / 180;
-      const deltaLng = (point2[0] - point1[0]) * Math.PI / 180;
-
-      const a = Math.sin(deltaLat/2) * Math.sin(deltaLat/2) +
-                Math.cos(lat1) * Math.cos(lat2) *
-                Math.sin(deltaLng/2) * Math.sin(deltaLng/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-      return R * c; // Distance in meters
-    }
 
     function updateStatus(state, title, content = '') {
       const statusBox = document.getElementById('status-box');
@@ -602,27 +611,44 @@ title: マップマッチングデモ
       };
 
       updateStatus('success', `${profileNames[profile]}モードに切り替えました`,
-        `${profileDescriptions[profile]}<br>地図をクリックして道路にマッチングしてください。`);
+        `${profileDescriptions[profile]}<br>既存の地点がある場合は「ルートをマッチング」をクリックしてください。`);
     }
 
     function clearPoints() {
       // Remove all markers
       clickedMarkers.forEach(marker => marker.remove());
-      matchedMarkers.forEach(marker => marker.remove());
 
+      // Reset arrays
       clickedMarkers = [];
-      matchedMarkers = [];
+      clickedPoints = [];
+      matchedRoute = null;
 
-      // Clear connection lines
-      if (map.getSource('connections')) {
-        map.getSource('connections').setData({
-          type: 'FeatureCollection',
-          features: []
+      // Clear lines
+      if (map.getSource('clicked-line')) {
+        map.getSource('clicked-line').setData({
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: []
+          }
         });
       }
 
-      updateStatus('', 'すべてのポイントをクリアしました',
-        '地図をクリックして新しいポイントを追加してください。');
+      if (map.getSource('matched-route')) {
+        map.getSource('matched-route').setData({
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: []
+          }
+        });
+      }
+
+      // Disable match button
+      document.getElementById('match-btn').disabled = true;
+
+      updateStatus('', 'すべてクリアしました',
+        '地図をクリックして新しい地点を追加してください。');
     }
   </script>
 </body>
