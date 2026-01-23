@@ -481,8 +481,7 @@ title: マップマッチングデモ
                 <strong>道路上にマッチング</strong><br>
                 <span style="font-family: monospace; font-size: 11px;">
                   ${matchedPoint[0].toFixed(6)}, ${matchedPoint[1].toFixed(6)}
-                </span><br>
-                <small>信頼度: ${(matching.confidence * 100).toFixed(1)}%</small>
+                </span>
               `))
             .addTo(map);
 
@@ -504,8 +503,7 @@ title: マップマッチングデモ
           // Update status
           updateStatus('success', '道路にマッチングしました！',
             `最寄りの${profileNames[currentProfile]}ルートへ <strong>${distance.toFixed(1)}m</strong> スナップしました<br>` +
-            `<span class="coordinates">${matchedPoint[0].toFixed(6)}, ${matchedPoint[1].toFixed(6)}</span><br>` +
-            `信頼度: <strong>${(matching.confidence * 100).toFixed(1)}%</strong>`);
+            `<span class="coordinates">${matchedPoint[0].toFixed(6)}, ${matchedPoint[1].toFixed(6)}</span>`);
 
           // Show popup briefly (keep auto-close for popups)
           matchedMarker.togglePopup();
