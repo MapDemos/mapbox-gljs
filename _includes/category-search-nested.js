@@ -440,18 +440,23 @@ function createMultiSelectUI(categories) {
         position: absolute;
         top: 10px;
         left: 10px;
+        bottom: 10px;
         background: white;
         padding: 10px;
         border-radius: 4px;
         box-shadow: 0 0 0 2px rgba(0,0,0,.1);
         width: 400px;
         z-index: 1;
+        max-height: calc(100vh - 20px);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
     `;
 
     // Create title
     const title = document.createElement('h3');
     title.textContent = 'カテゴリー検索 (ネスト対応)';
-    title.style.cssText = 'margin: 0 0 10px 0; font-size: 14px; color: #333;';
+    title.style.cssText = 'margin: 0 0 10px 0; font-size: 14px; color: #333; flex-shrink: 0;';
     controlContainer.appendChild(title);
 
     // Create selected chips container
@@ -459,7 +464,7 @@ function createMultiSelectUI(categories) {
     chipsContainer.id = 'chips-container';
     chipsContainer.style.cssText = `
         min-height: 32px;
-        max-height: 150px;
+        max-height: 100px;
         overflow-y: auto;
         margin-bottom: 10px;
         padding: 4px;
@@ -469,6 +474,7 @@ function createMultiSelectUI(categories) {
         flex-wrap: wrap;
         align-content: flex-start;
         border: 1px solid #e0e0e0;
+        flex-shrink: 0;
     `;
 
     const placeholder = document.createElement('span');
@@ -482,7 +488,7 @@ function createMultiSelectUI(categories) {
     // Create search input wrapper
     const inputWrapper = document.createElement('div');
     inputWrapper.className = 'search-input-wrapper';
-    inputWrapper.style.cssText = 'position: relative;';
+    inputWrapper.style.cssText = 'position: relative; flex-shrink: 0;';
 
     // Create search input
     const searchInput = document.createElement('input');
@@ -511,7 +517,7 @@ function createMultiSelectUI(categories) {
 
     // Create buttons container
     const buttonsContainer = document.createElement('div');
-    buttonsContainer.style.cssText = 'display: flex; gap: 10px; margin-top: 10px;';
+    buttonsContainer.style.cssText = 'display: flex; gap: 10px; margin-top: 10px; flex-shrink: 0;';
 
     // Add search button
     const searchButton = document.createElement('button');
@@ -543,6 +549,7 @@ function createMultiSelectUI(categories) {
         border-radius: 4px;
         font-size: 12px;
         color: #666;
+        flex-shrink: 0;
     `;
     statusDiv.textContent = `${categories.length}個のカテゴリーが利用可能`;
     controlContainer.appendChild(statusDiv);
@@ -552,8 +559,11 @@ function createMultiSelectUI(categories) {
     resultsDiv.id = 'results';
     resultsDiv.style.cssText = `
         margin-top: 10px;
-        max-height: 400px;
+        flex: 1;
         overflow-y: auto;
+        min-height: 0;
+        border-top: 1px solid #e0e0e0;
+        padding-top: 10px;
     `;
     controlContainer.appendChild(resultsDiv);
 

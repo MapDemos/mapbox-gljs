@@ -518,6 +518,252 @@ title: マップマッチングデモ
       }
     }
 
+    // Anomaly detection and cleaning functions
+    function cleanPointAnomalies(points) {
+      if (points.length < 2) return points;
+
+      let cleanedPoints = [...points];
+      const originalCount = cleanedPoints.length;
+
+      // Step 1: Remove duplicate consecutive points
+      cleanedPoints = removeDuplicatePoints(cleanedPoints);
+      console.log(`Removed ${originalCount - cleanedPoints.length} duplicate points`);
+
+      // Step 2: Remove points with unrealistic jumps (distance-based filtering)
+      if (cleanedPoints.length > 2) {
+        const beforeJump = cleanedPoints.length;
+        cleanedPoints = removeJumpAnomalies(cleanedPoints);
+        console.log(`Removed ${beforeJump - cleanedPoints.length} points with unrealistic jumps`);
+      }
+
+      // Step 3: Remove outliers using statistical analysis
+      if (cleanedPoints.length > 3) {
+        const beforeOutliers = cleanedPoints.length;
+        cleanedPoints = removeStatisticalOutliers(cleanedPoints);
+        console.log(`Removed ${beforeOutliers - cleanedPoints.length} statistical outliers`);
+      }
+
+      // Step 4: Simplify if too many points (removes GPS noise)
+      if (cleanedPoints.length > 10) {
+        const beforeSimplify = cleanedPoints.length;
+        cleanedPoints = simplifyPoints(cleanedPoints);
+        console.log(`Simplified from ${beforeSimplify} to ${cleanedPoints.length} points`);
+      }
+
+      // Step 5: Remove isolated clusters (DBSCAN)
+      if (cleanedPoints.length > 5) {
+        const beforeClustering = cleanedPoints.length;
+        cleanedPoints = removeIsolatedClusters(cleanedPoints);
+        console.log(`Removed ${beforeClustering - cleanedPoints.length} isolated points`);
+      }
+
+      return cleanedPoints;
+    }
+
+    // Remove consecutive duplicate points
+    function removeDuplicatePoints(points) {
+      const cleaned = [points[0]];
+      for (let i = 1; i < points.length; i++) {
+        const dist = turf.distance(
+          turf.point(points[i-1]),
+          turf.point(points[i]),
+          { units: 'meters' }
+        );
+        // Keep point if it's at least 1 meter away from previous
+        if (dist > 1) {
+          cleaned.push(points[i]);
+        }
+      }
+      return cleaned;
+    }
+
+    // Remove points with unrealistic jumps
+    // Based on 5-second intervals:
+    // - 60km/h = 83m per 5 seconds
+    // - 72km/h = 100m per 5 seconds (threshold)
+    // Using 100m (0.1km) as strict threshold
+    function removeJumpAnomalies(points, maxJumpKm = 0.1) {
+      const cleaned = [points[0]];
+      let lastGoodPoint = points[0];
+
+      for (let i = 1; i < points.length; i++) {
+        const distance = turf.distance(
+          turf.point(lastGoodPoint),
+          turf.point(points[i]),
+          { units: 'kilometers' }
+        );
+
+        // If jump is reasonable, keep the point
+        if (distance <= maxJumpKm) {
+          cleaned.push(points[i]);
+          lastGoodPoint = points[i];
+        } else {
+          console.log(`Anomaly detected: ${distance.toFixed(2)}km jump at point ${i}`);
+        }
+      }
+
+      return cleaned;
+    }
+
+    // Remove statistical outliers
+    function removeStatisticalOutliers(points) {
+      if (points.length < 4) return points;
+
+      // Calculate center point
+      const featureCollection = turf.featureCollection(
+        points.map(p => turf.point(p))
+      );
+      const center = turf.center(featureCollection);
+
+      // Calculate distances from center
+      const distances = points.map(p =>
+        turf.distance(center, turf.point(p), { units: 'kilometers' })
+      );
+
+      // Calculate mean and standard deviation
+      const mean = distances.reduce((a, b) => a + b, 0) / distances.length;
+      const variance = distances.reduce((sum, d) => sum + Math.pow(d - mean, 2), 0) / distances.length;
+      const stdDev = Math.sqrt(variance);
+
+      // Remove points more than 2.5 standard deviations from mean
+      const threshold = mean + (2.5 * stdDev);
+      const cleaned = [];
+
+      points.forEach((point, i) => {
+        if (distances[i] <= threshold) {
+          cleaned.push(point);
+        } else {
+          console.log(`Statistical outlier: point ${i} at ${distances[i].toFixed(2)}km from center (threshold: ${threshold.toFixed(2)}km)`);
+        }
+      });
+
+      // Keep at least 3 points
+      if (cleaned.length < 3 && points.length >= 3) {
+        // Return the 3 points closest to center
+        const indexed = points.map((p, i) => ({ point: p, distance: distances[i] }));
+        indexed.sort((a, b) => a.distance - b.distance);
+        return indexed.slice(0, 3).map(item => item.point);
+      }
+
+      return cleaned;
+    }
+
+    // Simplify points to remove GPS noise
+    function simplifyPoints(points) {
+      if (points.length < 3) return points;
+
+      const lineString = turf.lineString(points);
+
+      // Tolerance in degrees (roughly 10-50 meters depending on latitude)
+      const tolerance = 0.0001;
+
+      const simplified = turf.simplify(lineString, {
+        tolerance: tolerance,
+        highQuality: true
+      });
+
+      return simplified.geometry.coordinates;
+    }
+
+    // Remove isolated point clusters using DBSCAN
+    function removeIsolatedClusters(points) {
+      if (points.length < 4) return points;
+
+      const featureCollection = turf.featureCollection(
+        points.map(p => turf.point(p))
+      );
+
+      // Max distance between points in a cluster (in km)
+      const maxDistance = 0.5; // 500 meters
+      const minPoints = 2; // Minimum points to form a cluster
+
+      // Run DBSCAN clustering
+      const clustered = turf.clustersDbscan(featureCollection, maxDistance, {
+        minPoints: minPoints
+      });
+
+      // Find the largest cluster
+      const clusterMap = {};
+      clustered.features.forEach((feature, index) => {
+        const cluster = feature.properties.cluster;
+        if (cluster !== undefined) {
+          if (!clusterMap[cluster]) {
+            clusterMap[cluster] = [];
+          }
+          clusterMap[cluster].push(points[index]);
+        }
+      });
+
+      // If no clusters found, return all points
+      if (Object.keys(clusterMap).length === 0) {
+        return points;
+      }
+
+      // Return points from the largest cluster(s)
+      const clusters = Object.values(clusterMap);
+      clusters.sort((a, b) => b.length - a.length);
+
+      // If multiple significant clusters, keep them all
+      const significantClusters = clusters.filter(c => c.length >= Math.max(2, clusters[0].length * 0.3));
+
+      // Flatten all significant clusters and sort by original order
+      const cleaned = [];
+      points.forEach(point => {
+        for (const cluster of significantClusters) {
+          if (cluster.some(p => p[0] === point[0] && p[1] === point[1])) {
+            cleaned.push(point);
+            break;
+          }
+        }
+      });
+
+      return cleaned;
+    }
+
+    // Update display to show which points were removed
+    function updateCleanedPointsDisplay(cleanedPoints) {
+      // Update markers to show which were removed
+      clickedMarkers.forEach((marker, index) => {
+        const originalPoint = clickedPoints[index];
+        const isKept = cleanedPoints.some(p =>
+          Math.abs(p[0] - originalPoint[0]) < 0.000001 &&
+          Math.abs(p[1] - originalPoint[1]) < 0.000001
+        );
+
+        if (!isKept) {
+          // Change color of removed points to gray
+          marker.remove();
+          const removedMarker = new mapboxgl.Marker({
+            color: '#9ca3af',
+            scale: 0.6
+          })
+            .setLngLat(originalPoint)
+            .setPopup(new mapboxgl.Popup({ offset: 25 })
+              .setHTML(`
+                <strong>削除された地点 ${index + 1}</strong><br>
+                <span style="font-family: monospace; font-size: 11px;">
+                  ${originalPoint[0].toFixed(6)}, ${originalPoint[1].toFixed(6)}
+                </span><br>
+                <small style="color: #ef4444;">異常値として検出</small>
+              `))
+            .addTo(map);
+
+          clickedMarkers[index] = removedMarker;
+        }
+      });
+
+      // Update the clicked line to show cleaned path
+      if (cleanedPoints.length > 1) {
+        map.getSource('clicked-line').setData({
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: cleanedPoints
+          }
+        });
+      }
+    }
+
     async function matchRoute() {
       if (clickedPoints.length < 2) {
         updateStatus('error', 'エラー', '少なくとも2地点を選択してください');
@@ -525,13 +771,38 @@ title: マップマッチングデモ
       }
 
       try {
-        updateStatus('loading', 'ルートマッチング中...',
-          `${clickedPoints.length} 地点を道路にマッチングしています...`);
+        // Clean anomalies from points
+        updateStatus('loading', '地点データをクリーニング中...',
+          `${clickedPoints.length} 地点から異常値を除去しています...`);
 
-        // Construct Map Matching API URL with all points
-        const coordinatesString = clickedPoints.map(coord => coord.join(',')).join(';');
-        const radiuses = clickedPoints.map(() => '25').join(';'); // 25m radius for each point
-        const url = `https://api.mapbox.com/matching/v5/mapbox.tmp.valhalla-zenrin/${currentProfile}/${coordinatesString}?access_token=${mapboxgl.accessToken}&geometries=geojson&radiuses=${radiuses}&overview=full&tidy=true`;
+        const cleanedPoints = cleanPointAnomalies(clickedPoints);
+
+        if (cleanedPoints.length < 2) {
+          updateStatus('error', 'エラー',
+            `クリーニング後の地点が不足しています（${clickedPoints.length}地点→${cleanedPoints.length}地点）`);
+          return;
+        }
+
+        if (cleanedPoints.length < clickedPoints.length) {
+          updateStatus('loading', 'ルートマッチング中...',
+            `${clickedPoints.length} 地点から ${cleanedPoints.length} 地点にクリーニングしました。道路にマッチングしています...`);
+
+          // Update visual representation with cleaned points
+          updateCleanedPointsDisplay(cleanedPoints);
+        } else {
+          updateStatus('loading', 'ルートマッチング中...',
+            `${cleanedPoints.length} 地点を道路にマッチングしています...`);
+        }
+
+        // Construct Map Matching API URL with cleaned points
+        const coordinatesString = cleanedPoints.map(coord => coord.join(',')).join(';');
+        const radiuses = cleanedPoints.map(() => '50').join(';'); // 50m radius for each point
+
+        // Add dummy timestamps (5 seconds apart starting from current time)
+        const baseTime = Math.floor(Date.now() / 1000); // Current Unix timestamp in seconds
+        const timestamps = cleanedPoints.map((_, index) => baseTime + (index * 5)).join(';');
+
+        const url = `https://api.mapbox.com/matching/v5/mapbox.tmp.valhalla-zenrin/${currentProfile}/${coordinatesString}?access_token=${mapboxgl.accessToken}&geometries=geojson&radiuses=${radiuses}&timestamps=${timestamps}&overview=full&tidy=false`;
 
         const response = await fetch(url);
         const data = await response.json();
