@@ -347,6 +347,22 @@ title: マップマッチングデモ
         🗑️ クリア
       </button>
     </div>
+
+    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+      <div class="profile-label">GeoJSONファイルアップロード</div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <input type="file" id="geojson-upload" accept=".json,.geojson" style="display: none;" onchange="handleFileUpload(event)">
+        <button class="btn btn-clear" onclick="document.getElementById('geojson-upload').click()" style="background: #3b82f6; color: white; flex: 1;">
+          📁 GeoJSONを読み込む
+        </button>
+        <button class="btn btn-clear" onclick="downloadCurrentPoints()" id="download-btn" style="background: #6366f1; color: white;" disabled>
+          💾 保存
+        </button>
+      </div>
+      <div style="font-size: 11px; color: #9ca3af; margin-top: 6px;">
+        Point, MultiPoint, LineString, またはPolygonを含むGeoJSONファイル
+      </div>
+    </div>
   </div>
 
   <div class="legend">
@@ -474,6 +490,9 @@ title: マップマッチングデモ
 
       // Update clicked line
       updateClickedLine();
+
+      // Enable download button if we have points
+      document.getElementById('download-btn').disabled = false;
 
       // Update status
       if (clickedPoints.length === 1) {
@@ -644,11 +663,245 @@ title: マップマッチングデモ
         });
       }
 
-      // Disable match button
+      // Disable buttons
       document.getElementById('match-btn').disabled = true;
+      document.getElementById('download-btn').disabled = true;
 
       updateStatus('', 'すべてクリアしました',
         '地図をクリックして新しい地点を追加してください。');
+    }
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const geojson = JSON.parse(e.target.result);
+          processGeoJSON(geojson);
+        } catch (error) {
+          updateStatus('error', 'ファイルエラー',
+            `GeoJSONファイルの読み込みに失敗しました: ${error.message}`);
+        }
+      };
+      reader.readAsText(file);
+
+      // Reset file input so same file can be selected again
+      event.target.value = '';
+    }
+
+    function processGeoJSON(geojson) {
+      // Clear existing points first
+      clearPoints();
+
+      let extractedPoints = [];
+
+      // Handle single Feature
+      if (geojson.type === 'Feature') {
+        extractedPoints = extractPointsFromGeometry(geojson.geometry);
+      }
+      // Handle FeatureCollection
+      else if (geojson.type === 'FeatureCollection' && geojson.features) {
+        geojson.features.forEach(feature => {
+          if (feature.geometry) {
+            const points = extractPointsFromGeometry(feature.geometry);
+            extractedPoints = extractedPoints.concat(points);
+          }
+        });
+      }
+      // Handle raw Geometry
+      else if (geojson.type && geojson.coordinates) {
+        extractedPoints = extractPointsFromGeometry(geojson);
+      }
+
+      if (extractedPoints.length === 0) {
+        updateStatus('error', '地点が見つかりません',
+          'GeoJSONファイルに有効な座標が含まれていません。');
+        return;
+      }
+
+      // Add all extracted points to the map
+      extractedPoints.forEach((point, index) => {
+        clickedPoints.push(point);
+
+        // Add marker with number
+        const markerNumber = index + 1;
+        const marker = new mapboxgl.Marker({
+          color: '#ef4444',
+          scale: 0.8
+        })
+          .setLngLat(point)
+          .setPopup(new mapboxgl.Popup({ offset: 25 })
+            .setHTML(`
+              <strong>地点 ${markerNumber}</strong><br>
+              <span style="font-family: monospace; font-size: 11px;">
+                ${point[0].toFixed(6)}, ${point[1].toFixed(6)}
+              </span>
+            `))
+          .addTo(map);
+
+        clickedMarkers.push(marker);
+      });
+
+      // Update clicked line
+      updateClickedLine();
+
+      // Fit map to show all points
+      if (extractedPoints.length > 0) {
+        const bounds = new mapboxgl.LngLatBounds();
+        extractedPoints.forEach(point => {
+          bounds.extend(point);
+        });
+        map.fitBounds(bounds, { padding: 50 });
+      }
+
+      // Update status and enable buttons
+      if (extractedPoints.length > 0) {
+        document.getElementById('download-btn').disabled = false;
+      }
+
+      if (extractedPoints.length >= 2) {
+        document.getElementById('match-btn').disabled = false;
+        updateStatus('success', `${extractedPoints.length} 地点を読み込みました`,
+          `GeoJSONファイルから地点を追加しました。「ルートをマッチング」をクリックしてください。`);
+      } else if (extractedPoints.length === 1) {
+        updateStatus('', `${extractedPoints.length} 地点を読み込みました`,
+          `もう1地点以上追加してルートを作成してください。`);
+      }
+    }
+
+    function extractPointsFromGeometry(geometry) {
+      const points = [];
+
+      switch (geometry.type) {
+        case 'Point':
+          // Single point
+          if (isValidCoordinate(geometry.coordinates)) {
+            points.push(geometry.coordinates);
+          }
+          break;
+
+        case 'MultiPoint':
+          // Multiple points
+          geometry.coordinates.forEach(coord => {
+            if (isValidCoordinate(coord)) {
+              points.push(coord);
+            }
+          });
+          break;
+
+        case 'LineString':
+          // Line vertices
+          geometry.coordinates.forEach(coord => {
+            if (isValidCoordinate(coord)) {
+              points.push(coord);
+            }
+          });
+          break;
+
+        case 'MultiLineString':
+          // Multiple lines vertices
+          geometry.coordinates.forEach(line => {
+            line.forEach(coord => {
+              if (isValidCoordinate(coord)) {
+                points.push(coord);
+              }
+            });
+          });
+          break;
+
+        case 'Polygon':
+          // Polygon vertices (only exterior ring)
+          if (geometry.coordinates[0]) {
+            geometry.coordinates[0].forEach(coord => {
+              if (isValidCoordinate(coord)) {
+                points.push(coord);
+              }
+            });
+          }
+          break;
+
+        case 'MultiPolygon':
+          // Multiple polygons vertices
+          geometry.coordinates.forEach(polygon => {
+            if (polygon[0]) {
+              polygon[0].forEach(coord => {
+                if (isValidCoordinate(coord)) {
+                  points.push(coord);
+                }
+              });
+            }
+          });
+          break;
+
+        case 'GeometryCollection':
+          // Recursive for geometry collection
+          if (geometry.geometries) {
+            geometry.geometries.forEach(geom => {
+              const geomPoints = extractPointsFromGeometry(geom);
+              points.push(...geomPoints);
+            });
+          }
+          break;
+      }
+
+      return points;
+    }
+
+    function isValidCoordinate(coord) {
+      return Array.isArray(coord) &&
+             coord.length >= 2 &&
+             typeof coord[0] === 'number' &&
+             typeof coord[1] === 'number' &&
+             coord[0] >= -180 && coord[0] <= 180 &&
+             coord[1] >= -90 && coord[1] <= 90;
+    }
+
+    function downloadCurrentPoints() {
+      if (clickedPoints.length === 0) {
+        updateStatus('error', 'エラー', '保存する地点がありません。');
+        return;
+      }
+
+      // Create GeoJSON object with individual Point features
+      const features = [];
+
+      // Add each clicked point as a separate Point feature
+      clickedPoints.forEach((point, index) => {
+        features.push({
+          type: 'Feature',
+          properties: {
+            index: index + 1,
+            profile: currentProfile
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: point
+          }
+        });
+      });
+
+      const geojson = {
+        type: 'FeatureCollection',
+        features: features
+      };
+
+      // Create download
+      const dataStr = JSON.stringify(geojson, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `map-points-${new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-')}.geojson`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      updateStatus('success', 'ファイルをダウンロードしました',
+        `${clickedPoints.length} 地点を含むGeoJSONファイルを保存しました。`);
     }
   </script>
 </body>
