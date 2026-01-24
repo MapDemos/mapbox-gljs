@@ -1,6 +1,6 @@
 ---
 layout: none
-title: Nested Category Search (Japan)
+title: SearchBox カテゴリー検索
 js: category-search-nested.js
 ---
 
