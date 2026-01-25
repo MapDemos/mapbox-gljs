@@ -306,6 +306,18 @@ let filteredCategories = [];
 let dropdownVisible = false;
 let expandedPaths = new Set();
 let currentPopup = null; // Track current popup
+let currentSearchMode = 'category'; // 'category', 'suggest', or 'forward'
+let suggestAbortController = null; // For canceling suggest requests
+let sessionToken = generateSessionToken(); // Generate session token for Search Box API
+
+// Generate a unique session token (UUID v4)
+function generateSessionToken() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
 
 // Color palette for different categories (up to 10 distinct colors)
 const categoryColors = [
@@ -845,11 +857,334 @@ function createMultiSelectUI(categories) {
 
     // Create title
     const title = document.createElement('h3');
-    title.textContent = 'SearchBox カテゴリー検索';
+    title.textContent = 'SearchBox POI検索';
     title.style.cssText = 'margin: 0 0 10px 0; font-size: 14px; color: #333; flex-shrink: 0;';
     controlContainer.appendChild(title);
 
-    // Create button container for side-by-side layout
+    // Create mode toggle
+    const modeToggleContainer = document.createElement('div');
+    modeToggleContainer.style.cssText = `
+        display: flex;
+        background: #f0f0f0;
+        border-radius: 8px;
+        padding: 2px;
+        margin-bottom: 12px;
+        position: relative;
+    `;
+
+    // Mode toggle background slider
+    const toggleSlider = document.createElement('div');
+    toggleSlider.id = 'toggle-slider';
+    toggleSlider.style.cssText = `
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: calc(33.33% - 2px);
+        height: calc(100% - 4px);
+        background: white;
+        border-radius: 6px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    `;
+    modeToggleContainer.appendChild(toggleSlider);
+
+    // Category mode button
+    const categoryModeBtn = document.createElement('button');
+    categoryModeBtn.id = 'category-mode-btn';
+    categoryModeBtn.textContent = 'カテゴリー検索';
+    categoryModeBtn.style.cssText = `
+        flex: 1;
+        padding: 8px 8px;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        color: #333;
+        z-index: 1;
+        position: relative;
+        transition: color 0.3s ease;
+        height: auto !important;
+    `;
+    categoryModeBtn.onclick = () => setSearchMode('category');
+    modeToggleContainer.appendChild(categoryModeBtn);
+
+    // Suggest mode button
+    const suggestModeBtn = document.createElement('button');
+    suggestModeBtn.id = 'suggest-mode-btn';
+    suggestModeBtn.textContent = 'サジェスト検索';
+    suggestModeBtn.style.cssText = `
+        flex: 1;
+        padding: 8px 8px;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 400;
+        color: #666;
+        z-index: 1;
+        position: relative;
+        transition: color 0.3s ease;
+        height: auto !important;
+    `;
+    suggestModeBtn.onclick = () => setSearchMode('suggest');
+    modeToggleContainer.appendChild(suggestModeBtn);
+
+    // Forward mode button
+    const forwardModeBtn = document.createElement('button');
+    forwardModeBtn.id = 'forward-mode-btn';
+    forwardModeBtn.textContent = '文字列検索';
+    forwardModeBtn.style.cssText = `
+        flex: 1;
+        padding: 8px 8px;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 400;
+        color: #666;
+        z-index: 1;
+        position: relative;
+        transition: color 0.3s ease;
+        height: auto !important;
+    `;
+    forwardModeBtn.onclick = () => setSearchMode('forward');
+    modeToggleContainer.appendChild(forwardModeBtn);
+
+    controlContainer.appendChild(modeToggleContainer);
+
+    // Create container for category mode controls
+    const categoryModeContainer = document.createElement('div');
+    categoryModeContainer.id = 'category-mode-container';
+    categoryModeContainer.style.cssText = `
+        display: block;
+    `;
+
+    // Create container for suggest mode controls
+    const suggestModeContainer = document.createElement('div');
+    suggestModeContainer.id = 'suggest-mode-container';
+    suggestModeContainer.style.cssText = `
+        display: none;
+    `;
+
+    // Create suggest input field
+    const suggestInputWrapper = document.createElement('div');
+    suggestInputWrapper.style.cssText = `
+        position: relative;
+        margin-bottom: 12px;
+    `;
+
+    const suggestInput = document.createElement('input');
+    suggestInput.id = 'suggest-input';
+    suggestInput.type = 'text';
+    suggestInput.placeholder = '場所や住所を検索...';
+    suggestInput.style.cssText = `
+        width: 100%;
+        padding: 10px 40px 10px 12px;
+        border: 2px solid #e0e0e0;
+        border-radius: 6px;
+        font-size: 14px;
+        transition: all 0.2s;
+        box-sizing: border-box;
+    `;
+    suggestInput.onfocus = () => {
+        suggestInput.style.borderColor = '#4285f4';
+        suggestInput.style.boxShadow = '0 0 0 3px rgba(66, 133, 244, 0.1)';
+        // Generate new session token when input is focused
+        sessionToken = generateSessionToken();
+    };
+    suggestInput.onblur = () => {
+        suggestInput.style.borderColor = '#e0e0e0';
+        suggestInput.style.boxShadow = 'none';
+        // Hide autocomplete dropdown after a delay to allow click events
+        setTimeout(() => {
+            autocompleteDropdown.style.display = 'none';
+        }, 200);
+    };
+
+    // Add input event handler for autocomplete
+    let debounceTimer;
+    suggestInput.oninput = async (e) => {
+        const query = e.target.value.trim();
+
+        // Clear previous timer
+        clearTimeout(debounceTimer);
+
+        // Hide dropdown if query is empty
+        if (!query) {
+            autocompleteDropdown.style.display = 'none';
+            return;
+        }
+
+        // Debounce the API call
+        debounceTimer = setTimeout(async () => {
+            try {
+                // Cancel any pending suggest request
+                if (suggestAbortController) {
+                    suggestAbortController.abort();
+                }
+
+                suggestAbortController = new AbortController();
+
+                // Build search parameters
+                const searchParams = {
+                    q: query,
+                    language: 'ja',
+                    limit: 10,
+                    types: 'poi',
+                    access_token: mapboxgl.accessToken,
+                    session_token: sessionToken
+                };
+
+                // Add proximity if center is set
+                const searchCenter = getSearchCenter();
+                if (searchCenter) {
+                    searchParams.proximity = `${searchCenter.lng},${searchCenter.lat}`;
+                }
+
+                // Add selected categories as POI category filter if any
+                if (selectedCategories.size > 0) {
+                    // Use canonical_id values for poi_category parameter
+                    searchParams.poi_category = Array.from(selectedCategories).join(',');
+                }
+
+                const suggestUrl = `https://api.mapbox.com/search/searchbox/v1/suggest?${new URLSearchParams(searchParams)}`;
+
+                // Log the full request URL for debugging
+                console.log('Suggest Autocomplete Request:', suggestUrl);
+                console.log('Suggest parameters:', searchParams);
+
+                // Perform suggest API call
+                const response = await fetch(suggestUrl, {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    signal: suggestAbortController.signal
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // Clear dropdown
+                autocompleteDropdown.innerHTML = '';
+
+                if (data.suggestions && data.suggestions.length > 0) {
+                    // Show dropdown
+                    autocompleteDropdown.style.display = 'block';
+
+                    // Add suggestions to dropdown
+                    data.suggestions.forEach((suggestion, index) => {
+                        const item = document.createElement('div');
+                        item.style.cssText = `
+                            padding: 10px 12px;
+                            cursor: pointer;
+                            border-bottom: 1px solid #f0f0f0;
+                            transition: background 0.2s;
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                        `;
+
+                        // Add icon based on feature type
+                        const icon = suggestion.feature_type === 'poi' ? '📍' : '🏠';
+
+                        item.innerHTML = `
+                            <span style="font-size: 16px;">${icon}</span>
+                            <div style="flex: 1;">
+                                <div style="font-size: 13px; font-weight: 500; color: #333;">
+                                    ${suggestion.name || suggestion.place_name || ''}
+                                </div>
+                                ${suggestion.place_formatted ? `
+                                    <div style="font-size: 11px; color: #666; margin-top: 2px;">
+                                        ${suggestion.place_formatted}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+
+                        item.onmouseover = () => {
+                            item.style.background = '#f5f5f5';
+                        };
+
+                        item.onmouseout = () => {
+                            item.style.background = 'white';
+                        };
+
+                        item.onclick = () => {
+                            // Set the input value
+                            suggestInput.value = suggestion.name || suggestion.place_name || '';
+
+                            // Store the suggestion for later retrieval
+                            suggestInput.dataset.mapboxId = suggestion.mapbox_id;
+
+                            // Hide dropdown
+                            autocompleteDropdown.style.display = 'none';
+
+                            // Optionally trigger search immediately
+                            performSuggestSearch();
+                        };
+
+                        autocompleteDropdown.appendChild(item);
+                    });
+                } else {
+                    // No suggestions found
+                    autocompleteDropdown.style.display = 'none';
+                }
+
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('Suggest request was aborted');
+                    return;
+                }
+                console.error('Error fetching suggestions:', error);
+                autocompleteDropdown.style.display = 'none';
+            }
+        }, 300); // 300ms debounce delay
+    };
+
+    suggestInputWrapper.appendChild(suggestInput);
+
+    // Search icon for suggest input
+    const searchIcon = document.createElement('div');
+    searchIcon.innerHTML = '🔍';
+    searchIcon.style.cssText = `
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 18px;
+        color: #999;
+        pointer-events: none;
+    `;
+    suggestInputWrapper.appendChild(searchIcon);
+
+    // Autocomplete dropdown
+    const autocompleteDropdown = document.createElement('div');
+    autocompleteDropdown.id = 'autocomplete-dropdown';
+    autocompleteDropdown.style.cssText = `
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        margin-top: 4px;
+        max-height: 300px;
+        overflow-y: auto;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        display: none;
+        z-index: 1000;
+    `;
+    suggestInputWrapper.appendChild(autocompleteDropdown);
+
+    // Create button container for side-by-side layout (for category mode)
     const buttonContainer = document.createElement('div');
     buttonContainer.style.cssText = `
         display: flex;
@@ -917,7 +1252,7 @@ function createMultiSelectUI(categories) {
     searchButton.onclick = performSearch;
     buttonContainer.appendChild(searchButton);
 
-    controlContainer.appendChild(buttonContainer);
+    categoryModeContainer.appendChild(buttonContainer);
 
     // Create chips container (restored under search button)
     const chipsContainer = document.createElement('div');
@@ -945,7 +1280,251 @@ function createMultiSelectUI(categories) {
     placeholder.id = 'chips-placeholder';
     chipsContainer.appendChild(placeholder);
 
-    controlContainer.appendChild(chipsContainer);
+    categoryModeContainer.appendChild(chipsContainer);
+
+    // Add category mode container to control container
+    controlContainer.appendChild(categoryModeContainer);
+
+    // Add category filter section for suggest mode
+    const categoryFilterSection = document.createElement('div');
+    categoryFilterSection.style.cssText = `
+        margin-bottom: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #e0e0e0;
+    `;
+
+    const filterTitle = document.createElement('div');
+    filterTitle.style.cssText = `
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 8px;
+        font-weight: 500;
+    `;
+    filterTitle.textContent = 'カテゴリーフィルター（オプション）';
+    categoryFilterSection.appendChild(filterTitle);
+
+    const filterButton = document.createElement('button');
+    filterButton.innerHTML = '🏷️ フィルターを設定';
+    filterButton.style.cssText = `
+        width: 100%;
+        padding: 8px;
+        background: white;
+        color: #666;
+        border: 2px solid #e0e0e0;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: auto !important;
+    `;
+    filterButton.onclick = () => showCategoryModal();
+    filterButton.onmouseover = () => {
+        filterButton.style.borderColor = '#4285f4';
+        filterButton.style.color = '#4285f4';
+    };
+    filterButton.onmouseout = () => {
+        filterButton.style.borderColor = '#e0e0e0';
+        filterButton.style.color = '#666';
+    };
+    categoryFilterSection.appendChild(filterButton);
+
+    // Add selected categories display for suggest mode
+    const suggestChipsContainer = document.createElement('div');
+    suggestChipsContainer.id = 'suggest-chips-container';
+    suggestChipsContainer.style.cssText = `
+        margin-top: 8px;
+        min-height: 32px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    `;
+
+    const suggestChipsPlaceholder = document.createElement('span');
+    suggestChipsPlaceholder.textContent = 'フィルターなし';
+    suggestChipsPlaceholder.style.cssText = `
+        color: #999;
+        font-size: 12px;
+        padding: 4px 0;
+    `;
+    suggestChipsPlaceholder.id = 'suggest-chips-placeholder';
+    suggestChipsContainer.appendChild(suggestChipsPlaceholder);
+
+    categoryFilterSection.appendChild(suggestChipsContainer);
+
+    // Add category filter FIRST, then the input field
+    suggestModeContainer.appendChild(categoryFilterSection);
+    suggestModeContainer.appendChild(suggestInputWrapper);
+
+    // Add suggest mode container to control container
+    controlContainer.appendChild(suggestModeContainer);
+
+    // Create container for forward mode controls
+    const forwardModeContainer = document.createElement('div');
+    forwardModeContainer.id = 'forward-mode-container';
+    forwardModeContainer.style.cssText = `
+        display: none;
+    `;
+
+    // Create forward search input field (similar to suggest but without autocomplete)
+    const forwardInputWrapper = document.createElement('div');
+    forwardInputWrapper.style.cssText = `
+        position: relative;
+        margin-bottom: 12px;
+    `;
+
+    const forwardInput = document.createElement('input');
+    forwardInput.id = 'forward-input';
+    forwardInput.type = 'text';
+    forwardInput.placeholder = '場所や住所を検索...';
+    forwardInput.style.cssText = `
+        width: 100%;
+        padding: 10px 40px 10px 12px;
+        border: 2px solid #e0e0e0;
+        border-radius: 6px;
+        font-size: 14px;
+        transition: all 0.2s;
+        box-sizing: border-box;
+    `;
+    forwardInput.onfocus = () => {
+        forwardInput.style.borderColor = '#4285f4';
+        forwardInput.style.boxShadow = '0 0 0 3px rgba(66, 133, 244, 0.1)';
+        // Generate new session token when input is focused
+        sessionToken = generateSessionToken();
+    };
+    forwardInput.onblur = () => {
+        forwardInput.style.borderColor = '#e0e0e0';
+        forwardInput.style.boxShadow = 'none';
+    };
+
+    // Handle Enter key in forward input
+    forwardInput.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            performForwardSearch();
+        }
+    };
+
+    forwardInputWrapper.appendChild(forwardInput);
+
+    // Search icon for forward input
+    const forwardSearchIcon = document.createElement('div');
+    forwardSearchIcon.innerHTML = '🔍';
+    forwardSearchIcon.style.cssText = `
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 18px;
+        color: #999;
+        pointer-events: none;
+    `;
+    forwardInputWrapper.appendChild(forwardSearchIcon);
+
+    // Add forward search button
+    const forwardSearchButton = document.createElement('button');
+    forwardSearchButton.textContent = '検索';
+    forwardSearchButton.style.cssText = `
+        width: 100%;
+        padding: 10px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+        height: auto !important;
+    `;
+    forwardSearchButton.onclick = performForwardSearch;
+
+    // Add category filter section for forward mode (same as suggest mode)
+    const forwardCategoryFilterSection = document.createElement('div');
+    forwardCategoryFilterSection.style.cssText = `
+        margin-bottom: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #e0e0e0;
+    `;
+
+    const forwardFilterTitle = document.createElement('div');
+    forwardFilterTitle.style.cssText = `
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 8px;
+        font-weight: 500;
+    `;
+    forwardFilterTitle.textContent = 'カテゴリーフィルター（オプション）';
+    forwardCategoryFilterSection.appendChild(forwardFilterTitle);
+
+    const forwardFilterButton = document.createElement('button');
+    forwardFilterButton.innerHTML = '🏷️ フィルターを設定';
+    forwardFilterButton.style.cssText = `
+        width: 100%;
+        padding: 8px;
+        background: white;
+        color: #666;
+        border: 2px solid #e0e0e0;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: auto !important;
+    `;
+    forwardFilterButton.onclick = () => showCategoryModal();
+    forwardFilterButton.onmouseover = () => {
+        forwardFilterButton.style.borderColor = '#4285f4';
+        forwardFilterButton.style.color = '#4285f4';
+    };
+    forwardFilterButton.onmouseout = () => {
+        forwardFilterButton.style.borderColor = '#e0e0e0';
+        forwardFilterButton.style.color = '#666';
+    };
+    forwardCategoryFilterSection.appendChild(forwardFilterButton);
+
+    // Add selected categories display for forward mode
+    const forwardChipsContainer = document.createElement('div');
+    forwardChipsContainer.id = 'forward-chips-container';
+    forwardChipsContainer.style.cssText = `
+        margin-top: 8px;
+        min-height: 32px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    `;
+
+    const forwardChipsPlaceholder = document.createElement('span');
+    forwardChipsPlaceholder.textContent = 'フィルターなし';
+    forwardChipsPlaceholder.style.cssText = `
+        color: #999;
+        font-size: 12px;
+        padding: 4px 0;
+    `;
+    forwardChipsPlaceholder.id = 'forward-chips-placeholder';
+    forwardChipsContainer.appendChild(forwardChipsPlaceholder);
+
+    forwardCategoryFilterSection.appendChild(forwardChipsContainer);
+
+    // Add category filter FIRST, then input field, then search button
+    forwardModeContainer.appendChild(forwardCategoryFilterSection);
+    forwardModeContainer.appendChild(forwardInputWrapper);
+    forwardModeContainer.appendChild(forwardSearchButton);
+
+    // Add forward mode container to control container
+    controlContainer.appendChild(forwardModeContainer);
 
     // Create modal container
     const modalOverlay = document.createElement('div');
@@ -1486,28 +2065,79 @@ function selectCategory(category) {
 
 // Function to update chips display
 function updateChipsDisplay() {
+    // Update category mode chips
     const container = document.getElementById('chips-container');
     const placeholder = document.getElementById('chips-placeholder');
 
-    if (!container) return;
+    if (container) {
+        // Clear existing chips
+        container.querySelectorAll('.category-chip').forEach(chip => chip.remove());
 
-    // Clear existing chips
-    container.querySelectorAll('.category-chip').forEach(chip => chip.remove());
+        if (selectedCategories.size === 0) {
+            if (placeholder) placeholder.style.display = 'block';
+        } else {
+            if (placeholder) placeholder.style.display = 'none';
 
-    if (selectedCategories.size === 0) {
-        placeholder.style.display = 'block';
-    } else {
-        placeholder.style.display = 'none';
+            let colorIndex = 0;
+            selectedCategories.forEach(categoryId => {
+                const category = categories.find(c => c.canonical_id === categoryId);
+                if (category) {
+                    const chip = createChip(category, colorIndex % categoryColors.length);
+                    container.insertBefore(chip, placeholder);
+                    colorIndex++;
+                }
+            });
+        }
+    }
 
-        let colorIndex = 0;
-        selectedCategories.forEach(categoryId => {
-            const category = categories.find(c => c.canonical_id === categoryId);
-            if (category) {
-                const chip = createChip(category, colorIndex % categoryColors.length);
-                container.insertBefore(chip, placeholder);
-                colorIndex++;
-            }
-        });
+    // Update suggest mode chips
+    const suggestContainer = document.getElementById('suggest-chips-container');
+    const suggestPlaceholder = document.getElementById('suggest-chips-placeholder');
+
+    if (suggestContainer) {
+        // Clear existing chips
+        suggestContainer.querySelectorAll('.category-chip').forEach(chip => chip.remove());
+
+        if (selectedCategories.size === 0) {
+            if (suggestPlaceholder) suggestPlaceholder.style.display = 'block';
+        } else {
+            if (suggestPlaceholder) suggestPlaceholder.style.display = 'none';
+
+            let colorIndex = 0;
+            selectedCategories.forEach(categoryId => {
+                const category = categories.find(c => c.canonical_id === categoryId);
+                if (category) {
+                    const chip = createChip(category, colorIndex % categoryColors.length);
+                    suggestContainer.insertBefore(chip, suggestPlaceholder);
+                    colorIndex++;
+                }
+            });
+        }
+    }
+
+    // Update forward mode chips
+    const forwardContainer = document.getElementById('forward-chips-container');
+    const forwardPlaceholder = document.getElementById('forward-chips-placeholder');
+
+    if (forwardContainer) {
+        // Clear existing chips
+        forwardContainer.querySelectorAll('.category-chip').forEach(chip => chip.remove());
+
+        if (selectedCategories.size === 0) {
+            if (forwardPlaceholder) forwardPlaceholder.style.display = 'block';
+        } else {
+            if (forwardPlaceholder) forwardPlaceholder.style.display = 'none';
+
+            let colorIndex = 0;
+            selectedCategories.forEach(categoryId => {
+                const category = categories.find(c => c.canonical_id === categoryId);
+                if (category) {
+                    const chip = createChip(category, colorIndex % categoryColors.length);
+                    forwardContainer.insertBefore(chip, forwardPlaceholder);
+                    colorIndex++;
+                }
+            });
+        }
     }
 }
 
@@ -2046,14 +2676,17 @@ async function performSearch() {
                 const categoryColorIndex = selectedCategoryIds.indexOf(categoryId) % categoryColors.length;
 
                 try {
-                    const response = await fetch(
-                        `https://api.mapbox.com/search/searchbox/v1/category/${encodeURIComponent(categoryId)}?` +
+                    const categoryUrl = `https://api.mapbox.com/search/searchbox/v1/category/${encodeURIComponent(categoryId)}?` +
                         `proximity=${center.lng},${center.lat}&` +
                         // `bbox=${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}&` +
                         'language=ja&' +
                         'limit=10&' + // Limit per category to avoid too many results
-                        `access_token=${mapboxgl.accessToken}`
-                    );
+                        `access_token=${mapboxgl.accessToken}`;
+
+                    // Log the full request URL for debugging
+                    console.log('Category Search Request:', categoryUrl);
+
+                    const response = await fetch(categoryUrl);
 
                     if (!response.ok) {
                         console.error(`Failed to search category ${categoryId}: ${response.status}`);
@@ -2139,6 +2772,476 @@ async function performSearch() {
                 </div>
             `;
         }
+    }
+}
+
+// Function to clear results
+function clearResults() {
+    const resultsDiv = document.getElementById('results');
+    if (resultsDiv) {
+        resultsDiv.innerHTML = '';
+    }
+
+    // Clear map layers
+    if (map.getLayer('search-results-circles')) {
+        map.removeLayer('search-results-circles');
+    }
+    if (map.getLayer('search-results-labels')) {
+        map.removeLayer('search-results-labels');
+    }
+    if (map.getSource('search-results')) {
+        map.removeSource('search-results');
+    }
+
+    // Reset global results array
+    window.currentSearchResults = [];
+}
+
+// Function to switch between search modes
+function setSearchMode(mode) {
+    currentSearchMode = mode;
+
+    const categoryModeContainer = document.getElementById('category-mode-container');
+    const suggestModeContainer = document.getElementById('suggest-mode-container');
+    const forwardModeContainer = document.getElementById('forward-mode-container');
+    const categoryModeBtn = document.getElementById('category-mode-btn');
+    const suggestModeBtn = document.getElementById('suggest-mode-btn');
+    const forwardModeBtn = document.getElementById('forward-mode-btn');
+    const modeIndicator = document.getElementById('toggle-slider');
+
+    // Reset all containers and buttons
+    categoryModeContainer.style.display = 'none';
+    suggestModeContainer.style.display = 'none';
+    forwardModeContainer.style.display = 'none';
+
+    // Reset button styles
+    const inactiveStyle = `
+        flex: 1;
+        padding: 8px 8px;
+        background: transparent;
+        color: #666;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        z-index: 2;
+        position: relative;
+        height: auto !important;
+    `;
+
+    const activeStyle = `
+        flex: 1;
+        padding: 8px 8px;
+        background: transparent;
+        color: #4285f4;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        z-index: 2;
+        position: relative;
+        height: auto !important;
+    `;
+
+    categoryModeBtn.style.cssText = inactiveStyle;
+    suggestModeBtn.style.cssText = inactiveStyle;
+    forwardModeBtn.style.cssText = inactiveStyle;
+
+    if (mode === 'category') {
+        // Show category mode UI
+        categoryModeContainer.style.display = 'block';
+        categoryModeBtn.style.cssText = activeStyle;
+
+        // Move indicator to category position
+        modeIndicator.style.transform = 'translateX(0)';
+
+    } else if (mode === 'suggest') {
+        // Show suggest mode UI
+        suggestModeContainer.style.display = 'block';
+        suggestModeBtn.style.cssText = activeStyle;
+
+        // Move indicator to suggest position (middle)
+        modeIndicator.style.transform = 'translateX(100%)';
+
+        // Focus the suggest input
+        const suggestInput = document.getElementById('suggest-input');
+        if (suggestInput) {
+            suggestInput.focus();
+        }
+
+    } else if (mode === 'forward') {
+        // Show forward mode UI
+        forwardModeContainer.style.display = 'block';
+        forwardModeBtn.style.cssText = activeStyle;
+
+        // Move indicator to forward position (right)
+        modeIndicator.style.transform = 'translateX(200%)';
+
+        // Focus the forward input
+        const forwardInput = document.getElementById('forward-input');
+        if (forwardInput) {
+            forwardInput.focus();
+        }
+    }
+
+    // Clear results when switching modes
+    clearResults();
+}
+
+// Function to perform suggest search
+async function performSuggestSearch() {
+    const suggestInput = document.getElementById('suggest-input');
+    const query = suggestInput.value.trim();
+
+    if (!query) {
+        return;
+    }
+
+    // Check if we have a stored mapbox_id from autocomplete selection
+    const storedMapboxId = suggestInput.dataset.mapboxId;
+
+    // Cancel any pending suggest request
+    if (suggestAbortController) {
+        suggestAbortController.abort();
+    }
+
+    try {
+        // Create new abort controller
+        suggestAbortController = new AbortController();
+
+        // Show loading state
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = `
+            <div style="
+                text-align: center;
+                padding: 40px 20px;
+                color: #666;
+            ">
+                <div class="loading-spinner" style="
+                    width: 40px;
+                    height: 40px;
+                    border: 4px solid #f3f3f3;
+                    border-top: 4px solid #4285f4;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto 16px;
+                "></div>
+                <div style="font-size: 14px;">検索中...</div>
+            </div>
+        `;
+
+        let features = [];
+
+        if (storedMapboxId) {
+            // Direct retrieve for the selected suggestion from autocomplete
+            const retrieveUrl = `https://api.mapbox.com/search/searchbox/v1/retrieve/${storedMapboxId}?access_token=${mapboxgl.accessToken}&session_token=${sessionToken}&language=ja`;
+
+            // Log the full request URL for debugging
+            console.log('Retrieve Request (from suggest autocomplete):', retrieveUrl);
+
+            const retrieveResponse = await fetch(retrieveUrl, {
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                signal: suggestAbortController.signal
+            });
+
+            if (retrieveResponse.ok) {
+                const retrieveData = await retrieveResponse.json();
+                if (retrieveData.features && retrieveData.features.length > 0) {
+                    features = retrieveData.features;
+                }
+            }
+
+            // Clear the stored mapbox_id
+            delete suggestInput.dataset.mapboxId;
+
+        } else {
+            // Use forward search endpoint for full search results
+            const searchParams = {
+                q: query,
+                language: 'ja',
+                limit: 10,
+                types: 'poi',
+                access_token: mapboxgl.accessToken,
+                session_token: sessionToken
+            };
+
+            // Add selected categories as POI category filter if any are selected
+            if (selectedCategories.size > 0) {
+                // Use canonical_id values for poi_category parameter
+                searchParams.poi_category = Array.from(selectedCategories).join(',');
+            }
+
+            // If current center is set, add proximity
+            const searchCenter = getSearchCenter();
+            if (searchCenter) {
+                searchParams.proximity = `${searchCenter.lng},${searchCenter.lat}`;
+            }
+
+            const forwardUrl = `https://api.mapbox.com/search/searchbox/v1/forward?${new URLSearchParams(searchParams)}`;
+
+            // Log the full request URL for debugging
+            console.log('Forward Search Request (from suggest mode):', forwardUrl);
+            console.log('Search parameters:', searchParams);
+
+            // Perform forward search using the /forward endpoint
+            const response = await fetch(forwardUrl, {
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                signal: suggestAbortController.signal
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            // Forward endpoint returns features directly
+            if (data.features && data.features.length > 0) {
+                features = data.features;
+            }
+        }
+
+        // Process results
+        if (features.length > 0) {
+
+            // Process results similar to category search
+            const searchResult = {
+                categoryId: 'suggest',
+                categoryName: 'サジェスト検索',
+                colorIndex: 0,
+                features: features
+            };
+
+            processMultiCategoryResults([searchResult]);
+
+        } else {
+            // No results found
+            resultsDiv.innerHTML = `
+                <div style="
+                    text-align: center;
+                    padding: 40px 20px;
+                    color: #999;
+                ">
+                    <div style="
+                        width: 64px;
+                        height: 64px;
+                        margin: 0 auto 16px;
+                        background: #f0f0f0;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 32px;
+                    ">🔍</div>
+                    <div style="font-size: 14px; font-weight: 500; color: #666; margin-bottom: 4px;">
+                        結果が見つかりませんでした
+                    </div>
+                    <div style="font-size: 12px; color: #999;">
+                        別のキーワードをお試しください
+                    </div>
+                </div>
+            `;
+        }
+
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            console.log('Suggest request was aborted');
+            return;
+        }
+
+        console.error('Error performing suggest search:', error);
+
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = `
+            <div style="
+                text-align: center;
+                padding: 40px 20px;
+                color: #d32f2f;
+            ">
+                <div style="
+                    width: 64px;
+                    height: 64px;
+                    margin: 0 auto 16px;
+                    background: #ffebee;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 32px;
+                ">⚠️</div>
+                <div style="font-size: 14px; font-weight: 500; margin-bottom: 4px;">
+                    検索エラーが発生しました
+                </div>
+                <div style="font-size: 12px; color: #999;">
+                    もう一度お試しください
+                </div>
+            </div>
+        `;
+    }
+}
+
+// Function to perform forward search (without autocomplete)
+async function performForwardSearch() {
+    const forwardInput = document.getElementById('forward-input');
+    const query = forwardInput.value.trim();
+
+    if (!query) {
+        return;
+    }
+
+    // Cancel any pending request
+    if (suggestAbortController) {
+        suggestAbortController.abort();
+    }
+
+    try {
+        // Create new abort controller
+        suggestAbortController = new AbortController();
+
+        // Show loading state
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = `
+            <div style="
+                text-align: center;
+                padding: 40px 20px;
+                color: #666;
+            ">
+                <div class="loading-spinner" style="
+                    width: 40px;
+                    height: 40px;
+                    border: 4px solid #f3f3f3;
+                    border-top: 4px solid #4285f4;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto 16px;
+                "></div>
+                <div style="font-size: 14px;">検索中...</div>
+            </div>
+        `;
+
+        // Build search parameters for forward search
+        // Note: /forward endpoint doesn't use session_token
+        const searchParams = {
+            q: query,
+            language: 'ja',
+            limit: 10,
+            types: 'poi',
+            access_token: mapboxgl.accessToken
+        };
+
+        // Add selected categories as POI category filter if any are selected
+        if (selectedCategories.size > 0) {
+            searchParams.poi_category = Array.from(selectedCategories).join(',');
+        }
+
+        // If current center is set, add proximity
+        const searchCenter = getSearchCenter();
+        if (searchCenter) {
+            searchParams.proximity = `${searchCenter.lng},${searchCenter.lat}`;
+        }
+
+        const forwardUrl = `https://api.mapbox.com/search/searchbox/v1/forward?${new URLSearchParams(searchParams)}`;
+
+        // Log the full request URL for debugging
+        console.log('Forward Search Request (from forward mode):', forwardUrl);
+        console.log('Search parameters:', searchParams);
+
+        // Perform forward search using the /forward endpoint
+        const response = await fetch(forwardUrl, {
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            signal: suggestAbortController.signal
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Process results
+        if (data.features && data.features.length > 0) {
+            const searchResult = {
+                categoryId: 'forward',
+                categoryName: '文字列検索',
+                colorIndex: 0,
+                features: data.features
+            };
+
+            processMultiCategoryResults([searchResult]);
+
+        } else {
+            // No results found
+            resultsDiv.innerHTML = `
+                <div style="
+                    text-align: center;
+                    padding: 40px 20px;
+                    color: #999;
+                ">
+                    <div style="
+                        width: 64px;
+                        height: 64px;
+                        margin: 0 auto 16px;
+                        background: #f0f0f0;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 32px;
+                    ">🔍</div>
+                    <div style="font-size: 14px; font-weight: 500; color: #666; margin-bottom: 4px;">
+                        結果が見つかりませんでした
+                    </div>
+                    <div style="font-size: 12px; color: #999;">
+                        別のキーワードをお試しください
+                    </div>
+                </div>
+            `;
+        }
+
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            console.log('Forward search request was aborted');
+            return;
+        }
+
+        console.error('Error performing forward search:', error);
+
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = `
+            <div style="
+                text-align: center;
+                padding: 40px 20px;
+                color: #d32f2f;
+            ">
+                <div style="
+                    width: 64px;
+                    height: 64px;
+                    margin: 0 auto 16px;
+                    background: #ffebee;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 32px;
+                ">⚠️</div>
+                <div style="font-size: 14px; font-weight: 500; margin-bottom: 4px;">
+                    検索エラーが発生しました
+                </div>
+                <div style="font-size: 12px; color: #999;">
+                    もう一度お試しください
+                </div>
+            </div>
+        `;
     }
 }
 

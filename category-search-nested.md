@@ -1,6 +1,6 @@
 ---
 layout: none
-title: SearchBox カテゴリー検索
+title: SearchBox POI検索
 js: category-search-nested.js
 ---
 
