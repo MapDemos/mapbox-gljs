@@ -296,8 +296,7 @@ const map = new mapboxgl.Map({
     language: 'ja' // Set language to Japanese
 });
 
-// Store for markers and current results
-let markers = [];
+// Store for current results
 let currentResults = [];
 let categories = [];
 let nestedCategories = {};
@@ -306,6 +305,7 @@ let centerMarker = null;
 let filteredCategories = [];
 let dropdownVisible = false;
 let expandedPaths = new Set();
+let currentPopup = null; // Track current popup
 
 // Color palette for different categories (up to 10 distinct colors)
 const categoryColors = [
@@ -2231,18 +2231,92 @@ function displayMultiCategoryResults(features, resultsByCategory) {
             <span style="font-size: 20px;">📍</span>
             <span style="font-size: 15px; font-weight: 600;">検索結果</span>
         </div>
-        <div style="
-            background: rgba(255, 255, 255, 0.2);
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 13px;
-            font-weight: 600;
-            backdrop-filter: blur(10px);
-        ">
-            合計 ${features.length} 件
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="
+                background: rgba(255, 255, 255, 0.2);
+                padding: 4px 12px;
+                border-radius: 12px;
+                font-size: 13px;
+                font-weight: 600;
+                backdrop-filter: blur(10px);
+            ">
+                合計 ${features.length} 件
+            </div>
+            <button id="clear-results-btn" style="
+                background: rgba(255, 255, 255, 0.9);
+                color: #666;
+                border: none;
+                padding: 3px 12px;
+                border-radius: 12px;
+                font-size: 12px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s;
+                line-height: 1.4;
+                min-width: 60px;
+            ">
+                クリア
+            </button>
         </div>
     `;
     summaryCard.appendChild(summaryHeader);
+
+    // Add clear button functionality
+    setTimeout(() => {
+        const clearBtn = document.getElementById('clear-results-btn');
+        if (clearBtn) {
+            clearBtn.onmouseover = () => {
+                clearBtn.style.background = 'rgba(255, 100, 100, 0.9)';
+                clearBtn.style.color = 'white';
+                clearBtn.style.transform = 'scale(1.05)';
+            };
+            clearBtn.onmouseout = () => {
+                clearBtn.style.background = 'rgba(255, 255, 255, 0.9)';
+                clearBtn.style.color = '#666';
+                clearBtn.style.transform = 'scale(1)';
+            };
+            clearBtn.onclick = () => {
+                // Clear results
+                resultsDiv.innerHTML = `
+                    <div style="
+                        text-align: center;
+                        padding: 40px 20px;
+                        color: #999;
+                    ">
+                        <div style="
+                            width: 64px;
+                            height: 64px;
+                            margin: 0 auto 16px;
+                            background: #f0f0f0;
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 32px;
+                        ">🗺️</div>
+                        <div style="font-size: 14px; font-weight: 500; color: #666; margin-bottom: 4px;">
+                            結果をクリアしました
+                        </div>
+                        <div style="font-size: 12px; color: #999;">
+                            カテゴリーを選択して検索してください
+                        </div>
+                    </div>
+                `;
+
+                // Clear map markers
+                clearMarkers();
+
+                // Clear current results
+                currentResults = [];
+
+                // Close any open popup
+                if (currentPopup) {
+                    currentPopup.remove();
+                    currentPopup = null;
+                }
+            };
+        }
+    }, 0);
 
     // Category breakdown with improved styling
     const categoryBreakdown = document.createElement('div');
@@ -2459,9 +2533,9 @@ function displayMultiCategoryResults(features, resultsByCategory) {
             `;
             infoContainer.appendChild(categoryBadge);
 
-            // Display all other properties
-            const propertyDetails = document.createElement('div');
-            propertyDetails.style.cssText = `
+            // Show only address as essential field
+            const essentialDetails = document.createElement('div');
+            essentialDetails.style.cssText = `
                 margin-top: 8px;
                 padding-top: 8px;
                 border-top: 1px solid #f0f0f0;
@@ -2470,55 +2544,84 @@ function displayMultiCategoryResults(features, resultsByCategory) {
                 line-height: 1.6;
             `;
 
-            // Create a list of all properties excluding already displayed ones
-            const excludeKeys = ['name', 'place_name'];
-            const additionalProps = Object.entries(properties)
-                .filter(([key]) => !excludeKeys.includes(key))
-                .filter(([key, value]) => value !== null && value !== undefined && value !== '');
-
-            if (additionalProps.length > 0) {
-                const propsList = document.createElement('dl');
-                propsList.style.cssText = `
-                    margin: 0;
-                    display: grid;
-                    grid-template-columns: auto 1fr;
-                    gap: 4px 8px;
-                `;
-
-                additionalProps.forEach(([key, value]) => {
-                    const dt = document.createElement('dt');
-                    dt.style.cssText = `
-                        font-weight: 600;
-                        color: #666;
-                        text-transform: capitalize;
-                    `;
-                    dt.textContent = key.replace(/_/g, ' ') + ':';
-
-                    const dd = document.createElement('dd');
-                    dd.style.cssText = `
-                        margin: 0;
-                        word-break: break-word;
-                        color: #888;
-                    `;
-
-                    // Handle different value types
-                    if (typeof value === 'object') {
-                        dd.textContent = JSON.stringify(value, null, 2);
-                        dd.style.fontFamily = 'monospace';
-                        dd.style.whiteSpace = 'pre-wrap';
-                    } else if (typeof value === 'boolean') {
-                        dd.textContent = value ? '✓' : '✗';
-                    } else {
-                        dd.textContent = String(value);
-                    }
-
-                    propsList.appendChild(dt);
-                    propsList.appendChild(dd);
-                });
-
-                propertyDetails.appendChild(propsList);
-                infoContainer.appendChild(propertyDetails);
+            // Display address if available
+            if (properties.address) {
+                const addressRow = document.createElement('div');
+                addressRow.innerHTML = `<strong style="color: #666;">address:</strong> ${properties.address}`;
+                essentialDetails.appendChild(addressRow);
             }
+
+            infoContainer.appendChild(essentialDetails);
+
+            // Create expandable section for raw JSON response
+            // Add Show More button
+            const toggleButton = document.createElement('button');
+            toggleButton.textContent = `詳細を表示`;
+            toggleButton.style.cssText = `
+                margin-top: 8px;
+                padding: 4px 8px;
+                background: ${color}10;
+                color: ${color};
+                border: 1px solid ${color}30;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 11px;
+                font-weight: 500;
+                transition: all 0.2s;
+                width: auto;
+            `;
+
+            // Create collapsible container for raw JSON
+            const additionalDetails = document.createElement('div');
+            additionalDetails.style.cssText = `
+                margin-top: 8px;
+                padding: 8px;
+                background: #f8f8f8;
+                border: 1px solid #e0e0e0;
+                border-radius: 4px;
+                font-size: 11px;
+                color: #666;
+                font-family: monospace;
+                white-space: pre-wrap;
+                word-break: break-all;
+                max-height: 300px;
+                overflow-y: auto;
+                display: none;
+                animation: slideInDown 0.3s ease-out;
+            `;
+
+            // Show raw JSON of all properties
+            additionalDetails.textContent = JSON.stringify(properties, null, 2);
+
+            // Toggle button functionality
+            let isExpanded = false;
+            toggleButton.onclick = (e) => {
+                e.stopPropagation(); // Prevent triggering result item click
+                isExpanded = !isExpanded;
+
+                if (isExpanded) {
+                    additionalDetails.style.display = 'block';
+                    toggleButton.textContent = '詳細を隠す';
+                    toggleButton.style.background = `${color}20`;
+                } else {
+                    additionalDetails.style.display = 'none';
+                    toggleButton.textContent = '詳細を表示';
+                    toggleButton.style.background = `${color}10`;
+                }
+            };
+
+            toggleButton.onmouseover = () => {
+                toggleButton.style.background = `${color}30`;
+                toggleButton.style.borderColor = color;
+            };
+
+            toggleButton.onmouseout = () => {
+                toggleButton.style.background = isExpanded ? `${color}20` : `${color}10`;
+                toggleButton.style.borderColor = `${color}30`;
+            };
+
+            infoContainer.appendChild(toggleButton);
+            infoContainer.appendChild(additionalDetails);
 
             contentContainer.appendChild(infoContainer);
             resultItem.appendChild(contentContainer);
@@ -2558,10 +2661,37 @@ function displayMultiCategoryResults(features, resultsByCategory) {
                         essential: true
                     });
 
-                    // Open popup for this marker
-                    if (markers[index]) {
-                        markers[index].togglePopup();
+                    // Close any existing popup
+                    if (currentPopup) {
+                        currentPopup.remove();
                     }
+
+                    // Create and show popup at this location
+                    currentPopup = new mapboxgl.Popup({ closeButton: true, closeOnClick: false })
+                        .setLngLat(coordinates)
+                        .setHTML(`
+                            <div style="padding: 5px;">
+                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                    <span style="
+                                        display: inline-flex;
+                                        align-items: center;
+                                        justify-content: center;
+                                        width: 24px;
+                                        height: 24px;
+                                        background: ${color};
+                                        color: white;
+                                        border-radius: 50%;
+                                        font-weight: bold;
+                                        font-size: 12px;
+                                    ">${index + 1}</span>
+                                    <strong>${properties.name || properties.place_name || '名称なし'}</strong>
+                                </div>
+                                <div style="background: ${color}20; color: ${color}; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-left: 32px;">
+                                    ${feature.categoryName}
+                                </div>
+                            </div>
+                        `)
+                        .addTo(map);
                 }
             };
 
@@ -2570,77 +2700,128 @@ function displayMultiCategoryResults(features, resultsByCategory) {
     });
 }
 
-// Function to add multi-category markers to map
+// Function to add multi-category markers to map using layers
 function addMultiCategoryMarkers(features) {
-    features.forEach((feature, index) => {
-        const coordinates = feature.geometry?.coordinates;
-        const properties = feature.properties || {};
-        const color = categoryColors[feature.colorIndex];
+    // Clear existing layers
+    clearMarkers();
 
-        if (!coordinates || coordinates.length !== 2) return;
+    if (features.length === 0) return;
 
-        // Create custom marker element
-        const markerElement = document.createElement('div');
-        markerElement.style.cssText = `
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background-color: ${color};
-            border: 2px solid white;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 12px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            cursor: pointer;
-            transition: all 0.2s;
-        `;
-        markerElement.textContent = (index + 1).toString();
-
-        // Add click handler to scroll to result in panel
-        markerElement.addEventListener('click', () => {
-            const resultItem = document.getElementById(`result-item-${index}`);
-            if (resultItem) {
-                // Scroll the result into view at the top
-                resultItem.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start'
-                });
-
-                // Add highlight animation to the result
-                resultItem.style.background = `linear-gradient(to right, ${color}20 0%, white 100%)`;
-                resultItem.style.boxShadow = `0 6px 16px ${color}30`;
-                resultItem.style.transform = 'scale(1.02)';
-
-                // Remove highlight after animation
-                setTimeout(() => {
-                    resultItem.style.background = 'white';
-                    resultItem.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.04)';
-                    resultItem.style.transform = 'scale(1)';
-                }, 2000);
+    // Create GeoJSON from features with proper properties
+    const geojson = {
+        type: 'FeatureCollection',
+        features: features.map((feature, index) => ({
+            type: 'Feature',
+            geometry: feature.geometry,
+            properties: {
+                ...feature.properties,
+                index: index,
+                colorIndex: feature.colorIndex,
+                color: categoryColors[feature.colorIndex],
+                categoryName: feature.categoryName,
+                label: (index + 1).toString()
             }
-        });
+        }))
+    };
 
-        // Create popup with only name and category
-        const popup = new mapboxgl.Popup({ offset: 25 })
+    // Add source for markers
+    map.addSource('search-results', {
+        type: 'geojson',
+        data: geojson
+    });
+
+    // Add circle layer for markers (smaller, without numbers)
+    map.addLayer({
+        id: 'search-results-circles',
+        type: 'circle',
+        source: 'search-results',
+        paint: {
+            'circle-radius': 8,
+            'circle-color': ['get', 'color'],
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-width': 2,
+            'circle-opacity': 1,
+            'circle-pitch-alignment': 'map'
+        }
+    });
+
+    // Add click handler for markers
+    map.on('click', 'search-results-circles', (e) => {
+        if (!e.features[0]) return;
+
+        const properties = e.features[0].properties;
+        const index = properties.index;
+        const coordinates = e.features[0].geometry.coordinates.slice();
+
+        // Ensure that if the map is zoomed out such that multiple
+        // copies of the feature are visible, the popup appears over the copy being clicked
+        while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+            coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+        }
+
+        // Close any existing popup
+        if (currentPopup) {
+            currentPopup.remove();
+        }
+
+        // Create and show popup with number
+        currentPopup = new mapboxgl.Popup()
+            .setLngLat(coordinates)
             .setHTML(`
                 <div style="padding: 5px;">
-                    <strong>${properties.name || properties.place_name || '名称なし'}</strong>
-                    <div style="background: ${color}20; color: ${color}; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-top: 4px;">
-                        ${feature.categoryName}
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                        <span style="
+                            display: inline-flex;
+                            align-items: center;
+                            justify-content: center;
+                            width: 24px;
+                            height: 24px;
+                            background: ${properties.color};
+                            color: white;
+                            border-radius: 50%;
+                            font-weight: bold;
+                            font-size: 12px;
+                        ">${properties.label}</span>
+                        <strong>${properties.name || properties.place_name || '名称なし'}</strong>
+                    </div>
+                    <div style="background: ${properties.color}20; color: ${properties.color}; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-left: 32px;">
+                        ${properties.categoryName}
                     </div>
                 </div>
-            `);
-
-        // Create marker
-        const marker = new mapboxgl.Marker(markerElement)
-            .setLngLat(coordinates)
-            .setPopup(popup)
+            `)
             .addTo(map);
 
-        markers.push(marker);
+        // Scroll to corresponding result in panel
+        const resultItem = document.getElementById(`result-item-${index}`);
+        if (resultItem) {
+            // Scroll the result into view at the top
+            resultItem.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+
+            // Add highlight animation to the result
+            const color = properties.color;
+            resultItem.style.background = `linear-gradient(to right, ${color}20 0%, white 100%)`;
+            resultItem.style.boxShadow = `0 6px 16px ${color}30`;
+            resultItem.style.transform = 'scale(1.02)';
+
+            // Remove highlight after animation
+            setTimeout(() => {
+                resultItem.style.background = 'white';
+                resultItem.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.04)';
+                resultItem.style.transform = 'scale(1)';
+            }, 2000);
+        }
+    });
+
+    // Change cursor on hover
+    map.on('mouseenter', 'search-results-circles', () => {
+        map.getCanvas().style.cursor = 'pointer';
+    });
+
+    map.on('mouseleave', 'search-results-circles', () => {
+        map.getCanvas().style.cursor = '';
     });
 
     // Fit map to show all markers if there are results
@@ -2659,10 +2840,15 @@ function addMultiCategoryMarkers(features) {
     }
 }
 
-// Function to clear all markers
+// Function to clear all markers (now removes layers)
 function clearMarkers() {
-    markers.forEach(marker => marker.remove());
-    markers = [];
+    // Remove layer if it exists
+    if (map.getLayer('search-results-circles')) {
+        map.removeLayer('search-results-circles');
+    }
+    if (map.getSource('search-results')) {
+        map.removeSource('search-results');
+    }
 }
 
 // Function to create status messages
