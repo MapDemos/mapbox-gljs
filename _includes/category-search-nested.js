@@ -324,51 +324,57 @@ const categoryColors = [
 // Add navigation controls
 map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-// Function to update center marker
+// Function to create initial center marker at map center
 function updateCenterMarker() {
-    const center = map.getCenter();
+    // Only create initial marker if none exists
+    if (!centerMarker) {
+        const center = map.getCenter();
 
-    // Remove existing center marker if it exists
-    if (centerMarker) {
-        centerMarker.remove();
+        // Create center marker element
+        const centerEl = document.createElement('div');
+        centerEl.style.cssText = `
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: #ff4444;
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+            position: relative;
+        `;
+
+        // Add a pulse animation
+        const pulseEl = document.createElement('div');
+        pulseEl.style.cssText = `
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: #ff4444;
+            opacity: 0.5;
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            animation: pulse 2s ease-out infinite;
+        `;
+        centerEl.appendChild(pulseEl);
+
+        // Create the center marker with popup
+        centerMarker = new mapboxgl.Marker(centerEl, { anchor: 'center' })
+            .setLngLat(center)
+            .setPopup(new mapboxgl.Popup({ offset: 25 })
+                .setHTML(`<div style="padding: 5px;">
+                    <strong>検索中心点</strong><br>
+                    <span style="font-size: 11px; color: #666;">緯度: ${center.lat.toFixed(6)}<br>経度: ${center.lng.toFixed(6)}</span>
+                </div>`))
+            .addTo(map);
     }
+}
 
-    // Create center marker element
-    const centerEl = document.createElement('div');
-    centerEl.style.cssText = `
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        background-color: #ff4444;
-        border: 3px solid white;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-        position: relative;
-    `;
-
-    // Add a pulse animation
-    const pulseEl = document.createElement('div');
-    pulseEl.style.cssText = `
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        background-color: #ff4444;
-        opacity: 0.5;
-        position: absolute;
-        top: -3px;
-        left: -3px;
-        animation: pulse 2s ease-out infinite;
-    `;
-    centerEl.appendChild(pulseEl);
-
-    // Create the center marker with popup
-    centerMarker = new mapboxgl.Marker(centerEl, { anchor: 'center' })
-        .setLngLat(center)
-        .setPopup(new mapboxgl.Popup({ offset: 25 })
-            .setHTML(`<div style="padding: 5px;">
-                <strong>検索中心点</strong><br>
-                <span style="font-size: 11px; color: #666;">緯度: ${center.lat.toFixed(6)}<br>経度: ${center.lng.toFixed(6)}</span>
-            </div>`))
-        .addTo(map);
+// Helper function to get current search center
+function getSearchCenter() {
+    if (centerMarker) {
+        return centerMarker.getLngLat();
+    }
+    return map.getCenter();
 }
 
 // Add CSS for pulse animation and custom styles
@@ -819,22 +825,19 @@ function initializeCategories() {
 
 // Function to create multi-select UI
 function createMultiSelectUI(categories) {
-    // Create control container
+    // Create sidebar container
     const controlContainer = document.createElement('div');
-    controlContainer.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
+    controlContainer.id = 'sidebar';
     controlContainer.style.cssText = `
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        bottom: 10px;
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
         background: white;
-        padding: 10px;
-        border-radius: 4px;
-        box-shadow: 0 0 0 2px rgba(0,0,0,.1);
+        padding: 15px;
+        box-shadow: 2px 0 8px rgba(0,0,0,0.1);
         width: 400px;
         z-index: 1;
-        max-height: calc(100vh - 40px);
-        height: calc(100vh - 40px);
         display: flex;
         flex-direction: column;
         overflow: hidden;
@@ -1136,8 +1139,8 @@ function createMultiSelectUI(categories) {
     `;
     controlContainer.appendChild(resultsDiv);
 
-    // Add to map
-    document.getElementById('map').appendChild(controlContainer);
+    // Add sidebar to body (not to map)
+    document.body.appendChild(controlContainer);
 
     // Set up event listeners
     setupEventListeners();
@@ -1980,11 +1983,13 @@ async function performSearch() {
         }
         clearMarkers();
 
-        // Update center marker position
-        updateCenterMarker();
+        // Get search center from marker or map
+        const center = getSearchCenter();
 
-        const center = map.getCenter();
-        const bounds = map.getBounds();
+        // Calculate bounds around the search center
+        const bounds = new mapboxgl.LngLatBounds()
+            .extend([center.lng - 0.05, center.lat - 0.05])
+            .extend([center.lng + 0.05, center.lat + 0.05]);
 
         // Convert selected categories to array
         const selectedCategoryIds = Array.from(selectedCategories);
@@ -2044,7 +2049,7 @@ async function performSearch() {
                     const response = await fetch(
                         `https://api.mapbox.com/search/searchbox/v1/category/${encodeURIComponent(categoryId)}?` +
                         `proximity=${center.lng},${center.lat}&` +
-                        `bbox=${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}&` +
+                        // `bbox=${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}&` +
                         'language=ja&' +
                         'limit=10&' + // Limit per category to avoid too many results
                         `access_token=${mapboxgl.accessToken}`
@@ -2243,17 +2248,18 @@ function displayMultiCategoryResults(features, resultsByCategory) {
                 合計 ${features.length} 件
             </div>
             <button id="clear-results-btn" style="
-                background: rgba(255, 255, 255, 0.9);
-                color: #666;
+                background: rgba(255, 255, 255, 0.9) !important;
+                color: #666 !important;
                 border: none;
-                padding: 3px 12px;
+                padding: 5px 14px !important;
                 border-radius: 12px;
-                font-size: 12px;
+                font-size: 12px !important;
                 font-weight: 500;
                 cursor: pointer;
                 transition: all 0.2s;
-                line-height: 1.4;
+                line-height: 1.2;
                 min-width: 60px;
+                height: auto !important;
             ">
                 クリア
             </button>
@@ -2834,7 +2840,7 @@ function addMultiCategoryMarkers(features) {
         });
 
         map.fitBounds(bounds, {
-            padding: { top: 50, bottom: 50, left: 450, right: 50 },
+            padding: { top: 50, bottom: 50, left: 50, right: 50 },
             maxZoom: 15
         });
     }
@@ -2884,8 +2890,76 @@ map.on('load', () => {
     // Show center marker on load
     updateCenterMarker();
 
-    // Update center marker when map moves
-    map.on('moveend', () => {
-        updateCenterMarker();
+    // Add click handler to set search center
+    map.on('click', (e) => {
+        // Check if clicking on a result marker (only if the layer exists)
+        let clickedOnResult = false;
+        if (map.getLayer('search-results-circles')) {
+            const features = map.queryRenderedFeatures(e.point, {
+                layers: ['search-results-circles']
+            });
+            clickedOnResult = features.length > 0;
+        }
+
+        // If not clicking on a result marker, set the new center
+        if (!clickedOnResult) {
+            const clickedLngLat = e.lngLat;
+
+            // Remove existing center marker
+            if (centerMarker) {
+                centerMarker.remove();
+            }
+
+            // Create center marker at clicked location
+            const center = {
+                lng: clickedLngLat.lng,
+                lat: clickedLngLat.lat
+            };
+
+            // Create center marker element
+            const centerEl = document.createElement('div');
+            centerEl.style.cssText = `
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                background-color: #ff4444;
+                border: 3px solid white;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+                position: relative;
+            `;
+
+            // Add a pulse animation
+            const pulseEl = document.createElement('div');
+            pulseEl.style.cssText = `
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                background-color: #ff4444;
+                opacity: 0.5;
+                position: absolute;
+                top: -3px;
+                left: -3px;
+                animation: pulse 2s ease-out infinite;
+            `;
+            centerEl.appendChild(pulseEl);
+
+            // Create the center marker with popup
+            centerMarker = new mapboxgl.Marker(centerEl, { anchor: 'center' })
+                .setLngLat(center)
+                .setPopup(new mapboxgl.Popup({ offset: 25 })
+                    .setHTML(`<div style="padding: 5px;">
+                        <strong>検索中心点</strong><br>
+                        <span style="font-size: 11px; color: #666;">緯度: ${center.lat.toFixed(6)}<br>経度: ${center.lng.toFixed(6)}</span>
+                    </div>`))
+                .addTo(map);
+
+            // Optionally, show the popup briefly to confirm the new center
+            centerMarker.togglePopup();
+            setTimeout(() => {
+                if (centerMarker.getPopup().isOpen()) {
+                    centerMarker.togglePopup();
+                }
+            }, 2000);
+        }
     });
 });

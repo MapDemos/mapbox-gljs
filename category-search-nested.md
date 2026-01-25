@@ -9,7 +9,18 @@ js: category-search-nested.js
 <head>
   {% include common_head.html %}
   <style>
-    {% include common.css %}
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 400px;
+      right: 0;
+    }
 </style>
 </head>
 
