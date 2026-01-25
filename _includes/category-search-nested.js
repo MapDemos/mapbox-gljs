@@ -1022,6 +1022,21 @@ function createMultiSelectUI(categories) {
         // Debounce the API call
         debounceTimer = setTimeout(async () => {
             try {
+                // Check category limit for autocomplete
+                if (selectedCategories.size > 15) {
+                    // Don't show alert for every keystroke, just disable autocomplete silently
+                    autocompleteDropdown.innerHTML = `
+                        <div style="padding: 12px; color: #ff6b6b; font-size: 13px; text-align: center;">
+                            ⚠️ カテゴリー数が上限を超えています<br>
+                            <span style="font-size: 12px; color: #999;">
+                                15個以下に減らしてください
+                            </span>
+                        </div>
+                    `;
+                    autocompleteDropdown.style.display = 'block';
+                    return;
+                }
+
                 // Cancel any pending suggest request
                 if (suggestAbortController) {
                     suggestAbortController.abort();
@@ -1338,9 +1353,15 @@ function createMultiSelectUI(categories) {
     suggestChipsContainer.style.cssText = `
         margin-top: 8px;
         min-height: 32px;
+        max-height: 120px;
+        overflow-y: auto;
         display: flex;
         flex-wrap: wrap;
         gap: 6px;
+        padding: 4px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        border: 1px solid #e0e0e0;
     `;
 
     const suggestChipsPlaceholder = document.createElement('span');
@@ -1398,14 +1419,6 @@ function createMultiSelectUI(categories) {
     forwardInput.onblur = () => {
         forwardInput.style.borderColor = '#e0e0e0';
         forwardInput.style.boxShadow = 'none';
-    };
-
-    // Handle Enter key in forward input
-    forwardInput.onkeydown = (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            performForwardSearch();
-        }
     };
 
     forwardInputWrapper.appendChild(forwardInput);
@@ -1501,9 +1514,15 @@ function createMultiSelectUI(categories) {
     forwardChipsContainer.style.cssText = `
         margin-top: 8px;
         min-height: 32px;
+        max-height: 120px;
+        overflow-y: auto;
         display: flex;
         flex-wrap: wrap;
         gap: 6px;
+        padding: 4px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        border: 1px solid #e0e0e0;
     `;
 
     const forwardChipsPlaceholder = document.createElement('span');
@@ -1824,17 +1843,27 @@ function renderNestedGroup(node, path = [], level = 0) {
             itemEl.className = `dropdown-item level-${Math.min(level + 1, 4)}`;
 
             const isSelected = selectedCategories.has(item.canonical_id);
+            const isDisabled = !isSelected &&
+                (currentSearchMode === 'suggest' || currentSearchMode === 'forward') &&
+                selectedCategories.size >= 15;
 
             itemEl.innerHTML = `
-                <input type="checkbox" ${isSelected ? 'checked' : ''} />
-                <span style="${isSelected ? 'font-weight: 500;' : ''}">${item.displayName}</span>
+                <input type="checkbox" ${isSelected ? 'checked' : ''} ${isDisabled ? 'disabled' : ''} />
+                <span style="${isSelected ? 'font-weight: 500;' : ''}${isDisabled ? 'color: #999;' : ''}">${item.displayName}</span>
                 ${level > 0 ? `<span class="category-path">${item.pathArray.slice(0, -1).join(' > ')}</span>` : ''}
             `;
 
             itemEl.onclick = (e) => {
                 e.stopPropagation();
-                selectCategory(item);
+                if (!isDisabled) {
+                    selectCategory(item);
+                }
             };
+
+            if (isDisabled) {
+                itemEl.style.cursor = 'not-allowed';
+                itemEl.title = '最大15個のカテゴリーまで選択可能です';
+            }
 
             contentContainer.appendChild(itemEl);
         });
@@ -1849,16 +1878,26 @@ function renderNestedGroup(node, path = [], level = 0) {
         itemEl.className = `dropdown-item level-${Math.min(level, 4)}`;
 
         const isSelected = selectedCategories.has(item.canonical_id);
+        const isDisabled = !isSelected &&
+            (currentSearchMode === 'suggest' || currentSearchMode === 'forward') &&
+            selectedCategories.size >= 15;
 
         itemEl.innerHTML = `
-            <input type="checkbox" ${isSelected ? 'checked' : ''} />
-            <span style="${isSelected ? 'font-weight: 500;' : ''}">${item.displayName}</span>
+            <input type="checkbox" ${isSelected ? 'checked' : ''} ${isDisabled ? 'disabled' : ''} />
+            <span style="${isSelected ? 'font-weight: 500;' : ''}${isDisabled ? 'color: #999;' : ''}">${item.displayName}</span>
         `;
 
         itemEl.onclick = (e) => {
             e.stopPropagation();
-            selectCategory(item);
+            if (!isDisabled) {
+                selectCategory(item);
+            }
         };
+
+        if (isDisabled) {
+            itemEl.style.cursor = 'not-allowed';
+            itemEl.title = '最大15個のカテゴリーまで選択可能です';
+        }
 
         elements.push(itemEl);
     });
@@ -1968,10 +2007,24 @@ window.toggleGroupSelection = function(event, path) {
         selectedCategories.has(cat.canonical_id)
     );
 
+    // Check if adding would exceed limit for suggest/forward modes
+    if (!allSelected && (currentSearchMode === 'suggest' || currentSearchMode === 'forward')) {
+        const categoriesToAdd = groupCategories.filter(cat => !selectedCategories.has(cat.canonical_id));
+        if (selectedCategories.size + categoriesToAdd.length > 15) {
+            showCategoryLimitWarning();
+            return; // Don't add the categories
+        }
+    }
+
     groupCategories.forEach(category => {
         if (allSelected) {
             selectedCategories.delete(category.canonical_id);
         } else {
+            // Double-check limit for suggest/forward modes
+            if ((currentSearchMode === 'suggest' || currentSearchMode === 'forward') &&
+                selectedCategories.size >= 15) {
+                return; // Skip adding more categories
+            }
             selectedCategories.add(category.canonical_id);
         }
     });
@@ -1991,10 +2044,26 @@ window.toggleAllSelection = function(event) {
         // Deselect all if any are selected
         selectedCategories.clear();
     } else {
-        // Select all if none are selected
-        categories.forEach(cat => {
-            selectedCategories.add(cat.canonical_id);
-        });
+        // Check limit for suggest/forward modes
+        if ((currentSearchMode === 'suggest' || currentSearchMode === 'forward')) {
+            if (categories.length > 15) {
+                showCategoryLimitWarning();
+                // Select only the first 15 categories
+                categories.slice(0, 15).forEach(cat => {
+                    selectedCategories.add(cat.canonical_id);
+                });
+            } else {
+                // Select all if under limit
+                categories.forEach(cat => {
+                    selectedCategories.add(cat.canonical_id);
+                });
+            }
+        } else {
+            // Category mode - no limit
+            categories.forEach(cat => {
+                selectedCategories.add(cat.canonical_id);
+            });
+        }
     }
 
     updateSearchButton();
@@ -2024,16 +2093,26 @@ function displayFilteredCategories() {
 
             const name = category.name || category.canonical_id;
             const isSelected = selectedCategories.has(category.canonical_id);
+            const isDisabled = !isSelected &&
+                (currentSearchMode === 'suggest' || currentSearchMode === 'forward') &&
+                selectedCategories.size >= 15;
 
             item.innerHTML = `
-                <input type="checkbox" ${isSelected ? 'checked' : ''} />
-                <span style="${isSelected ? 'font-weight: 500;' : ''}">${name}</span>
+                <input type="checkbox" ${isSelected ? 'checked' : ''} ${isDisabled ? 'disabled' : ''} />
+                <span style="${isSelected ? 'font-weight: 500;' : ''}${isDisabled ? 'color: #999;' : ''}">${name}</span>
             `;
 
             item.onclick = (e) => {
                 e.stopPropagation();
-                selectCategory(category);
+                if (!isDisabled) {
+                    selectCategory(category);
+                }
             };
+
+            if (isDisabled) {
+                item.style.cursor = 'not-allowed';
+                item.title = '最大15個のカテゴリーまで選択可能です';
+            }
 
             dropdownList.appendChild(item);
         });
@@ -2049,6 +2128,13 @@ function selectCategory(category) {
     if (selectedCategories.has(categoryId)) {
         selectedCategories.delete(categoryId);
     } else {
+        // Check category limit for suggest/forward modes
+        if ((currentSearchMode === 'suggest' || currentSearchMode === 'forward') &&
+            selectedCategories.size >= 15) {
+            // Show warning message
+            showCategoryLimitWarning();
+            return; // Don't add the category
+        }
         selectedCategories.add(categoryId);
     }
 
@@ -2163,6 +2249,73 @@ function createChip(category, colorIndex) {
 }
 
 // Function to show category modal
+// Function to show category limit warning
+function showCategoryLimitWarning() {
+    // Create warning element if it doesn't exist
+    let warning = document.getElementById('category-limit-warning');
+    if (!warning) {
+        warning = document.createElement('div');
+        warning.id = 'category-limit-warning';
+        warning.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border: 2px solid #ff6b6b;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 20000;
+            max-width: 400px;
+            animation: shake 0.5s ease-out;
+        `;
+        warning.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                <span style="font-size: 24px;">⚠️</span>
+                <strong style="font-size: 16px; color: #333;">カテゴリー数の上限</strong>
+            </div>
+            <p style="margin: 0 0 16px 0; color: #666; font-size: 14px; line-height: 1.5;">
+                ${currentSearchMode === 'suggest' ? 'サジェスト検索' : '文字列検索'}では最大15個のカテゴリーまでフィルター可能です。
+            </p>
+            <p style="margin: 0 0 16px 0; color: #666; font-size: 13px; line-height: 1.5;">
+                カテゴリー検索に切り替えると、すべてのカテゴリーを使用できます。
+            </p>
+            <button onclick="document.getElementById('category-limit-warning').remove()" style="
+                background: #4285f4;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+                width: 100%;
+            ">OK</button>
+        `;
+        document.body.appendChild(warning);
+
+        // Add shake animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes shake {
+                0%, 100% { transform: translate(-50%, -50%) translateX(0); }
+                25% { transform: translate(-50%, -50%) translateX(-5px); }
+                75% { transform: translate(-50%, -50%) translateX(5px); }
+            }
+        `;
+        document.head.appendChild(style);
+    } else {
+        warning.style.display = 'block';
+    }
+
+    // Auto-hide after 3 seconds
+    setTimeout(() => {
+        if (warning) {
+            warning.remove();
+        }
+    }, 3000);
+}
+
 function showCategoryModal() {
     const overlay = document.getElementById('category-modal-overlay');
     overlay.style.display = 'block';
@@ -2513,7 +2666,16 @@ function filterNestedStructure(node, query) {
 function updateModalSelectionInfo() {
     const info = document.getElementById('modal-selection-info');
     if (info) {
-        info.textContent = `${selectedCategories.size}個選択中`;
+        const count = selectedCategories.size;
+        const limit = (currentSearchMode === 'suggest' || currentSearchMode === 'forward') ? 15 : null;
+
+        if (limit && count >= limit) {
+            info.innerHTML = `<span style="color: #ff6b6b; font-weight: 600;">⚠️ ${count}/${limit}個選択中 (上限)</span>`;
+        } else if (limit) {
+            info.textContent = `${count}/${limit}個選択中`;
+        } else {
+            info.textContent = `${count}個選択中`;
+        }
     }
 }
 
@@ -2901,6 +3063,12 @@ async function performSuggestSearch() {
         return;
     }
 
+    // Check category limit before making API call
+    if (selectedCategories.size > 15) {
+        alert(`エラー: サジェスト検索では最大15個のカテゴリーまでしか使用できません。\n\n現在${selectedCategories.size}個のカテゴリーが選択されています。\nカテゴリー数を減らすか、カテゴリー検索モードをご利用ください。`);
+        return;
+    }
+
     // Check if we have a stored mapbox_id from autocomplete selection
     const storedMapboxId = suggestInput.dataset.mapboxId;
 
@@ -3094,6 +3262,12 @@ async function performForwardSearch() {
     const query = forwardInput.value.trim();
 
     if (!query) {
+        return;
+    }
+
+    // Check category limit before making API call
+    if (selectedCategories.size > 15) {
+        alert(`エラー: 文字列検索では最大15個のカテゴリーまでしか使用できません。\n\n現在${selectedCategories.size}個のカテゴリーが選択されています。\nカテゴリー数を減らすか、カテゴリー検索モードをご利用ください。`);
         return;
     }
 
@@ -3498,7 +3672,18 @@ function displayMultiCategoryResults(features, resultsByCategory) {
         // Category section header
         const category = categories.find(c => c.name === categoryName || c.canonical_id === categoryName);
         const categoryId = category ? category.canonical_id : categoryName;
-        const colorIndex = Array.from(selectedCategories).indexOf(categoryId) % categoryColors.length;
+
+        // Handle color assignment for different search modes
+        let colorIndex;
+        if (categoryName === 'サジェスト検索' || categoryName === '文字列検索') {
+            // Use a default color for suggest/forward search modes
+            colorIndex = 0; // Use the first color (blue) for non-category searches
+        } else {
+            colorIndex = Array.from(selectedCategories).indexOf(categoryId);
+            // Make sure we have a valid color index
+            if (colorIndex === -1) colorIndex = 0;
+        }
+        colorIndex = colorIndex % categoryColors.length;
         const color = categoryColors[colorIndex];
 
         const sectionHeader = document.createElement('div');
