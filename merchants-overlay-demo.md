@@ -1,0 +1,955 @@
+---
+layout: none
+title: Merchants Tileset Overlay Demo
+---
+
+{% include common_head.html %}
+
+<style>
+    .demo-container {
+      display: flex;
+      height: 100vh;
+      width: 100%;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    }
+
+    /* Control panel */
+    #control-panel {
+      width: 320px;
+      background: #f9fafb;
+      border-right: 1px solid #e5e7eb;
+      padding: 20px;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    #control-panel h2 {
+      margin-top: 0;
+      margin-bottom: 20px;
+      color: #1f2937;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    #control-panel h3 {
+      margin-top: 20px;
+      margin-bottom: 12px;
+      color: #4b5563;
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .control-group {
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .control-group:last-child {
+      border-bottom: none;
+    }
+
+    .checkbox-control {
+      display: flex;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .checkbox-control input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-right: 10px;
+      cursor: pointer;
+      accent-color: #667eea;
+    }
+
+    .checkbox-control label {
+      cursor: pointer;
+      font-size: 14px;
+      color: #374151;
+      user-select: none;
+    }
+
+    /* Filter sections */
+    .filter-section {
+      margin-bottom: 8px;
+    }
+
+    .filter-section-compact {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      padding: 8px;
+      background: white;
+    }
+
+    /* Buttons */
+    .button-group {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      background: white;
+      color: #374151;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: #f3f4f6;
+      border-color: #9ca3af;
+    }
+
+    .btn-primary {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+
+    .btn-primary:hover {
+      background: #5568d3;
+    }
+
+    /* Active filter count badge */
+    .filter-badge {
+      display: inline-block;
+      background: #667eea;
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-left: 8px;
+    }
+
+    #map {
+      flex: 1;
+      position: relative;
+      min-width: 0;
+    }
+
+    /* Coordinates display */
+    #coords-display {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: white;
+      padding: 10px 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      z-index: 999;
+    }
+
+    #coords-display .coord-item {
+      margin-bottom: 5px;
+    }
+
+    #coords-display .coord-item:last-child {
+      margin-bottom: 0;
+    }
+
+    #coords-display .coord-label {
+      color: #6b7280;
+      font-weight: 500;
+      margin-right: 6px;
+    }
+
+    #coords-display .coord-value {
+      color: #667eea;
+      font-weight: 700;
+      font-family: monospace;
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+      body {
+        flex-direction: column;
+      }
+
+      #control-panel {
+        width: 100%;
+        height: 200px;
+        border-right: none;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      #coords-display {
+        bottom: 10px;
+        left: 10px;
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+    }
+  </style>
+
+<div class="demo-container">
+  <!-- Control Panel -->
+  <div id="control-panel">
+    <h2>Merchant Filters</h2>
+
+    <!-- Search by Name -->
+    <div class="control-group">
+      <h3>Search</h3>
+      <input type="text" id="search-name" placeholder="Search by merchant name..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+    </div>
+
+    <!-- Category Filters -->
+    <div class="control-group">
+      <h3>Categories <span id="category-badge" class="filter-badge" style="display:none;">0</span></h3>
+      <div class="filter-section-compact" id="category-filters"></div>
+      <!-- <div class="button-group">
+        <button class="btn" id="category-select-all">All</button>
+        <button class="btn" id="category-clear">Clear</button>
+      </div> -->
+    </div>
+
+    <!-- Genre Filters -->
+    <div class="control-group">
+      <h3>Genres <span id="genre-badge" class="filter-badge" style="display:none;">0</span></h3>
+      <div class="filter-section-compact" id="genre-filters"></div>
+      <!-- <div class="button-group">
+        <button class="btn" id="genre-select-all">All</button>
+        <button class="btn" id="genre-clear">Clear</button>
+      </div>-->
+    </div>
+
+
+    <!-- Feature Filters -->
+    <div class="control-group">
+      <h3>Features</h3>
+      <div class="checkbox-control">
+        <input type="checkbox" id="filter-coupon">
+        <label for="filter-coupon">Has Coupon</label>
+      </div>
+      <div class="checkbox-control">
+        <input type="checkbox" id="filter-campaign">
+        <label for="filter-campaign">Has Campaign</label>
+      </div>
+      <div class="checkbox-control">
+        <input type="checkbox" id="filter-points">
+        <label for="filter-points">Has Points</label>
+      </div>
+    </div>
+
+    <!-- Apply/Reset Buttons -->
+    <div class="button-group">
+      <button class="btn btn-primary" id="apply-filters">Apply Filters</button>
+      <button class="btn" id="reset-filters">Reset All</button>
+    </div>
+  </div>
+
+  <!-- Map Container -->
+  <div id="map"></div>
+
+
+  <script>
+    // Filter data definitions
+    const CATEGORIES = {
+      "1": { ja: "グルメ", en: "Gourmet" },
+      "2": { ja: "お買い物", en: "Shopping" },
+      "3": { ja: "ファッション・小物", en: "Fashion & Accessories" },
+      "4": { ja: "暮らし・サービス", en: "Living & Services" },
+      "5": { ja: "美容・健康", en: "Beauty & Health" },
+      "6": { ja: "レジャー・娯楽", en: "Leisure & Entertainment" }
+    };
+
+    const GENRES = {
+      "11": "飲食店", "12": "カフェ", "13": "居酒屋", "14": "ファミレス",
+      "21": "コンビニ", "22": "スーパー", "23": "ドラッグストア", "24": "ディスカウントストア",
+      "31": "アパレル", "32": "靴", "33": "眼鏡", "34": "アクセサリー",
+      "41": "家電量販店", "42": "書店", "43": "ホームセンター", "44": "ガソリンスタンド", "45": "クリーニング",
+      "51": "美容院・理容店", "52": "エステ", "53": "リラクゼーション",
+      "61": "映画館", "62": "カラオケ", "63": "宿泊施設", "64": "テーマパーク"
+    };
+
+    // Mapping of categories to their relevant genres
+    const CATEGORY_GENRE_MAPPING = {
+      "1": ["11", "12", "13", "14"],  // グルメ → 飲食店, カフェ, 居酒屋, ファミレス
+      "2": ["21", "22", "23", "24"],  // お買い物 → コンビニ, スーパー, ドラッグストア, ディスカウントストア
+      "3": ["31", "32", "33", "34"],  // ファッション・小物 → アパレル, 靴, 眼鏡, アクセサリー
+      "4": ["41", "42", "43", "44", "45"],  // 暮らし・サービス → 家電量販店, 書店, ホームセンター, ガソリンスタンド, クリーニング
+      "5": ["51", "52", "53"],  // 美容・健康 → 美容院・理容店, エステ, リラクゼーション
+      "6": ["61", "62", "63", "64"]  // レジャー・娯楽 → 映画館, カラオケ, 宿泊施設, テーマパーク
+    };
+
+
+
+    // Filter state
+    const filterState = {
+      categories: new Set(),
+      genres: new Set(),
+      hasCoupon: false,
+      hasCampaign: false,
+      hasPoints: false,
+      searchTerm: ''
+    };
+
+    // Create coordinates display element
+    const coordsDisplay = document.createElement('div');
+    coordsDisplay.id = 'coords-display';
+    coordsDisplay.innerHTML = `
+      <div class="coord-item">
+        <span class="coord-label">Zoom:</span>
+        <span class="coord-value" id="zoom-value">10.00</span>
+      </div>
+      <div class="coord-item">
+        <span class="coord-label">Lat:</span>
+        <span class="coord-value" id="lat-value">35.6812</span>
+      </div>
+      <div class="coord-item">
+        <span class="coord-label">Lng:</span>
+        <span class="coord-value" id="lng-value">139.7671</span>
+      </div>
+    `;
+    document.getElementById('map').appendChild(coordsDisplay);
+
+    // Initialize filter UI
+    function initializeFilterUI() {
+      // Populate category checkboxes
+      const categoryContainer = document.getElementById('category-filters');
+      Object.entries(CATEGORIES).forEach(([id, names]) => {
+        const div = document.createElement('div');
+        div.className = 'checkbox-control filter-section';
+        div.innerHTML = `
+          <input type="checkbox" id="cat-${id}" value="${id}" class="category-filter">
+          <label for="cat-${id}">${names.ja}</label>
+        `;
+        categoryContainer.appendChild(div);
+      });
+
+      // Populate genre checkboxes
+      const genreContainer = document.getElementById('genre-filters');
+      Object.entries(GENRES).forEach(([id, name]) => {
+        const div = document.createElement('div');
+        div.className = 'checkbox-control filter-section';
+        div.innerHTML = `
+          <input type="checkbox" id="genre-${id}" value="${id}" class="genre-filter">
+          <label for="genre-${id}">${name}</label>
+        `;
+        genreContainer.appendChild(div);
+      });
+
+      // Add event listeners for badge updates and immediate filter application
+      document.querySelectorAll('.category-filter').forEach(cb => {
+        cb.addEventListener('change', () => {
+          updateBadge('category');
+          updateGenreVisibility();
+          applyFilters();
+        });
+      });
+      document.querySelectorAll('.genre-filter').forEach(cb => {
+        cb.addEventListener('change', () => {
+          updateBadge('genre');
+          applyFilters();
+        });
+      });
+    }
+
+    // Update filter badge counts
+    function updateBadge(type) {
+      const checkboxes = document.querySelectorAll(`.${type}-filter:checked`);
+      const badge = document.getElementById(`${type}-badge`);
+      const count = checkboxes.length;
+
+      if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    // Update genre visibility based on selected categories
+    function updateGenreVisibility() {
+      const selectedCategories = new Set();
+      document.querySelectorAll('.category-filter:checked').forEach(cb => {
+        selectedCategories.add(cb.value);
+      });
+
+      // Get genres that should be visible
+      const visibleGenres = new Set();
+      selectedCategories.forEach(categoryId => {
+        const genreIds = CATEGORY_GENRE_MAPPING[categoryId] || [];
+        genreIds.forEach(genreId => visibleGenres.add(genreId));
+      });
+
+      // Show/hide genre checkboxes
+      document.querySelectorAll('.genre-filter').forEach(checkbox => {
+        const genreId = checkbox.value;
+        const parentDiv = checkbox.closest('.checkbox-control');
+
+        if (selectedCategories.size === 0) {
+          // No categories selected - hide all genres
+          parentDiv.style.display = 'none';
+          checkbox.checked = false;
+        } else if (visibleGenres.has(genreId)) {
+          // Show genres that belong to selected categories and auto-select them
+          parentDiv.style.display = 'flex';
+          checkbox.checked = true;
+        } else {
+          // Hide and uncheck genres that don't belong
+          parentDiv.style.display = 'none';
+          checkbox.checked = false;
+        }
+      });
+
+      // Update the genre badge after changing visibility
+      updateBadge('genre');
+    }
+
+
+
+    // Build filter expression for layers
+    function buildFilterExpression() {
+      // Special case: if there's a search term but no categories selected,
+      // search across all merchants
+      const hasSearchTerm = filterState.searchTerm && filterState.searchTerm.trim() !== '';
+
+      // If no categories AND no search term, hide everything
+      if (filterState.categories.size === 0 && !hasSearchTerm) {
+        return false; // This will hide all features
+      }
+
+      // If no genres are selected (and categories > 0 or search exists), also hide everything
+      if (filterState.genres.size === 0 && filterState.categories.size > 0) {
+        return false; // This will hide all features
+      }
+
+      const filters = ['all'];
+
+      // Category filter - only apply if categories are selected
+      if (filterState.categories.size > 0) {
+        const categoryFilter = ['match', ['get', 'c'], Array.from(filterState.categories).map(Number), true, false];
+        filters.push(categoryFilter);
+
+        // Genre filter - only apply if categories are selected
+        const genreFilter = ['match', ['get', 'g'], Array.from(filterState.genres).map(Number), true, false];
+        filters.push(genreFilter);
+      }
+
+      // Feature filters (coupon, campaign, points)
+      if (filterState.hasCoupon) {
+        filters.push(['==', ['get', 'cp'], 1]);
+      }
+      if (filterState.hasCampaign) {
+        filters.push(['==', ['get', 'cm'], 1]);
+      }
+      if (filterState.hasPoints) {
+        filters.push(['==', ['get', 'pt'], 1]);
+      }
+
+      // Search filter - case-insensitive contains
+      if (hasSearchTerm) {
+        filters.push(['in', filterState.searchTerm.toLowerCase(), ['downcase', ['get', 'n']]]);
+      }
+
+      console.log(`filters:${filters}`)
+      return filters;
+    }
+
+    // Apply filters to all layers
+    function applyFilters() {
+      // Update filter state from UI
+      filterState.categories.clear();
+      document.querySelectorAll('.category-filter:checked').forEach(cb => {
+        filterState.categories.add(cb.value);
+      });
+
+      filterState.genres.clear();
+      document.querySelectorAll('.genre-filter:checked').forEach(cb => {
+        filterState.genres.add(cb.value);
+      });
+
+      filterState.hasCoupon = document.getElementById('filter-coupon').checked;
+      filterState.hasCampaign = document.getElementById('filter-campaign').checked;
+      filterState.hasPoints = document.getElementById('filter-points').checked;
+      filterState.searchTerm = document.getElementById('search-name').value;
+
+      // Build the filter expression
+      const filterExpression = buildFilterExpression();
+
+      // If filterExpression is false (no categories selected), hide everything
+      if (filterExpression === false) {
+        // map.setFilter('clusters', false);
+        // map.setFilter('cluster-count', false);
+        map.setFilter('merchants', false);
+      } else {
+        // Apply to clusters (combine with cluster filter)
+        // const clusterFilter = ['all', ['has', 'count'], filterExpression];
+        // map.setFilter('clusters', clusterFilter);
+
+        // // Apply to cluster labels (combine with count filter)
+        // const clusterLabelFilter = ['all', ['>', ['get', 'count'], 1], filterExpression];
+        // map.setFilter('cluster-count', clusterLabelFilter);
+
+        // Apply to unclustered points (combine with no-count filter)
+        const unclusteredFilter = ['all', ['!', ['has', 'count']], filterExpression];
+        map.setFilter('merchants', unclusteredFilter);
+      }
+
+      console.log('Filters applied:', {
+        categories: Array.from(filterState.categories),
+        genres: Array.from(filterState.genres),
+        features: {
+          coupon: filterState.hasCoupon,
+          campaign: filterState.hasCampaign,
+          points: filterState.hasPoints
+        }
+      });
+    }
+
+    // Reset all filters (select all categories and genres to show everything)
+    function resetFilters() {
+      // Check all category checkboxes to show everything
+      document.querySelectorAll('.category-filter').forEach(cb => {
+        cb.checked = true;
+      });
+
+      // Update genre visibility first (will show all genres since categories are selected)
+      updateGenreVisibility();
+
+      // Check all visible genre checkboxes
+      document.querySelectorAll('.genre-filter').forEach(cb => {
+        const parentDiv = cb.closest('.checkbox-control');
+        if (parentDiv.style.display !== 'none') {
+          cb.checked = true;
+        }
+      });
+
+      // Clear feature checkboxes
+      document.getElementById('filter-coupon').checked = false;
+      document.getElementById('filter-campaign').checked = false;
+      document.getElementById('filter-points').checked = false;
+
+      // Update badges
+      updateBadge('category');
+      updateBadge('genre');
+
+      // Set all categories and genres in filter state
+      filterState.categories.clear();
+      document.querySelectorAll('.category-filter').forEach(cb => {
+        filterState.categories.add(cb.value);
+      });
+
+      filterState.genres.clear();
+      document.querySelectorAll('.genre-filter:checked').forEach(cb => {
+        filterState.genres.add(cb.value);
+      });
+
+      filterState.hasCoupon = false;
+      filterState.hasCampaign = false;
+      filterState.hasPoints = false;
+
+      // Clear search
+      document.getElementById('search-name').value = '';
+      filterState.searchTerm = '';
+
+      // Apply the filters to show all categories and genres
+      applyFilters();
+
+      console.log('Filters reset - showing all categories and genres');
+    }
+
+    // Initialize the map
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/kenji-shima/cmkux01n9007t01sr6b1qd5zc',
+      center: [139.7671, 35.6812], // Tokyo
+      language: 'ja',
+      zoom: 14,
+      pitch: 0,
+      bearing: 0
+    });
+
+    // Add navigation control
+    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    // Add scale control
+    map.addControl(new mapboxgl.ScaleControl({
+      maxWidth: 200,
+      unit: 'metric'
+    }), 'bottom-right');
+
+    // Add fullscreen control
+    map.addControl(new mapboxgl.FullscreenControl(), 'top-right');
+
+    // Update display values
+    function updateDisplayValues() {
+      const center = map.getCenter();
+      const zoom = map.getZoom();
+
+      document.getElementById('zoom-value').textContent = zoom.toFixed(2);
+      document.getElementById('lat-value').textContent = center.lat.toFixed(4);
+      document.getElementById('lng-value').textContent = center.lng.toFixed(4);
+    }
+
+    // Update on map movement
+    map.on('move', updateDisplayValues);
+    map.on('zoom', updateDisplayValues);
+
+    // Initialize filter UI on page load
+    initializeFilterUI();
+
+    // Map loaded event
+    map.on('load', () => {
+      console.log('✅ Map loaded successfully');
+
+      // Add the clustered merchants tileset source
+      // map.addSource('merchants-clustered', {
+      //   type: 'vector',
+      //   url: 'mapbox://kenji-shima.merchants-clustered-z16'
+      // });
+
+      // Circle layer for clusters with color-coded sizing based on count
+      // map.addLayer({
+      //   'id': 'clusters',
+      //   'type': 'circle',
+      //   'source': 'merchants-clustered',
+      //   'source-layer': 'merchants-clustered', // Update this if your source layer name is different
+      //   'filter': ['has', 'count'],
+      //   'paint': {
+      //     'circle-color': [
+      //       'step',
+      //       ['get', 'count'],
+      //       '#667eea',  // Purple for small clusters
+      //       10, '#5B86E5',  // Blue for medium clusters
+      //       20, '#FF6B6B',  // Red for larger clusters
+      //       75, '#FDCB6E'   // Yellow for very large clusters
+      //     ],
+      //     'circle-opacity': 0.75,
+      //     'circle-radius': [
+      //       'step',
+      //       ['get', 'count'],
+      //       8,      // Base size
+      //       2, 14,  // 2+ points
+      //       10, 20, // 10+ points
+      //       20, 28, // 20+ points
+      //       50, 35, // 50+ points
+      //       100, 42 // 100+ points
+      //     ],
+      //     'circle-stroke-color': '#ffffff',
+      //     'circle-stroke-width': 2
+      //   }
+      // });
+
+      // Label each cluster with its count
+      // map.addLayer({
+      //   'id': 'cluster-count',
+      //   'type': 'symbol',
+      //   'source': 'merchants-clustered',
+      //   'source-layer': 'merchants', // Update this if your source layer name is different
+      //   'filter': ['>', ['get', 'count'], 1],
+      //   'layout': {
+      //     'text-field': ['get', 'count'],
+      //     'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+      //     'text-size': 14,
+      //     'text-allow-overlap': true
+      //   },
+      //   'paint': {
+      //     'text-color': '#ffffff'
+      //   }
+      // });
+
+      // Add unclustered individual points (no count property)
+      // map.addLayer({
+      //   'id': 'unclustered-points',
+      //   'type': 'circle',
+      //   'source': 'merchants-clustered',
+      //   'source-layer': 'merchants', // Update this if your source layer name is different
+      //   'filter': ['!', ['has', 'count']],
+      //   'paint': {
+      //     'circle-radius': 6,
+      //     'circle-color': [
+      //       'match',
+      //       ['get', 'g'],
+      //       // グルメ (Gourmet) - Warm colors
+      //       11, '#FF6B6B',  // 飲食店 - Red
+      //       12, '#4ECDC4',  // カフェ - Teal
+      //       13, '#FF8E53',  // 居酒屋 - Orange
+      //       14, '#FFA07A',  // ファミレス - Light Salmon
+      //       // お買い物 (Shopping) - Cool colors
+      //       21, '#45B7D1',  // コンビニ - Sky Blue
+      //       22, '#5B86E5',  // スーパー - Blue
+      //       23, '#96CEB4',  // ドラッグストア - Mint Green
+      //       24, '#6C5CE7',  // ディスカウントストア - Purple
+      //       // ファッション (Fashion) - Pink/Purple tones
+      //       31, '#FDA7DF',  // アパレル - Pink
+      //       32, '#D63031',  // 靴 - Dark Red
+      //       33, '#74B9FF',  // 眼鏡 - Light Blue
+      //       34, '#A29BFE',  // アクセサリー - Lavender
+      //       // 暮らし・サービス (Living/Services) - Earth tones
+      //       41, '#FDCB6E',  // 家電量販店 - Yellow
+      //       42, '#6C5CE7',  // 書店 - Purple
+      //       43, '#FAB1A0',  // ホームセンター - Peach
+      //       44, '#E17055',  // ガソリンスタンド - Coral
+      //       45, '#00B894',  // クリーニング - Turquoise
+      //       // 美容・健康 (Beauty/Health) - Green tones
+      //       51, '#00CEC9',  // 美容院・理容店 - Cyan
+      //       52, '#55EFC4',  // エステ - Light Green
+      //       53, '#81ECEC',  // リラクゼーション - Light Cyan
+      //       // レジャー・娯楽 (Leisure) - Vibrant colors
+      //       61, '#FF6348',  // 映画館 - Tomato
+      //       62, '#FD79A8',  // カラオケ - Pink
+      //       63, '#A0E7E5',  // 宿泊施設 - Light Teal
+      //       64, '#FFBE76',  // テーマパーク - Light Orange
+      //       '#667eea'  // Default color
+      //     ],
+      //     'circle-stroke-color': '#ffffff',
+      //     'circle-stroke-width': 1,
+      //     'circle-opacity': 0.9
+      //   }
+      // });
+
+      console.log('✅ Merchants clustered tileset loaded and displayed');
+      updateDisplayValues();
+
+      // Set initial state - no categories selected by default
+      updateBadge('category');
+      updateBadge('genre');
+
+      // Update visibility - no genres will show initially
+      updateGenreVisibility();
+
+      // Apply initial filters (nothing selected by default)
+      applyFilters();
+
+      // Add hover effects for clusters and points
+      // map.on('mouseenter', 'clusters', () => {
+      //   map.getCanvas().style.cursor = 'pointer';
+      // });
+
+      // map.on('mouseleave', 'clusters', () => {
+      //   map.getCanvas().style.cursor = '';
+      // });
+
+      map.on('mouseenter', 'unclustered-points', () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+
+      map.on('mouseleave', 'unclustered-points', () => {
+        map.getCanvas().style.cursor = '';
+      });
+
+      // Add click popup for clusters
+      // map.on('click', 'clusters', (e) => {
+      //   const coordinates = e.features[0].geometry.coordinates.slice();
+      //   const count = e.features[0].properties.count;
+
+      //   // Ensure that if the map is zoomed out such that multiple
+      //   // copies of the feature are visible, the popup appears
+      //   // over the copy being pointed to.
+      //   while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+      //     coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+      //   }
+
+      //   new mapboxgl.Popup()
+      //     .setLngLat(coordinates)
+      //     .setHTML(`
+      //       <div style="padding: 8px;">
+      //         <strong>Cluster</strong><br>
+      //         Contains: ${count} merchants<br>
+      //         <em style="color: #666; font-size: 12px;">Zoom in to see details</em>
+      //       </div>
+      //     `)
+      //     .addTo(map);
+      // });
+
+      // Add click popup for individual points
+      map.on('click', 'unclustered-points', (e) => {
+        const coordinates = e.features[0].geometry.coordinates.slice();
+        const properties = e.features[0].properties;
+
+        // Create popup content based on available properties
+        let popupContent = '<div style="padding: 8px;"><strong>Merchant Details</strong><br>';
+
+        // Display all available properties
+        for (const [key, value] of Object.entries(properties)) {
+          popupContent += `<strong>${key}:</strong> ${value}<br>`;
+        }
+
+        popupContent += '</div>';
+
+        // Ensure that if the map is zoomed out such that multiple
+        // copies of the feature are visible, the popup appears
+        // over the copy being pointed to.
+        while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+          coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+        }
+
+        new mapboxgl.Popup()
+          .setLngLat(coordinates)
+          .setHTML(popupContent)
+          .addTo(map);
+      });
+    });
+
+    // Handle layer toggles
+    // Cluster toggle handlers commented out since cluster layers are disabled
+    // document.getElementById('clusters-toggle').addEventListener('change', (e) => {
+    //   const visibility = e.target.checked ? 'visible' : 'none';
+    //   map.setLayoutProperty('clusters', 'visibility', visibility);
+    // });
+
+    // document.getElementById('cluster-labels-toggle').addEventListener('change', (e) => {
+    //   const visibility = e.target.checked ? 'visible' : 'none';
+    //   map.setLayoutProperty('cluster-count', 'visibility', visibility);
+    // });
+
+    // document.getElementById('unclustered-toggle').addEventListener('change', (e) => {
+    //   const visibility = e.target.checked ? 'visible' : 'none';
+    //   map.setLayoutProperty('unclustered-points', 'visibility', visibility);
+    // });
+
+    // Filter control buttons
+    document.getElementById('apply-filters').addEventListener('click', applyFilters);
+    document.getElementById('reset-filters').addEventListener('click', resetFilters);
+
+    // Category controls - commented out since buttons are removed
+    // document.getElementById('category-select-all').addEventListener('click', () => {
+    //   // Only check visible categories
+    //   document.querySelectorAll('.category-filter').forEach(cb => {
+    //     const parentDiv = cb.closest('.checkbox-control');
+    //     if (parentDiv.style.display !== 'none') {
+    //       cb.checked = true;
+    //     }
+    //   });
+    //   updateBadge('category');
+    //   updateGenreVisibility();
+    //   updateBrandVisibility();
+    //   applyFilters();  // Apply filters immediately
+    // });
+    // document.getElementById('category-clear').addEventListener('click', () => {
+    //   document.querySelectorAll('.category-filter').forEach(cb => cb.checked = false);
+    //   updateBadge('category');
+    //   updateGenreVisibility();
+    //   updateBrandVisibility();
+    //   applyFilters();  // Apply filters immediately
+    // });
+
+    // Genre controls - commented out since buttons are removed
+    // document.getElementById('genre-select-all').addEventListener('click', () => {
+    //   // Only check visible genres
+    //   document.querySelectorAll('.genre-filter').forEach(cb => {
+    //     const parentDiv = cb.closest('.checkbox-control');
+    //     if (parentDiv.style.display !== 'none') {
+    //       cb.checked = true;
+    //     }
+    //   });
+    //   updateBadge('genre');
+    //   updateBrandVisibility();
+    //   applyFilters();  // Apply filters immediately
+    // });
+    // document.getElementById('genre-clear').addEventListener('click', () => {
+    //   document.querySelectorAll('.genre-filter').forEach(cb => cb.checked = false);
+    //   updateBadge('genre');
+    //   updateBrandVisibility();
+    //   applyFilters();  // Apply filters immediately
+    // });
+
+    // Feature filter controls - apply filters immediately when changed
+    document.getElementById('filter-coupon').addEventListener('change', () => {
+      applyFilters();
+    });
+    document.getElementById('filter-campaign').addEventListener('change', () => {
+      applyFilters();
+    });
+    document.getElementById('filter-points').addEventListener('change', () => {
+      applyFilters();
+    });
+
+    // Search input - apply filters on input with debouncing
+    let searchTimeout;
+    document.getElementById('search-name').addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        applyFilters();
+      }, 300); // Debounce for 300ms to avoid too many filter updates while typing
+    });
+
+    // Add click handler to show clicked location
+    map.on('click', (e) => {
+      // Only show coordinates if not clicking on a cluster or merchant point
+      const features = map.queryRenderedFeatures(e.point, {
+        layers: ['merchants']
+      });
+
+      if (!features.length) {
+        const coords = e.lngLat;
+
+        new mapboxgl.Popup()
+          .setLngLat(coords)
+          .setHTML(`
+            <div style="padding: 8px;">
+              <strong>Clicked Location</strong><br>
+              Lat: ${coords.lat.toFixed(4)}<br>
+              Lng: ${coords.lng.toFixed(4)}
+            </div>
+          `)
+          .addTo(map);
+      }else{
+        const coords = e.lngLat;
+        new mapboxgl.Popup()
+          .setLngLat(coords)
+          .setHTML(`
+            <div style="padding: 8px;">
+              Name: ${features[0].properties.n}<br>
+              Category: ${features[0].properties.c}<br>
+              Genre: ${features[0].properties.g}<br>
+              Brand: ${features[0].properties.b}<br>
+              Has Coupon: ${features[0].properties.cp}<br>
+              Has Campaign: ${features[0].properties.cm}<br>
+              Has Points: ${features[0].properties.pt}<r>
+            </div>
+          `)
+          .addTo(map);
+      }
+    });
+
+    // Log style details when loaded
+    map.on('style.load', () => {
+      const style = map.getStyle();
+      console.log('Style loaded:', {
+        name: style.name,
+        sources: Object.keys(style.sources),
+        layers: style.layers.length + ' layers',
+        version: style.version
+      });
+    });
+
+    // Error handling
+    map.on('error', (e) => {
+      console.error('Map error:', e);
+      if (e.error && e.error.message) {
+        console.error('Error details:', e.error.message);
+      }
+    });
+
+    // Listen for source data events to debug tileset loading
+    map.on('sourcedata', (e) => {
+      if (e.sourceId === 'merchants-clustered' && e.isSourceLoaded) {
+        console.log('Merchants clustered source data loaded successfully');
+      }
+    });
+
+    map.on('sourcedataloading', (e) => {
+      if (e.sourceId === 'merchants-clustered') {
+        console.log('Loading merchants clustered source data...');
+      }
+    });
+  </script>
+</div>
