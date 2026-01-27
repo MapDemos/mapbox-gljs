@@ -360,6 +360,26 @@
       </div>
     </div>
 
+    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+      <div class="profile-label">GPSギャップ処理方法</div>
+      <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+        <label style="display: flex; align-items: center; padding: 8px 12px; background: #f3f4f6; border-radius: 8px; cursor: pointer; flex: 1;">
+          <input type="radio" name="gap-handling" value="split" checked="" style="margin-right: 8px;" />
+          <div>
+            <div style="font-size: 13px; font-weight: 600;">分割</div>
+            <div style="font-size: 11px; color: #6b7280;">50m以上離れた地点で分割</div>
+          </div>
+        </label>
+        <label style="display: flex; align-items: center; padding: 8px 12px; background: #f3f4f6; border-radius: 8px; cursor: pointer; flex: 1;">
+          <input type="radio" name="gap-handling" value="fill" style="margin-right: 8px;" />
+          <div>
+            <div style="font-size: 13px; font-weight: 600;">補間</div>
+            <div style="font-size: 11px; color: #6b7280;">ギャップを自動で埋める</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
     <div style="display: flex; gap: 8px; margin-top: 10px;">
       <button class="btn btn-clear" onclick="matchRoute()" id="match-btn" style="background: #10b981; color: white; flex: 1;" disabled="">
         🛣️ ルートをマッチング
@@ -392,6 +412,10 @@
       <span>クリック地点</span>
     </div>
     <div class="legend-item">
+      <div class="legend-dot" style="background: #6366f1; width: 12px; height: 12px;"></div>
+      <span>補間地点</span>
+    </div>
+    <div class="legend-item">
       <div class="legend-line" style="background: #ef4444; opacity: 0.5; border: 1px dashed #ef4444; height: 2px;"></div>
       <span>選択順路</span>
     </div>
@@ -408,7 +432,8 @@
       container: 'map',
       style: 'mapbox://styles/mapbox/streets-v12',
       center: [139.7671, 35.6812], // Tokyo Station
-      zoom: 14
+      zoom: 14,
+      language: 'ja'
     });
 
     // Set map language to Japanese
@@ -418,6 +443,7 @@
 
     let clickedPoints = [];
     let clickedMarkers = [];
+    let interpolatedMarkers = []; // Track interpolated point markers
     let matchedRoute = null;
     let currentProfile = 'driving';
 
@@ -426,6 +452,7 @@
 
     // Initialize map layers on load
     map.on('load', () => {
+      //map.setConfigProperty('basemap', 'lightPreset', 'night');
       // Add source for clicked points line
       map.addSource('clicked-line', {
         type: 'geojson',
@@ -449,9 +476,10 @@
         },
         paint: {
           'line-color': '#ef4444',
-          'line-width': 2,
-          'line-dasharray': [2, 2],
-          'line-opacity': 0.5
+          'line-width': 4, // Thicker dashed line
+          'line-dasharray': [3, 2],
+          'line-opacity': 0.7,
+          'line-emissive-strength': 5
         }
       });
 
@@ -475,8 +503,45 @@
         },
         paint: {
           'line-color': '#10b981', // Green for all segments
-          'line-width': 4,
-          'line-opacity': 0.8
+          'line-width': 12, // Much thicker line
+          'line-opacity': 0.9,
+          'line-emissive-strength': 5
+        }
+      });
+
+      // Add an outline layer for better visibility
+      map.addLayer({
+        id: 'matched-routes-outline',
+        type: 'line',
+        source: 'matched-routes',
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round'
+        },
+        paint: {
+          'line-color': '#065f46', // Darker green outline
+          'line-width': 16, // Even thicker for outline
+          'line-opacity': 0.6,
+          'line-blur': 2,
+          'line-emissive-strength': 5
+        }
+      }, 'matched-routes-layer'); // Place outline below main line
+
+      // Add animated dashed overlay for visibility
+      map.addLayer({
+        id: 'matched-routes-animated',
+        type: 'line',
+        source: 'matched-routes',
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round'
+        },
+        paint: {
+          'line-color': '#fbbf24', // Yellow accent
+          'line-width': 8,
+          'line-dasharray': [0, 4, 3],
+          'line-opacity': 0.7,
+          'line-emissive-strength': 5
         }
       });
     });
@@ -557,7 +622,6 @@
           }
           // Start new segment
           currentSegment = [points[i]];
-          console.log(`GPS gap detected: ${distance.toFixed(1)}m between point ${i-1} and ${i}`);
         } else {
           // Continue current segment
           currentSegment.push(points[i]);
@@ -567,17 +631,82 @@
       // Add the last segment if it has at least 2 points
       if (currentSegment.length >= 2) {
         segments.push(currentSegment);
-      } else if (currentSegment.length === 1 && segments.length > 0) {
-        // If last segment has only 1 point, discard it
-        console.log('Last segment has only 1 point, discarding it');
       }
 
-      console.log(`Split ${points.length} points into ${segments.length} segments`);
-      segments.forEach((seg, idx) => {
-        console.log(`  Segment ${idx + 1}: ${seg.length} points`);
-      });
-
       return segments;
+    }
+
+    // Split large coordinate lists into chunks for API limits (max 1000 points per request)
+    function splitIntoChunks(points, maxChunkSize = 1000) {
+      if (points.length <= maxChunkSize) {
+        return [points];
+      }
+
+      const chunks = [];
+      for (let i = 0; i < points.length; i += maxChunkSize) {
+        // Take up to maxChunkSize points, ensuring at least 2 points per chunk
+        const chunk = points.slice(i, Math.min(i + maxChunkSize, points.length));
+        if (chunk.length >= 2) {
+          chunks.push(chunk);
+        } else if (chunks.length > 0 && chunk.length === 1) {
+          // If last chunk has only 1 point, add it to the previous chunk if possible
+          chunks[chunks.length - 1].push(chunk[0]);
+        }
+      }
+
+      return chunks;
+    }
+
+    // Fill gaps in coordinates by interpolating points
+    function fillCoordinateGaps(points, gapThresholdMeters = 50, interpolationInterval = 20) {
+      if (points.length < 2) {
+        return {
+          points: points,
+          interpolatedIndices: []
+        };
+      }
+
+      const filledPoints = [points[0]];
+      const interpolatedIndices = []; // Track which points are interpolated
+
+      for (let i = 1; i < points.length; i++) {
+        const prevPoint = points[i - 1];
+        const currPoint = points[i];
+
+        const distance = turf.distance(
+          turf.point(prevPoint),
+          turf.point(currPoint),
+          { units: 'meters' }
+        );
+
+        if (distance > gapThresholdMeters) {
+          // Gap detected - interpolate points to fill it
+
+          // Create a line between the two points
+          const line = turf.lineString([prevPoint, currPoint]);
+
+          // Calculate number of points to interpolate
+          const numInterpolatedPoints = Math.floor(distance / interpolationInterval);
+
+          if (numInterpolatedPoints > 1) {
+            // Add interpolated points along the line
+            for (let j = 1; j < numInterpolatedPoints; j++) {
+              const fraction = j / numInterpolatedPoints;
+              const interpolatedPoint = turf.along(line, distance * fraction / 1000, { units: 'kilometers' });
+              filledPoints.push(interpolatedPoint.geometry.coordinates);
+              interpolatedIndices.push(filledPoints.length - 1);
+            }
+          }
+        }
+
+        // Add the current point
+        filledPoints.push(currPoint);
+      }
+
+      return {
+        points: filledPoints,
+        interpolatedIndices: interpolatedIndices
+      };
     }
 
     // Anomaly detection and cleaning functions
@@ -659,8 +788,6 @@
         if (distance <= maxJumpKm) {
           cleaned.push(points[i]);
           lastGoodPoint = points[i];
-        } else {
-          console.log(`Anomaly detected: ${distance.toFixed(2)}km jump at point ${i}`);
         }
       }
 
@@ -694,8 +821,6 @@
       points.forEach((point, i) => {
         if (distances[i] <= threshold) {
           cleaned.push(point);
-        } else {
-          console.log(`Statistical outlier: point ${i} at ${distances[i].toFixed(2)}km from center (threshold: ${threshold.toFixed(2)}km)`);
         }
       });
 
@@ -833,11 +958,19 @@
       }
 
       try {
-        // Split points into segments based on GPS gaps (>50m)
-        updateStatus('loading', 'GPSギャップを検出中...',
-          `${clickedPoints.length} 地点を分析しています...`);
+        // Get gap handling strategy
+        const gapHandling = document.querySelector('input[name="gap-handling"]:checked').value;
 
-        const segments = splitCoordinatesByGaps(clickedPoints, 50); // 50m threshold
+        // Clear any existing interpolated markers when starting
+        interpolatedMarkers.forEach(marker => marker.remove());
+        interpolatedMarkers = [];
+
+        if (gapHandling === 'split') {
+          // Strategy A: Split points into segments based on GPS gaps (>50m)
+          updateStatus('loading', 'GPSギャップを検出中...',
+            `${clickedPoints.length} 地点を分析しています...`);
+
+          const segments = splitCoordinatesByGaps(clickedPoints, 50); // 50m threshold
 
         if (segments.length === 0) {
           updateStatus('error', 'エラー', '有効なセグメントが見つかりませんでした');
@@ -856,17 +989,25 @@
         for (let i = 0; i < segments.length; i++) {
           const segment = segments[i];
 
-          updateStatus('loading', `セグメント ${i + 1}/${segments.length} を処理中...`,
-            `${segment.length} 地点を道路にマッチングしています...`);
+          // Check if segment needs to be chunked (>1000 points)
+          const chunks = splitIntoChunks(segment, 1000);
 
-          // Clean anomalies from segment
-          const cleanedSegment = cleanPointAnomalies(segment);
+          for (let j = 0; j < chunks.length; j++) {
+            const chunk = chunks[j];
+            const chunkLabel = chunks.length > 1
+              ? `セグメント ${i + 1}/${segments.length} (チャンク ${j + 1}/${chunks.length})`
+              : `セグメント ${i + 1}/${segments.length}`;
 
-          if (cleanedSegment.length < 2) {
-            console.log(`Segment ${i + 1} has less than 2 points after cleaning, skipping`);
-            failedSegments++;
-            continue;
-          }
+            updateStatus('loading', `${chunkLabel} を処理中...`,
+              `${chunk.length} 地点を道路にマッチングしています...`);
+
+            // Clean anomalies from chunk
+            const cleanedSegment = cleanPointAnomalies(chunk);
+
+            if (cleanedSegment.length < 2) {
+              failedSegments++;
+              continue;
+            }
 
           // Construct coordinates and parameters for POST request
           const coordinatesString = cleanedSegment.map(coord => coord.join(',')).join(';');
@@ -906,6 +1047,7 @@
                 type: 'Feature',
                 properties: {
                   segment: i,
+                  chunk: j,
                   distance: matching.distance || 0,
                   duration: matching.duration || 0,
                   points: cleanedSegment.length
@@ -916,14 +1058,13 @@
               totalDistance += matching.distance || 0;
               totalDuration += matching.duration || 0;
             } else {
-              console.log(`No matching found for segment ${i + 1}`);
               failedSegments++;
             }
           } catch (segmentError) {
-            console.error(`Error matching segment ${i + 1}:`, segmentError);
             failedSegments++;
           }
-        }
+          } // End of chunks loop
+        } // End of segments loop
 
         // Update map with all matched segments
         if (matchedSegments.length > 0) {
@@ -966,8 +1107,231 @@
             'すべてのセグメントでマッチングに失敗しました。地点を道路の近くに配置してください。');
         }
 
+        } else {
+          // Strategy B: Fill gaps with interpolated points
+          updateStatus('loading', 'GPSギャップを補間中...',
+            `${clickedPoints.length} 地点のギャップを埋めています...`);
+
+          const fillResult = fillCoordinateGaps(clickedPoints, 50, 20); // 50m gap threshold, 20m interpolation interval
+          const filledPoints = fillResult.points;
+          const interpolatedIndices = fillResult.interpolatedIndices;
+
+          // Clear any existing interpolated markers
+          interpolatedMarkers.forEach(marker => marker.remove());
+          interpolatedMarkers = [];
+
+          // Add visual markers for interpolated points
+          interpolatedIndices.forEach(index => {
+            const point = filledPoints[index];
+            const interpolatedMarker = new mapboxgl.Marker({
+              color: '#6366f1', // Purple for interpolated points
+              scale: 0.5
+            })
+              .setLngLat(point)
+              .setPopup(new mapboxgl.Popup({ offset: 25 })
+                .setHTML(`
+                  <strong>補間地点</strong><br>
+                  <span style="font-family: monospace; font-size: 11px;">
+                    ${point[0].toFixed(6)}, ${point[1].toFixed(6)}
+                  </span><br>
+                  <small style="color: #6366f1;">自動生成されたポイント</small>
+                `))
+              .addTo(map);
+
+            interpolatedMarkers.push(interpolatedMarker);
+          });
+
+          updateStatus('loading', 'ルートマッチング中...',
+            `${filledPoints.length} 地点（${interpolatedIndices.length} 補間地点を含む）を道路にマッチングしています...`);
+
+          // Clean anomalies from filled points
+          const cleanedPoints = cleanPointAnomalies(filledPoints);
+
+          if (cleanedPoints.length < 2) {
+            updateStatus('error', 'エラー',
+              `クリーニング後の地点が不足しています（${filledPoints.length}地点→${cleanedPoints.length}地点）`);
+            return;
+          }
+
+          // Split into chunks if needed (max 1000 points per API call)
+          const chunks = splitIntoChunks(cleanedPoints, 1000);
+          const matchedChunks = [];
+          let totalDistance = 0;
+          let totalDuration = 0;
+          let failedChunks = 0;
+
+          for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i];
+            const chunkLabel = chunks.length > 1
+              ? `チャンク ${i + 1}/${chunks.length}`
+              : '補間されたルート';
+
+            updateStatus('loading', `${chunkLabel} を処理中...`,
+              `${chunk.length} 地点を道路にマッチングしています...`);
+
+            // Construct coordinates and parameters for POST request
+            const coordinatesString = chunk.map(coord => coord.join(',')).join(';');
+            const radiuses = chunk.map(() => '50').join(';'); // 50m radius for each point
+
+            // Add timestamps (5 seconds apart)
+            const baseTime = Math.floor(Date.now() / 1000) + (i * 5000); // Offset each chunk
+            const timestamps = chunk.map((_, index) => baseTime + (index * 5)).join(';');
+
+            // Use POST request for the filled route
+            const url = `https://api.mapbox.com/matching/v5/mapbox.tmp.valhalla-zenrin/${currentProfile}?access_token=${mapboxgl.accessToken}`;
+
+            // Prepare form data for POST request
+            const formData = new URLSearchParams();
+            formData.append('coordinates', coordinatesString);
+            formData.append('geometries', 'geojson');
+            formData.append('radiuses', radiuses);
+            formData.append('timestamps', timestamps);
+            formData.append('overview', 'full');
+            formData.append('tidy', 'false');
+
+            try {
+              const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: formData.toString()
+              });
+
+              const data = await response.json();
+
+              if (data.matchings && data.matchings.length > 0) {
+                // Process ALL matching segments from the response
+                data.matchings.forEach((matching, matchIdx) => {
+                  // Skip matchings with no or minimal coordinates
+                  if (!matching.geometry || !matching.geometry.coordinates || matching.geometry.coordinates.length < 2) {
+                    return;
+                  }
+
+                  // Skip matchings where all coordinates are the same point
+                  const firstCoord = matching.geometry.coordinates[0];
+                  const allSame = matching.geometry.coordinates.every(coord =>
+                    coord[0] === firstCoord[0] && coord[1] === firstCoord[1]
+                  );
+                  if (allSame) {
+                    return;
+                  }
+
+                  matchedChunks.push({
+                    type: 'Feature',
+                    properties: {
+                      segment: 0,
+                      chunk: i,
+                      matchingIndex: matchIdx,
+                      distance: matching.distance || 0,
+                      duration: matching.duration || 0,
+                      points: matching.geometry.coordinates.length
+                    },
+                    geometry: matching.geometry
+                  });
+
+                  totalDistance += matching.distance || 0;
+                  totalDuration += matching.duration || 0;
+                });
+              } else {
+                failedChunks++;
+              }
+            } catch (error) {
+              failedChunks++;
+            }
+          }
+
+          if (matchedChunks.length > 0) {
+            // Update map with all matched chunks
+            const mapData = {
+              type: 'FeatureCollection',
+              features: matchedChunks
+            };
+
+            // Wait for map to be ready if needed
+            if (!map.loaded()) {
+              map.once('load', () => {
+                const source = map.getSource('matched-routes');
+                if (source) {
+                  source.setData(mapData);
+                }
+              });
+              return;
+            }
+
+            // Check if source exists
+            const source = map.getSource('matched-routes');
+            if (!source) {
+              // Try to add it if it doesn't exist
+              map.addSource('matched-routes', {
+                type: 'geojson',
+                data: mapData
+              });
+            } else {
+              source.setData(mapData);
+
+              // Add pulsing animation to draw attention to the route
+              let step = 0;
+              const animateRoute = () => {
+                step = (step + 1) % 100;
+                const opacity = 0.5 + (Math.sin(step * 0.1) + 1) * 0.25;
+
+                if (map.getLayer('matched-routes-animated')) {
+                  map.setPaintProperty('matched-routes-animated', 'line-opacity', opacity);
+                }
+
+                // Animate for 3 seconds
+                if (step < 30) {
+                  requestAnimationFrame(animateRoute);
+                } else {
+                  if (map.getLayer('matched-routes-animated')) {
+                    map.setPaintProperty('matched-routes-animated', 'line-opacity', 0.7);
+                  }
+                }
+              };
+              animateRoute();
+            }
+
+
+            // Profile names in Japanese
+            const profileNames = {
+              'driving': '自動車',
+              'walking': '徒歩',
+              'cycling': '自転車'
+            };
+
+            // Create status message
+            let statusMessage = `${profileNames[currentProfile]}ルートで道路にマッチングしました<br>`;
+            statusMessage += `補間された地点: <strong>${interpolatedIndices.length}</strong><br>`;
+
+            if (chunks.length > 1) {
+              statusMessage += `処理済みチャンク: <strong>${matchedChunks.length}/${chunks.length}</strong><br>`;
+              if (failedChunks > 0) {
+                statusMessage += `<small style="color: #ef4444;">${failedChunks} チャンクはマッチングできませんでした</small><br>`;
+              }
+            }
+
+            statusMessage += `総距離: <strong>${(totalDistance / 1000).toFixed(2)} km</strong><br>`;
+            statusMessage += `推定時間: <strong>${Math.round(totalDuration / 60)} 分</strong>`;
+
+            updateStatus('success', 'ルートマッチング完了！', statusMessage);
+
+            // Fit map to show all routes
+            const bounds = new mapboxgl.LngLatBounds();
+            matchedChunks.forEach(chunk => {
+              chunk.geometry.coordinates.forEach(coord => {
+                bounds.extend(coord);
+              });
+            });
+            map.fitBounds(bounds, { padding: 50 });
+
+          } else {
+            updateStatus('error', 'ルートが見つかりません',
+              '地点間でルートを作成できませんでした。地点を道路の近くに配置してください。');
+          }
+        }
+
       } catch (error) {
-        console.error('Map matching error:', error);
         updateStatus('error', 'マップマッチングに失敗しました',
           `エラー: ${error.message}`);
       }
@@ -1027,9 +1391,11 @@
     function clearPoints() {
       // Remove all markers
       clickedMarkers.forEach(marker => marker.remove());
+      interpolatedMarkers.forEach(marker => marker.remove());
 
       // Reset arrays
       clickedMarkers = [];
+      interpolatedMarkers = [];
       clickedPoints = [];
       matchedRoute = null;
 
@@ -1051,6 +1417,13 @@
           features: []
         });
       }
+
+      // Make sure all route layers are cleared
+      ['matched-routes-layer', 'matched-routes-outline', 'matched-routes-animated'].forEach(layerId => {
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, 'visibility', 'visible'); // Ensure visible for next use
+        }
+      });
 
       // Disable buttons
       document.getElementById('match-btn').disabled = true;
