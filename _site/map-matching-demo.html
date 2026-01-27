@@ -547,36 +547,36 @@
       const originalCount = cleanedPoints.length;
 
       // Step 1: Remove duplicate consecutive points
-      cleanedPoints = removeDuplicatePoints(cleanedPoints);
-      console.log(`Removed ${originalCount - cleanedPoints.length} duplicate points`);
+      // cleanedPoints = removeDuplicatePoints(cleanedPoints);
+      // console.log(`Removed ${originalCount - cleanedPoints.length} duplicate points`);
 
       // Step 2: Remove points with unrealistic jumps (distance-based filtering)
-      if (cleanedPoints.length > 2) {
-        const beforeJump = cleanedPoints.length;
-        cleanedPoints = removeJumpAnomalies(cleanedPoints);
-        console.log(`Removed ${beforeJump - cleanedPoints.length} points with unrealistic jumps`);
-      }
+      // if (cleanedPoints.length > 2) {
+      //   const beforeJump = cleanedPoints.length;
+      //   cleanedPoints = removeJumpAnomalies(cleanedPoints);
+      //   console.log(`Removed ${beforeJump - cleanedPoints.length} points with unrealistic jumps`);
+      // }
 
-      // Step 3: Remove outliers using statistical analysis
-      if (cleanedPoints.length > 3) {
-        const beforeOutliers = cleanedPoints.length;
-        cleanedPoints = removeStatisticalOutliers(cleanedPoints);
-        console.log(`Removed ${beforeOutliers - cleanedPoints.length} statistical outliers`);
-      }
+      // // Step 3: Remove outliers using statistical analysis
+      // if (cleanedPoints.length > 3) {
+      //   const beforeOutliers = cleanedPoints.length;
+      //   cleanedPoints = removeStatisticalOutliers(cleanedPoints);
+      //   console.log(`Removed ${beforeOutliers - cleanedPoints.length} statistical outliers`);
+      // }
 
       // Step 4: Simplify if too many points (removes GPS noise)
       if (cleanedPoints.length > 10) {
         const beforeSimplify = cleanedPoints.length;
-        cleanedPoints = simplifyPoints(cleanedPoints);
+        cleanedPoints = simplifyPoints(cleanedPoints,{ tolerance: 0.01, highQuality: true});
         console.log(`Simplified from ${beforeSimplify} to ${cleanedPoints.length} points`);
       }
 
-      // Step 5: Remove isolated clusters (DBSCAN)
-      if (cleanedPoints.length > 5) {
-        const beforeClustering = cleanedPoints.length;
-        cleanedPoints = removeIsolatedClusters(cleanedPoints);
-        console.log(`Removed ${beforeClustering - cleanedPoints.length} isolated points`);
-      }
+      // // Step 5: Remove isolated clusters (DBSCAN)
+      // if (cleanedPoints.length > 5) {
+      //   const beforeClustering = cleanedPoints.length;
+      //   cleanedPoints = removeIsolatedClusters(cleanedPoints);
+      //   console.log(`Removed ${beforeClustering - cleanedPoints.length} isolated points`);
+      // }
 
       return cleanedPoints;
     }

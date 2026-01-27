@@ -221,17 +221,17 @@
 <div class="demo-container">
   <!-- Control Panel -->
   <div id="control-panel">
-    <h2>Merchant Filters</h2>
+    <h2>加盟店フィルター</h2>
 
     <!-- Search by Name -->
     <div class="control-group">
-      <h3>Search</h3>
-      <input type="text" id="search-name" placeholder="Search by merchant name..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" />
+      <h3>検索</h3>
+      <input type="text" id="search-name" placeholder="加盟店名で検索..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" />
     </div>
 
     <!-- Category Filters -->
     <div class="control-group">
-      <h3>Categories <span id="category-badge" class="filter-badge" style="display:none;">0</span></h3>
+      <h3>カテゴリー <span id="category-badge" class="filter-badge" style="display:none;">0</span></h3>
       <div class="filter-section-compact" id="category-filters"></div>
       <!-- <div class="button-group">
         <button class="btn" id="category-select-all">All</button>
@@ -241,7 +241,7 @@
 
     <!-- Genre Filters -->
     <div class="control-group">
-      <h3>Genres <span id="genre-badge" class="filter-badge" style="display:none;">0</span></h3>
+      <h3>ジャンル <span id="genre-badge" class="filter-badge" style="display:none;">0</span></h3>
       <div class="filter-section-compact" id="genre-filters"></div>
       <!-- <div class="button-group">
         <button class="btn" id="genre-select-all">All</button>
@@ -252,26 +252,26 @@
 
     <!-- Feature Filters -->
     <div class="control-group">
-      <h3>Features</h3>
+      <h3>特徴</h3>
       <div class="checkbox-control">
         <input type="checkbox" id="filter-coupon" />
-        <label for="filter-coupon">Has Coupon</label>
+        <label for="filter-coupon">クーポンあり</label>
       </div>
       <div class="checkbox-control">
         <input type="checkbox" id="filter-campaign" />
-        <label for="filter-campaign">Has Campaign</label>
+        <label for="filter-campaign">キャンペーンあり</label>
       </div>
       <div class="checkbox-control">
         <input type="checkbox" id="filter-points" />
-        <label for="filter-points">Has Points</label>
+        <label for="filter-points">ポイントあり</label>
       </div>
     </div>
 
     <!-- Apply/Reset Buttons -->
-    <div class="button-group">
+    <!-- <div class="button-group">
       <button class="btn btn-primary" id="apply-filters">Apply Filters</button>
       <button class="btn" id="reset-filters">Reset All</button>
-    </div>
+    </div>-->
   </div>
 
   <!-- Map Container -->
@@ -325,15 +325,15 @@
     coordsDisplay.id = 'coords-display';
     coordsDisplay.innerHTML = `
       <div class="coord-item">
-        <span class="coord-label">Zoom:</span>
+        <span class="coord-label">ズーム:</span>
         <span class="coord-value" id="zoom-value">10.00</span>
       </div>
       <div class="coord-item">
-        <span class="coord-label">Lat:</span>
+        <span class="coord-label">緯度:</span>
         <span class="coord-value" id="lat-value">35.6812</span>
       </div>
       <div class="coord-item">
-        <span class="coord-label">Lng:</span>
+        <span class="coord-label">経度:</span>
         <span class="coord-value" id="lng-value">139.7671</span>
       </div>
     `;
@@ -441,14 +441,11 @@
       // search across all merchants
       const hasSearchTerm = filterState.searchTerm && filterState.searchTerm.trim() !== '';
 
-      // If no categories AND no search term, hide everything
-      if (filterState.categories.size === 0 && !hasSearchTerm) {
-        return false; // This will hide all features
-      }
-
-      // If no genres are selected (and categories > 0 or search exists), also hide everything
-      if (filterState.genres.size === 0 && filterState.categories.size > 0) {
-        return false; // This will hide all features
+      // If nothing is selected and no filters applied, show everything
+      if (filterState.categories.size === 0 && filterState.genres.size === 0 &&
+          !filterState.hasCoupon && !filterState.hasCampaign &&
+          !filterState.hasPoints && !hasSearchTerm) {
+        return true; // Show all features without any filter
       }
 
       const filters = ['all'];
@@ -457,8 +454,10 @@
       if (filterState.categories.size > 0) {
         const categoryFilter = ['match', ['get', 'c'], Array.from(filterState.categories).map(Number), true, false];
         filters.push(categoryFilter);
+      }
 
-        // Genre filter - only apply if categories are selected
+      // Genre filter - only apply if genres are selected
+      if (filterState.genres.size > 0) {
         const genreFilter = ['match', ['get', 'g'], Array.from(filterState.genres).map(Number), true, false];
         filters.push(genreFilter);
       }
@@ -477,6 +476,11 @@
       // Search filter - case-insensitive contains
       if (hasSearchTerm) {
         filters.push(['in', filterState.searchTerm.toLowerCase(), ['downcase', ['get', 'n']]]);
+      }
+
+      // If only 'all' is in the filters array, return true to show everything
+      if (filters.length === 1) {
+        return true;
       }
 
       console.log(`filters:${filters}`)
@@ -509,6 +513,11 @@
         // map.setFilter('clusters', false);
         // map.setFilter('cluster-count', false);
         map.setFilter('merchants', false);
+      } else if (filterExpression === true) {
+        // If filterExpression is true (show everything), remove filters
+        // map.setFilter('clusters', ['has', 'count']);
+        // map.setFilter('cluster-count', ['>', ['get', 'count'], 1]);
+        map.setFilter('merchants', ['!', ['has', 'count']]);
       } else {
         // Apply to clusters (combine with cluster filter)
         // const clusterFilter = ['all', ['has', 'count'], filterExpression];
@@ -534,23 +543,20 @@
       });
     }
 
-    // Reset all filters (select all categories and genres to show everything)
+    // Reset all filters (uncheck everything but show all POIs)
     function resetFilters() {
-      // Check all category checkboxes to show everything
+      // Uncheck all category checkboxes
       document.querySelectorAll('.category-filter').forEach(cb => {
-        cb.checked = true;
+        cb.checked = false;
       });
 
-      // Update genre visibility first (will show all genres since categories are selected)
-      updateGenreVisibility();
-
-      // Check all visible genre checkboxes
+      // Uncheck all genre checkboxes
       document.querySelectorAll('.genre-filter').forEach(cb => {
-        const parentDiv = cb.closest('.checkbox-control');
-        if (parentDiv.style.display !== 'none') {
-          cb.checked = true;
-        }
+        cb.checked = false;
       });
+
+      // Update genre visibility (will hide all genres since no categories are selected)
+      updateGenreVisibility();
 
       // Clear feature checkboxes
       document.getElementById('filter-coupon').checked = false;
@@ -561,17 +567,9 @@
       updateBadge('category');
       updateBadge('genre');
 
-      // Set all categories and genres in filter state
+      // Clear filter state
       filterState.categories.clear();
-      document.querySelectorAll('.category-filter').forEach(cb => {
-        filterState.categories.add(cb.value);
-      });
-
       filterState.genres.clear();
-      document.querySelectorAll('.genre-filter:checked').forEach(cb => {
-        filterState.genres.add(cb.value);
-      });
-
       filterState.hasCoupon = false;
       filterState.hasCampaign = false;
       filterState.hasPoints = false;
@@ -580,10 +578,10 @@
       document.getElementById('search-name').value = '';
       filterState.searchTerm = '';
 
-      // Apply the filters to show all categories and genres
+      // Apply the filters (with nothing selected, will show all)
       applyFilters();
 
-      console.log('Filters reset - showing all categories and genres');
+      console.log('Filters reset - showing all POIs with no filters selected');
     }
 
     // Initialize the map
@@ -673,7 +671,7 @@
       //   'id': 'cluster-count',
       //   'type': 'symbol',
       //   'source': 'merchants-clustered',
-      //   'source-layer': 'merchants', // Update this if your source layer name is different
+      //   'source-layer': 'merchants-clustered', // Update this if your source layer name is different
       //   'filter': ['>', ['get', 'count'], 1],
       //   'layout': {
       //     'text-field': ['get', 'count'],
@@ -691,7 +689,7 @@
       //   'id': 'unclustered-points',
       //   'type': 'circle',
       //   'source': 'merchants-clustered',
-      //   'source-layer': 'merchants', // Update this if your source layer name is different
+      //   'source-layer': 'merchants-clustered', // Update this if your source layer name is different
       //   'filter': ['!', ['has', 'count']],
       //   'paint': {
       //     'circle-radius': 6,
@@ -739,14 +737,14 @@
       console.log('✅ Merchants clustered tileset loaded and displayed');
       updateDisplayValues();
 
-      // Set initial state - no categories selected by default
+      // Set initial state - no categories selected by default (but show everything)
       updateBadge('category');
       updateBadge('genre');
 
       // Update visibility - no genres will show initially
       updateGenreVisibility();
 
-      // Apply initial filters (nothing selected by default)
+      // Apply initial filters (nothing selected but will show all)
       applyFilters();
 
       // Add hover effects for clusters and points
@@ -795,15 +793,22 @@
         const coordinates = e.features[0].geometry.coordinates.slice();
         const properties = e.features[0].properties;
 
-        // Create popup content based on available properties
-        let popupContent = '<div style="padding: 8px;"><strong>Merchant Details</strong><br>';
+        // Get category and genre names
+        const categoryId = properties.c;
+        const genreId = properties.g;
+        const categoryName = CATEGORIES[categoryId] ? CATEGORIES[categoryId].ja : `カテゴリー ${categoryId}`;
+        const genreName = GENRES[genreId] || `ジャンル ${genreId}`;
 
-        // Display all available properties
-        for (const [key, value] of Object.entries(properties)) {
-          popupContent += `<strong>${key}:</strong> ${value}<br>`;
-        }
-
-        popupContent += '</div>';
+        // Create popup content with Japanese labels
+        let popupContent = `<div style="padding: 8px;">
+          <strong>店舗名:</strong> ${properties.n}<br>
+          <strong>カテゴリー:</strong> ${categoryName}<br>
+          <strong>ジャンル:</strong> ${genreName}<br>
+          <strong>ブランド:</strong> ${properties.b || 'なし'}<br>
+          <strong>クーポン:</strong> ${properties.cp === 1 ? 'あり' : 'なし'}<br>
+          <strong>キャンペーン:</strong> ${properties.cm === 1 ? 'あり' : 'なし'}<br>
+          <strong>ポイント:</strong> ${properties.pt === 1 ? 'あり' : 'なし'}
+        </div>`;
 
         // Ensure that if the map is zoomed out such that multiple
         // copies of the feature are visible, the popup appears
@@ -836,9 +841,9 @@
     //   map.setLayoutProperty('unclustered-points', 'visibility', visibility);
     // });
 
-    // Filter control buttons
-    document.getElementById('apply-filters').addEventListener('click', applyFilters);
-    document.getElementById('reset-filters').addEventListener('click', resetFilters);
+    // Filter control buttons - commented out since buttons are removed from HTML
+    // document.getElementById('apply-filters').addEventListener('click', applyFilters);
+    // document.getElementById('reset-filters').addEventListener('click', resetFilters);
 
     // Category controls - commented out since buttons are removed
     // document.getElementById('category-select-all').addEventListener('click', () => {
@@ -910,31 +915,37 @@
       });
 
       if (!features.length) {
+        // const coords = e.lngLat;
+
+        // new mapboxgl.Popup()
+        //   .setLngLat(coords)
+        //   .setHTML(`
+        //     <div style="padding: 8px;">
+        //       <strong>Clicked Location</strong><br>
+        //       Lat: ${coords.lat.toFixed(4)}<br>
+        //       Lng: ${coords.lng.toFixed(4)}
+        //     </div>
+        //   `)
+        //   .addTo(map);
+      }else{
         const coords = e.lngLat;
+        // Get category and genre names
+        const categoryId = features[0].properties.c;
+        const genreId = features[0].properties.g;
+        const categoryName = CATEGORIES[categoryId] ? CATEGORIES[categoryId].ja : `カテゴリー ${categoryId}`;
+        const genreName = GENRES[genreId] || `ジャンル ${genreId}`;
 
         new mapboxgl.Popup()
           .setLngLat(coords)
           .setHTML(`
             <div style="padding: 8px;">
-              <strong>Clicked Location</strong><br>
-              Lat: ${coords.lat.toFixed(4)}<br>
-              Lng: ${coords.lng.toFixed(4)}
-            </div>
-          `)
-          .addTo(map);
-      }else{
-        const coords = e.lngLat;
-        new mapboxgl.Popup()
-          .setLngLat(coords)
-          .setHTML(`
-            <div style="padding: 8px;">
-              Name: ${features[0].properties.n}<br>
-              Category: ${features[0].properties.c}<br>
-              Genre: ${features[0].properties.g}<br>
-              Brand: ${features[0].properties.b}<br>
-              Has Coupon: ${features[0].properties.cp}<br>
-              Has Campaign: ${features[0].properties.cm}<br>
-              Has Points: ${features[0].properties.pt}<r>
+              <strong>店舗名:</strong> ${features[0].properties.n}<br>
+              <strong>カテゴリー:</strong> ${categoryName}<br>
+              <strong>ジャンル:</strong> ${genreName}<br>
+              <strong>ブランド:</strong> ${features[0].properties.b || 'なし'}<br>
+              <strong>クーポン:</strong> ${features[0].properties.cp === 1 ? 'あり' : 'なし'}<br>
+              <strong>キャンペーン:</strong> ${features[0].properties.cm === 1 ? 'あり' : 'なし'}<br>
+              <strong>ポイント:</strong> ${features[0].properties.pt === 1 ? 'あり' : 'なし'}
             </div>
           `)
           .addTo(map);
