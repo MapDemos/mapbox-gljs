@@ -348,7 +348,7 @@ title: Merchants Tileset Overlay Demo
       document.querySelectorAll('.category-filter').forEach(cb => {
         cb.addEventListener('change', () => {
           updateBadge('category');
-          updateGenreVisibility();
+          updateGenreVisibility(false);  // Don't auto-select genres
           applyFilters();
         });
       });
@@ -375,7 +375,7 @@ title: Merchants Tileset Overlay Demo
     }
 
     // Update genre visibility based on selected categories
-    function updateGenreVisibility() {
+    function updateGenreVisibility(autoSelect = true) {
       const selectedCategories = new Set();
       document.querySelectorAll('.category-filter:checked').forEach(cb => {
         selectedCategories.add(cb.value);
@@ -398,9 +398,12 @@ title: Merchants Tileset Overlay Demo
           parentDiv.style.display = 'none';
           checkbox.checked = false;
         } else if (visibleGenres.has(genreId)) {
-          // Show genres that belong to selected categories and auto-select them
+          // Show genres that belong to selected categories
           parentDiv.style.display = 'flex';
-          checkbox.checked = true;
+          // Only auto-select if autoSelect is true
+          if (autoSelect) {
+            checkbox.checked = true;
+          }
         } else {
           // Hide and uncheck genres that don't belong
           parentDiv.style.display = 'none';
@@ -566,7 +569,7 @@ title: Merchants Tileset Overlay Demo
     // Initialize the map
     const map = new mapboxgl.Map({
       container: 'map',
-      style: 'mapbox://styles/kenji-shima/cmkux01n9007t01sr6b1qd5zc',
+      style: 'mapbox://styles/kenji-shima/cmkw30aq1000101rc8mlzfj3d',
       center: [139.7671, 35.6812], // Tokyo
       language: 'ja',
       zoom: 14,
@@ -720,8 +723,8 @@ title: Merchants Tileset Overlay Demo
       updateBadge('category');
       updateBadge('genre');
 
-      // Update visibility - no genres will show initially
-      updateGenreVisibility();
+      // Update visibility - no genres will show initially (pass false to not auto-select)
+      updateGenreVisibility(false);
 
       // Apply initial filters (nothing selected but will show all)
       applyFilters();
