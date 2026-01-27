@@ -455,29 +455,26 @@
         }
       });
 
-      // Add source for matched route
-      map.addSource('matched-route', {
+      // Add source for matched routes (supports multiple segments)
+      map.addSource('matched-routes', {
         type: 'geojson',
         data: {
-          type: 'Feature',
-          geometry: {
-            type: 'LineString',
-            coordinates: []
-          }
+          type: 'FeatureCollection',
+          features: []
         }
       });
 
-      // Add layer for matched route (solid, thick line)
+      // Add layer for matched routes (all segments in green)
       map.addLayer({
-        id: 'matched-route-layer',
+        id: 'matched-routes-layer',
         type: 'line',
-        source: 'matched-route',
+        source: 'matched-routes',
         layout: {
           'line-cap': 'round',
           'line-join': 'round'
         },
         paint: {
-          'line-color': '#10b981',
+          'line-color': '#10b981', // Green for all segments
           'line-width': 4,
           'line-opacity': 0.8
         }
@@ -539,6 +536,50 @@
       }
     }
 
+    // Split coordinate list into segments where GPS signal was lost (gaps > threshold)
+    function splitCoordinatesByGaps(points, gapThresholdMeters = 50) {
+      if (points.length < 2) return [points];
+
+      const segments = [];
+      let currentSegment = [points[0]];
+
+      for (let i = 1; i < points.length; i++) {
+        const distance = turf.distance(
+          turf.point(points[i - 1]),
+          turf.point(points[i]),
+          { units: 'meters' }
+        );
+
+        if (distance > gapThresholdMeters) {
+          // GPS signal gap detected - save current segment if it has at least 2 points
+          if (currentSegment.length >= 2) {
+            segments.push(currentSegment);
+          }
+          // Start new segment
+          currentSegment = [points[i]];
+          console.log(`GPS gap detected: ${distance.toFixed(1)}m between point ${i-1} and ${i}`);
+        } else {
+          // Continue current segment
+          currentSegment.push(points[i]);
+        }
+      }
+
+      // Add the last segment if it has at least 2 points
+      if (currentSegment.length >= 2) {
+        segments.push(currentSegment);
+      } else if (currentSegment.length === 1 && segments.length > 0) {
+        // If last segment has only 1 point, discard it
+        console.log('Last segment has only 1 point, discarding it');
+      }
+
+      console.log(`Split ${points.length} points into ${segments.length} segments`);
+      segments.forEach((seg, idx) => {
+        console.log(`  Segment ${idx + 1}: ${seg.length} points`);
+      });
+
+      return segments;
+    }
+
     // Anomaly detection and cleaning functions
     function cleanPointAnomalies(points) {
       if (points.length < 2) return points;
@@ -551,11 +592,11 @@
       // console.log(`Removed ${originalCount - cleanedPoints.length} duplicate points`);
 
       // Step 2: Remove points with unrealistic jumps (distance-based filtering)
-      if (cleanedPoints.length > 2) {
-        const beforeJump = cleanedPoints.length;
-        cleanedPoints = removeJumpAnomalies(cleanedPoints);
-        console.log(`Removed ${beforeJump - cleanedPoints.length} points with unrealistic jumps`);
-      }
+      // if (cleanedPoints.length > 2) {
+      //   const beforeJump = cleanedPoints.length;
+      //   cleanedPoints = removeJumpAnomalies(cleanedPoints);
+      //   console.log(`Removed ${beforeJump - cleanedPoints.length} points with unrealistic jumps`);
+      // }
 
       // // Step 3: Remove outliers using statistical analysis
       // if (cleanedPoints.length > 3) {
@@ -565,11 +606,11 @@
       // }
 
       // Step 4: Simplify if too many points (removes GPS noise)
-      if (cleanedPoints.length > 10) {
-        const beforeSimplify = cleanedPoints.length;
-        cleanedPoints = simplifyPoints(cleanedPoints,{ tolerance: 0.01, highQuality: true});
-        console.log(`Simplified from ${beforeSimplify} to ${cleanedPoints.length} points`);
-      }
+      // if (cleanedPoints.length > 10) {
+      //   const beforeSimplify = cleanedPoints.length;
+      //   cleanedPoints = simplifyPoints(cleanedPoints,{ tolerance: 0.01, highQuality: true});
+      //   console.log(`Simplified from ${beforeSimplify} to ${cleanedPoints.length} points`);
+      // }
 
       // // Step 5: Remove isolated clusters (DBSCAN)
       // if (cleanedPoints.length > 5) {
@@ -792,55 +833,104 @@
       }
 
       try {
-        // Clean anomalies from points
-        updateStatus('loading', '地点データをクリーニング中...',
-          `${clickedPoints.length} 地点から異常値を除去しています...`);
+        // Split points into segments based on GPS gaps (>50m)
+        updateStatus('loading', 'GPSギャップを検出中...',
+          `${clickedPoints.length} 地点を分析しています...`);
 
-        const cleanedPoints = cleanPointAnomalies(clickedPoints);
+        const segments = splitCoordinatesByGaps(clickedPoints, 50); // 50m threshold
 
-        if (cleanedPoints.length < 2) {
-          updateStatus('error', 'エラー',
-            `クリーニング後の地点が不足しています（${clickedPoints.length}地点→${cleanedPoints.length}地点）`);
+        if (segments.length === 0) {
+          updateStatus('error', 'エラー', '有効なセグメントが見つかりませんでした');
           return;
         }
 
-        if (cleanedPoints.length < clickedPoints.length) {
-          updateStatus('loading', 'ルートマッチング中...',
-            `${clickedPoints.length} 地点から ${cleanedPoints.length} 地点にクリーニングしました。道路にマッチングしています...`);
+        updateStatus('loading', `${segments.length} セグメントを検出`,
+          segments.map((seg, i) => `セグメント ${i + 1}: ${seg.length} 地点`).join('<br>'));
 
-          // Update visual representation with cleaned points
-          updateCleanedPointsDisplay(cleanedPoints);
-        } else {
-          updateStatus('loading', 'ルートマッチング中...',
-            `${cleanedPoints.length} 地点を道路にマッチングしています...`);
+        // Process each segment separately
+        const matchedSegments = [];
+        let totalDistance = 0;
+        let totalDuration = 0;
+        let failedSegments = 0;
+
+        for (let i = 0; i < segments.length; i++) {
+          const segment = segments[i];
+
+          updateStatus('loading', `セグメント ${i + 1}/${segments.length} を処理中...`,
+            `${segment.length} 地点を道路にマッチングしています...`);
+
+          // Clean anomalies from segment
+          const cleanedSegment = cleanPointAnomalies(segment);
+
+          if (cleanedSegment.length < 2) {
+            console.log(`Segment ${i + 1} has less than 2 points after cleaning, skipping`);
+            failedSegments++;
+            continue;
+          }
+
+          // Construct coordinates and parameters for POST request
+          const coordinatesString = cleanedSegment.map(coord => coord.join(',')).join(';');
+          const radiuses = cleanedSegment.map(() => '50').join(';'); // 50m radius for each point
+
+          // Add timestamps (5 seconds apart)
+          const baseTime = Math.floor(Date.now() / 1000) + (i * 1000); // Offset each segment
+          const timestamps = cleanedSegment.map((_, index) => baseTime + (index * 5)).join(';');
+
+          // Use POST request for better handling of large coordinate lists
+          const url = `https://api.mapbox.com/matching/v5/mapbox.tmp.valhalla-zenrin/${currentProfile}?access_token=${mapboxgl.accessToken}`;
+
+          // Prepare form data for POST request
+          const formData = new URLSearchParams();
+          formData.append('coordinates', coordinatesString);
+          formData.append('geometries', 'geojson');
+          formData.append('radiuses', radiuses);
+          formData.append('timestamps', timestamps);
+          formData.append('overview', 'full');
+          formData.append('tidy', 'false');
+
+          try {
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+              },
+              body: formData.toString()
+            });
+            const data = await response.json();
+
+            if (data.matchings && data.matchings.length > 0) {
+              const matching = data.matchings[0];
+
+              // Add this segment to matched segments with segment index
+              matchedSegments.push({
+                type: 'Feature',
+                properties: {
+                  segment: i,
+                  distance: matching.distance || 0,
+                  duration: matching.duration || 0,
+                  points: cleanedSegment.length
+                },
+                geometry: matching.geometry
+              });
+
+              totalDistance += matching.distance || 0;
+              totalDuration += matching.duration || 0;
+            } else {
+              console.log(`No matching found for segment ${i + 1}`);
+              failedSegments++;
+            }
+          } catch (segmentError) {
+            console.error(`Error matching segment ${i + 1}:`, segmentError);
+            failedSegments++;
+          }
         }
 
-        // Construct Map Matching API URL with cleaned points
-        const coordinatesString = cleanedPoints.map(coord => coord.join(',')).join(';');
-        const radiuses = cleanedPoints.map(() => '50').join(';'); // 50m radius for each point
-
-        // Add dummy timestamps (5 seconds apart starting from current time)
-        const baseTime = Math.floor(Date.now() / 1000); // Current Unix timestamp in seconds
-        const timestamps = cleanedPoints.map((_, index) => baseTime + (index * 5)).join(';');
-
-        const url = `https://api.mapbox.com/matching/v5/mapbox.tmp.valhalla-zenrin/${currentProfile}/${coordinatesString}?access_token=${mapboxgl.accessToken}&geometries=geojson&radiuses=${radiuses}&timestamps=${timestamps}&overview=full&tidy=false&ignore=access,oneways,restrictions`;
-
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (data.matchings && data.matchings.length > 0) {
-          const matching = data.matchings[0];
-          matchedRoute = matching.geometry;
-
-          // Update matched route on map
-          map.getSource('matched-route').setData({
-            type: 'Feature',
-            geometry: matchedRoute
+        // Update map with all matched segments
+        if (matchedSegments.length > 0) {
+          map.getSource('matched-routes').setData({
+            type: 'FeatureCollection',
+            features: matchedSegments
           });
-
-          // Calculate total distance
-          const distance = matching.distance || 0;
-          const duration = matching.duration || 0;
 
           // Profile names in Japanese
           const profileNames = {
@@ -849,22 +939,31 @@
             'cycling': '自転車'
           };
 
-          // Update status
-          updateStatus('success', 'ルートマッチング完了！',
-            `${profileNames[currentProfile]}ルートで道路にマッチングしました<br>` +
-            `総距離: <strong>${(distance / 1000).toFixed(2)} km</strong><br>` +
-            `推定時間: <strong>${Math.round(duration / 60)} 分</strong>`);
+          // Create status message
+          let statusMessage = `${profileNames[currentProfile]}ルートで道路にマッチングしました<br>`;
+          statusMessage += `マッチング済みセグメント: <strong>${matchedSegments.length}/${segments.length}</strong><br>`;
 
-          // Fit map to show entire route
+          if (failedSegments > 0) {
+            statusMessage += `<small style="color: #ef4444;">${failedSegments} セグメントはマッチングできませんでした</small><br>`;
+          }
+
+          statusMessage += `総距離: <strong>${(totalDistance / 1000).toFixed(2)} km</strong><br>`;
+          statusMessage += `推定時間: <strong>${Math.round(totalDuration / 60)} 分</strong>`;
+
+          updateStatus('success', 'ルートマッチング完了！', statusMessage);
+
+          // Fit map to show all routes
           const bounds = new mapboxgl.LngLatBounds();
-          matchedRoute.coordinates.forEach(coord => {
-            bounds.extend(coord);
+          matchedSegments.forEach(segment => {
+            segment.geometry.coordinates.forEach(coord => {
+              bounds.extend(coord);
+            });
           });
           map.fitBounds(bounds, { padding: 50 });
 
         } else {
           updateStatus('error', 'ルートが見つかりません',
-            '選択した地点間でルートを作成できませんでした。地点を道路の近くに配置してください。');
+            'すべてのセグメントでマッチングに失敗しました。地点を道路の近くに配置してください。');
         }
 
       } catch (error) {
@@ -945,13 +1044,11 @@
         });
       }
 
-      if (map.getSource('matched-route')) {
-        map.getSource('matched-route').setData({
-          type: 'Feature',
-          geometry: {
-            type: 'LineString',
-            coordinates: []
-          }
+      // Clear matched routes (new multiple segments source)
+      if (map.getSource('matched-routes')) {
+        map.getSource('matched-routes').setData({
+          type: 'FeatureCollection',
+          features: []
         });
       }
 
