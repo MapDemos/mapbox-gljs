@@ -530,11 +530,11 @@ title: マップマッチングデモ
       // console.log(`Removed ${originalCount - cleanedPoints.length} duplicate points`);
 
       // Step 2: Remove points with unrealistic jumps (distance-based filtering)
-      // if (cleanedPoints.length > 2) {
-      //   const beforeJump = cleanedPoints.length;
-      //   cleanedPoints = removeJumpAnomalies(cleanedPoints);
-      //   console.log(`Removed ${beforeJump - cleanedPoints.length} points with unrealistic jumps`);
-      // }
+      if (cleanedPoints.length > 2) {
+        const beforeJump = cleanedPoints.length;
+        cleanedPoints = removeJumpAnomalies(cleanedPoints);
+        console.log(`Removed ${beforeJump - cleanedPoints.length} points with unrealistic jumps`);
+      }
 
       // // Step 3: Remove outliers using statistical analysis
       // if (cleanedPoints.length > 3) {
@@ -802,7 +802,7 @@ title: マップマッチングデモ
         const baseTime = Math.floor(Date.now() / 1000); // Current Unix timestamp in seconds
         const timestamps = cleanedPoints.map((_, index) => baseTime + (index * 5)).join(';');
 
-        const url = `https://api.mapbox.com/matching/v5/mapbox.tmp.valhalla-zenrin/${currentProfile}/${coordinatesString}?access_token=${mapboxgl.accessToken}&geometries=geojson&radiuses=${radiuses}&timestamps=${timestamps}&overview=full&tidy=false`;
+        const url = `https://api.mapbox.com/matching/v5/mapbox.tmp.valhalla-zenrin/${currentProfile}/${coordinatesString}?access_token=${mapboxgl.accessToken}&geometries=geojson&radiuses=${radiuses}&timestamps=${timestamps}&overview=full&tidy=false&ignore=access,oneways,restrictions`;
 
         const response = await fetch(url);
         const data = await response.json();
