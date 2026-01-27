@@ -228,6 +228,11 @@ title: Merchants Tileset Overlay Demo
       </div>-->
     </div>
 
+    <!-- Brand Filters -->
+    <div class="control-group">
+      <h3>ブランド <span id="brand-badge" class="filter-badge" style="display:none;">0</span></h3>
+      <div class="filter-section-compact" id="brand-filters"></div>
+    </div>
 
     <!-- Feature Filters -->
     <div class="control-group">
@@ -277,6 +282,40 @@ title: Merchants Tileset Overlay Demo
       "61": "映画館", "62": "カラオケ", "63": "宿泊施設", "64": "テーマパーク"
     };
 
+    // Brand data from merchant-brands.json
+    const BRANDS = {
+      "201": "セブンイレブン",
+      "202": "ローソン",
+      "203": "ファミリーマート",
+      "204": "イオン",
+      "205": "イトーヨーカドー",
+      "206": "マツモトキヨシ",
+      "207": "ツルハドラッグ",
+      "208": "ドン・キホーテ",
+      "209": "ユニクロ",
+      "210": "GU",
+      "211": "ヤマダ電機",
+      "212": "ビックカメラ",
+      "213": "スターバックス",
+      "214": "マクドナルド",
+      "215": "すき家",
+      "216": "吉野家",
+      "217": "ガスト",
+      "218": "サイゼリヤ",
+      "219": "カインズ",
+      "220": "ニトリ",
+      "221": "無印良品",
+      "222": "ダイソー",
+      "223": "エネオス",
+      "224": "出光",
+      "225": "コスモ石油",
+      "226": "QBハウス",
+      "227": "ホットペッパービューティー",
+      "228": "カラオケ館",
+      "229": "ビッグエコー",
+      "230": "その他"
+    };
+
     // Mapping of categories to their relevant genres
     const CATEGORY_GENRE_MAPPING = {
       "1": ["11", "12", "13", "14"],  // グルメ → 飲食店, カフェ, 居酒屋, ファミレス
@@ -293,6 +332,7 @@ title: Merchants Tileset Overlay Demo
     const filterState = {
       categories: new Set(),
       genres: new Set(),
+      brands: new Set(),
       hasCoupon: false,
       hasCampaign: false,
       hasPoints: false,
@@ -344,6 +384,19 @@ title: Merchants Tileset Overlay Demo
         genreContainer.appendChild(div);
       });
 
+      // Populate brand checkboxes - initially visible since brands are independent
+      const brandContainer = document.getElementById('brand-filters');
+      Object.entries(BRANDS).forEach(([id, name]) => {
+        const div = document.createElement('div');
+        div.className = 'checkbox-control filter-section';
+        div.style.display = 'flex';  // Brands are always visible
+        div.innerHTML = `
+          <input type="checkbox" id="brand-${id}" value="${id}" class="brand-filter">
+          <label for="brand-${id}">${name}</label>
+        `;
+        brandContainer.appendChild(div);
+      });
+
       // Add event listeners for badge updates and immediate filter application
       document.querySelectorAll('.category-filter').forEach(cb => {
         cb.addEventListener('change', () => {
@@ -355,6 +408,12 @@ title: Merchants Tileset Overlay Demo
       document.querySelectorAll('.genre-filter').forEach(cb => {
         cb.addEventListener('change', () => {
           updateBadge('genre');
+          applyFilters();
+        });
+      });
+      document.querySelectorAll('.brand-filter').forEach(cb => {
+        cb.addEventListener('change', () => {
+          updateBadge('brand');
           applyFilters();
         });
       });
@@ -372,6 +431,18 @@ title: Merchants Tileset Overlay Demo
       } else {
         badge.style.display = 'none';
       }
+    }
+
+    // Update brand visibility - brands are always visible (no parent-child relationship)
+    function updateBrandVisibility() {
+      // Brands are always visible - no need to check parent selections
+      document.querySelectorAll('.brand-filter').forEach(checkbox => {
+        const parentDiv = checkbox.closest('.checkbox-control');
+        parentDiv.style.display = 'flex';
+      });
+
+      // Update the brand badge
+      updateBadge('brand');
     }
 
     // Update genre visibility based on selected categories
@@ -424,7 +495,7 @@ title: Merchants Tileset Overlay Demo
       const hasSearchTerm = filterState.searchTerm && filterState.searchTerm.trim() !== '';
 
       // If nothing is selected and no filters applied, show everything
-      if (filterState.categories.size === 0 && filterState.genres.size === 0 &&
+      if (filterState.categories.size === 0 && filterState.genres.size === 0 && filterState.brands.size === 0 &&
           !filterState.hasCoupon && !filterState.hasCampaign &&
           !filterState.hasPoints && !hasSearchTerm) {
         return true; // Show all features without any filter
@@ -442,6 +513,13 @@ title: Merchants Tileset Overlay Demo
       if (filterState.genres.size > 0) {
         const genreFilter = ['match', ['get', 'g'], Array.from(filterState.genres).map(Number), true, false];
         filters.push(genreFilter);
+      }
+
+      // Brand filter - only apply if brands are selected
+      if (filterState.brands.size > 0) {
+        // Convert brand IDs to numbers since the 'b' property in the data uses numeric IDs
+        const brandFilter = ['match', ['get', 'b'], Array.from(filterState.brands).map(Number), true, false];
+        filters.push(brandFilter);
       }
 
       // Feature filters (coupon, campaign, points)
@@ -482,6 +560,11 @@ title: Merchants Tileset Overlay Demo
         filterState.genres.add(cb.value);
       });
 
+      filterState.brands.clear();
+      document.querySelectorAll('.brand-filter:checked').forEach(cb => {
+        filterState.brands.add(cb.value);
+      });
+
       filterState.hasCoupon = document.getElementById('filter-coupon').checked;
       filterState.hasCampaign = document.getElementById('filter-campaign').checked;
       filterState.hasPoints = document.getElementById('filter-points').checked;
@@ -517,11 +600,13 @@ title: Merchants Tileset Overlay Demo
       console.log('Filters applied:', {
         categories: Array.from(filterState.categories),
         genres: Array.from(filterState.genres),
+        brands: Array.from(filterState.brands),
         features: {
           coupon: filterState.hasCoupon,
           campaign: filterState.hasCampaign,
           points: filterState.hasPoints
-        }
+        },
+        search: filterState.searchTerm
       });
     }
 
@@ -537,7 +622,13 @@ title: Merchants Tileset Overlay Demo
         cb.checked = false;
       });
 
-      // Update genre visibility (will hide all genres since no categories are selected)
+      // Uncheck all brand checkboxes
+      document.querySelectorAll('.brand-filter').forEach(cb => {
+        cb.checked = false;
+      });
+
+      // Update genre visibility (will hide all since no categories are selected)
+      // Brands remain visible as they're independent
       updateGenreVisibility();
 
       // Clear feature checkboxes
@@ -548,10 +639,12 @@ title: Merchants Tileset Overlay Demo
       // Update badges
       updateBadge('category');
       updateBadge('genre');
+      updateBadge('brand');
 
       // Clear filter state
       filterState.categories.clear();
       filterState.genres.clear();
+      filterState.brands.clear();
       filterState.hasCoupon = false;
       filterState.hasCampaign = false;
       filterState.hasPoints = false;
@@ -722,8 +815,10 @@ title: Merchants Tileset Overlay Demo
       // Set initial state - no categories selected by default (but show everything)
       updateBadge('category');
       updateBadge('genre');
+      updateBadge('brand');
 
       // Update visibility - no genres will show initially (pass false to not auto-select)
+      // Brands are always visible as they're independent
       updateGenreVisibility(false);
 
       // Apply initial filters (nothing selected but will show all)
@@ -775,18 +870,20 @@ title: Merchants Tileset Overlay Demo
         const coordinates = e.features[0].geometry.coordinates.slice();
         const properties = e.features[0].properties;
 
-        // Get category and genre names
+        // Get category, genre, and brand names
         const categoryId = properties.c;
         const genreId = properties.g;
+        const brandId = properties.b;
         const categoryName = CATEGORIES[categoryId] ? CATEGORIES[categoryId].ja : `カテゴリー ${categoryId}`;
         const genreName = GENRES[genreId] || `ジャンル ${genreId}`;
+        const brandName = BRANDS[brandId] || 'なし';
 
         // Create popup content with Japanese labels
         let popupContent = `<div style="padding: 8px;">
           <strong>店舗名:</strong> ${properties.n}<br>
           <strong>カテゴリー:</strong> ${categoryName}<br>
           <strong>ジャンル:</strong> ${genreName}<br>
-          <strong>ブランド:</strong> ${properties.b || 'なし'}<br>
+          <strong>ブランド:</strong> ${brandName}<br>
           <strong>クーポン:</strong> ${properties.cp === 1 ? 'あり' : 'なし'}<br>
           <strong>キャンペーン:</strong> ${properties.cm === 1 ? 'あり' : 'なし'}<br>
           <strong>ポイント:</strong> ${properties.pt === 1 ? 'あり' : 'なし'}
@@ -911,11 +1008,13 @@ title: Merchants Tileset Overlay Demo
         //   .addTo(map);
       }else{
         const coords = e.lngLat;
-        // Get category and genre names
+        // Get category, genre, and brand names
         const categoryId = features[0].properties.c;
         const genreId = features[0].properties.g;
+        const brandId = features[0].properties.b;
         const categoryName = CATEGORIES[categoryId] ? CATEGORIES[categoryId].ja : `カテゴリー ${categoryId}`;
         const genreName = GENRES[genreId] || `ジャンル ${genreId}`;
+        const brandName = BRANDS[brandId] || 'なし';
 
         new mapboxgl.Popup()
           .setLngLat(coords)
@@ -924,7 +1023,7 @@ title: Merchants Tileset Overlay Demo
               <strong>店舗名:</strong> ${features[0].properties.n}<br>
               <strong>カテゴリー:</strong> ${categoryName}<br>
               <strong>ジャンル:</strong> ${genreName}<br>
-              <strong>ブランド:</strong> ${features[0].properties.b || 'なし'}<br>
+              <strong>ブランド:</strong> ${brandName}<br>
               <strong>クーポン:</strong> ${features[0].properties.cp === 1 ? 'あり' : 'なし'}<br>
               <strong>キャンペーン:</strong> ${features[0].properties.cm === 1 ? 'あり' : 'なし'}<br>
               <strong>ポイント:</strong> ${features[0].properties.pt === 1 ? 'あり' : 'なし'}
