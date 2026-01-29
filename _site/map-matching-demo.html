@@ -360,27 +360,7 @@
       </div>
     </div>
 
-    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
-      <div class="profile-label">GPSギャップ処理方法</div>
-      <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-        <label style="display: flex; align-items: center; padding: 8px 12px; background: #f3f4f6; border-radius: 8px; cursor: pointer; flex: 1;">
-          <input type="radio" name="gap-handling" value="split" checked="" style="margin-right: 8px;" />
-          <div>
-            <div style="font-size: 13px; font-weight: 600;">分割</div>
-            <div style="font-size: 11px; color: #6b7280;">50m以上離れた地点で分割</div>
-          </div>
-        </label>
-        <label style="display: flex; align-items: center; padding: 8px 12px; background: #f3f4f6; border-radius: 8px; cursor: pointer; flex: 1;">
-          <input type="radio" name="gap-handling" value="fill" style="margin-right: 8px;" />
-          <div>
-            <div style="font-size: 13px; font-weight: 600;">補間</div>
-            <div style="font-size: 11px; color: #6b7280;">ギャップを自動で埋める</div>
-          </div>
-        </label>
-      </div>
-    </div>
-
-    <div style="display: flex; gap: 8px; margin-top: 10px;">
+    <div style="display: flex; gap: 8px; margin-top: 15px;">
       <button class="btn btn-clear" onclick="matchRoute()" id="match-btn" style="background: #10b981; color: white; flex: 1;" disabled="">
         🛣️ ルートをマッチング
       </button>
@@ -410,10 +390,6 @@
     <div class="legend-item">
       <div class="legend-dot" style="background: #ef4444;"></div>
       <span>クリック地点</span>
-    </div>
-    <div class="legend-item">
-      <div class="legend-dot" style="background: #6366f1; width: 12px; height: 12px;"></div>
-      <span>補間地点</span>
     </div>
     <div class="legend-item">
       <div class="legend-line" style="background: #ef4444; opacity: 0.5; border: 1px dashed #ef4444; height: 2px;"></div>
@@ -657,57 +633,6 @@
       return chunks;
     }
 
-    // Fill gaps in coordinates by interpolating points
-    function fillCoordinateGaps(points, gapThresholdMeters = 50, interpolationInterval = 20) {
-      if (points.length < 2) {
-        return {
-          points: points,
-          interpolatedIndices: []
-        };
-      }
-
-      const filledPoints = [points[0]];
-      const interpolatedIndices = []; // Track which points are interpolated
-
-      for (let i = 1; i < points.length; i++) {
-        const prevPoint = points[i - 1];
-        const currPoint = points[i];
-
-        const distance = turf.distance(
-          turf.point(prevPoint),
-          turf.point(currPoint),
-          { units: 'meters' }
-        );
-
-        if (distance > gapThresholdMeters) {
-          // Gap detected - interpolate points to fill it
-
-          // Create a line between the two points
-          const line = turf.lineString([prevPoint, currPoint]);
-
-          // Calculate number of points to interpolate
-          const numInterpolatedPoints = Math.floor(distance / interpolationInterval);
-
-          if (numInterpolatedPoints > 1) {
-            // Add interpolated points along the line
-            for (let j = 1; j < numInterpolatedPoints; j++) {
-              const fraction = j / numInterpolatedPoints;
-              const interpolatedPoint = turf.along(line, distance * fraction / 1000, { units: 'kilometers' });
-              filledPoints.push(interpolatedPoint.geometry.coordinates);
-              interpolatedIndices.push(filledPoints.length - 1);
-            }
-          }
-        }
-
-        // Add the current point
-        filledPoints.push(currPoint);
-      }
-
-      return {
-        points: filledPoints,
-        interpolatedIndices: interpolatedIndices
-      };
-    }
 
     // Anomaly detection and cleaning functions
     function cleanPointAnomalies(points) {
@@ -958,19 +883,16 @@
       }
 
       try {
-        // Get gap handling strategy
-        const gapHandling = document.querySelector('input[name="gap-handling"]:checked').value;
+        // Always use split strategy - Split points into segments based on GPS gaps (>50m)
 
         // Clear any existing interpolated markers when starting
         interpolatedMarkers.forEach(marker => marker.remove());
         interpolatedMarkers = [];
 
-        if (gapHandling === 'split') {
-          // Strategy A: Split points into segments based on GPS gaps (>50m)
-          updateStatus('loading', 'GPSギャップを検出中...',
-            `${clickedPoints.length} 地点を分析しています...`);
+        updateStatus('loading', 'GPSギャップを検出中...',
+          `${clickedPoints.length} 地点を分析しています...`);
 
-          const segments = splitCoordinatesByGaps(clickedPoints, 50); // 50m threshold
+        const segments = splitCoordinatesByGaps(clickedPoints, 50); // 50m threshold
 
         if (segments.length === 0) {
           updateStatus('error', 'エラー', '有効なセグメントが見つかりませんでした');
@@ -1107,229 +1029,6 @@
             'すべてのセグメントでマッチングに失敗しました。地点を道路の近くに配置してください。');
         }
 
-        } else {
-          // Strategy B: Fill gaps with interpolated points
-          updateStatus('loading', 'GPSギャップを補間中...',
-            `${clickedPoints.length} 地点のギャップを埋めています...`);
-
-          const fillResult = fillCoordinateGaps(clickedPoints, 50, 20); // 50m gap threshold, 20m interpolation interval
-          const filledPoints = fillResult.points;
-          const interpolatedIndices = fillResult.interpolatedIndices;
-
-          // Clear any existing interpolated markers
-          interpolatedMarkers.forEach(marker => marker.remove());
-          interpolatedMarkers = [];
-
-          // Add visual markers for interpolated points
-          interpolatedIndices.forEach(index => {
-            const point = filledPoints[index];
-            const interpolatedMarker = new mapboxgl.Marker({
-              color: '#6366f1', // Purple for interpolated points
-              scale: 0.5
-            })
-              .setLngLat(point)
-              .setPopup(new mapboxgl.Popup({ offset: 25 })
-                .setHTML(`
-                  <strong>補間地点</strong><br>
-                  <span style="font-family: monospace; font-size: 11px;">
-                    ${point[0].toFixed(6)}, ${point[1].toFixed(6)}
-                  </span><br>
-                  <small style="color: #6366f1;">自動生成されたポイント</small>
-                `))
-              .addTo(map);
-
-            interpolatedMarkers.push(interpolatedMarker);
-          });
-
-          updateStatus('loading', 'ルートマッチング中...',
-            `${filledPoints.length} 地点（${interpolatedIndices.length} 補間地点を含む）を道路にマッチングしています...`);
-
-          // Clean anomalies from filled points
-          const cleanedPoints = cleanPointAnomalies(filledPoints);
-
-          if (cleanedPoints.length < 2) {
-            updateStatus('error', 'エラー',
-              `クリーニング後の地点が不足しています（${filledPoints.length}地点→${cleanedPoints.length}地点）`);
-            return;
-          }
-
-          // Split into chunks if needed (max 1000 points per API call)
-          const chunks = splitIntoChunks(cleanedPoints, 1000);
-          const matchedChunks = [];
-          let totalDistance = 0;
-          let totalDuration = 0;
-          let failedChunks = 0;
-
-          for (let i = 0; i < chunks.length; i++) {
-            const chunk = chunks[i];
-            const chunkLabel = chunks.length > 1
-              ? `チャンク ${i + 1}/${chunks.length}`
-              : '補間されたルート';
-
-            updateStatus('loading', `${chunkLabel} を処理中...`,
-              `${chunk.length} 地点を道路にマッチングしています...`);
-
-            // Construct coordinates and parameters for POST request
-            const coordinatesString = chunk.map(coord => coord.join(',')).join(';');
-            const radiuses = chunk.map(() => '50').join(';'); // 50m radius for each point
-
-            // Add timestamps (5 seconds apart)
-            const baseTime = Math.floor(Date.now() / 1000) + (i * 5000); // Offset each chunk
-            const timestamps = chunk.map((_, index) => baseTime + (index * 5)).join(';');
-
-            // Use POST request for the filled route
-            const url = `https://api.mapbox.com/matching/v5/mapbox.tmp.valhalla-zenrin/${currentProfile}?access_token=${mapboxgl.accessToken}`;
-
-            // Prepare form data for POST request
-            const formData = new URLSearchParams();
-            formData.append('coordinates', coordinatesString);
-            formData.append('geometries', 'geojson');
-            formData.append('radiuses', radiuses);
-            formData.append('timestamps', timestamps);
-            formData.append('overview', 'full');
-            formData.append('tidy', 'false');
-
-            try {
-              const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: formData.toString()
-              });
-
-              const data = await response.json();
-
-              if (data.matchings && data.matchings.length > 0) {
-                // Process ALL matching segments from the response
-                data.matchings.forEach((matching, matchIdx) => {
-                  // Skip matchings with no or minimal coordinates
-                  if (!matching.geometry || !matching.geometry.coordinates || matching.geometry.coordinates.length < 2) {
-                    return;
-                  }
-
-                  // Skip matchings where all coordinates are the same point
-                  const firstCoord = matching.geometry.coordinates[0];
-                  const allSame = matching.geometry.coordinates.every(coord =>
-                    coord[0] === firstCoord[0] && coord[1] === firstCoord[1]
-                  );
-                  if (allSame) {
-                    return;
-                  }
-
-                  matchedChunks.push({
-                    type: 'Feature',
-                    properties: {
-                      segment: 0,
-                      chunk: i,
-                      matchingIndex: matchIdx,
-                      distance: matching.distance || 0,
-                      duration: matching.duration || 0,
-                      points: matching.geometry.coordinates.length
-                    },
-                    geometry: matching.geometry
-                  });
-
-                  totalDistance += matching.distance || 0;
-                  totalDuration += matching.duration || 0;
-                });
-              } else {
-                failedChunks++;
-              }
-            } catch (error) {
-              failedChunks++;
-            }
-          }
-
-          if (matchedChunks.length > 0) {
-            // Update map with all matched chunks
-            const mapData = {
-              type: 'FeatureCollection',
-              features: matchedChunks
-            };
-
-            // Wait for map to be ready if needed
-            if (!map.loaded()) {
-              map.once('load', () => {
-                const source = map.getSource('matched-routes');
-                if (source) {
-                  source.setData(mapData);
-                }
-              });
-              return;
-            }
-
-            // Check if source exists
-            const source = map.getSource('matched-routes');
-            if (!source) {
-              // Try to add it if it doesn't exist
-              map.addSource('matched-routes', {
-                type: 'geojson',
-                data: mapData
-              });
-            } else {
-              source.setData(mapData);
-
-              // Add pulsing animation to draw attention to the route
-              let step = 0;
-              const animateRoute = () => {
-                step = (step + 1) % 100;
-                const opacity = 0.5 + (Math.sin(step * 0.1) + 1) * 0.25;
-
-                if (map.getLayer('matched-routes-animated')) {
-                  map.setPaintProperty('matched-routes-animated', 'line-opacity', opacity);
-                }
-
-                // Animate for 3 seconds
-                if (step < 30) {
-                  requestAnimationFrame(animateRoute);
-                } else {
-                  if (map.getLayer('matched-routes-animated')) {
-                    map.setPaintProperty('matched-routes-animated', 'line-opacity', 0.7);
-                  }
-                }
-              };
-              animateRoute();
-            }
-
-
-            // Profile names in Japanese
-            const profileNames = {
-              'driving': '自動車',
-              'walking': '徒歩',
-              'cycling': '自転車'
-            };
-
-            // Create status message
-            let statusMessage = `${profileNames[currentProfile]}ルートで道路にマッチングしました<br>`;
-            statusMessage += `補間された地点: <strong>${interpolatedIndices.length}</strong><br>`;
-
-            if (chunks.length > 1) {
-              statusMessage += `処理済みチャンク: <strong>${matchedChunks.length}/${chunks.length}</strong><br>`;
-              if (failedChunks > 0) {
-                statusMessage += `<small style="color: #ef4444;">${failedChunks} チャンクはマッチングできませんでした</small><br>`;
-              }
-            }
-
-            statusMessage += `総距離: <strong>${(totalDistance / 1000).toFixed(2)} km</strong><br>`;
-            statusMessage += `推定時間: <strong>${Math.round(totalDuration / 60)} 分</strong>`;
-
-            updateStatus('success', 'ルートマッチング完了！', statusMessage);
-
-            // Fit map to show all routes
-            const bounds = new mapboxgl.LngLatBounds();
-            matchedChunks.forEach(chunk => {
-              chunk.geometry.coordinates.forEach(coord => {
-                bounds.extend(coord);
-              });
-            });
-            map.fitBounds(bounds, { padding: 50 });
-
-          } else {
-            updateStatus('error', 'ルートが見つかりません',
-              '地点間でルートを作成できませんでした。地点を道路の近くに配置してください。');
-          }
-        }
 
       } catch (error) {
         updateStatus('error', 'マップマッチングに失敗しました',
