@@ -2203,6 +2203,15 @@ function selectCategory(category) {
 
 // Function to update chips display
 function updateChipsDisplay() {
+    // Hide/show merchants layer based on category selection
+    if (map.getLayer('merchants')) {
+        if (selectedCategories.size === 0) {
+            map.setLayoutProperty('merchants', 'visibility', 'visible');
+        } else {
+            map.setLayoutProperty('merchants', 'visibility', 'none');
+        }
+    }
+
     // Update category mode chips
     const container = document.getElementById('chips-container');
     const placeholder = document.getElementById('chips-placeholder');
@@ -3020,6 +3029,13 @@ function clearResults() {
 // Function to switch between search modes
 function setSearchMode(mode) {
     currentSearchMode = mode;
+
+    // Clear selected categories when switching modes
+    if (selectedCategories.size > 0) {
+        selectedCategories.clear();
+        updateSearchButton();
+        updateChipsDisplay();
+    }
 
     const categoryModeContainer = document.getElementById('category-mode-container');
     const suggestModeContainer = document.getElementById('suggest-mode-container');
@@ -4254,6 +4270,9 @@ map.on('load', () => {
 
     // Show center marker on load
     updateCenterMarker();
+
+    // Ensure merchants layer visibility is set based on initial category selection
+    updateChipsDisplay();
 
     // Add hover effects for merchants layer
     map.on('mouseenter', 'merchants', () => {
