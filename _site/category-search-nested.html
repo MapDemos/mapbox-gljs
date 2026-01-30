@@ -327,9 +327,9 @@ const STATIC_CATEGORIES = [
 
 const map = new mapboxgl.Map({
     container: 'map',
-    style: 'mapbox://styles/mapbox/streets-v12',
+    style: 'mapbox://styles/kenji-shima/cmkw30aq1000101rc8mlzfj3d',
     center: [139.6917, 35.6895], // Tokyo coordinates
-    zoom: 11,
+    zoom: 15,
     language: 'ja' // Set language to Japanese
 });
 
@@ -372,6 +372,58 @@ const categoryColors = [
 
 // Add navigation controls
 map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+// Data structures for merchant layer details (same as merchants-overlay-demo)
+const MERCHANT_CATEGORIES = {
+    "1": { ja: "グルメ", en: "Gourmet" },
+    "2": { ja: "お買い物", en: "Shopping" },
+    "3": { ja: "ファッション・小物", en: "Fashion & Accessories" },
+    "4": { ja: "暮らし・サービス", en: "Living & Services" },
+    "5": { ja: "美容・健康", en: "Beauty & Health" },
+    "6": { ja: "レジャー・娯楽", en: "Leisure & Entertainment" }
+};
+
+const MERCHANT_GENRES = {
+    "11": "飲食店", "12": "カフェ", "13": "居酒屋", "14": "ファミレス",
+    "21": "コンビニ", "22": "スーパー", "23": "ドラッグストア", "24": "ディスカウントストア",
+    "31": "アパレル", "32": "靴", "33": "眼鏡", "34": "アクセサリー",
+    "41": "家電量販店", "42": "書店", "43": "ホームセンター", "44": "ガソリンスタンド", "45": "クリーニング",
+    "51": "美容院・理容店", "52": "エステ", "53": "リラクゼーション",
+    "61": "映画館", "62": "カラオケ", "63": "宿泊施設", "64": "テーマパーク"
+};
+
+const MERCHANT_BRANDS = {
+    "201": "セブンイレブン",
+    "202": "ローソン",
+    "203": "ファミリーマート",
+    "204": "イオン",
+    "205": "イトーヨーカドー",
+    "206": "マツモトキヨシ",
+    "207": "ツルハドラッグ",
+    "208": "ドン・キホーテ",
+    "209": "ユニクロ",
+    "210": "GU",
+    "211": "ヤマダ電機",
+    "212": "ビックカメラ",
+    "213": "スターバックス",
+    "214": "マクドナルド",
+    "215": "すき家",
+    "216": "吉野家",
+    "217": "ガスト",
+    "218": "サイゼリヤ",
+    "219": "カインズ",
+    "220": "ニトリ",
+    "221": "無印良品",
+    "222": "ダイソー",
+    "223": "エネオス",
+    "224": "出光",
+    "225": "コスモ石油",
+    "226": "QBハウス",
+    "227": "ホットペッパービューティー",
+    "228": "カラオケ館",
+    "229": "ビッグエコー",
+    "230": "その他"
+};
 
 // Function to create initial center marker at map center
 function updateCenterMarker() {
@@ -2992,7 +3044,13 @@ function clearResults() {
         map.removeSource('search-results');
     }
 
-    // Reset global results array
+    // Show the merchants POI layer back when clearing results (including when switching search modes)
+    if (map.getLayer('merchants')) {
+        map.setLayoutProperty('merchants', 'visibility', 'visible');
+    }
+
+    // Reset global results arrays
+    currentResults = [];
     window.currentSearchResults = [];
 }
 
@@ -3216,6 +3274,10 @@ async function performSuggestSearch() {
 
         // Process results
         if (features.length > 0) {
+            // Hide the merchants POI layer when showing search results
+            if (map.getLayer('merchants')) {
+                map.setLayoutProperty('merchants', 'visibility', 'none');
+            }
 
             // Process results similar to category search
             const searchResult = {
@@ -3381,6 +3443,11 @@ async function performForwardSearch() {
 
         // Process results
         if (data.features && data.features.length > 0) {
+            // Hide the merchants POI layer when showing search results
+            if (map.getLayer('merchants')) {
+                map.setLayoutProperty('merchants', 'visibility', 'none');
+            }
+
             const searchResult = {
                 categoryId: 'forward',
                 categoryName: '文字列検索',
@@ -4036,6 +4103,11 @@ function addMultiCategoryMarkers(features) {
     // Clear existing layers
     clearMarkers();
 
+    // Hide the merchants POI layer when showing search results
+    if (map.getLayer('merchants')) {
+        map.setLayoutProperty('merchants', 'visibility', 'none');
+    }
+
     if (features.length === 0) return;
 
     // Create GeoJSON from features with proper properties
@@ -4180,6 +4252,11 @@ function clearMarkers() {
     if (map.getSource('search-results')) {
         map.removeSource('search-results');
     }
+
+    // Show the merchants POI layer back when clearing search results
+    if (map.getLayer('merchants')) {
+        map.setLayoutProperty('merchants', 'visibility', 'visible');
+    }
 }
 
 // Function to create status messages
@@ -4215,6 +4292,58 @@ map.on('load', () => {
     // Show center marker on load
     updateCenterMarker();
 
+    // Add hover effects for merchants layer
+    map.on('mouseenter', 'merchants', () => {
+        map.getCanvas().style.cursor = 'pointer';
+    });
+
+    map.on('mouseleave', 'merchants', () => {
+        map.getCanvas().style.cursor = '';
+    });
+
+    // Add click handler for merchants layer POIs
+    map.on('click', 'merchants', (e) => {
+        const coordinates = e.features[0].geometry.coordinates.slice();
+        const properties = e.features[0].properties;
+
+        // Get category, genre, and brand names
+        const categoryId = properties.c;
+        const genreId = properties.g;
+        const brandId = properties.b;
+        const categoryName = MERCHANT_CATEGORIES[categoryId] ? MERCHANT_CATEGORIES[categoryId].ja : `カテゴリー ${categoryId}`;
+        const genreName = MERCHANT_GENRES[genreId] || `ジャンル ${genreId}`;
+        const brandName = MERCHANT_BRANDS[brandId] || 'なし';
+
+        // Create popup content with Japanese labels
+        let popupContent = `<div style="padding: 8px;">
+          <strong>店舗名:</strong> ${properties.n || '不明'}<br>
+          <strong>カテゴリー:</strong> ${categoryName}<br>
+          <strong>ジャンル:</strong> ${genreName}<br>
+          <strong>ブランド:</strong> ${brandName}<br>
+          <strong>クーポン:</strong> ${properties.cp === 1 ? 'あり' : 'なし'}<br>
+          <strong>キャンペーン:</strong> ${properties.cm === 1 ? 'あり' : 'なし'}<br>
+          <strong>ポイント:</strong> ${properties.pt === 1 ? 'あり' : 'なし'}
+        </div>`;
+
+        // Ensure that if the map is zoomed out such that multiple
+        // copies of the feature are visible, the popup appears
+        // over the copy being pointed to.
+        while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+            coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+        }
+
+        // Close any existing popup
+        if (currentPopup) {
+            currentPopup.remove();
+        }
+
+        // Create and display the popup
+        currentPopup = new mapboxgl.Popup()
+            .setLngLat(coordinates)
+            .setHTML(popupContent)
+            .addTo(map);
+    });
+
     // Add click handler to set search center
     map.on('click', (e) => {
         // Check if clicking on a result marker (only if the layer exists)
@@ -4226,8 +4355,17 @@ map.on('load', () => {
             clickedOnResult = features.length > 0;
         }
 
-        // If not clicking on a result marker, set the new center
-        if (!clickedOnResult) {
+        // Check if clicking on a merchant POI
+        let clickedOnMerchant = false;
+        if (map.getLayer('merchants')) {
+            const merchantFeatures = map.queryRenderedFeatures(e.point, {
+                layers: ['merchants']
+            });
+            clickedOnMerchant = merchantFeatures.length > 0;
+        }
+
+        // If not clicking on a result marker or merchant POI, set the new center
+        if (!clickedOnResult && !clickedOnMerchant) {
             const clickedLngLat = e.lngLat;
 
             // Remove existing center marker
