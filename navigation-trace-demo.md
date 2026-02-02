@@ -480,6 +480,18 @@ title: Navigation Trace Visualization
       </div>
 
       <div class="controls-section">
+        <div style="margin-bottom: 12px;">
+          <div class="stats-title">Map Matching Options</div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <label style="font-size: 12px; color: #6b7280;">Chunk Size:</label>
+            <select id="chunk-size-select" style="flex: 1; padding: 8px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 12px; background: white;">
+              <option value="100" selected>100 points (Recommended)</option>
+              <option value="500">500 points</option>
+              <option value="1000">1000 points (Max)</option>
+            </select>
+          </div>
+        </div>
+
         <button class="btn btn-primary match-button" onclick="runMapMatching()" id="match-btn" style="display: none;">
           🛣️ Run Map Matching
         </button>
@@ -966,7 +978,7 @@ title: Navigation Trace Visualization
 
 
     // Split coordinate list into chunks for API limits
-    function splitIntoChunks(points, maxChunkSize = 1000) {
+    function splitIntoChunks(points, maxChunkSize) {
       const chunks = [];
       for (let i = 0; i < points.length; i += maxChunkSize - 1) {
         const chunk = points.slice(i, Math.min(i + maxChunkSize, points.length));
@@ -1032,8 +1044,12 @@ title: Navigation Trace Visualization
     // Match points to road using Mapbox Map Matching API
     async function matchPointsToRoad(coordinates, type) {
       try {
-        // Split into chunks if needed (1000 points per chunk)
-        const chunks = splitIntoChunks(coordinates, 1000);
+        // Get selected chunk size
+        const chunkSize = parseInt(document.getElementById('chunk-size-select').value);
+        console.log(`Using chunk size: ${chunkSize} points`);
+
+        // Split into chunks based on selected size
+        const chunks = splitIntoChunks(coordinates, chunkSize);
         const allFeatures = [];
 
         for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
