@@ -485,6 +485,8 @@ title: Navigation Trace Visualization
           <div style="display: flex; gap: 8px; align-items: center;">
             <label style="font-size: 12px; color: #6b7280;">Chunk Size:</label>
             <select id="chunk-size-select" style="flex: 1; padding: 8px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 12px; background: white;">
+              <option value="10">10 points (Ultra precision)</option>
+              <option value="50">50 points (High precision)</option>
               <option value="100" selected>100 points (Recommended)</option>
               <option value="500">500 points</option>
               <option value="1000">1000 points (Max)</option>
@@ -570,6 +572,42 @@ title: Navigation Trace Visualization
     let showMatchedLine = false;
     let rawMatchedRoute = null;
     let matchedMatchedRoute = null;
+
+    // Rate limiter for API requests (50 requests per second with parallel processing)
+    class RateLimiter {
+      constructor(maxRequestsPerSecond, maxConcurrent = 10) {
+        this.maxRequestsPerSecond = maxRequestsPerSecond;
+        this.maxConcurrent = maxConcurrent;
+        this.minDelay = 1000 / maxRequestsPerSecond; // 20ms for 50 req/sec
+        this.queue = [];
+        this.activeRequests = 0;
+        this.lastRequestTime = 0;
+      }
+
+      async throttle() {
+        // Wait if we've reached max concurrent requests
+        while (this.activeRequests >= this.maxConcurrent) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+
+        const now = Date.now();
+        const timeSinceLastRequest = now - this.lastRequestTime;
+
+        if (timeSinceLastRequest < this.minDelay) {
+          const waitTime = this.minDelay - timeSinceLastRequest;
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+
+        this.lastRequestTime = Date.now();
+        this.activeRequests++;
+      }
+
+      release() {
+        this.activeRequests--;
+      }
+    }
+
+    const rateLimiter = new RateLimiter(50, 10); // 50 requests per second, max 10 concurrent
 
     // Initialize map layers on load
     map.on('load', () => {
@@ -996,6 +1034,14 @@ title: Navigation Trace Visualization
       matchBtn.innerHTML = '<span class="spinner">⟳</span> Processing...';
 
       try {
+        // Get chunk size for estimation
+        const chunkSize = parseInt(document.getElementById('chunk-size-select').value);
+        const totalChunks = Math.ceil(rawPoints.length / chunkSize) + Math.ceil(matchedPoints.length / chunkSize);
+
+        if (totalChunks > 10) {
+          console.log(`Note: Processing ${totalChunks} chunks with rate limiting (50 req/sec, max 10 concurrent)`);
+        }
+
         // Process raw points
         if (rawPoints.length >= 2) {
           console.log(`Processing ${rawPoints.length} raw points...`);
@@ -1052,56 +1098,81 @@ title: Navigation Trace Visualization
         const chunks = splitIntoChunks(coordinates, chunkSize);
         const allFeatures = [];
 
-        for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
-          const chunk = chunks[chunkIndex];
-          console.log(`Processing ${type} chunk ${chunkIndex + 1}/${chunks.length} (${chunk.length} points)`);
+        // Process chunks in parallel with rate limiting
+        const processChunk = async (chunk, chunkIndex) => {
+          try {
+            console.log(`Processing ${type} chunk ${chunkIndex + 1}/${chunks.length} (${chunk.length} points)`);
 
-          // Prepare coordinates and parameters
-          const coordinatesString = chunk.map(coord => coord.join(',')).join(';');
-          const radiuses = chunk.map(() => '25').join(';');
+            // Apply rate limiting (50 requests per second, max 10 concurrent)
+            await rateLimiter.throttle();
 
-          // Add timestamps (5 seconds apart)
-          const baseTime = Math.floor(Date.now() / 1000) + (chunkIndex * 500);
-          const timestamps = chunk.map((_, index) => baseTime + (index * 5)).join(';');
+            // Prepare coordinates and parameters
+            const coordinatesString = chunk.map(coord => coord.join(',')).join(';');
+            const radiuses = chunk.map(() => '25').join(';');
 
-          // Use POST request with Zenrin profile (driving only)
-          const url = `https://api.mapbox.com/matching/v5/mapbox.tmp.valhalla-zenrin/driving?access_token=${mapboxgl.accessToken}`;
+            // Add timestamps (5 seconds apart)
+            const baseTime = Math.floor(Date.now() / 1000) + (chunkIndex * 500);
+            const timestamps = chunk.map((_, index) => baseTime + (index * 5)).join(';');
 
-          // Prepare form data
-          const formData = new URLSearchParams();
-          formData.append('coordinates', coordinatesString);
-          formData.append('geometries', 'geojson');
-          formData.append('radiuses', radiuses);
-          formData.append('timestamps', timestamps);
-          formData.append('overview', 'full');
-          formData.append('tidy', 'false');
+            // Use POST request with Zenrin profile (driving only)
+            const url = `https://api.mapbox.com/matching/v5/mapbox.tmp.valhalla-zenrin/driving?access_token=${mapboxgl.accessToken}`;
 
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: formData.toString()
-          });
+            // Prepare form data
+            const formData = new URLSearchParams();
+            formData.append('coordinates', coordinatesString);
+            formData.append('geometries', 'geojson');
+            formData.append('radiuses', radiuses);
+            formData.append('timestamps', timestamps);
+            formData.append('overview', 'full');
+            formData.append('tidy', 'false');
 
-          const data = await response.json();
-
-          if (data.matchings && data.matchings.length > 0) {
-            const matching = data.matchings[0];
-            allFeatures.push({
-              type: 'Feature',
-              properties: {
-                chunk: chunkIndex,
-                confidence: matching.confidence || 0,
-                distance: matching.distance || 0,
-                duration: matching.duration || 0
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
               },
-              geometry: matching.geometry
+              body: formData.toString()
             });
+
+            const data = await response.json();
+
+            rateLimiter.release(); // Release the concurrent slot
+
+            if (data.matchings && data.matchings.length > 0) {
+              const matching = data.matchings[0];
+              return {
+                type: 'Feature',
+                properties: {
+                  chunk: chunkIndex,
+                  confidence: matching.confidence || 0,
+                  distance: matching.distance || 0,
+                  duration: matching.duration || 0
+                },
+                geometry: matching.geometry
+              };
+            }
+          } catch (error) {
+            rateLimiter.release(); // Release even on error
+            console.error(`Error processing chunk ${chunkIndex}:`, error);
           }
-        }
+          return null;
+        };
+
+        // Process all chunks in parallel (controlled by rate limiter)
+        const promises = chunks.map((chunk, index) => processChunk(chunk, index));
+        const results = await Promise.all(promises);
+
+        // Filter out null results and maintain order
+        results.forEach(feature => {
+          if (feature) {
+            allFeatures.push(feature);
+          }
+        });
 
         if (allFeatures.length > 0) {
+          // Sort by chunk index to maintain order
+          allFeatures.sort((a, b) => a.properties.chunk - b.properties.chunk);
+
           return {
             type: 'FeatureCollection',
             features: allFeatures
