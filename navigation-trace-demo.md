@@ -225,6 +225,24 @@ title: Navigation Trace Visualization
     .match-button {
       margin-top: 12px;
     }
+    .selection-mode-btn {
+      background: #6366f1;
+      color: white;
+      margin-bottom: 12px;
+    }
+    .selection-mode-btn.active {
+      background: #4f46e5;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .selection-info {
+      background: #fef3c7;
+      border: 1px solid #fbbf24;
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: #92400e;
+    }
     .btn {
       padding: 10px 16px;
       border: none;
@@ -480,6 +498,16 @@ title: Navigation Trace Visualization
       </div>
 
       <div class="controls-section">
+        <button class="btn selection-mode-btn" onclick="toggleSelectionMode()" id="selection-mode-btn" style="display: none;">
+          📦 Select Area To Fix With Map Matching API
+        </button>
+
+        <div class="selection-info" id="selection-info" style="display: none;">
+          <strong>Selection Mode Active</strong><br>
+          Click and drag to draw a rectangle. Points inside will be map-matched.
+        </div>
+
+        <!-- Map Matching UI commented out
         <div style="margin-bottom: 12px;">
           <div class="stats-title">Map Matching Options</div>
           <div style="display: flex; gap: 8px; align-items: center;">
@@ -497,6 +525,7 @@ title: Navigation Trace Visualization
         <button class="btn btn-primary match-button" onclick="runMapMatching()" id="match-btn" style="display: none;">
           🛣️ Run Map Matching
         </button>
+        -->
 
         <button class="btn btn-secondary" onclick="clearData()">
           Clear & Upload New
@@ -507,14 +536,22 @@ title: Navigation Trace Visualization
           <div class="toggle-group">
             <button class="toggle-btn active raw" onclick="toggleLayer('raw')" id="toggle-raw" style="font-size: 12px;">
               <span>🔴</span>
-              <span>Raw Points<br>(Nav SDK)</span>
+              <span>Raw Points</span>
             </button>
             <button class="toggle-btn active matched" onclick="toggleLayer('matched')" id="toggle-matched" style="font-size: 12px;">
               <span>🟢</span>
-              <span>Matched Points<br>(Nav SDK)</span>
+              <span>Matched Points</span>
             </button>
           </div>
 
+          <div class="toggle-group">
+            <button class="toggle-btn active matched" onclick="toggleLayer('nav-sdk-matched-line')" id="toggle-nav-sdk-matched-line" style="font-size: 12px;">
+              <span style="display: inline-block; width: 16px; height: 3px; background: #10b981; border-radius: 2px; vertical-align: middle;"></span>
+              <span>Matched Route</span>
+            </button>
+          </div>
+
+          <!-- Map Matching route toggles commented out
           <div class="toggle-group">
             <button class="toggle-btn raw" onclick="toggleLayer('raw-line')" id="toggle-raw-line" style="font-size: 12px;">
               <span style="display: inline-block; width: 16px; height: 3px; background: #ef4444; border-radius: 2px; vertical-align: middle;"></span>
@@ -525,6 +562,7 @@ title: Navigation Trace Visualization
               <span>Matched Route<br>(Map Matching API)</span>
             </button>
           </div>
+          -->
         </div>
       </div>
     </div>
@@ -536,16 +574,12 @@ title: Navigation Trace Visualization
       <span>Raw GPS Points</span>
     </div>
     <div class="legend-item">
-      <div class="legend-line" style="background: #ef4444; opacity: 0.6;"></div>
-      <span>Raw → Map-Matched</span>
-    </div>
-    <div class="legend-item">
       <div class="legend-dot" style="background: #10b981;"></div>
       <span>Matched Points</span>
     </div>
     <div class="legend-item">
       <div class="legend-line" style="background: #10b981; opacity: 0.6;"></div>
-      <span>Matched → Map-Matched</span>
+      <span>Matched Route</span>
     </div>
   </div>
 
@@ -570,8 +604,18 @@ title: Navigation Trace Visualization
     let showMatched = true;
     let showRawLine = false;
     let showMatchedLine = false;
+    let showNavSdkMatchedLine = true;  // Changed to true by default
     let rawMatchedRoute = null;
     let matchedMatchedRoute = null;
+
+    // Rectangle selection
+    let selectionMode = false;
+    let startPoint = null;
+    let currentBox = null;
+    let selectedArea = null;
+
+    // Store the current reconstructed route coordinates
+    let currentReconstructedRoute = null;
 
     // Rate limiter for API requests (50 requests per second with parallel processing)
     class RateLimiter {
@@ -654,6 +698,63 @@ title: Navigation Trace Visualization
           'circle-stroke-width': 2,
           'circle-stroke-color': '#ffffff',
           'circle-opacity': 0.9
+        }
+      });
+
+      // Add source for Nav SDK matched points line
+      map.addSource('nav-sdk-matched-line', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: []
+        }
+      });
+
+      // Add layer for Nav SDK matched points line
+      map.addLayer({
+        id: 'nav-sdk-matched-line-layer',
+        type: 'line',
+        source: 'nav-sdk-matched-line',
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round',
+          'visibility': 'visible'  // Changed to visible by default
+        },
+        paint: {
+          'line-color': '#10b981',
+          'line-width': 12,
+          'line-opacity': 0.6
+        }
+      });
+
+      // Add source for selection rectangle
+      map.addSource('selection-box', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: []
+        }
+      });
+
+      // Add layer for selection rectangle
+      map.addLayer({
+        id: 'selection-box-fill',
+        type: 'fill',
+        source: 'selection-box',
+        paint: {
+          'fill-color': '#6366f1',
+          'fill-opacity': 0.15
+        }
+      });
+
+      map.addLayer({
+        id: 'selection-box-outline',
+        type: 'line',
+        source: 'selection-box',
+        paint: {
+          'line-color': '#6366f1',
+          'line-width': 2,
+          'line-dasharray': [2, 2]
         }
       });
 
@@ -964,6 +1065,22 @@ title: Navigation Trace Visualization
         };
         map.getSource('matched-points').setData(matchedGeoJSON);
 
+        // Also create line for Nav SDK matched points
+        const matchedLineGeoJSON = {
+          type: 'FeatureCollection',
+          features: [{
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: matchedPoints.map(p => p.coordinates)
+            }
+          }]
+        };
+        map.getSource('nav-sdk-matched-line').setData(matchedLineGeoJSON);
+
+        // Initialize the reconstructed route with original matched points
+        currentReconstructedRoute = matchedPoints.map(p => p.coordinates);
+
         // Calculate distance for matched path
         let totalDistance = 0;
         for (let i = 1; i < matchedPoints.length; i++) {
@@ -989,7 +1106,8 @@ title: Navigation Trace Visualization
       document.getElementById('upload-section').style.display = 'none';
       document.getElementById('stats-container').style.display = 'block';
       document.getElementById('legend').style.display = 'block';
-      document.getElementById('match-btn').style.display = 'block';
+      document.getElementById('selection-mode-btn').style.display = 'block';
+      // document.getElementById('match-btn').style.display = 'block'; // Map Matching button commented out
     }
 
     // Toggle layer visibility
@@ -1003,6 +1121,9 @@ title: Navigation Trace Visualization
       } else if (type === 'matched') {
         showMatched = !isActive;
         map.setLayoutProperty('matched-points-layer', 'visibility', showMatched ? 'visible' : 'none');
+      } else if (type === 'nav-sdk-matched-line') {
+        showNavSdkMatchedLine = !isActive;
+        map.setLayoutProperty('nav-sdk-matched-line-layer', 'visibility', showNavSdkMatchedLine ? 'visible' : 'none');
       } else if (type === 'raw-line') {
         showRawLine = !isActive;
         map.setLayoutProperty('raw-matched-line-layer', 'visibility', showRawLine ? 'visible' : 'none');
@@ -1186,14 +1307,354 @@ title: Navigation Trace Visualization
     }
 
 
+    // Toggle selection mode
+    function toggleSelectionMode() {
+      selectionMode = !selectionMode;
+      const btn = document.getElementById('selection-mode-btn');
+      const info = document.getElementById('selection-info');
+
+      if (selectionMode) {
+        btn.classList.add('active');
+        info.style.display = 'block';
+        map.getCanvas().style.cursor = 'crosshair';
+
+        // Add mouse event listeners
+        map.on('mousedown', onMouseDown);
+        map.on('mousemove', onMouseMove);
+        map.on('mouseup', onMouseUp);
+      } else {
+        btn.classList.remove('active');
+        info.style.display = 'none';
+        map.getCanvas().style.cursor = '';
+
+        // Remove mouse event listeners
+        map.off('mousedown', onMouseDown);
+        map.off('mousemove', onMouseMove);
+        map.off('mouseup', onMouseUp);
+
+        // Clear any existing selection
+        clearSelection();
+      }
+    }
+
+    // Mouse event handlers for rectangle drawing
+    function onMouseDown(e) {
+      if (!selectionMode) return;
+
+      // Prevent map dragging
+      map.dragPan.disable();
+
+      startPoint = [e.lngLat.lng, e.lngLat.lat];
+      currentBox = null;
+    }
+
+    function onMouseMove(e) {
+      if (!selectionMode || !startPoint) return;
+
+      const current = [e.lngLat.lng, e.lngLat.lat];
+
+      // Create rectangle from start point to current point
+      const minX = Math.min(startPoint[0], current[0]);
+      const maxX = Math.max(startPoint[0], current[0]);
+      const minY = Math.min(startPoint[1], current[1]);
+      const maxY = Math.max(startPoint[1], current[1]);
+
+      currentBox = [
+        [minX, minY],
+        [maxX, minY],
+        [maxX, maxY],
+        [minX, maxY],
+        [minX, minY]
+      ];
+
+      // Update selection box on map
+      map.getSource('selection-box').setData({
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [currentBox]
+        }
+      });
+    }
+
+    async function onMouseUp(e) {
+      if (!selectionMode || !startPoint || !currentBox) {
+        map.dragPan.enable();
+        return;
+      }
+
+      // Re-enable map dragging
+      map.dragPan.enable();
+
+      // Save the selected area
+      selectedArea = currentBox;
+      startPoint = null;
+
+      // Process the selection
+      await processSelectedArea();
+
+      // Turn off selection mode after processing
+      toggleSelectionMode();
+    }
+
+    function clearSelection() {
+      map.getSource('selection-box').setData({
+        type: 'FeatureCollection',
+        features: []
+      });
+      selectedArea = null;
+      startPoint = null;
+      currentBox = null;
+    }
+
+    // Interpolate points to fill gaps larger than 40m
+    function interpolatePoints(coordinates, maxDistanceMeters = 40) {
+      if (coordinates.length < 2) return coordinates;
+
+      const interpolated = [coordinates[0]];
+
+      for (let i = 1; i < coordinates.length; i++) {
+        const from = coordinates[i - 1];
+        const to = coordinates[i];
+
+        // Calculate distance between consecutive points
+        const distance = turf.distance(
+          turf.point(from),
+          turf.point(to),
+          { units: 'meters' }
+        );
+
+        if (distance > maxDistanceMeters) {
+          // Calculate number of intermediate points needed
+          const numIntermediatePoints = Math.ceil(distance / maxDistanceMeters) - 1;
+
+          // Create a line between the two points
+          const line = turf.lineString([from, to]);
+
+          // Add intermediate points along the line
+          for (let j = 1; j <= numIntermediatePoints; j++) {
+            const fraction = j / (numIntermediatePoints + 1);
+            const interpolatedPoint = turf.along(line, distance * fraction, { units: 'meters' });
+            interpolated.push(interpolatedPoint.geometry.coordinates);
+          }
+        }
+
+        // Add the original point
+        interpolated.push(to);
+      }
+
+      return interpolated;
+    }
+
+    // Process the selected area
+    async function processSelectedArea() {
+      if (!selectedArea || !currentReconstructedRoute || currentReconstructedRoute.length === 0) return;
+
+      console.log('Processing selected area...');
+
+      // Get bounding box from selection
+      const bounds = {
+        minX: selectedArea[0][0],
+        minY: selectedArea[0][1],
+        maxX: selectedArea[2][0],
+        maxY: selectedArea[2][1]
+      };
+
+      // Use the current reconstructed route instead of original matched points
+      const currentPoints = currentReconstructedRoute.map((coord, index) => ({
+        coordinates: coord,
+        timestamp: Date.now() + index * 1000  // Dummy timestamps
+      }));
+
+      // Filter points and split into segments
+      const segments = splitPointsByArea(currentPoints, bounds);
+
+      if (segments.target.length < 2) {
+        alert('Please select an area with at least 2 points');
+        return;
+      }
+
+      console.log(`Found ${segments.target.length} points in selected area`);
+
+      // Show processing indicator
+      const btn = document.getElementById('selection-mode-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner">⟳</span> Processing Map Matching...';
+
+      try {
+        // Get coordinates and interpolate to fill gaps
+        const targetCoordinates = segments.target.map(p => p.coordinates);
+        const interpolatedCoordinates = interpolatePoints(targetCoordinates, 40);
+
+        console.log(`Interpolated from ${targetCoordinates.length} to ${interpolatedCoordinates.length} points`);
+
+        // Call Map Matching API for interpolated target segment
+        const matchedRoute = await matchPointsToRoadForArea(interpolatedCoordinates);
+
+        if (matchedRoute && matchedRoute.features.length > 0) {
+          // Reconstruct the full route
+          reconstructRoute(segments, matchedRoute);
+        } else {
+          alert('Map matching failed for the selected area');
+        }
+      } catch (error) {
+        console.error('Error processing selected area:', error);
+        alert('Error processing selected area');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '📦 Select Area To Fix With Map Matching API';
+      }
+    }
+
+    // Split points by area into before/target/after segments
+    function splitPointsByArea(points, bounds) {
+      const before = [];
+      const target = [];
+      const after = [];
+
+      let foundFirst = false;
+      let foundLast = false;
+
+      points.forEach((point, index) => {
+        const [lng, lat] = point.coordinates;
+        const isInside = lng >= bounds.minX && lng <= bounds.maxX &&
+                        lat >= bounds.minY && lat <= bounds.maxY;
+
+        if (isInside) {
+          target.push({...point, originalIndex: index});
+          if (!foundFirst) foundFirst = true;
+        } else if (!foundFirst) {
+          before.push({...point, originalIndex: index});
+        } else {
+          after.push({...point, originalIndex: index});
+          foundLast = true;
+        }
+      });
+
+      return { before, target, after };
+    }
+
+    // Map matching specifically for selected area
+    async function matchPointsToRoadForArea(coordinates) {
+      try {
+        // Use chunk size of 100 for area matching
+        const chunks = splitIntoChunks(coordinates, 100);
+        const allFeatures = [];
+
+        for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+          const chunk = chunks[chunkIndex];
+          console.log(`Processing area chunk ${chunkIndex + 1}/${chunks.length}`);
+
+          await rateLimiter.throttle();
+
+          const coordinatesString = chunk.map(coord => coord.join(',')).join(';');
+          const radiuses = chunk.map(() => '25').join(';');
+          const baseTime = Math.floor(Date.now() / 1000);
+          const timestamps = chunk.map((_, index) => baseTime + (index * 5)).join(';');
+
+          const url = `https://api.mapbox.com/matching/v5/mapbox.tmp.valhalla-zenrin/driving?access_token=${mapboxgl.accessToken}`;
+
+          const formData = new URLSearchParams();
+          formData.append('coordinates', coordinatesString);
+          formData.append('geometries', 'geojson');
+          formData.append('radiuses', radiuses);
+          formData.append('timestamps', timestamps);
+          formData.append('overview', 'full');
+          formData.append('tidy', 'false');
+
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: formData.toString()
+          });
+
+          const data = await response.json();
+          rateLimiter.release();
+
+          if (data.matchings && data.matchings.length > 0) {
+            allFeatures.push({
+              type: 'Feature',
+              properties: { chunk: chunkIndex },
+              geometry: data.matchings[0].geometry
+            });
+          }
+        }
+
+        return {
+          type: 'FeatureCollection',
+          features: allFeatures
+        };
+      } catch (error) {
+        console.error('Error in area map matching:', error);
+        return null;
+      }
+    }
+
+    // Reconstruct the full route with map-matched segment
+    function reconstructRoute(segments, matchedRoute) {
+      const reconstructedCoordinates = [];
+
+      // Add before segment
+      segments.before.forEach(point => {
+        reconstructedCoordinates.push(point.coordinates);
+      });
+
+      // Add map-matched segment coordinates
+      matchedRoute.features.forEach(feature => {
+        if (feature.geometry.type === 'LineString') {
+          feature.geometry.coordinates.forEach(coord => {
+            reconstructedCoordinates.push(coord);
+          });
+        }
+      });
+
+      // Add after segment
+      segments.after.forEach(point => {
+        reconstructedCoordinates.push(point.coordinates);
+      });
+
+      // Save the reconstructed route as the new current state
+      currentReconstructedRoute = reconstructedCoordinates;
+
+      // Update the Nav SDK matched line with reconstructed route
+      const reconstructedGeoJSON = {
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: reconstructedCoordinates
+          }
+        }]
+      };
+
+      map.getSource('nav-sdk-matched-line').setData(reconstructedGeoJSON);
+
+      // Auto-show the reconstructed route
+      showNavSdkMatchedLine = true;
+      map.setLayoutProperty('nav-sdk-matched-line-layer', 'visibility', 'visible');
+      document.getElementById('toggle-nav-sdk-matched-line').classList.add('active');
+
+      console.log(`Route reconstructed: ${segments.before.length} before + ${matchedRoute.features.length} matched chunks + ${segments.after.length} after`);
+      console.log(`Total route points: ${currentReconstructedRoute.length}`);
+    }
+
     // Clear data and reset
     function clearData() {
+      // Clear selection if active
+      if (selectionMode) {
+        toggleSelectionMode();
+      }
+      clearSelection();
 
       // Clear data
       rawPoints = [];
       matchedPoints = [];
       sessionData = null;
       currentFileInfo = null;
+      currentReconstructedRoute = null;
 
       // Clear map sources
       if (map.getSource('raw-points')) {
@@ -1224,6 +1685,13 @@ title: Navigation Trace Visualization
         });
       }
 
+      if (map.getSource('nav-sdk-matched-line')) {
+        map.getSource('nav-sdk-matched-line').setData({
+          type: 'FeatureCollection',
+          features: []
+        });
+      }
+
       // Reset matched routes
       rawMatchedRoute = null;
       matchedMatchedRoute = null;
@@ -1238,10 +1706,12 @@ title: Navigation Trace Visualization
       // Reset toggles
       document.getElementById('toggle-raw').classList.add('active');
       document.getElementById('toggle-matched').classList.add('active');
+      document.getElementById('toggle-nav-sdk-matched-line').classList.add('active');  // Keep active by default
       document.getElementById('toggle-raw-line').classList.remove('active');
       document.getElementById('toggle-matched-line').classList.remove('active');
       showRaw = true;
       showMatched = true;
+      showNavSdkMatchedLine = true;  // Keep true by default
       showRawLine = false;
       showMatchedLine = false;
     }
