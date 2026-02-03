@@ -1081,13 +1081,8 @@ title: Navigation Trace Visualization
         // Initialize the reconstructed route with original matched points
         currentReconstructedRoute = matchedPoints.map(p => p.coordinates);
 
-        // Calculate distance for matched path
-        let totalDistance = 0;
-        for (let i = 1; i < matchedPoints.length; i++) {
-          const from = turf.point(matchedPoints[i-1].coordinates);
-          const to = turf.point(matchedPoints[i].coordinates);
-          totalDistance += turf.distance(from, to, {units: 'kilometers'});
-        }
+        // Calculate initial distance for matched path
+        const totalDistance = calculateRouteDistance(matchedPoints.map(p => p.coordinates));
         document.getElementById('distance').textContent = totalDistance.toFixed(2) + ' km';
       }
 
@@ -1592,6 +1587,19 @@ title: Navigation Trace Visualization
       }
     }
 
+    // Calculate distance for a route
+    function calculateRouteDistance(coordinates) {
+      if (!coordinates || coordinates.length < 2) return 0;
+
+      let totalDistance = 0;
+      for (let i = 1; i < coordinates.length; i++) {
+        const from = turf.point(coordinates[i-1]);
+        const to = turf.point(coordinates[i]);
+        totalDistance += turf.distance(from, to, {units: 'kilometers'});
+      }
+      return totalDistance;
+    }
+
     // Reconstruct the full route with map-matched segment
     function reconstructRoute(segments, matchedRoute) {
       const reconstructedCoordinates = [];
@@ -1632,6 +1640,10 @@ title: Navigation Trace Visualization
 
       map.getSource('nav-sdk-matched-line').setData(reconstructedGeoJSON);
 
+      // Recalculate and update distance
+      const newDistance = calculateRouteDistance(currentReconstructedRoute);
+      document.getElementById('distance').textContent = newDistance.toFixed(2) + ' km';
+
       // Auto-show the reconstructed route
       showNavSdkMatchedLine = true;
       map.setLayoutProperty('nav-sdk-matched-line-layer', 'visibility', 'visible');
@@ -1639,6 +1651,7 @@ title: Navigation Trace Visualization
 
       console.log(`Route reconstructed: ${segments.before.length} before + ${matchedRoute.features.length} matched chunks + ${segments.after.length} after`);
       console.log(`Total route points: ${currentReconstructedRoute.length}`);
+      console.log(`Updated distance: ${newDistance.toFixed(2)} km`);
     }
 
     // Clear data and reset
