@@ -258,7 +258,7 @@ title: Indoor Airport Navigation
     .location-button {
       position: absolute;
       bottom: 100px;
-      right: 20px;
+      left: 20px;  /* Changed from right to left */
       background: white;
       border: 2px solid #3b82f6;
       border-radius: 50%;
@@ -282,6 +282,46 @@ title: Indoor Airport Navigation
       color: white;
     }
 
+    /* Move the indoor floor selector to the left side */
+    /* The floor selector might use different class names depending on Mapbox version */
+    .mapboxgl-ctrl-indoor,
+    .mapboxgl-indoor-control,
+    .mapboxgl-ctrl-group.mapboxgl-ctrl-indoor,
+    .mapboxgl-ctrl-top-right .mapboxgl-ctrl:has(button[aria-label*="floor"]),
+    .mapboxgl-ctrl-top-right .mapboxgl-ctrl:has(button[aria-label*="Floor"]),
+    .mapboxgl-ctrl-top-right .mapboxgl-ctrl:has(button[aria-label*="level"]),
+    .mapboxgl-ctrl-top-right .mapboxgl-ctrl:has(button[aria-label*="Level"]) {
+      position: fixed !important;
+      left: 10px !important;
+      right: auto !important;
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+      margin: 0 !important;
+    }
+
+    /* Alternative: Move ALL controls in top-right to top-left */
+    /* This approach moves the entire control container */
+    .mapboxgl-ctrl-top-right {
+      left: 10px;
+      right: auto;
+    }
+
+    /* Ensure navigation controls stay on the right if needed */
+    .mapboxgl-ctrl-top-right .mapboxgl-ctrl-nav {
+      position: fixed;
+      right: 10px;
+      left: auto;
+    }
+
+    /* Adjust for mobile if needed */
+    @media (max-width: 640px) {
+      .mapboxgl-ctrl-indoor,
+      .mapboxgl-indoor-control,
+      .mapboxgl-ctrl-group.mapboxgl-ctrl-indoor {
+        left: 5px !important;
+      }
+    }
+
     /* Mobile responsive */
     @media (max-width: 640px) {
       .info-panel {
@@ -296,7 +336,7 @@ title: Indoor Airport Navigation
 
       .location-button {
         bottom: 80px;
-        right: 10px;
+        left: 10px;  /* Changed from right to left for mobile too */
       }
     }
   </style>
@@ -438,7 +478,8 @@ title: Indoor Airport Navigation
     const geolocateControl = new mapboxgl.GeolocateControl({
       positionOptions: {
         enableHighAccuracy: true,
-        timeout: 6000
+        timeout: 10000,  // Increased timeout to 10 seconds for better reliability
+        maximumAge: 0     // Always get fresh location (no caching)
       },
       trackUserLocation: true,
       showUserHeading: true,
@@ -604,7 +645,7 @@ title: Indoor Airport Navigation
             return new Promise((resolve) => {
               navigator.geolocation.getCurrentPosition(
                 (position) => {
-                  console.log('Location permission granted:', position.coords);
+                  console.log('Location permission granted (fresh):', position.coords);
                   geolocateControl.trigger();
                   resolve(true);
                 },
@@ -615,7 +656,7 @@ title: Indoor Airport Navigation
                 {
                   enableHighAccuracy: true,
                   timeout: 10000,
-                  maximumAge: 0
+                  maximumAge: 0  // Always get fresh location (no caching)
                 }
               );
             });
@@ -637,7 +678,7 @@ title: Indoor Airport Navigation
           return new Promise((resolve) => {
             navigator.geolocation.getCurrentPosition(
               (position) => {
-                console.log('Location obtained:', position.coords);
+                console.log('Location obtained (fresh):', position.coords);
                 geolocateControl.trigger();
                 resolve(true);
               },
@@ -648,7 +689,7 @@ title: Indoor Airport Navigation
               {
                 enableHighAccuracy: true,
                 timeout: 10000,
-                maximumAge: 0
+                maximumAge: 0  // Always get fresh location (no caching)
               }
             );
           });
