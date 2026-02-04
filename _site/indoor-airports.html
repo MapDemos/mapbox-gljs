@@ -263,6 +263,34 @@
       animation: pulse 2s infinite !important;
     }
 
+    /* Manual location button */
+    .location-button {
+      position: absolute;
+      bottom: 100px;
+      right: 20px;
+      background: white;
+      border: 2px solid #3b82f6;
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 1;
+      font-size: 24px;
+    }
+
+    .location-button:hover {
+      background: #eff6ff;
+    }
+
+    .location-button.active {
+      background: #3b82f6;
+      color: white;
+    }
+
     /* Mobile responsive */
     @media (max-width: 640px) {
       .info-panel {
@@ -271,9 +299,13 @@
         max-width: none;
       }
 
-
       .airport-grid {
         grid-template-columns: 1fr;
+      }
+
+      .location-button {
+        bottom: 80px;
+        right: 10px;
       }
     }
   </style>
@@ -345,6 +377,11 @@
     <div class="feature-details" id="feature-details">-</div>
   </div>
 
+  <!-- Manual location button for mobile -->
+  <button class="location-button" id="location-button" title="Show my location">
+    📍
+  </button>
+
   <script>
     mapboxgl.accessToken = "pk.eyJ1IjoibWFwYm94LW1hcC1kZXNpZ24iLCJhIjoiY2syeHpiaHlrMDJvODNidDR5azU5NWcwdiJ9.x0uSqSWGXdoFKuHZC5Eo_Q"
     // Airport configurations
@@ -409,12 +446,16 @@
     // Add geolocation control for user location
     const geolocateControl = new mapboxgl.GeolocateControl({
       positionOptions: {
-        enableHighAccuracy: true
+        enableHighAccuracy: true,
+        timeout: 6000
       },
       trackUserLocation: true,
       showUserHeading: true,
       showUserLocation: true,
-      showAccuracyCircle: true
+      showAccuracyCircle: true,
+      fitBoundsOptions: {
+        maxZoom: 18
+      }
     });
     map.addControl(geolocateControl);
 
@@ -552,6 +593,62 @@
       detectCurrentFloor();
     });
 
+    // Manual location button handler
+    let isTrackingLocation = false;
+    document.getElementById('location-button').addEventListener('click', () => {
+      if (!isTrackingLocation) {
+        // Request location permission and start tracking
+        if (navigator.geolocation) {
+          // First check if we can get location using the browser API
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              console.log('Browser geolocation successful:', position.coords);
+              // If browser location works, trigger the mapbox control
+              geolocateControl.trigger();
+              isTrackingLocation = true;
+              document.getElementById('location-button').classList.add('active');
+            },
+            (error) => {
+              console.error('Browser geolocation error:', error);
+              // Try triggering mapbox control anyway
+              geolocateControl.trigger();
+
+              if (error.code === 1) {
+                alert('Please enable location access for this site in your browser settings.');
+              } else if (error.code === 2) {
+                alert('Unable to get your location. Please check your device settings.');
+              } else {
+                alert('Location request timed out. Please try again.');
+              }
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: 5000,
+              maximumAge: 0
+            }
+          );
+        } else {
+          alert('Geolocation is not supported by your browser');
+        }
+      } else {
+        // Stop tracking
+        geolocateControl.trigger(); // This toggles the tracking
+        isTrackingLocation = false;
+        document.getElementById('location-button').classList.remove('active');
+      }
+    });
+
+    // Update button state based on geolocate control state
+    geolocateControl.on('trackuserlocationstart', () => {
+      isTrackingLocation = true;
+      document.getElementById('location-button').classList.add('active');
+    });
+
+    geolocateControl.on('trackuserlocationend', () => {
+      isTrackingLocation = false;
+      document.getElementById('location-button').classList.remove('active');
+    });
+
     // Initialize with configurations on load
     map.on('load', () => {
       // For Japanese labels, we need to update the text fields
@@ -593,8 +690,18 @@
         console.log('Could not set indoor zoom threshold:', e.message);
       }
 
-      // Automatically activate user location tracking
-      geolocateControl.trigger();
+      // Don't automatically trigger on mobile devices
+      // Let the user click the location button instead
+      // This avoids permission popup on page load
+      if (!/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        // Desktop: auto-trigger location
+        setTimeout(() => {
+          geolocateControl.trigger();
+          console.log('Auto-triggering geolocation on desktop...');
+        }, 1000);
+      } else {
+        console.log('Mobile device detected - user must click location button');
+      }
 
       // Log current camera state for debugging
       console.log('Map initialized at:', {
@@ -627,6 +734,31 @@
           break;
         }
       }
+    });
+
+    // Handle geolocation errors
+    geolocateControl.on('error', (error) => {
+      console.error('Geolocation error:', error);
+      if (error.code === 1) {
+        console.log('Location permission denied. Please enable location access for this site.');
+        alert('Location permission denied. Please enable location access in your browser settings.');
+      } else if (error.code === 2) {
+        console.log('Position unavailable');
+        alert('Unable to retrieve your location. Please check your device settings.');
+      } else if (error.code === 3) {
+        console.log('Timeout getting location');
+        alert('Timeout getting location. Please try again.');
+      }
+    });
+
+    // Log when tracking starts
+    geolocateControl.on('trackuserlocationstart', () => {
+      console.log('Started tracking user location');
+    });
+
+    // Log when tracking ends
+    geolocateControl.on('trackuserlocationend', () => {
+      console.log('Stopped tracking user location');
     });
 
     // Calculate distance between two points in km
