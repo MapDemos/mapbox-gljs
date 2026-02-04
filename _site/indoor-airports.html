@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Indoor Airport Navigation</title>
+  <link href="https://fonts.googleapis.com/css2?family=Raleway&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header>
+    <h1>Mapbox Demos</h1> 
+  </header>
+  <main>
+    <p>&lt;!DOCTYPE html&gt;</p>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Indoor Airport Navigation with Floor Selector</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-language/v1.0.0/mapbox-gl-language.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.17.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.17.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/d3@7.8.5/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.min.js"></script>
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.css" type="text/css" />
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<script src="https://kenji-shima.github.io/resource-files/polyline.js" type="module"></script>
+<script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    }
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    /* Info panel */
+    .info-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      max-width: 380px;
+      z-index: 1;
+    }
+
+    .info-panel h2 {
+      margin: 0 0 10px 0;
+      font-size: 20px;
+      color: #333;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .info-panel p {
+      margin: 0 0 15px 0;
+      font-size: 14px;
+      color: #666;
+      line-height: 1.5;
+    }
+
+    /* Airport selection */
+    .airport-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .airport-btn {
+      padding: 12px;
+      border: 2px solid #e5e7eb;
+      background: white;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .airport-btn:hover {
+      background: #f8f9fa;
+      border-color: #3b82f6;
+      transform: translateY(-2px);
+    }
+
+    .airport-btn.active {
+      background: #eff6ff;
+      border-color: #3b82f6;
+      color: #3b82f6;
+    }
+
+    .airport-code {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    .airport-name {
+      font-size: 11px;
+      color: #6b7280;
+    }
+
+
+    /* Airport info box */
+    .airport-info {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 15px;
+      font-size: 13px;
+      display: none;
+    }
+
+    .airport-info.visible {
+      display: block;
+    }
+
+    .airport-info-title {
+      font-weight: 600;
+      color: #0c4a6e;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .airport-info-detail {
+      color: #0369a1;
+      line-height: 1.5;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid #e0f2fe;
+    }
+
+    .info-row:last-child {
+      border-bottom: none;
+    }
+
+    .info-label {
+      font-weight: 500;
+      color: #0c4a6e;
+    }
+
+    .info-value {
+      color: #0369a1;
+    }
+
+    /* Feature highlight */
+    .feature-info {
+      position: absolute;
+      bottom: 30px;
+      left: 20px;
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      max-width: 300px;
+      display: none;
+      z-index: 1;
+    }
+
+    .feature-info.visible {
+      display: block;
+    }
+
+    .feature-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #333;
+    }
+
+    .feature-details {
+      font-size: 12px;
+      color: #666;
+      line-height: 1.4;
+    }
+
+    /* Loading spinner */
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: none;
+      z-index: 1000;
+    }
+
+    .loading.visible {
+      display: block;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid #e5e7eb;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* User location puck styling */
+    .mapboxgl-user-location-dot {
+      width: 15px !important;
+      height: 15px !important;
+      border: 3px solid #fff !important;
+      background-color: #3b82f6 !important;
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.4) !important;
+    }
+
+    .mapboxgl-user-location-dot::after {
+      display: none !important;
+    }
+
+    .mapboxgl-user-location-accuracy-circle {
+      background-color: rgba(59, 130, 246, 0.15) !important;
+      border: 2px solid rgba(59, 130, 246, 0.3) !important;
+    }
+
+    .mapboxgl-user-heading-indicator {
+      display: none !important;
+    }
+
+    /* Pulse animation for user location */
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+      }
+      70% {
+        box-shadow: 0 0 0 20px rgba(59, 130, 246, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+      }
+    }
+
+    .mapboxgl-user-location-dot {
+      animation: pulse 2s infinite !important;
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 640px) {
+      .info-panel {
+        left: 10px;
+        right: 10px;
+        max-width: none;
+      }
+
+
+      .airport-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Info panel commented out
+  <div class="info-panel">
+    <h2>
+      <span>✈️</span>
+      Indoor Airport Navigation
+    </h2>
+    <p>Select an airport to explore its indoor mapping with floor-by-floor navigation.</p>
+
+    <div class="airport-grid">
+      <button class="airport-btn" onclick="flyToAirport('SFO')">
+        <span class="airport-code">SFO</span>
+        <span class="airport-name">San Francisco</span>
+      </button>
+      <button class="airport-btn" onclick="flyToAirport('LAX')">
+        <span class="airport-code">LAX</span>
+        <span class="airport-name">Los Angeles</span>
+      </button>
+      <button class="airport-btn" onclick="flyToAirport('HND')">
+        <span class="airport-code">HND</span>
+        <span class="airport-name">Tokyo Haneda</span>
+      </button>
+      <button class="airport-btn" onclick="flyToAirport('LHR')">
+        <span class="airport-code">LHR</span>
+        <span class="airport-name">London Heathrow</span>
+      </button>
+      <button class="airport-btn" onclick="flyToAirport('AMS')">
+        <span class="airport-code">AMS</span>
+        <span class="airport-name">Amsterdam</span>
+      </button>
+      <button class="airport-btn" onclick="flyToAirport('LAS')">
+        <span class="airport-code">LAS</span>
+        <span class="airport-name">Las Vegas</span>
+      </button>
+    </div>
+
+    <div class="airport-info" id="airport-info">
+      <div class="airport-info-title" id="airport-title">Airport Information</div>
+      <div class="airport-info-detail">
+        <div class="info-row">
+          <span class="info-label">Terminal:</span>
+          <span class="info-value" id="terminal-info">-</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Current Floor:</span>
+          <span class="info-value" id="floor-info">Ground</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Available Floors:</span>
+          <span class="info-value" id="floors-available">-</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  -->
+
+  <div class="feature-info" id="feature-info">
+    <div class="feature-title" id="feature-title">-</div>
+    <div class="feature-details" id="feature-details">-</div>
+  </div>
+
+  <script>
+    mapboxgl.accessToken = "pk.eyJ1IjoibWFwYm94LW1hcC1kZXNpZ24iLCJhIjoiY2syeHpiaHlrMDJvODNidDR5azU5NWcwdiJ9.x0uSqSWGXdoFKuHZC5Eo_Q"
+    // Airport configurations
+    const airports = {
+      SFO: {
+        name: 'San Francisco International Airport',
+        center: [-122.3816, 37.6193],
+        zoom: 17,
+        floors: [-1, 0, 1, 2, 3],
+        terminals: ['Terminal 1', 'Terminal 2', 'Terminal 3', 'International']
+      },
+      LAX: {
+        name: 'Los Angeles International Airport',
+        center: [-118.4085, 33.9425],
+        zoom: 16,
+        floors: [0, 1, 2],
+        terminals: ['Tom Bradley International', 'Terminal 1-8']
+      },
+      HND: {
+        name: 'Tokyo Haneda Airport',
+        center: [139.7853, 35.5494],
+        zoom: 16,
+        floors: [0, 1, 2, 3],
+        terminals: ['Terminal 1', 'Terminal 2', 'Terminal 3 (International)']
+      },
+      LHR: {
+        name: 'London Heathrow Airport',
+        center: [-0.4543, 51.4700],
+        zoom: 16,
+        floors: [0, 1, 2],
+        terminals: ['Terminal 2', 'Terminal 3', 'Terminal 4', 'Terminal 5']
+      },
+      AMS: {
+        name: 'Amsterdam Airport Schiphol',
+        center: [4.7639, 52.3086],
+        zoom: 16,
+        floors: [-1, 0, 1],
+        terminals: ['Schiphol Plaza', 'Departures', 'Lounges']
+      },
+      LAS: {
+        name: 'McCarran International Airport',
+        center: [-115.1523, 36.0840],
+        zoom: 16,
+        floors: [0, 1, 2],
+        terminals: ['Terminal 1', 'Terminal 3']
+      }
+    };
+
+    // Initialize map with indoor-enabled style
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox-map-design/cmjd8dsg7003m01qw0snc8bmc', // Indoor-enabled style with tilesets
+      center: [139.7853, 35.5494], // Default to HND
+      zoom: 17,
+      pitch: 45, // Slight pitch for 3D effect
+      bearing: -17.6
+    });
+
+    // Add navigation controls
+    map.addControl(new mapboxgl.NavigationControl());
+
+    // Add geolocation control for user location
+    const geolocateControl = new mapboxgl.GeolocateControl({
+      positionOptions: {
+        enableHighAccuracy: true
+      },
+      trackUserLocation: true,
+      showUserHeading: true,
+      showUserLocation: true,
+      showAccuracyCircle: true
+    });
+    map.addControl(geolocateControl);
+
+    // Current state
+    let currentAirport = null;
+    let currentFloor = 0;
+    let availableFloors = [];
+    let indoorFeatures = [];
+    let userMarker = null;
+
+    // Monitor floor changes from the built-in control
+    function detectCurrentFloor() {
+      // The built-in control manages floor selection
+      // We can detect the current floor by querying visible features
+      if (!map.getStyle()) return;
+
+      const features = map.queryRenderedFeatures();
+      const floors = new Set();
+
+      features.forEach(f => {
+        if (f.properties && f.properties.floor_level !== undefined) {
+          floors.add(f.properties.floor_level);
+        }
+      });
+
+      // Update floor info based on what's visible
+      if (floors.size === 1) {
+        currentFloor = Array.from(floors)[0];
+        const floorName = currentFloor >= 0 ? `Floor ${currentFloor}` : `Basement ${Math.abs(currentFloor)}`;
+        document.getElementById('floor-info').textContent = floorName;
+      }
+    }
+
+
+    // Fly to selected airport
+    function flyToAirport(code) {
+      const airport = airports[code];
+      if (!airport) return;
+
+      currentAirport = code;
+
+      // Update UI
+      document.querySelectorAll('.airport-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      event.target.closest('.airport-btn').classList.add('active');
+
+      // Show loading
+      document.getElementById('loading').classList.add('visible');
+
+      // Fly to airport
+      map.flyTo({
+        center: airport.center,
+        zoom: airport.zoom,
+        pitch: 45,
+        bearing: -17.6,
+        essential: true,
+        duration: 2000
+      });
+
+      // Wait for movement to end
+      map.once('moveend', () => {
+        document.getElementById('loading').classList.remove('visible');
+
+        // Update airport info
+        document.getElementById('airport-title').textContent = airport.name;
+        document.getElementById('terminal-info').textContent = airport.terminals[0];
+        document.getElementById('floors-available').textContent =
+          airport.floors.map(f => f >= 0 ? f : `B${Math.abs(f)}`).join(', ');
+        document.getElementById('airport-info').classList.add('visible');
+
+        // Store available floors for this airport
+        availableFloors = airport.floors;
+
+        // The built-in floor control will handle floor selection
+        // We just monitor for changes
+        detectCurrentFloor();
+      });
+    }
+
+    // Handle map click for feature info
+    map.on('click', (e) => {
+      // Query features at click point
+      const features = map.queryRenderedFeatures(e.point);
+
+      // Look for indoor features
+      const indoorFeature = features.find(f => {
+        const props = f.properties;
+        return props && (
+          props.class ||
+          props.type ||
+          props.name ||
+          props.facility_name
+        );
+      });
+
+      if (indoorFeature) {
+        const props = indoorFeature.properties;
+        const name = props.name || props.facility_name || 'Indoor Feature';
+        const type = props.class || props.type || 'Unknown';
+        const floor = props.floor_level || props.level || currentFloor;
+
+        // Show feature info
+        document.getElementById('feature-title').textContent = name;
+        document.getElementById('feature-details').innerHTML = `
+          <strong>Type:</strong> ${type}<br>
+          <strong>Floor:</strong> ${floor >= 0 ? floor : `B${Math.abs(floor)}`}
+          ${props.facility_type ? `<br><strong>Facility:</strong> ${props.facility_type}` : ''}
+        `;
+        document.getElementById('feature-info').classList.add('visible');
+
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+          document.getElementById('feature-info').classList.remove('visible');
+        }, 5000);
+      }
+    });
+
+    // Change cursor on hover over interactive features
+    map.on('mousemove', (e) => {
+      const features = map.queryRenderedFeatures(e.point);
+      const hasIndoorFeature = features.some(f => {
+        const props = f.properties;
+        return props && (props.class || props.type || props.name);
+      });
+
+      map.getCanvas().style.cursor = hasIndoorFeature ? 'pointer' : '';
+    });
+
+    // Monitor for floor changes and update UI
+    map.on('idle', () => {
+      if (!currentAirport) return;
+
+      // Detect current floor from visible features
+      detectCurrentFloor();
+    });
+
+    // Initialize with configurations on load
+    map.on('load', () => {
+      // For Japanese labels, we need to update the text fields
+      // This style might have Japanese name fields available
+      const style = map.getStyle();
+
+      // Update all symbol layers to use Japanese labels where available
+      style.layers.forEach(layer => {
+        if (layer.type === 'symbol' && layer.layout && layer.layout['text-field']) {
+          const layerId = layer.id;
+
+          // Common patterns for label layers
+          if (layerId.includes('label') || layerId.includes('name') || layerId.includes('text')) {
+            try {
+              // Try to use coalesce to fallback from Japanese to default name
+              // This expression tries name:ja first, then name_ja, then falls back to name
+              const japaneseTextField = [
+                'coalesce',
+                ['get', 'name:ja'],
+                ['get', 'name_ja'],
+                ['get', 'name']
+              ];
+
+              map.setLayoutProperty(layerId, 'text-field', japaneseTextField);
+            } catch (e) {
+              // Some layers might not support this modification
+              console.log(`Could not update layer ${layerId}:`, e.message);
+            }
+          }
+        }
+      });
+
+      // Try to lower indoor zoom threshold if the style supports it
+      try {
+        // This style might use different config properties
+        map.setConfigProperty('basemap', 'indoorMapZoomThreshold', 14);
+      } catch (e) {
+        // Config might not be supported
+        console.log('Could not set indoor zoom threshold:', e.message);
+      }
+
+      // Automatically activate user location tracking
+      geolocateControl.trigger();
+
+      // Log current camera state for debugging
+      console.log('Map initialized at:', {
+        center: map.getCenter(),
+        zoom: map.getZoom(),
+        layers: style.layers.filter(l => l.type === 'symbol').length + ' symbol layers'
+      });
+    });
+
+    // Handle geolocation events
+    geolocateControl.on('geolocate', (e) => {
+      console.log('User location:', e.coords.latitude, e.coords.longitude);
+      console.log('Accuracy:', e.coords.accuracy, 'meters');
+
+      // Check if user is near any of our airports
+      const userLng = e.coords.longitude;
+      const userLat = e.coords.latitude;
+
+      // Check proximity to airports (within ~5km)
+      for (const [code, airport] of Object.entries(airports)) {
+        const distance = getDistance(
+          [userLng, userLat],
+          airport.center
+        );
+
+        if (distance < 5) { // Within 5km
+          console.log(`User is near ${code} airport`);
+          // Could auto-select the nearby airport
+          // flyToAirport(code);
+          break;
+        }
+      }
+    });
+
+    // Calculate distance between two points in km
+    function getDistance(coord1, coord2) {
+      const R = 6371; // Earth's radius in km
+      const dLat = toRad(coord2[1] - coord1[1]);
+      const dLon = toRad(coord2[0] - coord1[0]);
+      const lat1 = toRad(coord1[1]);
+      const lat2 = toRad(coord2[1]);
+
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(lat1) * Math.cos(lat2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    function toRad(deg) {
+      return deg * (Math.PI/180);
+    }
+  </script>
+</body>
+</html>
+
+  </main>
+  <footer>
+    <p>© 2024, Mapbox Demos</p>
+  </footer>
+</body>
+</html>
