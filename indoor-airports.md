@@ -225,7 +225,7 @@ title: Indoor Airport Navigation
       display: none !important;
     }
 
-    /* Pulse animation for user location */
+    /* Pulse animation for user location and button */
     @keyframes pulse {
       0% {
         box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
@@ -235,6 +235,18 @@ title: Indoor Airport Navigation
       }
       100% {
         box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+      }
+    }
+
+    /* Special pulse animation for location button hint */
+    @keyframes buttonPulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      }
+      50% {
+        transform: scale(1.1);
+        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
       }
     }
 
@@ -572,42 +584,105 @@ title: Indoor Airport Navigation
       detectCurrentFloor();
     });
 
+    // Function to programmatically request location permission
+    async function requestLocationPermission() {
+      try {
+        // Check if Permissions API is available
+        if ('permissions' in navigator) {
+          const result = await navigator.permissions.query({ name: 'geolocation' });
+          console.log('Current permission state:', result.state);
+
+          if (result.state === 'granted') {
+            // Permission already granted, start tracking
+            console.log('Location permission already granted');
+            geolocateControl.trigger();
+            return true;
+          } else if (result.state === 'prompt') {
+            // Need to request permission
+            console.log('Location permission will be requested');
+            // This will trigger the browser's permission prompt
+            return new Promise((resolve) => {
+              navigator.geolocation.getCurrentPosition(
+                (position) => {
+                  console.log('Location permission granted:', position.coords);
+                  geolocateControl.trigger();
+                  resolve(true);
+                },
+                (error) => {
+                  console.error('Location permission denied or error:', error);
+                  resolve(false);
+                },
+                {
+                  enableHighAccuracy: true,
+                  timeout: 10000,
+                  maximumAge: 0
+                }
+              );
+            });
+          } else if (result.state === 'denied') {
+            console.log('Location permission denied - user must enable in browser settings');
+            return false;
+          }
+
+          // Listen for permission changes
+          result.addEventListener('change', () => {
+            console.log('Permission state changed to:', result.state);
+            if (result.state === 'granted') {
+              geolocateControl.trigger();
+            }
+          });
+        } else {
+          // Permissions API not available, try direct request
+          console.log('Permissions API not available, trying direct request');
+          return new Promise((resolve) => {
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                console.log('Location obtained:', position.coords);
+                geolocateControl.trigger();
+                resolve(true);
+              },
+              (error) => {
+                console.error('Location error:', error);
+                resolve(false);
+              },
+              {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+              }
+            );
+          });
+        }
+      } catch (error) {
+        console.error('Error checking permissions:', error);
+        return false;
+      }
+    }
+
     // Manual location button handler
     let isTrackingLocation = false;
-    document.getElementById('location-button').addEventListener('click', () => {
+    document.getElementById('location-button').addEventListener('click', async () => {
       if (!isTrackingLocation) {
-        // Request location permission and start tracking
-        if (navigator.geolocation) {
-          // First check if we can get location using the browser API
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              console.log('Browser geolocation successful:', position.coords);
-              // If browser location works, trigger the mapbox control
-              geolocateControl.trigger();
-              isTrackingLocation = true;
-              document.getElementById('location-button').classList.add('active');
-            },
-            (error) => {
-              console.error('Browser geolocation error:', error);
-              // Try triggering mapbox control anyway
-              geolocateControl.trigger();
+        // Request location permission programmatically
+        const granted = await requestLocationPermission();
 
-              if (error.code === 1) {
-                alert('Please enable location access for this site in your browser settings.');
-              } else if (error.code === 2) {
-                alert('Unable to get your location. Please check your device settings.');
-              } else {
-                alert('Location request timed out. Please try again.');
-              }
-            },
-            {
-              enableHighAccuracy: true,
-              timeout: 5000,
-              maximumAge: 0
-            }
-          );
+        if (granted) {
+          isTrackingLocation = true;
+          document.getElementById('location-button').classList.add('active');
         } else {
-          alert('Geolocation is not supported by your browser');
+          // Check permission state to provide appropriate message
+          if ('permissions' in navigator) {
+            const result = await navigator.permissions.query({ name: 'geolocation' });
+            if (result.state === 'denied') {
+              alert('Location access is blocked. Please enable it in your browser settings:\n\n' +
+                    'Chrome Android: Tap the lock icon in address bar → Site settings → Location → Allow\n\n' +
+                    'Or go to Chrome Settings → Site settings → Location');
+            } else {
+              alert('Unable to access location. Please check your device location settings.');
+            }
+          } else {
+            alert('Unable to access location. Please enable location services and try again.');
+          }
         }
       } else {
         // Stop tracking
@@ -669,26 +744,66 @@ title: Indoor Airport Navigation
         console.log('Could not set indoor zoom threshold:', e.message);
       }
 
-      // Don't automatically trigger on mobile devices
-      // Let the user click the location button instead
-      // This avoids permission popup on page load
-      if (!/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-        // Desktop: auto-trigger location
-        setTimeout(() => {
-          geolocateControl.trigger();
-          console.log('Auto-triggering geolocation on desktop...');
-        }, 1000);
-      } else {
-        console.log('Mobile device detected - user must click location button');
+      // Check location permission status on load
+      checkAndRequestLocationPermission();
+    });
+
+    // Function to check permission and optionally auto-enable location
+    async function checkAndRequestLocationPermission() {
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+      try {
+        if ('permissions' in navigator) {
+          const result = await navigator.permissions.query({ name: 'geolocation' });
+          console.log('Initial permission state:', result.state);
+
+          if (result.state === 'granted') {
+            // Permission already granted, auto-enable location
+            setTimeout(() => {
+              geolocateControl.trigger();
+              console.log('Auto-enabling location (permission already granted)');
+              document.getElementById('location-button').classList.add('active');
+              isTrackingLocation = true;
+            }, 1000);
+          } else if (result.state === 'prompt') {
+            if (!isMobile) {
+              // On desktop, auto-request permission
+              setTimeout(() => {
+                console.log('Desktop: Auto-requesting location permission');
+                requestLocationPermission();
+              }, 1500);
+            } else {
+              // On mobile, show a hint to the user
+              console.log('Mobile: User needs to tap location button');
+              // Flash the location button to draw attention
+              setTimeout(() => {
+                const btn = document.getElementById('location-button');
+                btn.style.animation = 'buttonPulse 2s ease-in-out 3';
+                // Animation will stop automatically after 3 iterations (6 seconds)
+                btn.addEventListener('animationend', () => {
+                  btn.style.animation = '';
+                }, { once: true });
+              }, 2000);
+            }
+          } else if (result.state === 'denied') {
+            console.log('Location permission is denied');
+            // Could show a non-intrusive message about enabling location
+          }
+        } else {
+          // Permissions API not available
+          if (!isMobile) {
+            // Try to auto-enable on desktop
+            setTimeout(() => {
+              geolocateControl.trigger();
+              console.log('Desktop: Attempting to enable location');
+            }, 1000);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking initial permissions:', error);
       }
 
-      // Log current camera state for debugging
-      console.log('Map initialized at:', {
-        center: map.getCenter(),
-        zoom: map.getZoom(),
-        layers: style.layers.filter(l => l.type === 'symbol').length + ' symbol layers'
-      });
-    });
+    }
 
     // Handle geolocation events
     geolocateControl.on('geolocate', (e) => {
