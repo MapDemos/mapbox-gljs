@@ -424,6 +424,10 @@ title: Return to Route Demo
       <div class="legend-dot" style="background: #F97316; border: 3px solid #FFF; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>
       <span>Driver Position</span>
     </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background: #10B981; border: 3px solid #059669; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>
+      <span>Optimal Return Point</span>
+    </div>
   </div>
 
   <script>
@@ -597,7 +601,7 @@ title: Return to Route Demo
         }
       });
 
-      // Highlight intersection layer
+      // Highlight intersection layer (deviation start)
       map.addSource('highlight-intersection', {
         type: 'geojson',
         data: {
@@ -614,6 +618,28 @@ title: Return to Route Demo
           'circle-radius': 10,
           'circle-color': '#FBBF24',
           'circle-stroke-color': '#F59E0B',
+          'circle-stroke-width': 3,
+          'circle-opacity': 0.9
+        }
+      });
+
+      // Return intersection layer (optimal return point)
+      map.addSource('return-intersection', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: []
+        }
+      });
+
+      map.addLayer({
+        id: 'return-intersection-layer',
+        type: 'circle',
+        source: 'return-intersection',
+        paint: {
+          'circle-radius': 12,
+          'circle-color': '#10B981',
+          'circle-stroke-color': '#059669',
           'circle-stroke-width': 3,
           'circle-opacity': 0.9
         }
@@ -708,9 +734,14 @@ title: Return to Route Demo
           `${coords[1].toFixed(4)}, ${coords[0].toFixed(4)}`;
         document.getElementById('driver-coords').classList.remove('not-set');
 
-        // Enable create deviation button
-        document.getElementById('create-deviation').disabled = false;
-        hideInstruction();
+        showInstruction('Finding optimal return point...');
+
+        // Find optimal return intersection using Matrix API
+        findOptimalReturnIntersection(coords).then(() => {
+          // Enable create deviation button after finding return point
+          document.getElementById('create-deviation').disabled = false;
+          hideInstruction();
+        });
       }
     }
 
@@ -1041,32 +1072,126 @@ title: Return to Route Demo
           }
         });
 
-        // Find next intersection (using entry-capable intersections)
-        const entryCapableIntersections = [...entryOnlyIntersections, ...dualIntersections];
-        const routeLineForNext = turf.lineString(mainRoute.geometry.coordinates);
-        const currentPointOnRoute = turf.nearestPointOnLine(routeLineForNext, turf.point(nearestIntersection.location));
-
-        // Find entry intersections that are ahead on the route
-        let minDistanceAhead = Infinity;
+        // Don't find next intersection here - wait until we have driver position
+        // and can use Matrix API to find optimal return point
         nextIntersection = null;
+      }
+    }
 
-        entryCapableIntersections.forEach(intersection => {
-          const intersectionPointOnRoute = turf.nearestPointOnLine(routeLineForNext, turf.point(intersection.location));
+    // Find optimal return intersection using Matrix API
+    async function findOptimalReturnIntersection(driverPos) {
+      // Get all intersections that can be entry points (entry-only and dual)
+      const entryCapableIntersections = [...entryOnlyIntersections, ...dualIntersections];
 
-          // Check if this intersection is ahead on the route
-          if (intersectionPointOnRoute.properties.index > currentPointOnRoute.properties.index) {
-            const distance = intersectionPointOnRoute.properties.index - currentPointOnRoute.properties.index;
-            if (distance < minDistanceAhead) {
-              minDistanceAhead = distance;
-              nextIntersection = intersection;
-            }
-          }
-        });
+      if (entryCapableIntersections.length === 0) {
+        // Fallback to end point if no entry intersections
+        nextIntersection = { location: endPoint };
+        return;
+      }
 
-        // If no entry intersection found ahead, use end point
-        if (!nextIntersection) {
-          nextIntersection = { location: endPoint };
+      // Find the 10 closest intersections by straight-line distance using Turf
+      const intersectionsWithDistance = entryCapableIntersections.map(intersection => {
+        const distance = turf.distance(
+          turf.point(driverPos),
+          turf.point(intersection.location),
+          { units: 'kilometers' }
+        );
+        return { ...intersection, straightLineDistance: distance };
+      });
+
+      // Sort by distance and take top 10
+      intersectionsWithDistance.sort((a, b) => a.straightLineDistance - b.straightLineDistance);
+      const top10Intersections = intersectionsWithDistance.slice(0, 10);
+
+      // Skip intersections that are behind the deviation point on the route
+      const routeLine = turf.lineString(mainRoute.geometry.coordinates);
+      const deviationPointOnRoute = turf.nearestPointOnLine(routeLine, turf.point(nearestIntersection.location));
+
+      const candidateIntersections = top10Intersections.filter(intersection => {
+        const intersectionOnRoute = turf.nearestPointOnLine(routeLine, turf.point(intersection.location));
+        return intersectionOnRoute.properties.index > deviationPointOnRoute.properties.index;
+      });
+
+      if (candidateIntersections.length === 0) {
+        // If no intersections ahead, use end point
+        nextIntersection = { location: endPoint };
+        return;
+      }
+
+      // Prepare coordinates for Matrix API
+      // Build all coordinates: source first, then destinations
+      const allCoordinates = [
+        `${driverPos[0]},${driverPos[1]}`,  // Index 0: driver position (source)
+        ...candidateIntersections.map(i => `${i.location[0]},${i.location[1]}`)  // Index 1,2,3... destinations
+      ].join(';');
+
+      // Sources: just index 0 (driver position)
+      const sourcesParam = '0';
+
+      // Destinations: indices 1 through N (using semicolon separator!)
+      const destinationsParam = candidateIntersections
+        .map((_, i) => i + 1)
+        .join(';');  // CRITICAL: Use semicolon, not comma!
+
+      // Call Matrix API
+      const url = `https://api.mapbox.com/directions-matrix/v1/mapbox/driving/${allCoordinates}` +
+        `?access_token=${mapboxgl.accessToken}` +
+        `&sources=${sourcesParam}` +
+        `&destinations=${destinationsParam}` +
+        `&annotations=duration,distance`;
+
+      console.log('Matrix API URL:', url);
+      console.log('Candidate intersections:', candidateIntersections.length);
+
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        console.log('Matrix API response:', data);
+
+        // Check for successful response
+        if (data.code !== 'Ok') {
+          console.error('Matrix API error:', data.code, data.message);
+          throw new Error(`Matrix API: ${data.code} - ${data.message || 'Unknown error'}`);
         }
+
+        if (data.durations && data.durations[0]) {
+          // Find the intersection with minimum duration
+          let minDuration = Infinity;
+          let optimalIntersectionIndex = 0;
+
+          data.durations[0].forEach((duration, index) => {
+            if (duration !== null && duration < minDuration) {
+              minDuration = duration;
+              optimalIntersectionIndex = index;
+            }
+          });
+
+          // Set the optimal intersection as next intersection
+          nextIntersection = candidateIntersections[optimalIntersectionIndex];
+
+          console.log(`Matrix API: Selected intersection ${optimalIntersectionIndex + 1} of ${candidateIntersections.length}`);
+          console.log(`Travel time: ${Math.round(minDuration / 60)} minutes, Distance: ${Math.round(data.distances[0][optimalIntersectionIndex] / 1000)} km`);
+
+          // Highlight the selected return intersection with a different color
+          if (map.getSource('return-intersection')) {
+            map.getSource('return-intersection').setData({
+              type: 'Feature',
+              geometry: {
+                type: 'Point',
+                coordinates: nextIntersection.location
+              }
+            });
+          }
+        } else {
+          // Fallback to closest by straight-line distance
+          nextIntersection = candidateIntersections[0];
+          console.log('Matrix API failed, using closest intersection by distance');
+        }
+      } catch (error) {
+        console.error('Matrix API error:', error);
+        // Fallback to closest by straight-line distance
+        nextIntersection = candidateIntersections[0];
       }
     }
 
@@ -1234,6 +1359,12 @@ title: Return to Route Demo
           features: []
         });
       }
+      if (map.getSource('return-intersection')) {
+        map.getSource('return-intersection').setData({
+          type: 'FeatureCollection',
+          features: []
+        });
+      }
 
       // Reset deviation UI
       document.getElementById('deviation-start-coords').textContent = 'Not set';
@@ -1311,6 +1442,12 @@ title: Return to Route Demo
       }
       if (map.getSource('highlight-intersection')) {
         map.getSource('highlight-intersection').setData({
+          type: 'FeatureCollection',
+          features: []
+        });
+      }
+      if (map.getSource('return-intersection')) {
+        map.getSource('return-intersection').setData({
           type: 'FeatureCollection',
           features: []
         });
