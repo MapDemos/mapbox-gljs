@@ -4,6 +4,7 @@
 google-mapbox.md
 luup_all.geojson
 luup_random_select.geojson
+_site/
 _site/google-mapbox.html
 _includes/google-mapbox.js
 _includes/luup_all.js
