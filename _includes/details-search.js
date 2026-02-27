@@ -1271,6 +1271,7 @@ function selectPOI(poi, index) {
     center: poi.geometry.coordinates,
     zoom: 18,
     duration: 1000,
+    pitch: 60,
     padding: {
       left: 400,  // Account for the 400px sidebar
       top: 0,
