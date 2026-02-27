@@ -20,43 +20,43 @@ const JAPAN_CATEGORIES = [
   {"canonical_id": "ショップ>チケット販売", "icon": "shop", "name": "ショップ>チケット販売"},
   {"canonical_id": "ショップ>ディスカウントショップ", "icon": "shop", "name": "ショップ>ディスカウントショップ"},
   {"canonical_id": "ショップ>ハンドバッグ", "icon": "shop", "name": "ショップ>ハンドバッグ"},
-  {"canonical_id": "ショップ>バイク販売", "icon": "shop", "name": "ショップ>バイク販売"},
+  // {"canonical_id": "ショップ>バイク販売", "icon": "shop", "name": "ショップ>バイク販売"},
   {"canonical_id": "ショップ>ファッション(女性)", "icon": "clothing-store", "name": "ショップ>ファッション(女性)"},
   {"canonical_id": "ショップ>ファッション(男性)", "icon": "clothing-store", "name": "ショップ>ファッション(男性)"},
-  {"canonical_id": "ショップ>ブライダル", "icon": "shop", "name": "ショップ>ブライダル"},
-  {"canonical_id": "ショップ>ベッド", "icon": "furniture", "name": "ショップ>ベッド"},
-  {"canonical_id": "ショップ>ベビー用品", "icon": "shop", "name": "ショップ>ベビー用品"},
-  {"canonical_id": "ショップ>ペット用品", "icon": "shop", "name": "ショップ>ペット用品"},
-  {"canonical_id": "ショップ>ホームセンター", "icon": "hardware", "name": "ショップ>ホームセンター"},
+  // {"canonical_id": "ショップ>ブライダル", "icon": "shop", "name": "ショップ>ブライダル"},
+  // {"canonical_id": "ショップ>ベッド", "icon": "furniture", "name": "ショップ>ベッド"},
+  // {"canonical_id": "ショップ>ベビー用品", "icon": "shop", "name": "ショップ>ベビー用品"},
+  // {"canonical_id": "ショップ>ペット用品", "icon": "shop", "name": "ショップ>ペット用品"},
+  // {"canonical_id": "ショップ>ホームセンター", "icon": "hardware", "name": "ショップ>ホームセンター"},
   {"canonical_id": "ショップ>メガネ", "icon": "optician", "name": "ショップ>メガネ"},
-  {"canonical_id": "ショップ>リサイクル", "icon": "recycling", "name": "ショップ>リサイクル"},
-  {"canonical_id": "ショップ>中古車販売", "icon": "car", "name": "ショップ>中古車販売"},
+  // {"canonical_id": "ショップ>リサイクル", "icon": "recycling", "name": "ショップ>リサイクル"},
+  // {"canonical_id": "ショップ>中古車販売", "icon": "car", "name": "ショップ>中古車販売"},
   {"canonical_id": "ショップ>健康食品", "icon": "grocery", "name": "ショップ>健康食品"},
-  {"canonical_id": "ショップ>八百屋", "icon": "grocery", "name": "ショップ>八百屋"},
+  // {"canonical_id": "ショップ>八百屋", "icon": "grocery", "name": "ショップ>八百屋"},
   {"canonical_id": "ショップ>化粧品", "icon": "shop", "name": "ショップ>化粧品"},
   {"canonical_id": "ショップ>子ども服", "icon": "clothing-store", "name": "ショップ>子ども服"},
-  {"canonical_id": "ショップ>家具", "icon": "furniture", "name": "ショップ>家具"},
+  // {"canonical_id": "ショップ>家具", "icon": "furniture", "name": "ショップ>家具"},
   {"canonical_id": "ショップ>携帯電話", "icon": "mobile-phone", "name": "ショップ>携帯電話"},
   {"canonical_id": "ショップ>文房具", "icon": "shop", "name": "ショップ>文房具"},
-  {"canonical_id": "ショップ>新車販売", "icon": "car", "name": "ショップ>新車販売"},
+  // {"canonical_id": "ショップ>新車販売", "icon": "car", "name": "ショップ>新車販売"},
   {"canonical_id": "ショップ>日用雑貨", "icon": "convenience", "name": "ショップ>日用雑貨"},
   {"canonical_id": "ショップ>時計", "icon": "watch", "name": "ショップ>時計"},
   {"canonical_id": "ショップ>書籍", "icon": "library", "name": "ショップ>書籍"},
   {"canonical_id": "ショップ>百貨店", "icon": "commercial", "name": "ショップ>百貨店"},
-  {"canonical_id": "ショップ>米店", "icon": "grocery", "name": "ショップ>米店"},
-  {"canonical_id": "ショップ>肉屋", "icon": "slaughterhouse", "name": "ショップ>肉屋"},
+  // {"canonical_id": "ショップ>米店", "icon": "grocery", "name": "ショップ>米店"},
+  // {"canonical_id": "ショップ>肉屋", "icon": "slaughterhouse", "name": "ショップ>肉屋"},
   {"canonical_id": "ショップ>自然食品", "icon": "grocery", "name": "ショップ>自然食品"},
   {"canonical_id": "ショップ>自転車", "icon": "bicycle", "name": "ショップ>自転車"},
   {"canonical_id": "ショップ>花屋", "icon": "florist", "name": "ショップ>花屋"},
   {"canonical_id": "ショップ>薬局", "icon": "pharmacy", "name": "ショップ>薬局"},
-  {"canonical_id": "ショップ>質屋", "icon": "shop", "name": "ショップ>質屋"},
+  // {"canonical_id": "ショップ>質屋", "icon": "shop", "name": "ショップ>質屋"},
   {"canonical_id": "ショップ>酒店", "icon": "alcohol-shop", "name": "ショップ>酒店"},
   {"canonical_id": "ショップ>釣り用品", "icon": "shop", "name": "ショップ>釣り用品"},
   {"canonical_id": "ショップ>電化製品", "icon": "shop", "name": "ショップ>電化製品"},
   {"canonical_id": "ショップ>靴", "icon": "shoe", "name": "ショップ>靴"},
   {"canonical_id": "ショップ>音楽", "icon": "music", "name": "ショップ>音楽"},
   {"canonical_id": "ショップ>音楽楽器", "icon": "music", "name": "ショップ>音楽楽器"},
-  {"canonical_id": "ショップ>鮮魚店", "icon": "restaurant-seafood", "name": "ショップ>鮮魚店"},
+  // {"canonical_id": "ショップ>鮮魚店", "icon": "restaurant-seafood", "name": "ショップ>鮮魚店"},
   {"canonical_id": "トラベル", "icon": "suitcase", "name": "トラベル"},
   {"canonical_id": "トラベル>ガソリンスタンド", "icon": "fuel", "name": "トラベル>ガソリンスタンド"},
   {"canonical_id": "トラベル>サービスエリア", "icon": "highway-rest-area", "name": "トラベル>サービスエリア"},
@@ -67,7 +67,7 @@ const JAPAN_CATEGORIES = [
   {"canonical_id": "トラベル>ホテル", "icon": "lodging", "name": "トラベル>ホテル"},
   {"canonical_id": "トラベル>レンタカー", "icon": "car-rental", "name": "トラベル>レンタカー"},
   {"canonical_id": "トラベル>公共の宿", "icon": "lodging", "name": "トラベル>公共の宿"},
-  {"canonical_id": "トラベル>旅行代理店", "icon": "suitcase", "name": "トラベル>旅行代理店"},
+  // {"canonical_id": "トラベル>旅行代理店", "icon": "suitcase", "name": "トラベル>旅行代理店"},
   {"canonical_id": "トラベル>旅館", "icon": "lodging", "name": "トラベル>旅館"},
   {"canonical_id": "トラベル>民宿", "icon": "lodging", "name": "トラベル>民宿"},
   {"canonical_id": "トラベル>温泉", "icon": "hot-spring", "name": "トラベル>温泉"},
@@ -87,22 +87,22 @@ const JAPAN_CATEGORIES = [
   {"canonical_id": "レジャー>キャンプ場", "icon": "campsite", "name": "レジャー>キャンプ場"},
   {"canonical_id": "レジャー>クルージング", "icon": "shop", "name": "レジャー>クルージング"},
   {"canonical_id": "レジャー>ゲームセンター", "icon": "gaming", "name": "レジャー>ゲームセンター"},
-  {"canonical_id": "レジャー>ゴルフ", "icon": "golf", "name": "レジャー>ゴルフ"},
-  {"canonical_id": "レジャー>サッカー", "icon": "soccer", "name": "レジャー>サッカー"},
-  {"canonical_id": "レジャー>スケート", "icon": "stadium", "name": "レジャー>スケート"},
+  // {"canonical_id": "レジャー>ゴルフ", "icon": "golf", "name": "レジャー>ゴルフ"},
+  // {"canonical_id": "レジャー>サッカー", "icon": "soccer", "name": "レジャー>サッカー"},
+  // {"canonical_id": "レジャー>スケート", "icon": "stadium", "name": "レジャー>スケート"},
   {"canonical_id": "レジャー>スポーツジム", "icon": "fitness-centre", "name": "レジャー>スポーツジム"},
   {"canonical_id": "レジャー>スポーツ競技場", "icon": "stadium", "name": "レジャー>スポーツ競技場"},
-  {"canonical_id": "レジャー>セーリング", "icon": "ferry", "name": "レジャー>セーリング"},
-  {"canonical_id": "レジャー>テニス", "icon": "tennis", "name": "レジャー>テニス"},
+  // {"canonical_id": "レジャー>セーリング", "icon": "ferry", "name": "レジャー>セーリング"},
+  // {"canonical_id": "レジャー>テニス", "icon": "tennis", "name": "レジャー>テニス"},
   {"canonical_id": "レジャー>テーマパーク", "icon": "amusement-park", "name": "レジャー>テーマパーク"},
   {"canonical_id": "レジャー>ナイトクラブ", "icon": "nightclub", "name": "レジャー>ナイトクラブ"},
-  {"canonical_id": "レジャー>バスケットボール", "icon": "basketball", "name": "レジャー>バスケットボール"},
-  {"canonical_id": "レジャー>パチンコ", "icon": "gaming", "name": "レジャー>パチンコ"},
-  {"canonical_id": "レジャー>ビリヤード", "icon": "amusement-park", "name": "レジャー>ビリヤード"},
+  // {"canonical_id": "レジャー>バスケットボール", "icon": "basketball", "name": "レジャー>バスケットボール"},
+  // {"canonical_id": "レジャー>パチンコ", "icon": "gaming", "name": "レジャー>パチンコ"},
+  // {"canonical_id": "レジャー>ビリヤード", "icon": "amusement-park", "name": "レジャー>ビリヤード"},
   {"canonical_id": "レジャー>ボウリング", "icon": "bowling-alley", "name": "レジャー>ボウリング"},
-  {"canonical_id": "レジャー>ボクシング", "icon": "fitness-centre", "name": "レジャー>ボクシング"},
-  {"canonical_id": "レジャー>マリンスポーツ", "icon": "amusement-park", "name": "レジャー>マリンスポーツ"},
-  {"canonical_id": "レジャー>モーターレース", "icon": "amusement-park", "name": "レジャー>モーターレース"},
+  // {"canonical_id": "レジャー>ボクシング", "icon": "fitness-centre", "name": "レジャー>ボクシング"},
+  // {"canonical_id": "レジャー>マリンスポーツ", "icon": "amusement-park", "name": "レジャー>マリンスポーツ"},
+  // {"canonical_id": "レジャー>モーターレース", "icon": "amusement-park", "name": "レジャー>モーターレース"},
   {"canonical_id": "レジャー>ヨガ", "icon": "fitness-centre", "name": "レジャー>ヨガ"},
   {"canonical_id": "レジャー>公園", "icon": "park", "name": "レジャー>公園"},
   {"canonical_id": "レジャー>劇場", "icon": "theatre", "name": "レジャー>劇場"},
@@ -111,12 +111,12 @@ const JAPAN_CATEGORIES = [
   {"canonical_id": "レジャー>植物園", "icon": "garden", "name": "レジャー>植物園"},
   {"canonical_id": "レジャー>水族館", "icon": "aquarium", "name": "レジャー>水族館"},
   {"canonical_id": "レジャー>水泳場", "icon": "swimming", "name": "レジャー>水泳場"},
-  {"canonical_id": "レジャー>牧場", "icon": "horse-riding", "name": "レジャー>牧場"},
-  {"canonical_id": "レジャー>競馬", "icon": "racetrack-horse", "name": "レジャー>競馬"},
+  // {"canonical_id": "レジャー>牧場", "icon": "horse-riding", "name": "レジャー>牧場"},
+  // {"canonical_id": "レジャー>競馬", "icon": "racetrack-horse", "name": "レジャー>競馬"},
   {"canonical_id": "レジャー>美術館", "icon": "art-gallery", "name": "レジャー>美術館"},
   {"canonical_id": "レジャー>自転車レンタル", "icon": "bicycle-share", "name": "レジャー>自転車レンタル"},
-  {"canonical_id": "レジャー>野球", "icon": "baseball", "name": "レジャー>野球"},
-  {"canonical_id": "レジャー>釣り", "icon": "water", "name": "レジャー>釣り"},
+  // {"canonical_id": "レジャー>野球", "icon": "baseball", "name": "レジャー>野球"},
+  // {"canonical_id": "レジャー>釣り", "icon": "water", "name": "レジャー>釣り"},
   {"canonical_id": "レジャー>音楽ホール", "icon": "music", "name": "レジャー>音楽ホール"},
   // {"canonical_id": "レジャー博物館", "icon": "museum", "name": "レジャー博物館"},
   {"canonical_id": "レストラン", "icon": "restaurant", "name": "レストラン"},
@@ -673,8 +673,24 @@ function displayCategories(categories, isSubcategory = false) {
 
 // Select a category
 function selectCategory(category, hasChildren) {
-  if (hasChildren) {
-    // Navigate to subcategories
+  // Check if this is a main category (no > in the canonical_id)
+  const isMainCategory = !category.canonical_id.includes('>');
+
+  if (isMainCategory && hasChildren) {
+    // For main categories with subcategories, perform search for all POIs in this category
+    currentCategory = category;
+    // Create a combined category that includes all subcategories
+    const combinedCategory = {
+      ...category,
+      canonical_id: category.canonical_id,
+      name: category.name,
+      icon: category.icon,
+      // Include all subcategory IDs for search
+      allCategoryIds: getAllSubcategoryIds(category)
+    };
+    performCategorySearch(combinedCategory);
+  } else if (hasChildren) {
+    // For non-main categories with children, show subcategories as before
     currentPath.push(category);
     displaySubcategories(category);
   } else {
@@ -682,6 +698,23 @@ function selectCategory(category, hasChildren) {
     currentCategory = category;
     performCategorySearch(category);
   }
+}
+
+// Helper function to get all subcategory IDs from a parent category
+function getAllSubcategoryIds(parentCategory) {
+  const ids = [parentCategory.canonical_id];
+
+  if (parentCategory.children && parentCategory.children.length > 0) {
+    parentCategory.children.forEach(child => {
+      ids.push(child.canonical_id);
+      // Recursively get IDs from nested children
+      if (child.children && child.children.length > 0) {
+        ids.push(...getAllSubcategoryIds(child));
+      }
+    });
+  }
+
+  return ids;
 }
 
 // Display subcategories
@@ -781,38 +814,137 @@ async function performCategorySearch(category) {
     // Get current map center for proximity
     const center = map.getCenter();
 
-    // Determine the actual category ID to use for the API
-    let apiCategoryId = category.canonical_id;
+    // Check if we need to search multiple categories (for main categories)
+    const categoriesToSearch = category.allCategoryIds || [category.canonical_id];
 
-    // For global region, we need to map our hierarchical category to actual Mapbox categories
-    if (currentRegion === 'global') {
-      // Get all Mapbox category IDs that map to this hierarchical category
-      const mappedCategories = [];
-      const mapping = window.GLOBAL_CATEGORY_MAPPING || {};
-      for (const [mapboxId, hierarchicalId] of Object.entries(mapping)) {
-        if (hierarchicalId === category.canonical_id) {
-          mappedCategories.push(mapboxId);
-        }
-      }
+    // Collect all search results
+    const allSearchResults = [];
 
-      // If we have mapped categories, use the first one for now
-      // In a production app, you might want to search multiple categories
-      if (mappedCategories.length > 0) {
-        apiCategoryId = mappedCategories[0];
+    // Update loading text to show we're searching multiple categories
+    if (categoriesToSearch.length > 1) {
+      const loadingContainer = categoryList.querySelector('.loading-text');
+      if (loadingContainer) {
+        loadingContainer.textContent = currentRegion === 'japan' ?
+          `${categoriesToSearch.length} カテゴリーを検索中...` :
+          `Searching ${categoriesToSearch.length} categories...`;
       }
     }
 
-    // Perform category search
-    const searchUrl = `https://api.mapbox.com/search/searchbox/v1/category/${encodeURIComponent(apiCategoryId)}?` +
-      `proximity=${center.lng},${center.lat}&` +
-      `language=${currentRegion === 'japan' ? 'ja' : 'en'}&` +
-      `limit=25&` +
-      `access_token=${mapboxgl.accessToken}`;
+    // Rate limiter: 45 requests per second (reduced to avoid 500 errors)
+    const REQUESTS_PER_SECOND = 45;
+    const CATEGORY_BATCH_SIZE = 45; // Process in batches of 45
+    const BATCH_DELAY = 1100; // Wait 1.1 seconds between batches to ensure we stay under limit
 
-    const searchResponse = await fetch(searchUrl);
-    const searchData = await searchResponse.json();
+    // Process categories in batches with rate limiting
+    const batches = [];
+    for (let i = 0; i < categoriesToSearch.length; i += CATEGORY_BATCH_SIZE) {
+      batches.push(categoriesToSearch.slice(i, i + CATEGORY_BATCH_SIZE));
+    }
 
-    if (!searchData.features || searchData.features.length === 0) {
+    let completedRequests = 0;
+    const totalRequests = categoriesToSearch.length;
+
+    // Process each batch
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex];
+
+      // Update loading text with batch progress
+      if (batches.length > 1) {
+        const loadingContainer = categoryList.querySelector('.loading-text');
+        if (loadingContainer) {
+          loadingContainer.textContent = currentRegion === 'japan' ?
+            `バッチ ${batchIndex + 1}/${batches.length} を検索中... (${completedRequests}/${totalRequests} カテゴリー完了)` :
+            `Searching batch ${batchIndex + 1}/${batches.length}... (${completedRequests}/${totalRequests} categories completed)`;
+        }
+      }
+
+      // Create all requests for this batch
+      const batchPromises = batch.map(async (categoryId) => {
+        let apiCategoryId = categoryId;
+
+        // For global region, we need to map our hierarchical category to actual Mapbox categories
+        if (currentRegion === 'global') {
+          // Get all Mapbox category IDs that map to this hierarchical category
+          const mappedCategories = [];
+          const mapping = window.GLOBAL_CATEGORY_MAPPING || {};
+          for (const [mapboxId, hierarchicalId] of Object.entries(mapping)) {
+            if (hierarchicalId === categoryId) {
+              mappedCategories.push(mapboxId);
+            }
+          }
+
+          // If we have mapped categories, use the first one
+          if (mappedCategories.length > 0) {
+            apiCategoryId = mappedCategories[0];
+          }
+        }
+
+        // Perform category search
+        const searchUrl = `https://api.mapbox.com/search/searchbox/v1/category/${encodeURIComponent(apiCategoryId)}?` +
+          `proximity=${center.lng},${center.lat}&` +
+          `language=${currentRegion === 'japan' ? 'ja' : 'en'}&` +
+          `limit=${categoriesToSearch.length > 1 ? 10 : 25}&` + // Reduce limit per category when searching many
+          `access_token=${mapboxgl.accessToken}`;
+
+        try {
+          const searchResponse = await fetch(searchUrl);
+
+          // Check for rate limiting or errors
+          if (!searchResponse.ok) {
+            console.warn(`Category search failed for ${categoryId}: ${searchResponse.status}`);
+            return [];
+          }
+
+          const searchData = await searchResponse.json();
+
+          completedRequests++;
+
+          // Update progress bar
+          const progressBar = document.getElementById('progressBar');
+          if (progressBar) {
+            progressBar.style.width = `${(completedRequests / totalRequests) * 30}%`;
+          }
+
+          if (searchData.features && searchData.features.length > 0) {
+            // Just return the features, don't process details yet
+            return searchData.features;
+          }
+          return [];
+        } catch (error) {
+          console.error(`Error searching category ${categoryId}:`, error);
+          return [];
+        }
+      });
+
+      // Execute all requests in this batch asynchronously
+      const batchResults = await Promise.all(batchPromises);
+
+      // Collect results from this batch for final processing
+      batchResults.forEach(results => {
+        if (results.length > 0) {
+          allSearchResults.push(...results);
+        }
+      });
+
+      // If there are more batches, wait before starting the next one
+      if (batchIndex < batches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
+      }
+    }
+
+    // Combine and deduplicate results
+    const uniqueResults = [];
+    const seenIds = new Set();
+
+    for (const feature of allSearchResults) {
+      const id = feature.properties.mapbox_id;
+      if (id && !seenIds.has(id)) {
+        seenIds.add(id);
+        uniqueResults.push(feature);
+      }
+    }
+
+    if (uniqueResults.length === 0) {
       categoryList.innerHTML = `
         <div class="no-results">
           <div class="no-results-icon">🔍</div>
@@ -820,6 +952,27 @@ async function performCategorySearch(category) {
         </div>
       `;
       statusText.textContent = `${category.name} - 結果なし`;
+
+      // Update breadcrumb to show category name as a link even when no results
+      const breadcrumb = document.getElementById('breadcrumb');
+      if (currentRegion === 'japan') {
+        breadcrumb.innerHTML = `
+          <span class="breadcrumb-item">
+            <a href="#" class="breadcrumb-link" onclick="navigateToHome()">カテゴリー選択</a>
+          </span>
+          <span class="breadcrumb-separator"> > </span>
+          <span class="breadcrumb-item">${category.name}</span>
+        `;
+      } else {
+        breadcrumb.innerHTML = `
+          <span class="breadcrumb-item">
+            <a href="#" class="breadcrumb-link" onclick="navigateToHome()">Select Category</a>
+          </span>
+          <span class="breadcrumb-separator"> > </span>
+          <span class="breadcrumb-item">${category.name}</span>
+        `;
+      }
+
       return;
     }
 
@@ -829,49 +982,67 @@ async function performCategorySearch(category) {
       progressBar.style.width = '30%';
     }
 
-    // Extract POI IDs
-    const poiIds = searchData.features.map(f => f.properties.mapbox_id).filter(id => id);
+    statusText.textContent = `${uniqueResults.length} 件のPOI詳細を取得中...`;
 
-    statusText.textContent = `${poiIds.length} 件のPOI詳細を取得中...`;
-
-    // Retrieve details for each POI (in batches)
-    const BATCH_SIZE = 5;
-    const DELAY_BETWEEN_BATCHES = 200;
+    // Now process POI details and add them to the map immediately as they arrive
+    const DETAILS_BATCH_SIZE = 5;  // Process 5 POIs at a time for details (reduced from 10)
+    const DETAILS_DELAY = 200;  // Longer delay between detail batches (doubled from 100ms)
     const allPOIs = [];
+    let displayedCount = 0;
 
-    for (let i = 0; i < poiIds.length; i += BATCH_SIZE) {
-      const batch = poiIds.slice(i, i + BATCH_SIZE);
-      const batchPromises = batch.map(id => retrievePOIDetails(id));
+    // Process details in smaller batches to show POIs faster
+    for (let i = 0; i < uniqueResults.length; i += DETAILS_BATCH_SIZE) {
+      const batch = uniqueResults.slice(i, i + DETAILS_BATCH_SIZE);
 
-      const batchResults = await Promise.all(batchPromises);
+      // Process this batch of POIs
+      const detailPromises = batch.map(async (feature) => {
+        const id = feature.properties.mapbox_id;
+        if (!id) return null;
+
+        const poiDetails = await retrievePOIDetails(id);
+        if (poiDetails) {
+          // Add marker to map immediately
+          addSinglePOIMarker(poiDetails, displayedCount++);
+
+          // Update status count in real-time
+          statusCount.textContent = `${displayedCount} POIs`;
+
+          return poiDetails;
+        }
+        return null;
+      });
+
+      const batchResults = await Promise.all(detailPromises);
       allPOIs.push(...batchResults.filter(poi => poi !== null));
 
       // Update progress
-      const progress = 30 + ((i + batch.length) / poiIds.length * 60);
-      const progressBar = document.getElementById('progressBar');
+      const progress = 30 + ((i + batch.length) / uniqueResults.length * 60);
       if (progressBar) {
         progressBar.style.width = `${progress}%`;
       }
 
-      // Add delay between batches to avoid rate limiting
-      if (i + BATCH_SIZE < poiIds.length) {
-        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
+      // Fit map to current markers periodically (every 50 POIs or at the end)
+      if (displayedCount % 50 === 0 || i + DETAILS_BATCH_SIZE >= uniqueResults.length) {
+        if (allPOIs.length > 0) {
+          fitMapToMarkers(allPOIs);
+        }
+      }
+
+      // Small delay between detail batches
+      if (i + DETAILS_BATCH_SIZE < uniqueResults.length) {
+        await new Promise(resolve => setTimeout(resolve, DETAILS_DELAY));
       }
     }
 
-    // Display results
+    // Display results in the sidebar
     displayPOIResults(allPOIs, category);
 
     // Update progress to complete
-    const finalProgressBar = document.getElementById('progressBar');
-    if (finalProgressBar) {
-      finalProgressBar.style.width = '100%';
+    if (progressBar) {
+      progressBar.style.width = '100%';
     }
 
-    // Add markers to map
-    addPOIMarkers(allPOIs);
-
-    // Fit map to markers
+    // Final fit to all markers
     if (allPOIs.length > 0) {
       fitMapToMarkers(allPOIs);
     }
@@ -898,6 +1069,19 @@ async function retrievePOIDetails(mapboxId) {
       `access_token=${mapboxgl.accessToken}`;
 
     const response = await fetch(url);
+
+    // Check for 500 errors specifically
+    if (response.status === 500) {
+      console.warn(`POI ${mapboxId} returned 500 error - skipping (Mapbox internal error)`);
+      return null;
+    }
+
+    // Check for other non-OK statuses
+    if (!response.ok) {
+      console.warn(`POI ${mapboxId} returned status ${response.status} - skipping`);
+      return null;
+    }
+
     const data = await response.json();
 
     // Details API returns a single feature, not an array
@@ -926,12 +1110,53 @@ function displayPOIResults(pois, category) {
       </div>
     `;
     statusText.textContent = `${category.name} - 詳細なし`;
+
+    // Update breadcrumb to show category name as a link even when no details
+    const breadcrumb = document.getElementById('breadcrumb');
+    if (currentRegion === 'japan') {
+      breadcrumb.innerHTML = `
+        <span class="breadcrumb-item">
+          <a href="#" class="breadcrumb-link" onclick="navigateToHome()">カテゴリー選択</a>
+        </span>
+        <span class="breadcrumb-separator"> > </span>
+        <span class="breadcrumb-item">${category.name}</span>
+      `;
+    } else {
+      breadcrumb.innerHTML = `
+        <span class="breadcrumb-item">
+          <a href="#" class="breadcrumb-link" onclick="navigateToHome()">Select Category</a>
+        </span>
+        <span class="breadcrumb-separator"> > </span>
+        <span class="breadcrumb-item">${category.name}</span>
+      `;
+    }
+
     return;
   }
 
   categoryList.innerHTML = '';
   statusText.textContent = `${category.name} の検索結果`;
   statusCount.innerHTML = `<span class="status-count">${pois.length} 件</span>`;
+
+  // Update breadcrumb to show category name as a link
+  const breadcrumb = document.getElementById('breadcrumb');
+  if (currentRegion === 'japan') {
+    breadcrumb.innerHTML = `
+      <span class="breadcrumb-item">
+        <a href="#" class="breadcrumb-link" onclick="navigateToHome()">カテゴリー選択</a>
+      </span>
+      <span class="breadcrumb-separator"> > </span>
+      <span class="breadcrumb-item">${category.name}</span>
+    `;
+  } else {
+    breadcrumb.innerHTML = `
+      <span class="breadcrumb-item">
+        <a href="#" class="breadcrumb-link" onclick="navigateToHome()">Select Category</a>
+      </span>
+      <span class="breadcrumb-separator"> > </span>
+      <span class="breadcrumb-item">${category.name}</span>
+    `;
+  }
 
   // Get the category icon to use for all POIs in this category
   const categoryIcon = getCategoryIcon(category.icon);
@@ -1199,6 +1424,10 @@ function showPOIDetails(poi) {
 
       const hoursByDay = {};
       metadata.open_hours.periods.forEach(period => {
+        // Check if period has required properties
+        if (!period.open || !period.close || !period.open.time || !period.close.time) {
+          return; // Skip this period if data is missing
+        }
         const day = period.open.day;
         if (!hoursByDay[day]) hoursByDay[day] = [];
         const openTime = period.open.time.substring(0,2) + ':' + period.open.time.substring(2);
@@ -1468,6 +1697,41 @@ function addPOIMarkers(pois) {
 
   // Store POI data for reference
   markers = pois;
+}
+
+// Add a single POI marker to the map
+function addSinglePOIMarker(poi, index) {
+  const properties = poi.properties || {};
+
+  const feature = {
+    'type': 'Feature',
+    'geometry': poi.geometry,
+    'properties': {
+      'name': properties.name || '名称不明',
+      'index': index,
+      'selected': false,
+      'poiData': JSON.stringify(poi)
+    }
+  };
+
+  // Get current features from the source
+  const source = map.getSource('pois');
+  if (source) {
+    const currentData = source._data;
+    const currentFeatures = currentData && currentData.features ? currentData.features : [];
+
+    // Add the new feature
+    currentFeatures.push(feature);
+
+    // Update the source with the new feature
+    source.setData({
+      'type': 'FeatureCollection',
+      'features': currentFeatures
+    });
+  }
+
+  // Add to markers array for reference
+  markers.push(poi);
 }
 
 // Clear all markers
