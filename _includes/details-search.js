@@ -1231,6 +1231,13 @@ function selectPOI(poi, index) {
   selectedPOI = poi;
 
   // Update the symbol layer to highlight the selected POI
+  // We need to find the actual index of this POI in the markers array
+  const actualIndex = markers.findIndex(p =>
+    p.geometry.coordinates[0] === poi.geometry.coordinates[0] &&
+    p.geometry.coordinates[1] === poi.geometry.coordinates[1] &&
+    p.properties.mapbox_id === poi.properties.mapbox_id
+  );
+
   const features = markers.map((p, i) => {
     const properties = p.properties || {};
 
@@ -1240,7 +1247,7 @@ function selectPOI(poi, index) {
       'properties': {
         'name': properties.name || '名称不明',
         'index': i,
-        'selected': i === index, // Mark the selected POI
+        'selected': i === actualIndex, // Mark the selected POI using actual index
         'poiData': JSON.stringify(p)
       }
     };
@@ -1258,11 +1265,18 @@ function selectPOI(poi, index) {
   // The label layers will automatically update based on the 'selected' property
   // since we're using data-driven styling with ['get', 'selected'] expressions
 
-  // Fly to POI
+  // Fly to POI with padding to account for sidebar
+  // The sidebar is 400px wide, so we add padding to ensure the POI appears in the visible area
   map.flyTo({
     center: poi.geometry.coordinates,
-    zoom: 16,
-    duration: 1000
+    zoom: 18,
+    duration: 1000,
+    padding: {
+      left: 400,  // Account for the 400px sidebar
+      top: 0,
+      right: 0,
+      bottom: 0
+    }
   });
 
   // Show POI details popup
