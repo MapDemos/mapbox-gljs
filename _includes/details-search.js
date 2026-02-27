@@ -305,6 +305,7 @@ let currentPath = [];
 let markers = [];
 let sessionToken = null;
 let selectedPOI = null;
+let poiDetailsCache = new Map(); // Cache for fetched POI details
 
 // Update map language
 function updateMapLanguage(language) {
@@ -990,63 +991,43 @@ async function performCategorySearch(category) {
     // Update progress
     const progressBar = document.getElementById('progressBar');
     if (progressBar) {
-      progressBar.style.width = '30%';
+      progressBar.style.width = '90%';
     }
 
-    statusText.textContent = `${uniqueResults.length} 件のPOI詳細を取得中...`;
+    statusText.textContent = `${uniqueResults.length} 件のPOIを表示中...`;
 
-    // Now process POI details and add them to the map immediately as they arrive
-    const DETAILS_BATCH_SIZE = 5;  // Process 5 POIs at a time for details (reduced from 10)
-    const DETAILS_DELAY = 200;  // Longer delay between detail batches (doubled from 100ms)
-    const allPOIs = [];
-    let displayedCount = 0;
-
-    // Process details in smaller batches to show POIs faster
-    for (let i = 0; i < uniqueResults.length; i += DETAILS_BATCH_SIZE) {
-      const batch = uniqueResults.slice(i, i + DETAILS_BATCH_SIZE);
-
-      // Process this batch of POIs
-      const detailPromises = batch.map(async (feature) => {
-        const id = feature.properties.mapbox_id;
-        if (!id) return null;
-
-        const poiDetails = await retrievePOIDetails(id);
-        if (poiDetails) {
-          // Add marker to map immediately
-          addSinglePOIMarker(poiDetails, displayedCount++);
-
-          // Update status count in real-time
-          statusCount.textContent = `${displayedCount} POIs`;
-
-          return poiDetails;
+    // Convert search results to POI format (without fetching details)
+    const allPOIs = uniqueResults.map((feature, index) => {
+      return {
+        type: 'Feature',
+        geometry: feature.geometry,
+        properties: {
+          mapbox_id: feature.properties.mapbox_id,
+          name: feature.properties.name || feature.properties.name_preferred || '名称不明',
+          full_address: feature.properties.full_address || feature.properties.place_formatted || '',
+          // Store that this POI hasn't had details fetched yet
+          has_details: false,
+          // Keep any other basic properties from search
+          ...feature.properties
         }
-        return null;
-      });
+      };
+    });
 
-      const batchResults = await Promise.all(detailPromises);
-      allPOIs.push(...batchResults.filter(poi => poi !== null));
+    // Add all markers to map at once
+    addPOIMarkers(allPOIs);
 
-      // Update progress
-      const progress = 30 + ((i + batch.length) / uniqueResults.length * 60);
-      if (progressBar) {
-        progressBar.style.width = `${progress}%`;
-      }
-
-      // Fit map to current markers periodically (every 50 POIs or at the end)
-      if (displayedCount % 50 === 0 || i + DETAILS_BATCH_SIZE >= uniqueResults.length) {
-        if (allPOIs.length > 0) {
-          fitMapToMarkers(allPOIs);
-        }
-      }
-
-      // Small delay between detail batches
-      if (i + DETAILS_BATCH_SIZE < uniqueResults.length) {
-        await new Promise(resolve => setTimeout(resolve, DETAILS_DELAY));
-      }
-    }
-
-    // Display results in the sidebar
+    // Display results in the sidebar (with basic info)
     displayPOIResults(allPOIs, category);
+
+    // Update progress to complete
+    if (progressBar) {
+      progressBar.style.width = '100%';
+    }
+
+    // Final fit to all markers
+    if (allPOIs.length > 0) {
+      fitMapToMarkers(allPOIs);
+    }
 
     // Update progress to complete
     if (progressBar) {
@@ -1072,14 +1053,18 @@ async function performCategorySearch(category) {
 
 // Retrieve POI details using Details API endpoint
 async function retrievePOIDetails(mapboxId) {
+  const startTime = performance.now();
+
   try {
-    // Details API doesn't use session_token - only language and access_token
+    // Request all available attribute sets including venue
     const url = `https://api.mapbox.com/search/details/v1/retrieve/${mapboxId}?` +
       `language=${currentRegion === 'japan' ? 'ja' : 'en'}&` +
       `attribute_sets=basic,visit,photos,venue&` +  // Request all available attribute sets
       `access_token=${mapboxgl.accessToken}`;
 
+    console.log(`Fetching details for ${mapboxId}...`);
     const response = await fetch(url);
+    const fetchTime = performance.now() - startTime;
 
     // Check for 500 errors specifically
     if (response.status === 500) {
@@ -1094,15 +1079,21 @@ async function retrievePOIDetails(mapboxId) {
     }
 
     const data = await response.json();
+    const totalTime = performance.now() - startTime;
+
+    console.log(`Details fetched for ${mapboxId} in ${totalTime.toFixed(0)}ms (fetch: ${fetchTime.toFixed(0)}ms)`);
 
     // Details API returns a single feature, not an array
     if (data && data.type === 'Feature') {
+      // Mark that this POI now has detailed data
+      data.properties.has_details = true;
       return data;
     }
 
     return null;
   } catch (error) {
-    console.error(`Failed to retrieve details for ${mapboxId}:`, error);
+    const totalTime = performance.now() - startTime;
+    console.error(`Failed to retrieve details for ${mapboxId} after ${totalTime.toFixed(0)}ms:`, error);
     return null;
   }
 }
@@ -1227,7 +1218,7 @@ function calculateDistance(center, coords) {
 }
 
 // Select a POI and show details
-function selectPOI(poi, index) {
+async function selectPOI(poi, index) {
   selectedPOI = poi;
 
   // Update the symbol layer to highlight the selected POI
@@ -1265,8 +1256,34 @@ function selectPOI(poi, index) {
   // The label layers will automatically update based on the 'selected' property
   // since we're using data-driven styling with ['get', 'selected'] expressions
 
+  // Check if we need to fetch details for this POI
+  const mapboxId = poi.properties.mapbox_id;
+  let detailsPromise = null;
+
+  // Start fetching details immediately (in parallel with map animation)
+  if (!poi.properties.has_details && mapboxId) {
+    // Check cache first
+    if (poiDetailsCache.has(mapboxId)) {
+      // Use cached details immediately
+      const cachedDetails = poiDetailsCache.get(mapboxId);
+      if (actualIndex >= 0) {
+        markers[actualIndex] = cachedDetails;
+      }
+      showPOIDetails(cachedDetails);
+    } else {
+      // Show loading state and start fetching details
+      showPOIDetailsLoading(poi);
+
+      // Start fetching details (don't await yet, let it run in parallel)
+      detailsPromise = retrievePOIDetails(mapboxId);
+    }
+  } else {
+    // POI already has details or no mapbox_id, show what we have
+    showPOIDetails(poi);
+  }
+
   // Fly to POI with padding to account for sidebar
-  // The sidebar is 400px wide, so we add padding to ensure the POI appears in the visible area
+  // This happens in parallel with the details fetch
   map.flyTo({
     center: poi.geometry.coordinates,
     zoom: 18,
@@ -1280,8 +1297,47 @@ function selectPOI(poi, index) {
     }
   });
 
-  // Show POI details popup
-  showPOIDetails(poi);
+  // If we started fetching details, wait for it to complete
+  if (detailsPromise) {
+    const detailedPOI = await detailsPromise;
+
+    if (detailedPOI) {
+      // Cache the details
+      poiDetailsCache.set(mapboxId, detailedPOI);
+
+      // Update the POI in the markers array with full details
+      if (actualIndex >= 0) {
+        markers[actualIndex] = detailedPOI;
+        // Update the has_details flag
+        markers[actualIndex].properties.has_details = true;
+      }
+
+      // Show details with full data
+      showPOIDetails(detailedPOI);
+    } else {
+      // Show basic details if fetch failed
+      showPOIDetails(poi);
+    }
+  }
+}
+
+// Show loading state in POI popup
+function showPOIDetailsLoading(poi) {
+  const popup = document.getElementById('poiPopup');
+  const title = document.getElementById('poiTitle');
+  const details = document.getElementById('poiDetails');
+
+  const properties = poi.properties || {};
+  title.textContent = properties.name || '名称不明';
+
+  details.innerHTML = `
+    <div class="loading-container" style="padding: 20px; text-align: center;">
+      <div class="loading-spinner" style="margin: 0 auto;"></div>
+      <div class="loading-text" style="margin-top: 10px;">詳細情報を読み込み中...</div>
+    </div>
+  `;
+
+  popup.classList.add('show');
 }
 
 // Show POI details in popup with tabs
@@ -1297,8 +1353,11 @@ function showPOIDetails(poi) {
 
   let detailsHTML = '';
 
-  // Photo Gallery at the top (if photos exist)
-  if (metadata.photos && metadata.photos.length > 0) {
+  // Check if we have detailed data (metadata will be present if details were fetched)
+  const hasDetailedData = properties.has_details || (metadata && Object.keys(metadata).length > 0);
+
+  // Photo Gallery at the top (if photos exist and we have detailed data)
+  if (hasDetailedData && metadata.photos && metadata.photos.length > 0) {
     detailsHTML += '<div class="poi-photo-gallery"><div class="poi-photos">';
     metadata.photos.forEach(photo => {
       const photoUrl = typeof photo === 'string' ? photo : (photo.url || photo.prefix + photo.suffix);
@@ -1605,6 +1664,15 @@ function showPOIDetails(poi) {
           ${tab.content}
         </div>`;
     });
+  } else if (!hasDetailedData) {
+    // Show basic info only message when details haven't been fetched
+    detailsHTML += `
+      <div style="padding: 20px; text-align: center; color: #666;">
+        <p>${currentRegion === 'japan' ? '基本情報のみ表示' : 'Basic information only'}</p>
+        <p style="font-size: 12px; margin-top: 10px;">
+          ${currentRegion === 'japan' ? '詳細情報はAPIから自動的に取得されます' : 'Detailed information is being fetched'}
+        </p>
+      </div>`;
   }
 
   // Raw JSON for debugging (always at the bottom)
@@ -1771,6 +1839,8 @@ function clearMarkers() {
     });
   }
   markers = [];
+  // Clear the POI details cache when clearing markers
+  poiDetailsCache.clear();
 }
 
 // Fit map to show all markers
