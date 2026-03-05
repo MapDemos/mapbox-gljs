@@ -1872,6 +1872,12 @@ async function switchRegion(region) {
     btn.classList.toggle('active', btn.dataset.region === region);
   });
 
+  // Update page title
+  const pageTitle = document.getElementById('pageTitle');
+  if (pageTitle) {
+    pageTitle.textContent = region === 'japan' ? '周辺検索' : 'Explore Nearby';
+  }
+
   // Global categories should already be loaded from the included script
   if (region === 'global' && (!window.GLOBAL_CATEGORIES || window.GLOBAL_CATEGORIES.length === 0)) {
     console.error('Global categories not loaded. Make sure global-categories.js is included.');

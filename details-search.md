@@ -584,7 +584,7 @@ js: details-search.js
     <!-- Left sidebar for categories -->
     <div class="sidebar">
       <div class="header">
-        <h1>周辺検索</h1>
+        <h1 id="pageTitle">周辺検索</h1>
       </div>
 
       <div class="region-switcher">
