@@ -508,6 +508,127 @@ function generateUUID() {
   });
 }
 
+// Get POI timezone based on coordinates
+function getPOITimezone(coordinates) {
+  if (!coordinates || coordinates.length < 2) {
+    return null;
+  }
+
+  const [lng, lat] = coordinates;
+
+  // Japan (covers all main islands)
+  if (lng >= 122 && lng <= 146 && lat >= 24 && lat <= 46) {
+    return 'Asia/Tokyo';
+  }
+
+  // Continental US (simplified by longitude bands)
+  if (lng >= -125 && lng <= -66 && lat >= 24 && lat <= 49) {
+    // Pacific Time Zone
+    if (lng < -115) return 'America/Los_Angeles';
+    // Mountain Time Zone
+    if (lng < -102) return 'America/Denver';
+    // Central Time Zone
+    if (lng < -87) return 'America/Chicago';
+    // Eastern Time Zone
+    return 'America/New_York';
+  }
+
+  // Hawaii
+  if (lng >= -161 && lng <= -154 && lat >= 18 && lat <= 23) {
+    return 'Pacific/Honolulu';
+  }
+
+  // Alaska
+  if (lng >= -180 && lng <= -130 && lat >= 51 && lat <= 72) {
+    return 'America/Anchorage';
+  }
+
+  // Default: unknown timezone
+  return null;
+}
+
+// Check if POI is currently open based on open_hours
+function checkIfOpen(openHours, poiTimezone) {
+  // Return null if we can't determine status
+  if (!openHours || !openHours.periods || !poiTimezone) {
+    return null;
+  }
+
+  try {
+    // Get current time in POI's timezone
+    const poiTimeString = new Date().toLocaleString("en-US", {
+      timeZone: poiTimezone,
+      hour12: false,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+
+    const poiTime = new Date(poiTimeString);
+    const currentDay = poiTime.getDay(); // 0 = Sunday, 6 = Saturday
+    const currentHour = poiTime.getHours();
+    const currentMinute = poiTime.getMinutes();
+    const currentTimeNum = currentHour * 100 + currentMinute; // e.g., 1430 for 2:30 PM
+
+    // Find periods for current day
+    const todayPeriods = openHours.periods.filter(period => {
+      return period.open && period.open.day === currentDay &&
+             period.open.time && period.close && period.close.time;
+    });
+
+    if (todayPeriods.length === 0) {
+      // No hours for today = closed
+      return false;
+    }
+
+    // Check each period for today
+    for (const period of todayPeriods) {
+      const openTime = parseInt(period.open.time);
+      const closeTime = parseInt(period.close.time);
+
+      // Handle regular hours (same day)
+      if (closeTime >= openTime) {
+        if (currentTimeNum >= openTime && currentTimeNum < closeTime) {
+          return true;
+        }
+      } else {
+        // Handle overnight hours (closes after midnight)
+        // Either we're after opening time today, or before closing time (which is technically "tomorrow")
+        if (currentTimeNum >= openTime || currentTimeNum < closeTime) {
+          return true;
+        }
+      }
+    }
+
+    // Also check if we're in the early hours and yesterday had overnight hours
+    if (currentTimeNum < 600) { // Before 6 AM, might be yesterday's overnight hours
+      const yesterdayDay = (currentDay - 1 + 7) % 7;
+      const yesterdayPeriods = openHours.periods.filter(period => {
+        return period.open && period.open.day === yesterdayDay &&
+               period.open.time && period.close && period.close.time;
+      });
+
+      for (const period of yesterdayPeriods) {
+        const openTime = parseInt(period.open.time);
+        const closeTime = parseInt(period.close.time);
+
+        // Check if this was an overnight period and we're still in it
+        if (closeTime < openTime && currentTimeNum < closeTime) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  } catch (error) {
+    // If there's any error in timezone conversion or parsing, return null
+    return null;
+  }
+}
+
 // Build hierarchical category structure
 function buildCategoryHierarchy() {
   const hierarchy = {};
@@ -1400,16 +1521,28 @@ function showPOIDetails(poi) {
     hasBasicInfo = true;
   }
 
-  if (properties.operational_status) {
-    basicInfoContent += `
-      <div class="poi-detail">
-        <span class="poi-detail-label">${currentRegion === 'japan' ? '営業状況' : 'Status'}:</span>
-        <span class="poi-detail-value">${properties.operational_status === 'active'
-          ? (currentRegion === 'japan' ? '営業中' : 'Open')
-          : (currentRegion === 'japan' ? '閉店' : 'Closed')}</span>
-      </div>`;
-    hasBasicInfo = true;
+  // Calculate real-time operational status using open_hours
+  const poiTimezone = getPOITimezone(poi.geometry?.coordinates);
+  const isOpen = checkIfOpen(metadata.open_hours, poiTimezone);
+
+  // Determine status text based on confidence
+  let statusText = '';
+  if (isOpen === true) {
+    statusText = currentRegion === 'japan' ? '営業中' : 'Open';
+  } else if (isOpen === false) {
+    statusText = currentRegion === 'japan' ? '営業時間外' : 'Closed';
+  } else {
+    // Can't determine (no hours data or unknown timezone)
+    statusText = currentRegion === 'japan' ? '不明' : 'Unknown';
   }
+
+  // Always show operational status
+  basicInfoContent += `
+    <div class="poi-detail">
+      <span class="poi-detail-label">${currentRegion === 'japan' ? '営業状況' : 'Status'}:</span>
+      <span class="poi-detail-value">${statusText}</span>
+    </div>`;
+  hasBasicInfo = true;
 
   if (hasBasicInfo) {
     tabSections.push({
