@@ -122,6 +122,14 @@ const tilesets = {
         maplayer_above: 'road-exit-shield',
         colorscale: 'LinearPrecipitationBand',
     },
+    linear_precipitation_band_z8: {
+        value: 'mapbox://kenji-shima.lpbs-20250810120000-z8',
+        label: 'linear precipitation band【線状降水帯】(Zoom 8)',
+        type: 'raster-array',
+        mapstyle: 'mapbox://styles/kenji-shima/cmfurpm8w00j101r86qp530c8',
+        maplayer_above: 'road-exit-shield',
+        colorscale: 'LinearPrecipitationBand',
+    },
     linear_precipitation_band_z7: {
         value: 'mapbox://kenji-shima.lpbs-20250810120000-z7',
         label: 'linear precipitation band【線状降水帯】(Zoom 7)',
