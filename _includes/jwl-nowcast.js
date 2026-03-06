@@ -114,7 +114,22 @@ const tilesets = {
         mapstyle: 'mapbox://styles/mapbox/satellite-v9',
         maplayer_above: 'satellite',
     },
-
+    linear_precipitation_band: {
+        value: 'mapbox://kenji-shima.lpbs-20250810120000',
+        label: 'linear precipitation band【線状降水帯】',
+        type: 'raster-array',
+        mapstyle: 'mapbox://styles/kenji-shima/cmfurpm8w00j101r86qp530c8',
+        maplayer_above: 'road-exit-shield',
+        colorscale: 'LinearPrecipitationBand',
+    },
+    // linear_precipitation_band_z4: {
+    //     value: 'mapbox://kenji-shima.lpbs-20250810120000-z4',
+    //     label: 'linear precipitation band【線状降水帯】(Zoom 4)',
+    //     type: 'raster-array',
+    //     mapstyle: 'mapbox://styles/kenji-shima/cmfurpm8w00j101r86qp530c8',
+    //     maplayer_above: 'road-exit-shield',
+    //     colorscale: 'LinearPrecipitationBand',
+    // },
 
     // // wind_39_z6: {
     // //     value: "mapbox://kenji-shima.202402190000-wind-z6",

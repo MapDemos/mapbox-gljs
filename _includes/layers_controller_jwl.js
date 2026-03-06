@@ -332,6 +332,15 @@ const rainScale = () => {
     return domain.map((v, i) => [v, range[i]]).flat();
 };
 
+const lpbScale = () => {
+    const domain = [0, 1];
+    const range = [
+        'rgba(0, 0, 0, 0.0)',
+        'rgba(183, 0, 16, 0.8)',
+    ];
+    return domain.map((v, i) => [v, range[i]]).flat();
+};
+
 const COLORSCALES = {
     'Turbo': d3.interpolateTurbo,
     'Spectral': x => d3.interpolateSpectral(1 - x),
@@ -371,6 +380,10 @@ const COLORSCALES = {
     'KikikuruDosha': {
         manual: true,
         value: kikikuruDoshaScale()
+    },
+    'LinearPrecipitationBand': {
+        manual: true,
+        value: lpbScale()
     }
 };
 
