@@ -2,7 +2,7 @@
 const SKYLARK_API = 'https://store-info.skylark.co.jp/api/point/';
 const USE_REAL_DATA = true; // Set to false to use dummy data only
 const USE_CORS_PROXY = true; // Set to true to use CORS proxy (for demo purposes)
-const CORS_PROXY_URL = 'https://corsproxy.io/?'; // Public CORS proxy
+const CORS_PROXY_URL = 'https://api.codetabs.com/v1/proxy?quest='; // Public CORS proxy
 
 // Store data - will be populated from API or use dummy data as fallback
 let storeData = {
