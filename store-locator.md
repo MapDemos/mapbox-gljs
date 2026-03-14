@@ -284,7 +284,7 @@ js: store-locator.js
       padding: 0;
       border-radius: 4px;
       overflow: hidden;
-      min-width: 280px;
+      min-width: 420px;
     }
 
     .popup-header {
@@ -319,11 +319,15 @@ js: store-locator.js
     .popup-body {
       padding: 15px;
       background-color: white;
+      max-height: 400px;
+      overflow-y: auto;
     }
 
     .popup-section {
       margin-bottom: 12px;
       font-size: 14px;
+      display: flex;
+      gap: 12px;
     }
 
     .popup-section:last-child {
@@ -333,12 +337,19 @@ js: store-locator.js
     .popup-label {
       font-weight: 600;
       color: #333;
-      margin-bottom: 4px;
+      min-width: 80px;
+      flex-shrink: 0;
     }
 
     .popup-value {
       color: #666;
       line-height: 1.5;
+      flex: 1;
+    }
+
+    .popup-value-bold {
+      font-weight: 600;
+      font-size: 21px;
     }
 
     .popup-amenities {
@@ -429,6 +440,41 @@ js: store-locator.js
 
     #store-list::-webkit-scrollbar-thumb:hover {
       background: #999;
+    }
+
+    /* Area group marker styles */
+    .area-group-marker {
+      display: flex;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      transition: transform 0.2s;
+    }
+
+    .area-group-marker:hover {
+      transform: scale(1.05);
+    }
+
+    .area-label {
+      background-color: white;
+      color: black;
+      padding: 4px 8px;
+      border: 1.5px solid black;
+      border-right: none;
+      white-space: nowrap;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+    }
+
+    .area-count {
+      background-color: #ED1C24;
+      color: white;
+      padding: 4px 8px;
+      border: 1.5px solid black;
+      white-space: nowrap;
+      min-width: 24px;
+      text-align: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
     }
   </style>
 </head>
