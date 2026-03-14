@@ -1,5 +1,17 @@
-// Store data - fictional restaurants in Tokyo area
-const storeData = {
+// Configuration for Skylark API
+const SKYLARK_API = 'https://store-info.skylark.co.jp/api/point/';
+const USE_REAL_DATA = true; // Set to false to use dummy data only
+const USE_CORS_PROXY = true; // Set to true to use CORS proxy (for demo purposes)
+const CORS_PROXY_URL = 'https://corsproxy.io/?'; // Public CORS proxy
+
+// Store data - will be populated from API or use dummy data as fallback
+let storeData = {
+  type: 'FeatureCollection',
+  features: []
+};
+
+// Dummy data for fallback
+const dummyStoreData = {
   type: 'FeatureCollection',
   features: [
     {
@@ -195,6 +207,185 @@ const storeData = {
   ]
 };
 
+// Load real store data from Skylark API
+async function loadStoresFromAPI(mapBounds) {
+  if (!USE_REAL_DATA) {
+    console.log('Using dummy data (USE_REAL_DATA = false)');
+    storeData = dummyStoreData;
+    return;
+  }
+
+  try {
+    // Use map viewport bounds if provided, otherwise use expanded region
+    let bounds;
+    if (mapBounds) {
+      const ne = mapBounds.getNorthEast();
+      const sw = mapBounds.getSouthWest();
+      bounds = {
+        north: ne.lat,
+        south: sw.lat,
+        east: ne.lng,
+        west: sw.lng
+      };
+      console.log('Using map viewport bounds:', bounds);
+    } else {
+      // Default bounds for initial load - all of Japan including Okinawa
+      // Loads all stores upfront but eliminates API calls on pan
+      // Covers Hokkaido to Okinawa (entire country)
+      bounds = {
+        north: 45.5,    // Northern Hokkaido
+        south: 24.0,    // Southern Okinawa (Ishigaki, Miyako)
+        east: 146.0,    // Eastern Hokkaido
+        west: 122.0     // Western Okinawa (Yonaguni)
+      };
+      console.log('Using all Japan bounds (including Okinawa):', bounds);
+    }
+
+    // Create API URL with parameters
+    const params = new URLSearchParams({
+      backend_filters: JSON.stringify({}), // Empty to get all brands
+      backend_order: JSON.stringify({}),
+      b: `${bounds.north},${bounds.east},${bounds.south},${bounds.west}`
+    });
+
+    let apiUrl = `${SKYLARK_API}?${params}`;
+
+    // Use CORS proxy if enabled
+    if (USE_CORS_PROXY) {
+      apiUrl = `${CORS_PROXY_URL}${encodeURIComponent(apiUrl)}`;
+      console.log('Using CORS proxy to fetch stores...');
+    } else {
+      console.log('Fetching stores from Skylark API directly...');
+    }
+
+    const response = await fetch(apiUrl);
+
+    if (!response.ok) {
+      throw new Error(`API returned ${response.status}`);
+    }
+
+    let data = await response.json();
+
+    // Handle different response formats (direct array vs object with data/items property)
+    let storesArray = [];
+    if (Array.isArray(data)) {
+      storesArray = data;
+    } else if (data && Array.isArray(data.items)) {
+      // CORS proxy wraps data in {total: N, items: [...]}
+      storesArray = data.items;
+    } else if (data && Array.isArray(data.data)) {
+      storesArray = data.data;
+    } else if (data && Array.isArray(data.stores)) {
+      storesArray = data.stores;
+    } else if (data && Array.isArray(data.features)) {
+      storesArray = data.features;
+    } else {
+      console.log('Unexpected data format:', data);
+      throw new Error('Unexpected API response format');
+    }
+
+    console.log(`Loaded ${storesArray.length} stores from API for viewport`);
+
+    // Convert API data to GeoJSON format
+    storeData = {
+      type: 'FeatureCollection',
+      features: storesArray.map((store, index) => {
+        const extra = store.extra_fields || {};
+
+        // Map brand codes to brand names
+        const brandMapping = {
+          '0101': 'ガスト',
+          '0102': 'バーミヤン',
+          '0103': 'しゃぶ葉',
+          '0104': '夢庵',
+          '0105': 'ジョナサン',
+          '0106': 'ステーキガスト',
+          '0107': 'むさしの森珈琲',
+          '0108': 'から好し',
+          '0110': '藍屋'
+        };
+
+        const brandCode = extra.カテゴリ || '0101';
+        const brandName = brandMapping[brandCode] || 'その他';
+
+        // Build amenities array from flags (excluding parking - shown separately)
+        const amenities = [];
+        if (extra['ｗｉ－ｆｉ（有無）フラグ'] === '1') amenities.push('Wi-Fiあり');
+        if (extra['持ち帰りフラグ'] === '1') amenities.push('テイクアウト可');
+        if (extra['完全禁煙フラグ'] === '1') amenities.push('禁煙席あり');
+        if (extra['宅配フラグ'] === '1') amenities.push('宅配あり');
+        if (extra['全日２４時間フラグ'] === '1') amenities.push('24時間営業');
+        if (extra['サービスロボット（有無）フラグ'] === '1') amenities.push('サービスロボット');
+        if (extra['デジタルメニューブック（有無）フラグ'] === '1') amenities.push('デジタルメニューブック');
+        if (extra['QR決済（有無）フラグ'] === '1') amenities.push('QR決済対応');
+        if (extra['クレジット（有無）フラグ'] === '1') amenities.push('クレジットカード可');
+        if (extra['電子マネー（有無）フラグ'] === '1') amenities.push('電子マネー可');
+        if (extra['ubereatsフラグ'] === '1') amenities.push('Uber Eats');
+        if (extra['demaecanフラグ'] === '1') amenities.push('出前館');
+        if (extra['おむつ替え台フラグ'] === '1') amenities.push('おむつ替え台');
+        if (extra['車椅子対応フラグ'] === '1') amenities.push('車椅子対応');
+        if (extra['多目的トイレフラグ'] === '1') amenities.push('多目的トイレ');
+        if (extra['個室フラグ'] === '1') amenities.push('個室あり');
+        if (extra['座敷フラグ'] === '1') amenities.push('座敷あり');
+        if (extra['コンセント席フラグ'] === '1') amenities.push('コンセント席');
+
+        // Store parking details for separate display
+        const parkingInfo = {
+          hasParking: extra['駐車場（有無）フラグ'] === '1',
+          hasDisabledParking: extra['身障者用駐車場フラグ'] === '1'
+        };
+
+        // Option 1: Pre-parse address once at load time for performance
+        const parsedAddress = ADDRESS_PARSER.parseAddress(store.address);
+
+        return {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [store.longitude, store.latitude]
+          },
+          properties: {
+            id: parseInt(store.key) || index + 1,
+            name: store.name,
+            brand: brandName,
+            address: store.address,
+            phone: extra['電話番号'] || 'お問い合わせください',
+            hours: {
+              weekday: extra['平日'] || '営業時間はお問い合わせください',
+              weekend: extra['土曜日'] || extra['日曜・祝日'] || '営業時間はお問い合わせください'
+            },
+            amenities: amenities,
+            // Pre-parsed address components for fast grouping
+            prefecture: parsedAddress.prefecture,
+            wardCity: parsedAddress.wardCity,
+            hasParking: parkingInfo.hasParking,
+            hasDisabledParking: parkingInfo.hasDisabledParking
+          }
+        };
+      })
+    };
+
+    // Filter to only include brands we have icons for
+    const supportedBrands = Object.keys(brandIconURLs);
+    storeData.features = storeData.features.filter(feature =>
+      supportedBrands.includes(feature.properties.brand)
+    );
+
+    console.log(`Filtered to ${storeData.features.length} stores with supported brands`);
+
+  } catch (error) {
+    console.error('Failed to load from API, falling back to dummy data:', error);
+
+    // Check if CORS is the issue
+    if (error.message.includes('CORS') || error.message.includes('fetch')) {
+      console.log('💡 Tip: CORS may be blocking the API. Consider using a proxy or server-side solution.');
+    }
+
+    // Use dummy data as fallback
+    storeData = dummyStoreData;
+  }
+}
+
 // Brand icon URLs (locally hosted)
 const brandIconURLs = {
   'ガスト': 'assets/brand-icons/gusto.png',
@@ -223,17 +414,126 @@ const brandText = {
 let map;
 let selectedStoreId = null;
 let currentPopup = null;
+let currentZoom = 11;
 
-// Add hasParking property to all features
-storeData.features = storeData.features.map(feature => ({
-  ...feature,
-  properties: {
-    ...feature.properties,
-    hasParking: feature.properties.amenities.includes('駐車場あり')
+// Will be initialized after data loads
+let filteredStores = [];
+
+// No longer needed - using native symbol layers instead of canvas images
+
+// Address parsing utilities
+// Option 3: Pre-compiled regex patterns for better performance
+const PREFECTURE_REGEX = /^(東京都|北海道|大阪府|京都府|[^\s]+県)/;
+const WARD_CITY_REGEX = /^([^\s]+?(市|区|町|村))/;
+const FULL_ADDRESS_REGEX = /^(東京都|北海道|大阪府|京都府|[^\s]+県)([^\s]+?(市|区|町|村))?/;
+
+const ADDRESS_PARSER = {
+  // Option 2: Single-pass parser - parse both prefecture and ward/city in one pass
+  parseAddress(address) {
+    if (!address) return { prefecture: null, wardCity: null };
+
+    // Single regex to capture both prefecture and ward/city
+    const match = address.match(FULL_ADDRESS_REGEX);
+
+    return {
+      prefecture: match ? match[1] : null,
+      wardCity: match && match[2] ? match[2] : null
+    };
+  },
+
+  // Legacy methods for backward compatibility (now use single-pass internally)
+  parsePrefecture(address) {
+    return this.parseAddress(address).prefecture;
+  },
+
+  parseWardCity(address) {
+    return this.parseAddress(address).wardCity;
+  },
+
+  // Get administrative area based on zoom level
+  getAdminArea(address, zoom) {
+    if (zoom >= 13) {
+      return null; // Show individual stores
+    } else if (zoom >= 10) {
+      return this.parseWardCity(address); // Group by ward/city
+    } else {
+      return this.parsePrefecture(address); // Group by prefecture
+    }
   }
-}));
+};
 
-let filteredStores = storeData.features;
+// Group stores by administrative area
+function groupStoresByArea(stores, zoom) {
+  const groups = {};
+  const individualStores = [];
+
+  stores.forEach(feature => {
+    // Option 1: Use pre-parsed address properties instead of parsing on every call
+    // This is MUCH faster than parsing strings with regex
+    let adminArea;
+    if (zoom >= 13) {
+      adminArea = null; // Show individual stores
+    } else if (zoom >= 10) {
+      adminArea = feature.properties.wardCity; // Use pre-parsed ward/city
+    } else {
+      adminArea = feature.properties.prefecture; // Use pre-parsed prefecture
+    }
+
+    if (!adminArea) {
+      // Zoom level is high enough to show individual stores
+      individualStores.push(feature);
+    } else {
+      // Group by administrative area
+      if (!groups[adminArea]) {
+        groups[adminArea] = {
+          name: adminArea,
+          stores: [],
+          coordinates: []
+        };
+      }
+      groups[adminArea].stores.push(feature);
+      groups[adminArea].coordinates.push(feature.geometry.coordinates);
+    }
+  });
+
+  return { groups, individualStores };
+}
+
+// Calculate centroid of coordinates
+function calculateCentroid(coordinates) {
+  if (coordinates.length === 0) return [0, 0];
+
+  const sum = coordinates.reduce((acc, coord) => {
+    return [acc[0] + coord[0], acc[1] + coord[1]];
+  }, [0, 0]);
+
+  return [sum[0] / coordinates.length, sum[1] / coordinates.length];
+}
+
+// No longer needed - using two-layer native symbol approach instead
+
+// Create GeoJSON features for area groups
+function createGroupFeatures(groups) {
+  return Object.entries(groups).map(([areaName, group]) => {
+    const centroid = calculateCentroid(group.coordinates);
+
+    return {
+      type: 'Feature',
+      geometry: {
+        type: 'Point',
+        coordinates: centroid
+      },
+      properties: {
+        type: 'area-group',
+        name: areaName,
+        count: group.stores.length,
+        storeIds: group.stores.map(s => s.properties.id)
+      }
+    };
+  });
+}
+
+// No longer needed - using native symbol layers instead
 
 // Load brand icon image for map markers
 function loadBrandIcon(brand) {
@@ -269,7 +569,29 @@ function initMap() {
     language: 'ja'
   });
 
-  map.on('load', () => {
+  map.on('load', async () => {
+    // Load stores from API using expanded region (not just viewport)
+    // This loads more stores upfront but eliminates API calls on pan
+    await loadStoresFromAPI(null); // null = use default expanded bounds
+
+    // Add hasParking property to all features
+    storeData.features = storeData.features.map(feature => ({
+      ...feature,
+      properties: {
+        ...feature.properties,
+        hasParking: feature.properties.hasParking,
+        hasDisabledParking: feature.properties.hasDisabledParking
+      }
+    }));
+
+    // Initialize filtered stores
+    filteredStores = storeData.features;
+
+    // Update the UI with loaded stores
+    updateStoreListImmediate(); // Immediate update on initial load
+    updateStoreCount();
+    initBrandFilters(); // Re-initialize brand filters with actual data
+
     // Add Japanese language support
     if (typeof MapboxLanguage !== 'undefined') {
       map.addControl(new MapboxLanguage({
@@ -291,16 +613,53 @@ function initMap() {
 
     // Wait for all images to load, then add layers
     Promise.all(imagePromises).then(() => {
-      // Add store data source
+      // Add source for area groups
+      map.addSource('area-groups', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: []
+        }
+      });
+
+      // Add source for individual stores
       map.addSource('stores', {
         type: 'geojson',
         data: {
           type: 'FeatureCollection',
-          features: filteredStores
+          features: []
         }
       });
 
-      // Add symbol layer for stores
+      // Add symbol layer for area groups - Combined layer with formatted text
+      // Using a single layer ensures the name and count are treated as one atomic unit
+      // for collision detection, so they always appear/disappear together
+      map.addLayer({
+        id: 'area-groups-labels',
+        type: 'symbol',
+        source: 'area-groups',
+        layout: {
+          'text-field': [
+            'format',
+            ['get', 'name'], { 'text-color': 'black' },
+            ' ', {},
+            ['to-string', ['get', 'count']], { 'text-color': '#ED1C24' }  // Red count
+          ],
+          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+          'text-size': 26,
+          'text-allow-overlap': false,
+          'text-ignore-placement': false,
+          'text-padding': 2,
+          'symbol-sort-key': ['-', ['get', 'count']]  // Higher count = higher priority
+        },
+        paint: {
+          'text-halo-width': 8,
+          'text-halo-blur': 0,
+          'text-halo-color': 'white'  // White halo for entire text
+        }
+      });
+
+      // Add symbol layer for individual stores (brand icons)
       map.addLayer({
         id: 'store-icons',
         type: 'symbol',
@@ -335,16 +694,54 @@ function initMap() {
         }
       });
 
+      // Add click handler for area groups - handle both name and count layers
+      const handleAreaGroupClick = (e) => {
+        if (e.features && e.features.length > 0) {
+          const feature = e.features[0];
+          const coords = feature.geometry.coordinates;
+          map.easeTo({
+            center: coords,
+            zoom: Math.min(currentZoom + 3, 16),
+            duration: 1000
+          });
+        }
+      };
+
+      // Click handler for area group labels (combined layer)
+      map.on('click', 'area-groups-labels', handleAreaGroupClick);
+
       // Add click handler for store icons
       map.on('click', 'store-icons', (e) => {
         if (e.features && e.features.length > 0) {
           const feature = e.features[0];
           selectStore(feature.properties.id);
-          showPopup(feature);
+
+          // Center on the clicked store and show popup
+          const targetZoom = Math.max(map.getZoom(), 15);
+          const offsetCenter = getCenterOffset(feature.geometry.coordinates, targetZoom);
+
+          map.flyTo({
+            center: offsetCenter,
+            zoom: targetZoom,
+            duration: 500
+          });
+
+          map.once('moveend', () => {
+            showPopup(feature);
+          });
         }
       });
 
-      // Change cursor on hover
+      // Change cursor on hover for area groups
+      map.on('mouseenter', 'area-groups-labels', () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+
+      map.on('mouseleave', 'area-groups-labels', () => {
+        map.getCanvas().style.cursor = '';
+      });
+
+      // Change cursor on hover for store icons
       map.on('mouseenter', 'store-icons', () => {
         map.getCanvas().style.cursor = 'pointer';
       });
@@ -353,10 +750,100 @@ function initMap() {
         map.getCanvas().style.cursor = '';
       });
 
+      // Initial render
+      currentZoom = map.getZoom();
+      updateMapLayers();
+
       // Update selection state
       updateSymbolState();
     });
+
+    // Add zoom handler to update grouping
+    // Use 'zoomend' instead of 'zoom' - fires once when zoom animation completes
+    map.on('zoomend', () => {
+      const newZoom = map.getZoom();
+      const oldLevel = getZoomLevel(currentZoom);
+      const newLevel = getZoomLevel(newZoom);
+
+      currentZoom = newZoom;
+
+      // Update layers if zoom level crosses thresholds
+      if (oldLevel !== newLevel) {
+        updateMapLayers(); // No debouncing needed - zoomend only fires once
+      }
+    });
+
+    // Add map move handler to update visible stores (no API reload needed)
+    // Viewport filtering happens in updateMapLayers() - no debouncing needed
+    map.on('moveend', () => {
+      // Update map layers, list, and count with viewport filtering
+      // This only processes visible stores, making it fast enough for real-time updates
+      updateMapLayers();
+      updateStoreListImmediate();
+      updateStoreCount();
+    });
   });
+}
+
+// Get zoom level category
+function getZoomLevel(zoom) {
+  if (zoom >= 13) return 'individual';
+  if (zoom >= 10) return 'ward';
+  return 'prefecture';
+}
+
+// Filter stores to only those visible in current viewport with padding
+function getVisibleStores(allStores, mapBounds, padding = 0.15) {
+  // Add padding to bounds for smoother panning experience
+  // padding in degrees (~15km at Tokyo latitude)
+  const north = mapBounds.getNorth() + padding;
+  const south = mapBounds.getSouth() - padding;
+  const east = mapBounds.getEast() + padding;
+  const west = mapBounds.getWest() - padding;
+
+  return allStores.filter(feature => {
+    const [lng, lat] = feature.geometry.coordinates;
+    return lat >= south && lat <= north && lng >= west && lng <= east;
+  });
+}
+
+// Update map layers based on current zoom and filtered stores
+function updateMapLayers() {
+  if (!map.getSource('stores') || !map.getSource('area-groups')) return;
+
+  const zoom = map.getZoom();
+  const bounds = map.getBounds();
+
+  // KEY OPTIMIZATION: Only process stores visible in viewport
+  // This reduces processing from ~255 stores to ~30-80 stores
+  const visibleStores = getVisibleStores(filteredStores, bounds);
+
+  const { groups, individualStores } = groupStoresByArea(visibleStores, zoom);
+
+  // Create features for area groups (no image generation needed)
+  const groupFeatures = createGroupFeatures(groups);
+
+  // Update area groups source
+  map.getSource('area-groups').setData({
+    type: 'FeatureCollection',
+    features: groupFeatures
+  });
+
+  // Update individual stores source
+  map.getSource('stores').setData({
+    type: 'FeatureCollection',
+    features: individualStores
+  });
+
+  console.log(`Zoom ${zoom.toFixed(1)}: ${visibleStores.length} visible of ${filteredStores.length} total | ${groupFeatures.length} groups, ${individualStores.length} individual stores`);
+}
+
+// Calculate center offset to position store south of center
+function getCenterOffset(coordinates, zoom) {
+  // Offset latitude to shift the visual center northward
+  // This makes the store appear south of center (good for popups)
+  const latOffset = 0.003 / Math.pow(2, zoom - 15); // Scales with zoom
+  return [coordinates[0], coordinates[1] + latOffset];
 }
 
 // Update symbol state based on selection
@@ -398,20 +885,24 @@ function createPopupContent(feature) {
     </div>
     <div class="popup-body">
       <div class="popup-section">
-        <div class="popup-label">住所</div>
-        <div class="popup-value">${props.address}</div>
-      </div>
-      <div class="popup-section">
         <div class="popup-label">営業時間</div>
-        <div class="popup-value">
+        <div class="popup-value popup-value-bold">
           平日: ${hours.weekday}<br>
           土日祝: ${hours.weekend}
         </div>
       </div>
       <div class="popup-section">
         <div class="popup-label">電話番号</div>
-        <div class="popup-value">${props.phone}</div>
+        <div class="popup-value popup-value-bold">${props.phone}</div>
       </div>
+      ${props.hasParking ? `
+      <div class="popup-section">
+        <div class="popup-label">駐車場</div>
+        <div class="popup-value popup-value-bold">
+          あり${props.hasDisabledParking ? '（身障者用あり）' : ''}
+        </div>
+      </div>
+      ` : ''}
       <div class="popup-section">
         <div class="popup-label">設備・サービス</div>
         <div class="popup-amenities">
@@ -454,13 +945,8 @@ window.showDetails = function(storeId) {
 
 // Update markers on map
 function updateMarkers() {
-  if (!map.getSource('stores')) return;
-
-  // Update GeoJSON data with filtered stores
-  map.getSource('stores').setData({
-    type: 'FeatureCollection',
-    features: filteredStores
-  });
+  // Use the new updateMapLayers function
+  updateMapLayers();
 
   // Update selection state
   updateSymbolState();
@@ -487,8 +973,9 @@ function selectStore(storeId) {
   // Fly to store location
   const feature = storeData.features.find(f => f.properties.id === storeId);
   if (feature) {
+    const offsetCenter = getCenterOffset(feature.geometry.coordinates, 12);
     map.flyTo({
-      center: feature.geometry.coordinates,
+      center: offsetCenter,
       zoom: 12,
       duration: 1000
     });
@@ -499,6 +986,9 @@ function selectStore(storeId) {
 function initBrandFilters() {
   const brands = [...new Set(storeData.features.map(f => f.properties.brand))];
   const brandFiltersContainer = document.getElementById('brand-filters');
+
+  // Clear existing filters
+  brandFiltersContainer.innerHTML = '';
 
   brands.forEach((brand, index) => {
     const button = document.createElement('button');
@@ -548,30 +1038,87 @@ function applyFilters() {
       ...feature,
       properties: {
         ...feature.properties,
-        hasParking: feature.properties.amenities.includes('駐車場あり')
+        hasParking: feature.properties.hasParking,
+        hasDisabledParking: feature.properties.hasDisabledParking
       }
     };
   });
 
-  updateStoreList();
-  updateMarkers();
+  updateStoreListImmediate(); // Direct call for immediate response to filter clicks
+  updateMapLayers(); // Direct call - no debouncing needed for discrete filter actions
   updateStoreCount();
 }
 
 // Update store list
-function updateStoreList() {
+// Debounce timer for list updates
+let listUpdateTimeout;
+
+// Debounce timer for map layer updates
+let mapUpdateTimeout;
+
+// Cache for admin area parsing to avoid re-parsing on every zoom
+const adminAreaCache = new Map();
+
+// Debounced wrapper for updateStoreList
+function scheduleListUpdate() {
+  clearTimeout(listUpdateTimeout);
+  listUpdateTimeout = setTimeout(updateStoreListImmediate, 50);
+}
+
+// Debounced wrapper for updateMapLayers
+function scheduleMapUpdate() {
+  clearTimeout(mapUpdateTimeout);
+  mapUpdateTimeout = setTimeout(updateMapLayers, 50);
+}
+
+// Progressive loading state
+let currentVisibleStores = [];
+let displayedCount = 0;
+const batchSize = 20;
+
+// Immediate list update (called by debouncer or when immediate update needed)
+function updateStoreListImmediate() {
   const storeList = document.getElementById('store-list');
   storeList.innerHTML = '';
 
-  filteredStores.forEach(feature => {
+  // Filter by viewport WITHOUT padding - show only truly visible stores in list
+  // (Map uses padding for smooth rendering, but list should match what user sees)
+  const bounds = map.getBounds();
+  currentVisibleStores = getVisibleStores(filteredStores, bounds, 0); // No padding
+
+  // Reset display counter
+  displayedCount = 0;
+
+  // Show initial batch
+  appendStoreListBatch();
+
+  // Add scroll listener for progressive loading
+  storeList.removeEventListener('scroll', handleStoreListScroll);
+  storeList.addEventListener('scroll', handleStoreListScroll);
+}
+
+// Append a batch of stores to the list
+function appendStoreListBatch() {
+  const storeList = document.getElementById('store-list');
+
+  // Calculate how many stores to show in this batch
+  const remainingStores = currentVisibleStores.length - displayedCount;
+  if (remainingStores <= 0) return;
+
+  const storesToAdd = Math.min(batchSize, remainingStores);
+  const newStores = currentVisibleStores.slice(displayedCount, displayedCount + storesToAdd);
+
+  // Use document fragment to batch DOM operations
+  const fragment = document.createDocumentFragment();
+
+  newStores.forEach(feature => {
     const props = feature.properties;
 
     const storeItem = document.createElement('div');
     storeItem.className = 'store-item';
     storeItem.dataset.storeId = props.id;
 
-    const hasParking = props.amenities.includes('駐車場あり');
-    const parkingBadge = hasParking
+    const parkingBadge = props.hasParking
       ? '<span style="background: #9C27B0; color: white; padding: 2px 5px; border-radius: 3px; font-size: 10px; font-weight: bold; margin-right: 4px;">P</span>'
       : '';
 
@@ -585,17 +1132,92 @@ function updateStoreList() {
 
     storeItem.addEventListener('click', () => {
       selectStore(props.id);
-      showPopup(feature);
+
+      // Check if map is zoomed in enough to show individual stores
+      const currentZoom = map.getZoom();
+      if (currentZoom < 13) {
+        // Zoom in to show individual stores, then show popup
+        const offsetCenter = getCenterOffset(feature.geometry.coordinates, 15);
+
+        map.flyTo({
+          center: offsetCenter,
+          zoom: 15,
+          duration: 1000
+        });
+
+        // Show popup after zoom animation completes
+        map.once('moveend', () => {
+          showPopup(feature);
+        });
+      } else {
+        // Already zoomed in, just center and show popup
+        const targetZoom = Math.max(currentZoom, 15);
+        const offsetCenter = getCenterOffset(feature.geometry.coordinates, targetZoom);
+
+        map.flyTo({
+          center: offsetCenter,
+          zoom: targetZoom,
+          duration: 800
+        });
+
+        map.once('moveend', () => {
+          showPopup(feature);
+        });
+      }
     });
 
-    storeList.appendChild(storeItem);
+    fragment.appendChild(storeItem);
   });
+
+  // Remove loading indicator if it exists
+  const loadingIndicator = storeList.querySelector('.loading-indicator');
+  if (loadingIndicator) {
+    loadingIndicator.remove();
+  }
+
+  // Append new stores
+  storeList.appendChild(fragment);
+  displayedCount += storesToAdd;
+
+  // Add loading indicator if there are more stores to show
+  if (displayedCount < currentVisibleStores.length) {
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'loading-indicator';
+    loadingDiv.style.cssText = 'padding: 16px 20px; background-color: #f0f0f0; text-align: center; font-size: 13px; color: #666;';
+    loadingDiv.textContent = `${displayedCount}件表示中 - スクロールして続きを読み込む`;
+    storeList.appendChild(loadingDiv);
+  }
+}
+
+// Handle scroll event for progressive loading
+function handleStoreListScroll() {
+  const storeList = document.getElementById('store-list');
+  const scrollTop = storeList.scrollTop;
+  const scrollHeight = storeList.scrollHeight;
+  const clientHeight = storeList.clientHeight;
+
+  // Load more when user scrolls to bottom (with 100px threshold)
+  if (scrollTop + clientHeight >= scrollHeight - 100) {
+    if (displayedCount < currentVisibleStores.length) {
+      appendStoreListBatch();
+    }
+  }
+}
+
+// Keep old function name for compatibility, but make it use debounced version
+function updateStoreList() {
+  scheduleListUpdate();
 }
 
 // Update store count
 function updateStoreCount() {
+  const bounds = map.getBounds();
+  // Use no padding to match what's shown in the list
+  const visibleStores = getVisibleStores(filteredStores, bounds, 0);
+
+  // Show count of visible stores
   document.getElementById('store-count').textContent =
-    `${filteredStores.length}件見つかりました`;
+    `${visibleStores.length}件見つかりました`;
 }
 
 // Clear all filters
@@ -775,7 +1397,7 @@ function init() {
   initMap();
   initBrandFilters();
   initUIEvents();
-  updateStoreList();
+  updateStoreListImmediate(); // Immediate update on init
   updateStoreCount();
 }
 
