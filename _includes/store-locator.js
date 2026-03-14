@@ -1,8 +1,6 @@
-// Configuration for Skylark API
-const SKYLARK_API = 'https://store-info.skylark.co.jp/api/point/';
+// Configuration for Skylark data
+const SKYLARK_DATA_FILE = 'skylark-stores.json'; // Local JSON file with store data
 const USE_REAL_DATA = true; // Set to false to use dummy data only
-const USE_CORS_PROXY = true; // Set to true to use CORS proxy (for demo purposes)
-const CORS_PROXY_URL = 'https://api.codetabs.com/v1/proxy?quest='; // Public CORS proxy
 
 // Store data - will be populated from API or use dummy data as fallback
 let storeData = {
@@ -207,7 +205,7 @@ const dummyStoreData = {
   ]
 };
 
-// Load real store data from Skylark API
+// Load real store data from local JSON file
 async function loadStoresFromAPI(mapBounds) {
   if (!USE_REAL_DATA) {
     console.log('Using dummy data (USE_REAL_DATA = false)');
@@ -216,52 +214,12 @@ async function loadStoresFromAPI(mapBounds) {
   }
 
   try {
-    // Use map viewport bounds if provided, otherwise use expanded region
-    let bounds;
-    if (mapBounds) {
-      const ne = mapBounds.getNorthEast();
-      const sw = mapBounds.getSouthWest();
-      bounds = {
-        north: ne.lat,
-        south: sw.lat,
-        east: ne.lng,
-        west: sw.lng
-      };
-      console.log('Using map viewport bounds:', bounds);
-    } else {
-      // Default bounds for initial load - all of Japan including Okinawa
-      // Loads all stores upfront but eliminates API calls on pan
-      // Covers Hokkaido to Okinawa (entire country)
-      bounds = {
-        north: 45.5,    // Northern Hokkaido
-        south: 24.0,    // Southern Okinawa (Ishigaki, Miyako)
-        east: 146.0,    // Eastern Hokkaido
-        west: 122.0     // Western Okinawa (Yonaguni)
-      };
-      console.log('Using all Japan bounds (including Okinawa):', bounds);
-    }
+    console.log('Loading stores from local file:', SKYLARK_DATA_FILE);
 
-    // Create API URL with parameters
-    const params = new URLSearchParams({
-      backend_filters: JSON.stringify({}), // Empty to get all brands
-      backend_order: JSON.stringify({}),
-      b: `${bounds.north},${bounds.east},${bounds.south},${bounds.west}`
-    });
-
-    let apiUrl = `${SKYLARK_API}?${params}`;
-
-    // Use CORS proxy if enabled
-    if (USE_CORS_PROXY) {
-      apiUrl = `${CORS_PROXY_URL}${encodeURIComponent(apiUrl)}`;
-      console.log('Using CORS proxy to fetch stores...');
-    } else {
-      console.log('Fetching stores from Skylark API directly...');
-    }
-
-    const response = await fetch(apiUrl);
+    const response = await fetch(SKYLARK_DATA_FILE);
 
     if (!response.ok) {
-      throw new Error(`API returned ${response.status}`);
+      throw new Error(`Failed to load ${SKYLARK_DATA_FILE}: ${response.status}`);
     }
 
     let data = await response.json();
@@ -374,12 +332,8 @@ async function loadStoresFromAPI(mapBounds) {
     console.log(`Filtered to ${storeData.features.length} stores with supported brands`);
 
   } catch (error) {
-    console.error('Failed to load from API, falling back to dummy data:', error);
-
-    // Check if CORS is the issue
-    if (error.message.includes('CORS') || error.message.includes('fetch')) {
-      console.log('💡 Tip: CORS may be blocking the API. Consider using a proxy or server-side solution.');
-    }
+    console.error('Failed to load from local file, falling back to dummy data:', error);
+    console.log(`💡 Tip: Make sure ${SKYLARK_DATA_FILE} exists in the project root.`);
 
     // Use dummy data as fallback
     storeData = dummyStoreData;
