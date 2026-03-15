@@ -406,9 +406,9 @@ const ADDRESS_PARSER = {
 
   // Get administrative area based on zoom level
   getAdminArea(address, zoom) {
-    if (zoom >= 13) {
+    if (zoom >= 12) {
       return null; // Show individual stores
-    } else if (zoom >= 10) {
+    } else if (zoom >= 9) {
       return this.parseWardCity(address); // Group by ward/city
     } else {
       return this.parsePrefecture(address); // Group by prefecture
@@ -425,9 +425,9 @@ function groupStoresByArea(stores, zoom) {
     // Option 1: Use pre-parsed address properties instead of parsing on every call
     // This is MUCH faster than parsing strings with regex
     let adminArea;
-    if (zoom >= 13) {
+    if (zoom >= 12) {
       adminArea = null; // Show individual stores
-    } else if (zoom >= 10) {
+    } else if (zoom >= 9) {
       adminArea = feature.properties.wardCity; // Use pre-parsed ward/city
     } else {
       adminArea = feature.properties.prefecture; // Use pre-parsed prefecture
@@ -741,8 +741,8 @@ function initMap() {
 
 // Get zoom level category
 function getZoomLevel(zoom) {
-  if (zoom >= 13) return 'individual';
-  if (zoom >= 10) return 'ward';
+  if (zoom >= 12) return 'individual';
+  if (zoom >= 9) return 'ward';
   return 'prefecture';
 }
 
@@ -1089,7 +1089,7 @@ function appendStoreListBatch() {
 
       // Check if map is zoomed in enough to show individual stores
       const currentZoom = map.getZoom();
-      if (currentZoom < 13) {
+      if (currentZoom < 12) {
         // Zoom in to show individual stores, then show popup
         const offsetCenter = getCenterOffset(feature.geometry.coordinates, 15);
 
