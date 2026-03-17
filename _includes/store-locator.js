@@ -517,7 +517,7 @@ function loadBrandIcon(brand) {
 function initMap() {
   map = new mapboxgl.Map({
     container: 'map',
-    style: 'mapbox://styles/mapbox/standard',
+    style: 'mapbox://styles/kenji-shima/cmmtz45at001501sm99f0eima',
     center: [139.7025, 35.6895], // Center on Tokyo
     zoom: 11,
     language: 'ja'
