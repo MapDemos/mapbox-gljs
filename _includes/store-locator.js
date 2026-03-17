@@ -1212,33 +1212,56 @@ function debounce(func, wait) {
   };
 }
 
-// Initialize search with Geocoding API
+// Initialize search with SearchBox API
 function initSearch() {
   const searchBox = document.getElementById('search-box');
   const suggestionsContainer = document.getElementById('search-suggestions');
 
-  // Function to get search suggestions using Geocoding API
+  // Generate a session token for billing (UUIDv4)
+  let sessionToken = generateSessionToken();
+
+  // Store suggestion features with their mapbox_id for retrieval
+  let currentSuggestions = [];
+
+  // Generate UUIDv4 for session token
+  function generateSessionToken() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  // Function to get search suggestions using SearchBox API
   async function getSuggestions(query) {
     if (!query || query.length < 2) {
       suggestionsContainer.classList.remove('active');
       suggestionsContainer.innerHTML = '';
+      currentSuggestions = [];
       return;
     }
 
     try {
       const center = map.getCenter();
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
+        `https://api.mapbox.com/search/searchbox/v1/suggest?` +
+        `q=${encodeURIComponent(query)}&` +
         `access_token=${mapboxgl.accessToken}&` +
-        `country=JP&` +
+        `session_token=${sessionToken}&` +
         `language=ja&` +
+        `country=JP&` +
         `proximity=${center.lng},${center.lat}&` +
-        `limit=5&` +
-        `autocomplete=true`
+        `types=place,address,poi,street,locality,neighborhood&` +
+        `limit=5`
       );
 
+      if (!response.ok) {
+        throw new Error(`SearchBox API error: ${response.status}`);
+      }
+
       const data = await response.json();
-      displaySuggestions(data.features);
+      currentSuggestions = data.suggestions || [];
+      displaySuggestions(currentSuggestions);
     } catch (error) {
       console.error('Search error:', error);
       suggestionsContainer.innerHTML = '<div class="suggestion-item">エラーが発生しました</div>';
@@ -1247,33 +1270,35 @@ function initSearch() {
   }
 
   // Function to display suggestions
-  function displaySuggestions(features) {
+  function displaySuggestions(suggestions) {
     suggestionsContainer.innerHTML = '';
 
-    if (!features || features.length === 0) {
-      suggestionsContainer.innerHTML = '<div class="suggestion-item">結果が見つかりませんでした</div>';
+    if (!suggestions || suggestions.length === 0) {
+      suggestionsContainer.innerHTML = '<div class="suggestion-item">検索結果が見つかりませんでした</div>';
       suggestionsContainer.classList.add('active');
       return;
     }
 
-    features.forEach(feature => {
+    suggestions.forEach((suggestion, index) => {
       const item = document.createElement('div');
       item.className = 'suggestion-item';
 
       const name = document.createElement('div');
       name.className = 'suggestion-name';
-      name.textContent = feature.text;
+      // Use name property from SearchBox API
+      name.textContent = suggestion.name || suggestion.text || '';
 
       const address = document.createElement('div');
       address.className = 'suggestion-address';
-      address.textContent = feature.place_name;
+      // Build full address from SearchBox API response
+      address.textContent = suggestion.full_address || suggestion.place_formatted || '';
 
       item.appendChild(name);
       item.appendChild(address);
 
       // Handle click on suggestion
       item.addEventListener('click', () => {
-        selectSuggestion(feature);
+        selectSuggestion(suggestion, index);
       });
 
       suggestionsContainer.appendChild(item);
@@ -1283,22 +1308,65 @@ function initSearch() {
   }
 
   // Function to handle suggestion selection
-  function selectSuggestion(feature) {
-    const [lng, lat] = feature.center;
+  async function selectSuggestion(suggestion, index) {
+    try {
+      // For SearchBox API, we need to retrieve full details using the mapbox_id
+      const retrieveResponse = await fetch(
+        `https://api.mapbox.com/search/searchbox/v1/retrieve/${suggestion.mapbox_id}?` +
+        `access_token=${mapboxgl.accessToken}&` +
+        `session_token=${sessionToken}`
+      );
 
-    // Update input with selected place name
-    searchBox.value = feature.place_name;
+      if (!retrieveResponse.ok) {
+        throw new Error(`Retrieve API error: ${retrieveResponse.status}`);
+      }
 
-    // Hide suggestions
-    suggestionsContainer.classList.remove('active');
-    suggestionsContainer.innerHTML = '';
+      const data = await retrieveResponse.json();
 
-    // Fly to the location
-    map.flyTo({
-      center: [lng, lat],
-      zoom: 14,
-      duration: 1000
-    });
+      // Get coordinates from the retrieved feature
+      const feature = data.features && data.features[0];
+      if (!feature || !feature.geometry || !feature.geometry.coordinates) {
+        throw new Error('Invalid feature data');
+      }
+
+      const [lng, lat] = feature.geometry.coordinates;
+
+      // Update input with selected place name
+      searchBox.value = suggestion.full_address || suggestion.place_formatted || suggestion.name;
+
+      // Hide suggestions
+      suggestionsContainer.classList.remove('active');
+      suggestionsContainer.innerHTML = '';
+      currentSuggestions = [];
+
+      // Generate new session token for next search
+      sessionToken = generateSessionToken();
+
+      // Fly to the location
+      map.flyTo({
+        center: [lng, lat],
+        zoom: 14,
+        duration: 1000
+      });
+    } catch (error) {
+      console.error('Error retrieving suggestion details:', error);
+      // Fallback: try to use coordinates from suggestion if available
+      if (suggestion.geometry && suggestion.geometry.coordinates) {
+        const [lng, lat] = suggestion.geometry.coordinates;
+        searchBox.value = suggestion.full_address || suggestion.name;
+        suggestionsContainer.classList.remove('active');
+        suggestionsContainer.innerHTML = '';
+        sessionToken = generateSessionToken();
+
+        map.flyTo({
+          center: [lng, lat],
+          zoom: 14,
+          duration: 1000
+        });
+      } else {
+        alert('選択した場所の詳細を取得できませんでした');
+      }
+    }
   }
 
   // Add event listener with debounce
