@@ -1290,8 +1290,8 @@ function initSearch() {
 
       const address = document.createElement('div');
       address.className = 'suggestion-address';
-      // Build full address from SearchBox API response
-      address.textContent = suggestion.full_address || suggestion.place_formatted || '';
+      // Use place_formatted for geographic context without duplicating name
+      address.textContent = suggestion.place_formatted || '';
 
       item.appendChild(name);
       item.appendChild(address);
