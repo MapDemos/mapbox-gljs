@@ -230,6 +230,17 @@ js: details-search.js
       color: white;
     }
 
+    /* POI Camera Badge */
+    .poi-camera-badge {
+      display: inline-block;
+      background: #17a2b8;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 14px;
+      line-height: 1;
+      vertical-align: middle;
+    }
+
     /* Loading state */
     .loading-container {
       display: flex;

@@ -298,6 +298,17 @@ function getCurrentCategories() {
   return currentRegion === 'japan' ? JAPAN_CATEGORIES : (window.GLOBAL_CATEGORIES || []);
 }
 
+// Create SVG data URI for camera icon
+function createCameraIconSVG(color) {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="${color}">
+      <path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
+      <circle cx="12" cy="12" r="3" fill="white"/>
+    </svg>
+  `.trim();
+  return 'data:image/svg+xml;base64,' + btoa(svg);
+}
+
 // Global variables
 let map;
 let currentCategory = null;
@@ -306,6 +317,10 @@ let markers = [];
 let sessionToken = null;
 let selectedPOI = null;
 let poiDetailsCache = new Map(); // Cache for fetched POI details
+let progressiveLoadingQueue = [];
+let isLoadingDetails = false;
+const MAX_CONCURRENT_DETAILS_REQUESTS = 3;
+let activeDetailsRequests = 0;
 
 // Update map language
 function updateMapLanguage(language) {
@@ -351,6 +366,14 @@ function initMap() {
       map.addImage('location-pin', image);
       console.log('Custom location pin loaded');
     });
+
+    // Load camera icon image for confirmed photo badges
+    const cameraConfirmedImg = new Image();
+    cameraConfirmedImg.src = createCameraIconSVG('#17a2b8'); // Cyan confirmed (matches sidebar)
+    cameraConfirmedImg.onload = () => {
+      map.addImage('camera-confirmed', cameraConfirmedImg);
+      console.log('Camera confirmed icon loaded');
+    };
 
     // Set initial language to Japanese (since we start with Japan region)
     updateMapLanguage('ja');
@@ -476,6 +499,25 @@ function initMap() {
       }
     });
 
+    // Add photo badge layer for POIs with confirmed photos
+    map.addLayer({
+      'id': 'poi-photo-badges',
+      'type': 'symbol',
+      'source': 'pois',
+      'filter': ['==', ['get', 'photo_status'], 'confirmed'], // Only show confirmed photos
+      'layout': {
+        'icon-image': 'camera-confirmed',
+        'icon-size': 0.625, // 1.25x larger than before
+        'icon-offset': [12, -12], // Position at top-right corner
+        'icon-anchor': 'center',
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true
+      },
+      'paint': {
+        'icon-opacity': 1
+      }
+    });
+
     // Add hover effect for icons
     // Update to use poi-markers instead of poi-icons
     map.on('mouseenter', 'poi-markers', () => {
@@ -484,6 +526,11 @@ function initMap() {
 
     map.on('mouseleave', 'poi-markers', () => {
       map.getCanvas().style.cursor = '';
+    });
+
+    // Start progressive loading when map becomes idle
+    map.on('idle', () => {
+      startProgressivePhotoLoading();
     });
 
     // Add click handler for POI markers
@@ -1301,7 +1348,10 @@ function displayPOIResults(pois, category) {
     tile.innerHTML = `
       <div class="category-icon">${categoryIcon}</div>
       <div class="category-content">
-        <div class="category-name">${name}</div>
+        <div class="category-name">
+          <span class="poi-camera-badge" data-poi-index="${index}" style="display: none;">📷</span>
+          ${name}
+        </div>
         <div class="category-count">${address}</div>
         <div class="category-count">${distance}</div>
       </div>
@@ -1319,6 +1369,16 @@ function displayPOIResults(pois, category) {
 
     categoryList.appendChild(tile);
   });
+
+  // Check if any POIs already have confirmed photo status and show camera badges
+  const source = map.getSource('pois');
+  if (source && source._data && source._data.features) {
+    source._data.features.forEach(feature => {
+      if (feature.properties.photo_status === 'confirmed') {
+        updateSidebarCameraBadge(feature.properties.index, true);
+      }
+    });
+  }
 
   // Focus first result
   if (pois.length > 0) {
@@ -1350,8 +1410,18 @@ async function selectPOI(poi, index) {
     p.properties.mapbox_id === poi.properties.mapbox_id
   );
 
+  // Get current features to preserve photo_status
+  const source = map.getSource('pois');
+  const currentFeatures = source && source._data && source._data.features ? source._data.features : [];
+
   const features = markers.map((p, i) => {
     const properties = p.properties || {};
+
+    // Find the existing feature to preserve photo_status
+    const existingFeature = currentFeatures.find(f =>
+      f.properties && f.properties.index === i
+    );
+    const photoStatus = existingFeature ? existingFeature.properties.photo_status : 'none';
 
     return {
       'type': 'Feature',
@@ -1360,13 +1430,13 @@ async function selectPOI(poi, index) {
         'name': properties.name || '名称不明',
         'index': i,
         'selected': i === actualIndex, // Mark the selected POI using actual index
+        'photo_status': photoStatus, // Preserve photo status
         'poiData': JSON.stringify(p)
       }
     };
   });
 
   // Update the source with selection state
-  const source = map.getSource('pois');
   if (source) {
     source.setData({
       'type': 'FeatureCollection',
@@ -1831,6 +1901,10 @@ function closePOIPopup() {
 
   // Reset all POIs to unselected state
   if (markers && markers.length > 0) {
+    // Get current features to preserve photo_status
+    const source = map.getSource('pois');
+    const currentFeatures = source && source._data && source._data.features ? source._data.features : [];
+
     const features = markers.map((p, i) => {
       const properties = p.properties || {};
 
@@ -1838,6 +1912,12 @@ function closePOIPopup() {
       const makiIcon = properties.maki || 'marker';
       // Use the icon name that was stored when the POIs were first added
       const iconName = p._iconName || 'marker-15';
+
+      // Find the existing feature to preserve photo_status
+      const existingFeature = currentFeatures.find(f =>
+        f.properties && f.properties.index === i
+      );
+      const photoStatus = existingFeature ? existingFeature.properties.photo_status : 'none';
 
       return {
         'type': 'Feature',
@@ -1848,13 +1928,13 @@ function closePOIPopup() {
           'icon-name': iconName,
           'index': i,
           'selected': false, // All unselected
+          'photo_status': photoStatus, // Preserve photo status
           'poiData': JSON.stringify(p)
         }
       };
     });
 
     // Update the source
-    const source = map.getSource('pois');
     if (source) {
       source.setData({
         'type': 'FeatureCollection',
@@ -1893,6 +1973,10 @@ function addPOIMarkers(pois) {
   const features = pois.map((poi, index) => {
     const properties = poi.properties || {};
 
+    // Check if we already have confirmed photo data - photos are in metadata.photos
+    const metadata = properties.metadata || {};
+    const hasConfirmedPhotos = metadata.photos && metadata.photos.length > 0;
+
     const feature = {
       'type': 'Feature',
       'geometry': poi.geometry,
@@ -1900,12 +1984,15 @@ function addPOIMarkers(pois) {
         'name': properties.name || '名称不明',
         'index': index,
         'selected': false, // Add default selected state
+        'mapbox_id': properties.mapbox_id,
+        // Photo status: 'none' or 'confirmed' (will be updated via lazy loading)
+        'photo_status': hasConfirmedPhotos ? 'confirmed' : 'none',
         // Store the full POI data as a JSON string for retrieval on click
         'poiData': JSON.stringify(poi)
       }
     };
 
-    console.log(`POI ${index}: ${properties.name}`);
+    console.log(`POI ${index}: ${properties.name} - Photo status: ${feature.properties.photo_status}`);
     return feature;
   });
 
@@ -1924,6 +2011,9 @@ function addPOIMarkers(pois) {
 
   // Store POI data for reference
   markers = pois;
+
+  // Clear and restart progressive loading queue
+  progressiveLoadingQueue = [];
 }
 
 // Add a single POI marker to the map
@@ -1974,6 +2064,9 @@ function clearMarkers() {
   markers = [];
   // Clear the POI details cache when clearing markers
   poiDetailsCache.clear();
+  // Clear progressive loading queue
+  progressiveLoadingQueue = [];
+  activeDetailsRequests = 0;
 }
 
 // Fit map to show all markers
@@ -1990,6 +2083,194 @@ function fitMapToMarkers(pois) {
     padding: { top: 50, bottom: 50, left: 450, right: 50 },
     duration: 1000
   });
+}
+
+// Progressive photo loading - Start loading details for visible POIs
+function startProgressivePhotoLoading() {
+  if (!map || markers.length === 0) return;
+
+  // Get visible POIs in current viewport
+  const features = map.querySourceFeatures('pois', {
+    sourceLayer: 'pois'
+  });
+
+  if (!features || features.length === 0) {
+    // If querySourceFeatures doesn't work, get all POIs and filter by viewport
+    const bounds = map.getBounds();
+    const visiblePOIs = markers.filter(poi => {
+      const [lng, lat] = poi.geometry.coordinates;
+      return bounds.contains([lng, lat]);
+    });
+
+    // Build loading queue
+    buildProgressiveLoadingQueue(visiblePOIs);
+  } else {
+    // Use queried features
+    const visiblePOIs = features
+      .map(f => {
+        try {
+          return f.properties.poiData ? JSON.parse(f.properties.poiData) : null;
+        } catch (e) {
+          return null;
+        }
+      })
+      .filter(poi => poi !== null);
+
+    buildProgressiveLoadingQueue(visiblePOIs);
+  }
+
+  // Start processing the queue
+  processProgressiveLoadingQueue();
+}
+
+// Build queue of POIs to load, sorted by priority (center first)
+function buildProgressiveLoadingQueue(visiblePOIs) {
+  if (!visiblePOIs || visiblePOIs.length === 0) return;
+
+  const center = map.getCenter();
+  const centerLng = center.lng;
+  const centerLat = center.lat;
+
+  // Filter POIs that:
+  // 1. Not already cached
+  // 2. Have mapbox_id
+  const poisToLoad = visiblePOIs.filter(poi => {
+    const properties = poi.properties || {};
+    const mapboxId = properties.mapbox_id;
+
+    // Skip if no mapbox_id or already cached
+    if (!mapboxId || poiDetailsCache.has(mapboxId)) {
+      return false;
+    }
+
+    return true;
+  });
+
+  // Sort by distance from center
+  poisToLoad.sort((a, b) => {
+    const [aLng, aLat] = a.geometry.coordinates;
+    const [bLng, bLat] = b.geometry.coordinates;
+
+    const aDist = Math.sqrt(Math.pow(aLng - centerLng, 2) + Math.pow(aLat - centerLat, 2));
+    const bDist = Math.sqrt(Math.pow(bLng - centerLng, 2) + Math.pow(bLat - centerLat, 2));
+
+    return aDist - bDist;
+  });
+
+  // Add to queue (avoid duplicates)
+  poisToLoad.forEach(poi => {
+    const mapboxId = poi.properties.mapbox_id;
+    if (!progressiveLoadingQueue.find(p => p.properties.mapbox_id === mapboxId)) {
+      progressiveLoadingQueue.push(poi);
+    }
+  });
+
+  console.log(`Progressive loading queue: ${progressiveLoadingQueue.length} POIs`);
+}
+
+// Process the progressive loading queue with rate limiting
+async function processProgressiveLoadingQueue() {
+  if (isLoadingDetails || progressiveLoadingQueue.length === 0) return;
+  if (activeDetailsRequests >= MAX_CONCURRENT_DETAILS_REQUESTS) return;
+
+  isLoadingDetails = true;
+
+  while (progressiveLoadingQueue.length > 0 && activeDetailsRequests < MAX_CONCURRENT_DETAILS_REQUESTS) {
+    const poi = progressiveLoadingQueue.shift();
+    const mapboxId = poi.properties.mapbox_id;
+
+    // Skip if already cached
+    if (poiDetailsCache.has(mapboxId)) continue;
+
+    // Increment active requests
+    activeDetailsRequests++;
+
+    // Fetch details in background
+    retrievePOIDetails(mapboxId)
+      .then(detailedPOI => {
+        if (detailedPOI && detailedPOI.properties) {
+          // Cache the details
+          poiDetailsCache.set(mapboxId, detailedPOI);
+
+          // Check if it has photos - photos are in metadata.photos
+          const metadata = detailedPOI.properties.metadata || {};
+          const hasPhotos = metadata.photos && metadata.photos.length > 0;
+
+          if (hasPhotos) {
+            // Update the marker's photo status to confirmed
+            updatePOIPhotoStatus(mapboxId, 'confirmed');
+            console.log(`✓ Photos confirmed for ${detailedPOI.properties.name} (${metadata.photos.length} photos)`);
+          } else {
+            // No photos found, update status to none
+            updatePOIPhotoStatus(mapboxId, 'none');
+          }
+        }
+      })
+      .catch(err => {
+        console.warn(`Failed to load details for ${mapboxId}:`, err);
+      })
+      .finally(() => {
+        activeDetailsRequests--;
+        // Continue processing queue after a delay
+        setTimeout(() => {
+          isLoadingDetails = false;
+          processProgressiveLoadingQueue();
+        }, 200); // 200ms delay between requests
+      });
+  }
+
+  isLoadingDetails = false;
+}
+
+// Update a POI's photo status in the map layer
+function updatePOIPhotoStatus(mapboxId, photoStatus) {
+  const source = map.getSource('pois');
+  if (!source) return;
+
+  const data = source._data;
+  if (!data || !data.features) return;
+
+  // Find and update the feature
+  let updated = false;
+  let featureIndex = -1;
+  data.features.forEach(feature => {
+    if (feature.properties.mapbox_id === mapboxId) {
+      feature.properties.photo_status = photoStatus;
+      featureIndex = feature.properties.index;
+
+      // Also update the stored POI data
+      try {
+        const poiData = JSON.parse(feature.properties.poiData);
+        // Update the markers array if needed
+        const markerIndex = markers.findIndex(m => m.properties.mapbox_id === mapboxId);
+        if (markerIndex >= 0 && poiDetailsCache.has(mapboxId)) {
+          markers[markerIndex] = poiDetailsCache.get(mapboxId);
+        }
+      } catch (e) {
+        console.error('Error updating POI data:', e);
+      }
+
+      updated = true;
+    }
+  });
+
+  if (updated) {
+    // Refresh the source to update the layer
+    source.setData(data);
+
+    // Update the sidebar camera badge if showing confirmed photos
+    if (photoStatus === 'confirmed' && featureIndex >= 0) {
+      updateSidebarCameraBadge(featureIndex, true);
+    }
+  }
+}
+
+// Update the camera badge in the sidebar for a specific POI
+function updateSidebarCameraBadge(poiIndex, show) {
+  const badge = document.querySelector(`.poi-camera-badge[data-poi-index="${poiIndex}"]`);
+  if (badge) {
+    badge.style.display = show ? 'inline' : 'none';
+  }
 }
 
 // Initialize on load
