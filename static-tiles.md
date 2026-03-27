@@ -106,17 +106,17 @@ js: static-tiles.js
     }
 
     /* Active/checked state */
-    .layer-toggle input[type="radio"]:checked + label {
-      background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+    .layer-toggle label:has(input[type="radio"]:checked) {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
       color: #ffffff;
-      border-color: #4f46e5;
-      box-shadow: 0 8px 20px rgba(79, 70, 229, 0.4), 0 4px 8px rgba(79, 70, 229, 0.3);
+      border-color: #0f172a;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.6), 0 4px 8px rgba(15, 23, 42, 0.5);
       transform: translateY(-2px);
       opacity: 1;
       font-weight: 600;
     }
 
-    .layer-toggle input[type="radio"]:checked + label::before {
+    .layer-toggle label:has(input[type="radio"]:checked)::before {
       opacity: 1;
       filter: brightness(0) invert(1);
     }
@@ -146,7 +146,7 @@ js: static-tiles.js
     }
 
     /* Focus state for accessibility */
-    .layer-toggle input[type="radio"]:focus + label {
+    .layer-toggle label:has(input[type="radio"]:focus) {
       outline: 2px solid #4f46e5;
       outline-offset: 2px;
     }
