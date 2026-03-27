@@ -103,6 +103,14 @@ const loadMap = () => {
             }
         });
 
+        // Set up projection dropdown
+        const projectionSelect = document.getElementById('projection-select');
+
+        projectionSelect.addEventListener('change', (e) => {
+            const projection = e.target.value;
+            map.setProjection(projection);
+        });
+
         // Optional: Add click handler to show layer information
         map.on('click', (e) => {
             const features = map.queryRenderedFeatures(e.point);
