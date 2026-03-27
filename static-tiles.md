@@ -156,6 +156,54 @@ js: static-tiles.js
       transform: translateY(0);
     }
 
+    /* Dropdown styling */
+    .projection-dropdown {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 2px solid #e5e7eb;
+    }
+
+    .projection-dropdown label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #6b7280;
+      letter-spacing: -0.01em;
+    }
+
+    .projection-dropdown select {
+      width: 100%;
+      padding: 10px 12px;
+      background: #f9fafb;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #1a1a1a;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234b5563' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 20px;
+      padding-right: 40px;
+    }
+
+    .projection-dropdown select:hover {
+      background-color: #f3f4f6;
+      border-color: #d1d5db;
+    }
+
+    .projection-dropdown select:focus {
+      outline: 2px solid #4f46e5;
+      outline-offset: 2px;
+      border-color: #4f46e5;
+      background-color: #ffffff;
+    }
+
     /* Responsive adjustments */
     @media (max-width: 768px) {
       .layer-toggle {
@@ -186,6 +234,20 @@ js: static-tiles.js
       <input type="radio" name="layer-select" id="static-layer-radio" value="static" checked>
       <span>Streets</span>
     </label>
+
+    <div class="projection-dropdown">
+      <label for="projection-select">Map Projection</label>
+      <select id="projection-select">
+        <option value="mercator" selected>Mercator</option>
+        <option value="globe">Globe</option>
+        <option value="equalEarth">Equal Earth</option>
+        <option value="naturalEarth">Natural Earth</option>
+        <option value="winkelTripel">Winkel Tripel</option>
+        <option value="albers">Albers</option>
+        <option value="lambertConformalConic">Lambert Conformal Conic</option>
+        <option value="equirectangular">Equirectangular</option>
+      </select>
+    </div>
   </div>
 </body>
 <script>
