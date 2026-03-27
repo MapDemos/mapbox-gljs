@@ -12,7 +12,7 @@ const loadMap = () => {
         style: 'mapbox://styles/kenji-shima/cmmswfkcf001601sw9h7w5quj', // Base style
         center: defaultCoordinates,
         zoom: 6,
-        minZoom: 3,
+        minZoom: 0,
         maxZoom: 20,
         scrollZoom: true
     });
