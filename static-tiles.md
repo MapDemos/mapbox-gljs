@@ -175,7 +175,7 @@ js: static-tiles.js
   <div id="map" class="map"></div>
 
   <div class="layer-toggle">
-    <h3>Layer Controls</h3>
+    <h3>Style Controls</h3>
 
     <label>
       <input type="radio" name="layer-select" id="satellite-layer-radio" value="satellite">
@@ -184,7 +184,7 @@ js: static-tiles.js
 
     <label>
       <input type="radio" name="layer-select" id="static-layer-radio" value="static" checked>
-      <span>Static Tiles Layer</span>
+      <span>Streets</span>
     </label>
   </div>
 </body>
