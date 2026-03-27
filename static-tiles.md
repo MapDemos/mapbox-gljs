@@ -163,14 +163,18 @@ js: static-tiles.js
       border-top: 2px solid #e5e7eb;
     }
 
-    .projection-dropdown label {
-      display: block;
-      margin-bottom: 8px;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      color: #6b7280;
+    .projection-dropdown h3 {
+      margin: 0 0 16px 0;
+      font-size: 15px;
+      font-weight: 600;
+      background: none;
+      color: #1a1a1a;
+      padding: 0;
       letter-spacing: -0.01em;
+      text-transform: uppercase;
+      font-size: 11px;
+      color: #6b7280;
+      font-weight: 700;
     }
 
     .projection-dropdown select {
@@ -236,7 +240,7 @@ js: static-tiles.js
     </label>
 
     <div class="projection-dropdown">
-      <label for="projection-select">Map Projection</label>
+      <h3>Map Projection</h3>
       <select id="projection-select">
         <option value="mercator" selected>Mercator</option>
         <option value="globe">Globe</option>
