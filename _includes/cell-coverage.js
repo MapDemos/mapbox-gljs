@@ -1,3 +1,6 @@
+// Override token for this demo to access mbxsolutions tileset
+mapboxgl.accessToken = 'pk.eyJ1IjoibWJ4c29sdXRpb25zIiwiYSI6ImNqeWtiM250dzBjcGMzbnQ1NXpkZml6YjUifQ.EiJnPlDOMMlG5wr93SxVYQ';
+
 // FPS Meter implementation
 window.requestAnimationFrame ||
   (window.requestAnimationFrame = (() =>
