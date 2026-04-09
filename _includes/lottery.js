@@ -1,9 +1,10 @@
 // Lottery App
 // Replace this with your actual Lambda API Gateway URL
-const LAMBDA_API_URL = 'https://oaltm6yf1d.execute-api.ap-northeast-1.amazonaws.com/default/lottery-function?maxWinners=200';
+const LAMBDA_API_URL = 'https://oaltm6yf1d.execute-api.ap-northeast-1.amazonaws.com/default/lottery-function';
 
 let map;
 let isAnimating = false;
+let rotationAnimId = null;
 
 // Initialize map on load
 window.addEventListener('load', () => {
@@ -48,21 +49,28 @@ function initializeMap() {
 }
 
 function startGlobeRotation() {
+  if (rotationAnimId !== null) {
+    cancelAnimationFrame(rotationAnimId);
+    rotationAnimId = null;
+  }
+
   let rotation = 0;
 
   function rotate() {
     if (!isAnimating && map) {
-      rotation += 0.1; // Slower rotation speed
+      rotation = (rotation + 0.1) % 360;
       map.easeTo({
         center: [rotation, 35.7],
-        duration: 200, // Smoother transition
+        duration: 200,
         easing: (t) => t
       });
-      requestAnimationFrame(rotate);
+      rotationAnimId = requestAnimationFrame(rotate);
+    } else {
+      rotationAnimId = null;
     }
   }
 
-  rotate();
+  rotationAnimId = requestAnimationFrame(rotate);
 }
 
 async function playLottery() {
@@ -78,11 +86,8 @@ async function playLottery() {
   document.getElementById('startScreen').style.display = 'none';
   document.getElementById('loadingScreen').style.display = 'block';
 
-  // Dramatic map animation
-  await animateGlobe();
-
-  // Always call API to track remaining prizes accurately
   try {
+    await animateGlobe();
     const result = await callLotteryAPI();
     showResult(result);
   } catch (error) {
@@ -141,14 +146,14 @@ async function animateGlobe() {
 async function callLotteryAPI() {
   // Check for URL parameter to pass to Lambda
   const urlParams = new URLSearchParams(window.location.search);
-  const winParam = urlParams.get('win');
+  const tierParam = urlParams.get('tier'); // e.g., ?tier=1 or ?tier=0
 
   // Build API URL with parameter if present
   let apiUrl = LAMBDA_API_URL;
-  if (winParam === '1' || winParam === '0') {
+  if (tierParam !== null) {
     // Check if URL already has query params
     const separator = apiUrl.includes('?') ? '&' : '?';
-    apiUrl += `${separator}win=${winParam}`;
+    apiUrl += `${separator}tier=${tierParam}`;
   }
 
   try {
@@ -171,13 +176,26 @@ async function callLotteryAPI() {
     // Fallback for development/testing (remove in production)
     if (LAMBDA_API_URL.includes('YOUR-API-ID')) {
       console.warn('Using mock data - please configure LAMBDA_API_URL');
-      const forceWin = winParam === '1';
-      const forceLose = winParam === '0';
+      const forceTier = tierParam ? parseInt(tierParam, 10) : null;
+      let tier = 4; // Default to consolation
+      if (forceTier !== null) {
+        tier = forceTier;
+      } else {
+        const rand = Math.random();
+        if (rand < 0.005) tier = 1;
+        else if (rand < 0.02) tier = 2;
+        else if (rand < 0.30) tier = 3;
+        else tier = 4;
+      }
       return {
-        isWinner: forceLose ? false : (forceWin || Math.random() < 0.5),
-        remaining: Math.floor(Math.random() * 200),
-        totalPlays: Math.floor(Math.random() * 400),
-        probability: forceWin ? 100 : (forceLose ? 0 : 50)
+        tier,
+        tierName: `${tier}等`,
+        remaining: {
+          tier1: 1,
+          tier2: 2,
+          tier3: 50,
+          tier4: 99999
+        }
       };
     }
 
@@ -186,7 +204,7 @@ async function callLotteryAPI() {
 }
 
 function showResult(result) {
-  const { isWinner, remaining } = result;
+  const { tier, tierName, remaining } = result;
 
   // Hide loading
   document.getElementById('loadingScreen').style.display = 'none';
@@ -199,58 +217,120 @@ function showResult(result) {
 
   resultScreen.style.display = 'block';
 
-  if (isWinner) {
-    resultMessage.textContent = '';
-    resultMessage.className = 'result-message result-win';
-    resultPrize.textContent = '🎉 当たり';
-    resultPrize.className = 'result-prize result-win';
-
-    // Celebrate on map and with confetti
-    celebrateOnMap();
-    createConfetti();
+  // Different displays based on tier
+  if (tier === 1) {
+    // 1等 - Grand prize
+    resultMessage.textContent = '大当たり！';
+    resultMessage.className = 'result-message result-tier1';
+    resultPrize.textContent = '🎊 1等';
+    resultPrize.className = 'result-prize result-tier1';
+    celebrateOnMap('gold');
+    createConfetti(150); // More confetti
+  } else if (tier === 2) {
+    // 2等 - Second prize
+    resultMessage.textContent = 'おめでとうございます！';
+    resultMessage.className = 'result-message result-tier2';
+    resultPrize.textContent = '🎉 2等';
+    resultPrize.className = 'result-prize result-tier2';
+    celebrateOnMap('silver');
+    createConfetti(100);
+  } else if (tier === 3) {
+    // 3等 - Third prize
+    resultMessage.textContent = '当選！';
+    resultMessage.className = 'result-message result-tier3';
+    resultPrize.textContent = '⭐ 3等';
+    resultPrize.className = 'result-prize result-tier3';
+    celebrateOnMap('bronze');
+    createConfetti(50);
+  } else if (tier === 4) {
+    // 4等 - Consolation prize
+    resultMessage.textContent = '参加賞';
+    resultMessage.className = 'result-message result-tier4';
+    resultPrize.textContent = '🎁 4等';
+    resultPrize.className = 'result-prize result-tier4';
+    // No map celebration for consolation
   } else {
+    // tier === 0 - No prize (shouldn't happen with consolation tier)
     resultMessage.textContent = '残念...';
     resultMessage.className = 'result-message result-lose';
     resultPrize.textContent = 'ハズレ';
     resultPrize.className = 'result-prize result-lose';
   }
 
-  // Show only remaining count
-  if (remaining !== undefined) {
-    statsInfo.innerHTML = `残り当選枠: ${remaining}`;
+  // Show remaining counts for each tier
+  if (remaining) {
+    let statsHtml = '<div style="font-size: 12px; line-height: 1.6;">';
+    if (remaining.tier1 !== undefined) statsHtml += `1等 残り: ${remaining.tier1}<br>`;
+    if (remaining.tier2 !== undefined) statsHtml += `2等 残り: ${remaining.tier2}<br>`;
+    if (remaining.tier3 !== undefined) statsHtml += `3等 残り: ${remaining.tier3}<br>`;
+    statsHtml += '</div>';
+    statsInfo.innerHTML = statsHtml;
   }
 
   isAnimating = false;
 }
 
-function celebrateOnMap() {
-  // 1. Initial flash of golden light across map
-  const originalFog = {
-    color: 'rgb(186, 210, 235)',
-    'high-color': 'rgb(36, 92, 223)',
-    'horizon-blend': 0.02,
-    'space-color': 'rgb(11, 11, 25)',
-    'star-intensity': 0.6
+function celebrateOnMap(theme = 'gold') {
+  // Different color themes for different tiers
+  const themes = {
+    gold: {
+      flash: {
+        color: 'rgb(255, 255, 200)',
+        'high-color': 'rgb(255, 220, 100)',
+        'horizon-blend': 0.1,
+        'space-color': 'rgb(30, 30, 40)',
+        'star-intensity': 1.0
+      },
+      sustained: {
+        color: 'rgb(255, 223, 140)',
+        'high-color': 'rgb(255, 200, 87)',
+        'horizon-blend': 0.05,
+        'space-color': 'rgb(11, 11, 25)',
+        'star-intensity': 1.0
+      }
+    },
+    silver: {
+      flash: {
+        color: 'rgb(240, 240, 255)',
+        'high-color': 'rgb(200, 200, 230)',
+        'horizon-blend': 0.08,
+        'space-color': 'rgb(30, 30, 40)',
+        'star-intensity': 0.9
+      },
+      sustained: {
+        color: 'rgb(220, 220, 240)',
+        'high-color': 'rgb(180, 180, 210)',
+        'horizon-blend': 0.04,
+        'space-color': 'rgb(11, 11, 25)',
+        'star-intensity': 0.8
+      }
+    },
+    bronze: {
+      flash: {
+        color: 'rgb(255, 230, 200)',
+        'high-color': 'rgb(230, 180, 130)',
+        'horizon-blend': 0.06,
+        'space-color': 'rgb(30, 30, 40)',
+        'star-intensity': 0.8
+      },
+      sustained: {
+        color: 'rgb(240, 210, 180)',
+        'high-color': 'rgb(210, 160, 110)',
+        'horizon-blend': 0.03,
+        'space-color': 'rgb(11, 11, 25)',
+        'star-intensity': 0.7
+      }
+    }
   };
 
-  // Flash to bright gold
-  map.setFog({
-    color: 'rgb(255, 255, 200)',
-    'high-color': 'rgb(255, 220, 100)',
-    'horizon-blend': 0.1,
-    'space-color': 'rgb(30, 30, 40)',
-    'star-intensity': 1.0
-  });
+  const selectedTheme = themes[theme] || themes.gold;
 
-  // Return to golden atmosphere after flash
+  // Flash to bright color
+  map.setFog(selectedTheme.flash);
+
+  // Return to sustained atmosphere after flash
   setTimeout(() => {
-    map.setFog({
-      color: 'rgb(255, 223, 140)',
-      'high-color': 'rgb(255, 200, 87)',
-      'horizon-blend': 0.05,
-      'space-color': 'rgb(11, 11, 25)',
-      'star-intensity': 1.0
-    });
+    map.setFog(selectedTheme.sustained);
   }, 300);
 
   // 2. Add celebration icons at random locations
@@ -376,9 +456,9 @@ function celebrateOnMap() {
   }
 }
 
-function createConfetti() {
+function createConfetti(count = 100) {
   const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#6c5ce7', '#a29bfe', '#fd79a8', '#fdcb6e'];
-  const confettiCount = 100;
+  const confettiCount = count;
 
   for (let i = 0; i < confettiCount; i++) {
     const confetti = document.createElement('div');

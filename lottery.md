@@ -96,13 +96,29 @@ js: lottery.js
       margin-bottom: 15px;
     }
 
-    .result-win {
-      color: #ff6b6b;
+    .result-tier1 {
+      color: #FFD700;
+      animation: pulse 1s ease-in-out infinite;
+      text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+    }
+
+    .result-tier2 {
+      color: #C0C0C0;
+      animation: pulse 1s ease-in-out;
+      text-shadow: 0 0 8px rgba(192, 192, 192, 0.5);
+    }
+
+    .result-tier3 {
+      color: #CD7F32;
       animation: pulse 1s ease-in-out;
     }
 
-    .result-lose {
+    .result-tier4 {
       color: #4ecdc4;
+    }
+
+    .result-lose {
+      color: #999;
     }
 
     .reset-button {
