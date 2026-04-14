@@ -369,7 +369,7 @@ async function fetchMapboxRoute(fetchId) {
     : '';
 
   const url =
-    `https://api.mapbox.com/directions/v5/mapbox/${profile}/` +
+    `https://api.mapbox.com/directions/v5/mapbox.tmp.valhalla-zenrin/${profile}/` +
     `${origin.lng},${origin.lat};${destination.lng},${destination.lat}` +
     `?steps=true&geometries=geojson&overview=full&language=ja` +
     `${excludeParam}` +
