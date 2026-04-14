@@ -1,0 +1,23 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "route": "仙台市若林区卸町東５丁目５－５ → 仙台市太白区柳生５－１３－１",
+        "role": "origin",
+        "address": "仙台市若林区卸町東５丁目５－５"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route": "仙台市若林区卸町東５丁目５－５ → 仙台市太白区柳生５－１３－１",
+        "role": "destination",
+        "address": "仙台市太白区柳生５－１３－１"
+      },
+      "geometry": null
+    }
+  ]
+}
