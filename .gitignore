@@ -14,3 +14,10 @@ vendor
 192.168.11.27.pem
 Claude.md
 LOTTERY-SETUP.md
+autopilot-map.md
+_includes/autopilot-map.js
+_site/autopilot-map.html
+search-comparison.md
+_includes/search-comparison.js
+_site/search-comparison.html
+
