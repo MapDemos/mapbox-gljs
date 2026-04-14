@@ -21,13 +21,39 @@ let STORES = [];
 const BRAND_MAPPING = {
   '0101': 'ガスト',
   '0102': 'バーミヤン',
-  '0103': 'しゃぶ葉',
+  '0103': 'ジョナサン',
   '0104': '夢庵',
-  '0105': 'ジョナサン',
-  '0106': 'ステーキガスト',
-  '0107': 'むさしの森珈琲',
-  '0108': 'から好し',
-  '0110': '藍屋'
+  '0105': 'ステーキガスト',
+  '0106': 'グラッチェガーデンズ',
+  '0107': '藍屋',
+  '0109': '魚屋路',
+  '0110': 'chawan',
+  '0111': '三〇三',
+  '0112': 'ゆめあん食堂',
+  '0113': 'ラ・オハナ',
+  '0114': 'とんから亭',
+  '0117': 'から好し',
+  '0119': 'しゃぶ葉',
+  '0120': '桃菜',
+  '0121': '八郎そば',
+  '0201': 'むさしの森珈琲',
+  '0202': 'フォレスト',
+  '0203': 'ニューマーケット',
+  '0204': 'フェスタガーデン',
+  '0205': 'グランブッフェ',
+  '0206': '包包點心',
+  '0207': '點心甜心',
+  '0208': 'すうぷ',
+  '0209': 'くし葉',
+  '0210': 'ダイナー',
+  '0211': 'ペルティカ',
+  '0212': 'ザ ブッフェ',
+  '0213': '八献',
+  '0220': 'アソート',
+  '0301': 'フロプレステージュ',
+  '0401': 'トマト＆オニオン',
+  '0402': 'じゅうじゅうカルビ',
+  '0501': '資さんうどん'
 };
 
 async function loadStoresFromJSON() {
@@ -47,23 +73,19 @@ async function loadStoresFromJSON() {
       storesArray = data.stores;
     }
 
-    const supportedBrands = Object.keys(brandIconURLs);
-
-    STORES = storesArray
-      .map((store, index) => {
-        const extra = store.extra_fields || {};
-        const brandCode = extra['カテゴリ'] || '0101';
-        const brand = BRAND_MAPPING[brandCode] || 'その他';
-        return {
-          id: store.id || index + 1,
-          name: store.name,
-          brand: brand,
-          lat: store.latitude,
-          lng: store.longitude,
-          address: store.address
-        };
-      })
-      .filter(store => supportedBrands.includes(store.brand));
+    STORES = storesArray.map((store, index) => {
+      const extra = store.extra_fields || {};
+      const brandCode = extra['カテゴリ'] || '0101';
+      const brand = BRAND_MAPPING[brandCode] || 'その他';
+      return {
+        id: store.id || index + 1,
+        name: store.name,
+        brand: brand,
+        lat: store.latitude,
+        lng: store.longitude,
+        address: store.address
+      };
+    });
 
     console.log(`Loaded ${STORES.length} stores`);
   } catch (error) {
@@ -265,8 +287,20 @@ function initMapboxMap() {
       });
     });
 
-    // Wait for all images to load, then add source and layer
+    // Wait for all images to load, then add blank fallback image
     await Promise.all(imagePromises);
+
+    const fallbackCanvas = document.createElement('canvas');
+    fallbackCanvas.width = 48; fallbackCanvas.height = 48;
+    const ctx = fallbackCanvas.getContext('2d');
+    ctx.beginPath();
+    ctx.arc(24, 24, 20, 0, Math.PI * 2);
+    ctx.fillStyle = '#ED1C24';
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    mapboxMap.addImage('brand-default', ctx.getImageData(0, 0, 48, 48));
 
     // Add source for selected store marker
     mapboxMap.addSource('selected-store', {
@@ -283,7 +317,7 @@ function initMapboxMap() {
       type: 'symbol',
       source: 'selected-store',
       layout: {
-        'icon-image': ['concat', 'brand-', ['get', 'brand']],
+        'icon-image': ['coalesce', ['image', ['concat', 'brand-', ['get', 'brand']]], ['image', 'brand-default']],
         'icon-size': 0.6,
         'icon-allow-overlap': true,
         'icon-ignore-placement': true
