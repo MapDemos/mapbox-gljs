@@ -666,7 +666,7 @@ let presetGroups = [];
 
 async function loadPresetRoutes() {
   try {
-    const res = await fetch('/cbcloud-routes.geojson');
+    const res = await fetch('cbcloud-routes.geojson');
     const data = await res.json();
     const features = data.features || [];
 
