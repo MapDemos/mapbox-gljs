@@ -204,6 +204,7 @@ js: directions-comparison.js
   </select>
   <select id="travel-mode">
     <option value="driving">車</option>
+    <option value="driving-traffic">車 (交通情報)</option>
     <option value="walking">徒歩</option>
     <option value="cycling">自転車</option>
   </select>
