@@ -121,7 +121,7 @@ header {
 
 <div class="card-container">
   {% for page in site.html_pages %}
-    {% if page.url contains '.html' and page.url != '/404.html' %}
+    {% if page.url contains '.html' and page.url != '/404.html' and page.url contains '/docs/' == false %}
       <div class="card">
         <a href="{{ page.url | relative_url }}" target="_blank">
           <div class="iframe-container">
