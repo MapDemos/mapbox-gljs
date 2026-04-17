@@ -38,11 +38,25 @@ header {
 /* Wrapper for the iframe to ensure it's responsive and scaled */
 .iframe-container {
   position: relative;
-  width: 100%; /* Full width of the card */
-  height: 200px; /* Set a fixed height for the iframe */
+  width: 100%;
+  height: 200px;
   overflow: hidden;
   border: 1px solid #ddd;
-  background-color: #fff;
+  background-color: #111;
+  cursor: pointer;
+}
+
+/* Placeholder shown before iframe loads */
+.iframe-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 13px;
+  text-shadow: none;
+  letter-spacing: 0.03em;
 }
 
 /* The iframe itself */
@@ -50,11 +64,31 @@ header {
   position: absolute;
   top: 0;
   left: 0;
-  width: 400%; /* Adjust this to make the iframe content larger */
+  width: 400%;
   height: 400%;
-  transform: scale(0.25); /* Scale the content down */
-  transform-origin: top left; /* Keep scaling origin at the top-left corner */
-  pointer-events: none; /* Disable interaction inside the iframe */
+  transform: scale(0.25);
+  transform-origin: top left;
+  pointer-events: none;
+}
+
+/* Open button overlay */
+.open-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  padding: 5px 10px;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  font-size: 12px;
+  border-radius: 4px;
+  text-decoration: none;
+  text-shadow: none;
+  display: none;
+  z-index: 10;
+}
+
+.open-btn:hover {
+  background: rgba(0,0,0,0.9);
 }
 
 /* Container to hold multiple cards */
@@ -123,11 +157,10 @@ header {
   {% for page in site.html_pages %}
     {% if page.url contains '.html' and page.url != '/404.html' and page.url contains '/docs/' == false %}
       <div class="card">
-        <a href="{{ page.url | relative_url }}" target="_blank">
-          <div class="iframe-container">
-            <iframe src="{{ page.url | relative_url }}" frameborder="0"></iframe>
-          </div>
-        </a>
+        <div class="iframe-container" data-src="{{ page.url | relative_url }}">
+          <div class="iframe-placeholder">Click to preview</div>
+          <a class="open-btn" href="{{ page.url | relative_url }}" target="_blank">Open →</a>
+        </div>
         <div class="card-content">
           <h3>{{ page.title | default: page.url }}</h3>
         </div>
@@ -137,11 +170,10 @@ header {
 
   {% for card in site.data.external %}
   <div class="card">
-    <a href="{{ card.url }}" target="_blank">
-        <div class="iframe-container">
-            <iframe src="{{ card.url }}" class="card-iframe"></iframe>
-        </div>
-    </a>
+    <div class="iframe-container" data-src="{{ card.url }}">
+      <div class="iframe-placeholder">Click to preview</div>
+      <a class="open-btn" href="{{ card.url }}" target="_blank">Open →</a>
+    </div>
     <div class="card-content">
       <h3>{{ card.title }}</h3>
     </div>
@@ -152,5 +184,28 @@ header {
 <footer>
   <p>© 2024, {{ site.title }}</p>
 </footer>
+<script>
+  document.querySelectorAll('.iframe-container').forEach(container => {
+    container.addEventListener('click', (e) => {
+      if (e.target.classList.contains('open-btn')) return;
+      if (container.querySelector('iframe')) return;
+
+      const src = container.dataset.src;
+      const placeholder = container.querySelector('.iframe-placeholder');
+      const openBtn = container.querySelector('.open-btn');
+
+      placeholder.textContent = 'Loading...';
+
+      const iframe = document.createElement('iframe');
+      iframe.src = src;
+      iframe.frameBorder = '0';
+      iframe.onload = () => {
+        placeholder.remove();
+        openBtn.style.display = 'block';
+      };
+      container.appendChild(iframe);
+    });
+  });
+</script>
 </body>
 </html>
