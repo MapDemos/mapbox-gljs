@@ -155,7 +155,8 @@ header {
 
 <div class="card-container">
   {% for page in site.html_pages %}
-    {% if page.url contains '.html' and page.url != '/404.html' and page.url contains '/docs/' == false %}
+    {% if page.url contains '.html' and page.url != '/404.html' %}
+    {% unless page.url contains '/docs/' %}
       <div class="card">
         <div class="iframe-container" data-src="{{ page.url | relative_url }}">
           <div class="iframe-placeholder">Click to preview</div>
@@ -165,6 +166,7 @@ header {
           <h3>{{ page.title | default: page.url }}</h3>
         </div>
       </div>
+    {% endunless %}
     {% endif %}
   {% endfor %}
 
