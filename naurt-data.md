@@ -22,6 +22,7 @@ js: naurt-data.js
       font-family: 'Source Sans Pro', Arial, sans-serif;
       font-size: 14px;
       z-index: 1;
+      min-width: 180px;
     }
 
     .layer-controls h3 {
@@ -30,6 +31,19 @@ js: naurt-data.js
       font-size: 16px;
       color: #333;
       font-weight: 600;
+    }
+
+    #region-select {
+      width: 100%;
+      margin-bottom: 14px;
+      padding: 5px 8px;
+      font-size: 13px;
+      font-family: 'Source Sans Pro', Arial, sans-serif;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #f9f9f9;
+      cursor: pointer;
+      color: #333;
     }
 
     .layer-toggle {
@@ -60,6 +74,50 @@ js: naurt-data.js
       border: 1px solid rgba(0,0,0,0.2);
     }
 
+    .stats-section {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .stats-section h4 {
+      margin: 0 0 8px 0;
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .stat-row {
+      margin-bottom: 7px;
+    }
+
+    .stat-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 3px;
+    }
+
+    .stat-label span:last-child {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .stat-bar-bg {
+      height: 5px;
+      background: #e5e7eb;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .stat-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
   </style>
 </head>
 
@@ -67,7 +125,12 @@ js: naurt-data.js
   <div id="map" class="map"></div>
 
   <div class="layer-controls">
-    <h3>Layer Controls</h3>
+    <h3>Naurt Data</h3>
+    <select id="region-select">
+      <option value="japan">Japan</option>
+      <option value="nz">New Zealand</option>
+      <option value="us">United States</option>
+    </select>
     <div class="layer-toggle">
       <input type="checkbox" id="toggle-doors" checked>
       <label for="toggle-doors">
@@ -82,6 +145,7 @@ js: naurt-data.js
         <span class="color-indicator" style="background-color: #10b981;"></span>
       </label>
     </div>
+    <div class="stats-section" id="stats-section"></div>
   </div>
 </body>
 <script>
