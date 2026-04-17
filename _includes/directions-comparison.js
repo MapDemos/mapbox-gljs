@@ -344,12 +344,28 @@ async function fetchBothRoutes() {
     </div>`;
 
   document.getElementById('mapbox-result-content').innerHTML = loadingHTML;
-  document.getElementById('google-result-content').innerHTML = loadingHTML;
+
+  // Google Directions API does not support cycling in Japan — show notice immediately
+  if (state.travelMode === 'cycling') {
+    document.getElementById('google-result-content').innerHTML = `
+      <div class="result-placeholder" style="padding: 24px; color: #999; font-size: 13px; text-align: center;">
+        <span class="icon">🚲</span>
+        <span>Google Directions API は日本での自転車ルートに対応していません</span>
+      </div>`;
+    if (directionsRenderer) {
+      directionsRenderer.setMap(null);
+      directionsRenderer.setMap(googleMap);
+    }
+  } else {
+    document.getElementById('google-result-content').innerHTML = loadingHTML;
+  }
 
   const controls = ['btn-origin', 'btn-destination', 'travel-mode', 'clear-btn', 'mapbox-avoid-btn', 'google-avoid-btn', 'mapbox-execute-btn', 'google-execute-btn'];
   controls.forEach(id => document.getElementById(id).disabled = true);
   try {
-    await Promise.all([fetchMapboxRoute(fetchId), fetchGoogleRoute(fetchId)]);
+    const tasks = [fetchMapboxRoute(fetchId)];
+    if (state.travelMode !== 'cycling') tasks.push(fetchGoogleRoute(fetchId));
+    await Promise.all(tasks);
   } finally {
     controls.forEach(id => document.getElementById(id).disabled = false);
   }
@@ -361,7 +377,7 @@ async function fetchBothRoutes() {
 async function fetchMapboxRoute(fetchId) {
   const { origin, destination, travelMode } = state;
 
-  const profileMap = { driving: 'driving', walking: 'walking', cycling: 'cycling' };
+  const profileMap = { driving: 'driving', 'driving-traffic': 'driving-traffic', walking: 'walking', cycling: 'cycling' };
   const profile = profileMap[travelMode] || 'driving';
 
   const excludeParam = state.mapboxExclude.length > 0
@@ -369,7 +385,7 @@ async function fetchMapboxRoute(fetchId) {
     : '';
 
   const url =
-    `https://api.mapbox.com/directions/v5/mapbox.tmp.valhalla-zenrin/${profile}/` +
+    `https://api.mapbox.com/directions/v5/mapbox.tmp.valhalla-zenrin-premium/${profile}/` +
     `${origin.lng},${origin.lat};${destination.lng},${destination.lat}` +
     `?steps=true&geometries=geojson&overview=full&language=ja` +
     `${excludeParam}` +
@@ -416,19 +432,30 @@ function fetchGoogleRoute(fetchId) {
 
     const modeMap = {
       driving: google.maps.TravelMode.DRIVING,
+      'driving-traffic': google.maps.TravelMode.DRIVING,
       walking: google.maps.TravelMode.WALKING,
       cycling: google.maps.TravelMode.BICYCLING,
     };
 
+    const requestParams = {
+      origin: { lat: origin.lat, lng: origin.lng },
+      destination: { lat: destination.lat, lng: destination.lng },
+      travelMode: modeMap[travelMode] || google.maps.TravelMode.DRIVING,
+      avoidTolls: state.googleAvoid.includes('tolls'),
+      avoidHighways: state.googleAvoid.includes('highways'),
+      avoidFerries: state.googleAvoid.includes('ferries'),
+    };
+
+    // driving-traffic: request traffic-aware duration (Google equivalent)
+    if (travelMode === 'driving-traffic') {
+      requestParams.drivingOptions = {
+        departureTime: new Date(),
+        trafficModel: google.maps.TrafficModel.BEST_GUESS,
+      };
+    }
+
     directionsService.route(
-      {
-        origin: { lat: origin.lat, lng: origin.lng },
-        destination: { lat: destination.lat, lng: destination.lng },
-        travelMode: modeMap[travelMode] || google.maps.TravelMode.DRIVING,
-        avoidTolls: state.googleAvoid.includes('tolls'),
-        avoidHighways: state.googleAvoid.includes('highways'),
-        avoidFerries: state.googleAvoid.includes('ferries'),
-      },
+      requestParams,
       (result, status) => {
         if (fetchId !== currentFetchId) { resolve(); return; }
         if (status === google.maps.DirectionsStatus.OK) {
@@ -564,7 +591,8 @@ function renderMapboxResult(route) {
  */
 function renderGoogleResult(route) {
   const leg = route.legs[0];
-  const durationSec = leg.duration.value;
+  // Prefer duration_in_traffic when available (driving-traffic mode)
+  const durationSec = (leg.duration_in_traffic ?? leg.duration).value;
   const distanceM = leg.distance.value;
   const summary = route.summary || '';
 
