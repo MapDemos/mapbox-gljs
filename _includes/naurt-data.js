@@ -20,8 +20,8 @@ const regions = {
         language: 'en',
         reportUrl: 'https://github.com/MapDemos/mapbox-gljs/blob/main/docs/naurt-nz-evaluation.md',
         stats: [
-            { label: 'Address match',  value: 63.3 },
-            { label: 'Door match',     value: 61.8 },
+            { label: 'Address match',  value: 72.7 },
+            { label: 'Door match',     value: 65.9 },
             { label: 'Has Mapbox result', value: 99.6 },
         ],
     },
@@ -33,8 +33,8 @@ const regions = {
         language: 'en',
         reportUrl: 'https://github.com/MapDemos/mapbox-gljs/blob/main/docs/naurt-us-evaluation.md',
         stats: [
-            { label: 'Address match',  value: 89.6 },
-            { label: 'Door match',     value: 88.8 },
+            { label: 'Address match',  value: 72.4 },
+            { label: 'Door match',     value: 69.3 },
             { label: 'Has Mapbox result', value: 99.9 },
         ],
     },
