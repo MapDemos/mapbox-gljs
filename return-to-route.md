@@ -21,23 +21,35 @@ title: Return to Route Demo
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
     }
 
+    .page-wrapper {
+      display: flex;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+    }
+
+    .map-container {
+      flex: 1;
+      position: relative;
+    }
+
     #map {
       position: absolute;
       top: 0;
       bottom: 0;
-      width: 100%;
+      left: 0;
+      right: 0;
     }
 
     .control-panel {
-      position: absolute;
-      top: 20px;
-      left: 20px;
+      width: 320px;
+      flex-shrink: 0;
       background: white;
       padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      width: 320px;
-      z-index: 1;
+      overflow-y: auto;
+      border-right: 1px solid #e5e7eb;
     }
 
     .control-panel h2 {
@@ -211,6 +223,7 @@ title: Return to Route Demo
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       font-size: 12px;
       z-index: 1;
+      pointer-events: none;
     }
 
     .legend h3 {
@@ -306,12 +319,74 @@ title: Return to Route Demo
       to { transform: rotate(360deg); }
     }
 
+    .return-options h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #6b7280;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .return-option-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      margin-bottom: 6px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .return-option-item:hover {
+      background: #f8f9fa;
+    }
+
+    .return-option-item.selected {
+      border-color: currentColor;
+      background: #f8f9fa;
+    }
+
+    .return-option-swatch {
+      width: 24px;
+      height: 4px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .return-option-details {
+      flex: 1;
+      font-size: 13px;
+    }
+
+    .return-option-details .option-label {
+      font-weight: 600;
+      color: #374151;
+    }
+
+    .return-option-details .option-stats {
+      color: #6b7280;
+      font-size: 12px;
+    }
+
+    .return-option-truncated {
+      font-size: 10px;
+      color: #F43F5E;
+      font-weight: 500;
+    }
+
     /* Mobile responsive */
     @media (max-width: 640px) {
+      .page-wrapper {
+        flex-direction: column;
+      }
       .control-panel {
-        left: 10px;
-        right: 10px;
-        width: auto;
+        width: 100%;
+        max-height: 40vh;
+        border-right: none;
+        border-bottom: 1px solid #e5e7eb;
       }
       .legend {
         bottom: 10px;
@@ -322,12 +397,7 @@ title: Return to Route Demo
   </style>
 </head>
 <body>
-  <div id="map"></div>
-
-  <div class="instructions" id="instructions">
-    Click on the map to set points
-  </div>
-
+  <div class="page-wrapper">
   <div class="control-panel">
     <h2>
       <span>🗺️</span>
@@ -370,6 +440,11 @@ title: Return to Route Demo
       </button>
     </div>
 
+    <div class="return-options" id="return-options" style="display: none; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #e5e7eb;">
+      <h3>Return Route Options</h3>
+      <div id="return-options-list"></div>
+    </div>
+
     <div class="status">
       <div class="status-item">
         <span class="status-label">Start:</span>
@@ -394,8 +469,15 @@ title: Return to Route Demo
     </div>
   </div>
 
-  <div class="legend">
-    <h3>Legend</h3>
+  <div class="map-container">
+    <div id="map"></div>
+
+    <div class="instructions" id="instructions">
+      Click on the map to set points
+    </div>
+
+    <div class="legend">
+      <h3>Legend</h3>
     <div class="legend-item">
       <div class="legend-color" style="background: #3B82F6"></div>
       <span>Main Route</span>
@@ -406,7 +488,15 @@ title: Return to Route Demo
     </div>
     <div class="legend-item">
       <div class="legend-color" style="background: #F97316"></div>
-      <span>Return Route</span>
+      <span>Return Option 1</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background: #14B8A6"></div>
+      <span>Return Option 2</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background: #F43F5E"></div>
+      <span>Return Option 3</span>
     </div>
     <div class="legend-item">
       <div class="legend-dot" style="background: #EC4899"></div>
@@ -424,10 +514,8 @@ title: Return to Route Demo
       <div class="legend-dot" style="background: #F97316; border: 3px solid #FFF; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>
       <span>Driver Position</span>
     </div>
-    <div class="legend-item">
-      <div class="legend-dot" style="background: #10B981; border: 3px solid #059669; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>
-      <span>Optimal Return Point</span>
-    </div>
+  </div>
+  </div>
   </div>
 
   <script>
@@ -458,7 +546,13 @@ title: Return to Route Demo
     let exitOnlyIntersections = []; // Where drivers can only exit
     let dualIntersections = []; // Where drivers can both enter and exit
     let nearestIntersection = null;
-    let nextIntersection = null;
+    let topIntersections = []; // Top 3 return intersection options
+    let allMatrixResults = []; // All Matrix results sorted by duration (for sequential option picking)
+    let selectedReturnOption = null; // 0, 1, or 2
+    let deviationRouteGeometry = null; // Stored from createDeviationRoute
+
+    const RETURN_OPTION_COLORS = ['#F97316', '#14B8A6', '#F43F5E'];
+    const RETURN_OPTION_LABELS = ['Option 1', 'Option 2', 'Option 3'];
 
     // Initialize map sources and layers on load
     map.on('load', () => {
@@ -576,38 +670,46 @@ title: Return to Route Demo
         }
       });
 
-      // Return route source and layer
-      map.addSource('return-route', {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: []
-        }
-      });
-
-      map.addLayer({
-        id: 'return-route-layer',
-        type: 'line',
-        source: 'return-route',
-        layout: {
-          'line-cap': 'round',
-          'line-join': 'round'
-        },
-        paint: {
-          'line-color': '#F97316',
-          'line-width': 4,
-          'line-opacity': 0.8,
-          'line-dasharray': [2, 1]
-        }
-      });
+      // Return route and intersection sources/layers (3 options)
+      for (let i = 0; i < 3; i++) {
+        map.addSource(`return-route-${i}`, {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+        map.addLayer({
+          id: `return-route-layer-${i}`,
+          type: 'line',
+          source: `return-route-${i}`,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': RETURN_OPTION_COLORS[i],
+            'line-width': 4,
+            'line-opacity': 0.8,
+            'line-dasharray': [2, 1]
+          }
+        });
+        map.addSource(`return-intersection-${i}`, {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+        map.addLayer({
+          id: `return-intersection-layer-${i}`,
+          type: 'circle',
+          source: `return-intersection-${i}`,
+          paint: {
+            'circle-radius': 10,
+            'circle-color': RETURN_OPTION_COLORS[i],
+            'circle-stroke-color': '#FFFFFF',
+            'circle-stroke-width': 2,
+            'circle-opacity': 0.9
+          }
+        });
+      }
 
       // Highlight intersection layer (deviation start)
       map.addSource('highlight-intersection', {
         type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: []
-        }
+        data: { type: 'FeatureCollection', features: [] }
       });
 
       map.addLayer({
@@ -618,28 +720,6 @@ title: Return to Route Demo
           'circle-radius': 10,
           'circle-color': '#FBBF24',
           'circle-stroke-color': '#F59E0B',
-          'circle-stroke-width': 3,
-          'circle-opacity': 0.9
-        }
-      });
-
-      // Return intersection layer (optimal return point)
-      map.addSource('return-intersection', {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: []
-        }
-      });
-
-      map.addLayer({
-        id: 'return-intersection-layer',
-        type: 'circle',
-        source: 'return-intersection',
-        paint: {
-          'circle-radius': 12,
-          'circle-color': '#10B981',
-          'circle-stroke-color': '#059669',
           'circle-stroke-width': 3,
           'circle-opacity': 0.9
         }
@@ -1074,130 +1154,141 @@ title: Return to Route Demo
 
         // Don't find next intersection here - wait until we have driver position
         // and can use Matrix API to find optimal return point
-        nextIntersection = null;
+        topIntersections = [];
       }
     }
 
-    // Find optimal return intersection using Matrix API
+    // Find optimal return intersections using Matrix API (top 3)
     async function findOptimalReturnIntersection(driverPos) {
-      // Get all intersections that can be entry points (entry-only and dual)
       const entryCapableIntersections = [...entryOnlyIntersections, ...dualIntersections];
 
       if (entryCapableIntersections.length === 0) {
-        // Fallback to end point if no entry intersections
-        nextIntersection = { location: endPoint };
+        topIntersections = [{ location: endPoint }];
         return;
       }
 
-      // Find the 10 closest intersections by straight-line distance using Turf
-      const intersectionsWithDistance = entryCapableIntersections.map(intersection => {
-        const distance = turf.distance(
-          turf.point(driverPos),
-          turf.point(intersection.location),
-          { units: 'kilometers' }
-        );
-        return { ...intersection, straightLineDistance: distance };
-      });
-
-      // Sort by distance and take top 10
-      intersectionsWithDistance.sort((a, b) => a.straightLineDistance - b.straightLineDistance);
-      const top10Intersections = intersectionsWithDistance.slice(0, 10);
-
-      // Skip intersections that are behind the deviation point on the route
       const routeLine = turf.lineString(mainRoute.geometry.coordinates);
-      const deviationPointOnRoute = turf.nearestPointOnLine(routeLine, turf.point(nearestIntersection.location));
 
-      const candidateIntersections = top10Intersections.filter(intersection => {
-        const intersectionOnRoute = turf.nearestPointOnLine(routeLine, turf.point(intersection.location));
-        return intersectionOnRoute.properties.index > deviationPointOnRoute.properties.index;
+      // Project driver position onto main route
+      const driverProjection = turf.nearestPointOnLine(routeLine, turf.point(driverPos));
+      const deviationProjection = turf.nearestPointOnLine(routeLine, turf.point(nearestIntersection.location));
+
+      // Project every entry-capable intersection onto the main route
+      const projectedCandidates = entryCapableIntersections.map(intersection => {
+        const proj = turf.nearestPointOnLine(routeLine, turf.point(intersection.location));
+        return {
+          ...intersection,
+          routeLocation: proj.properties.location
+        };
       });
 
-      if (candidateIntersections.length === 0) {
-        // If no intersections ahead, use end point
-        nextIntersection = { location: endPoint };
+      // Sort by route position (forward along the route)
+      projectedCandidates.sort((a, b) => a.routeLocation - b.routeLocation);
+
+      // Start from driver's projected position (with 2-intersection backward buffer)
+      const driverRouteLocation = driverProjection.properties.location;
+      let driverSortedIndex = projectedCandidates.findIndex(c => c.routeLocation >= driverRouteLocation);
+      if (driverSortedIndex === -1) driverSortedIndex = projectedCandidates.length;
+      const startIdx = Math.max(0, driverSortedIndex - 2);
+      const candidates = projectedCandidates.slice(startIdx);
+
+      // Filter out anything behind the deviation point
+      const deviationRouteLocation = deviationProjection.properties.location;
+      const filteredCandidates = candidates.filter(c => c.routeLocation > deviationRouteLocation);
+
+      if (filteredCandidates.length === 0) {
+        topIntersections = [{ location: endPoint }];
         return;
       }
 
-      // Prepare coordinates for Matrix API
-      // Build all coordinates: source first, then destinations
-      const allCoordinates = [
-        `${driverPos[0]},${driverPos[1]}`,  // Index 0: driver position (source)
-        ...candidateIntersections.map(i => `${i.location[0]},${i.location[1]}`)  // Index 1,2,3... destinations
-      ].join(';');
+      console.log(`Smart filter: ${entryCapableIntersections.length} total → ${filteredCandidates.length} candidates`);
 
-      // Sources: just index 0 (driver position)
-      const sourcesParam = '0';
+      // Batch Matrix API calls (max 24 destinations per request)
+      const BATCH_SIZE = 24;
+      const batches = [];
+      for (let i = 0; i < filteredCandidates.length; i += BATCH_SIZE) {
+        batches.push(filteredCandidates.slice(i, i + BATCH_SIZE));
+      }
 
-      // Destinations: indices 1 through N (using semicolon separator!)
-      const destinationsParam = candidateIntersections
-        .map((_, i) => i + 1)
-        .join(';');  // CRITICAL: Use semicolon, not comma!
+      let allResults = [];
 
-      // Call Matrix API
-      const url = `https://api.mapbox.com/directions-matrix/v1/mapbox/driving/${allCoordinates}` +
-        `?access_token=${mapboxgl.accessToken}` +
-        `&sources=${sourcesParam}` +
-        `&destinations=${destinationsParam}` +
-        `&annotations=duration,distance`;
+      for (let b = 0; b < batches.length; b++) {
+        const batch = batches[b];
+        const allCoordinates = [
+          `${driverPos[0]},${driverPos[1]}`,
+          ...batch.map(i => `${i.location[0]},${i.location[1]}`)
+        ].join(';');
 
-      console.log('Matrix API URL:', url);
-      console.log('Candidate intersections:', candidateIntersections.length);
+        const destinationsParam = batch.map((_, i) => i + 1).join(';');
 
-      try {
-        const response = await fetch(url);
-        const data = await response.json();
+        const url = `https://api.mapbox.com/directions-matrix/v1/mapbox/driving/${allCoordinates}` +
+          `?access_token=${mapboxgl.accessToken}` +
+          `&sources=0` +
+          `&destinations=${destinationsParam}` +
+          `&annotations=duration,distance`;
 
-        console.log('Matrix API response:', data);
+        try {
+          const response = await fetch(url);
+          const data = await response.json();
 
-        // Check for successful response
-        if (data.code !== 'Ok') {
-          console.error('Matrix API error:', data.code, data.message);
-          throw new Error(`Matrix API: ${data.code} - ${data.message || 'Unknown error'}`);
-        }
+          if (data.code !== 'Ok') {
+            console.error(`Matrix batch ${b + 1} error:`, data.code, data.message);
+            continue;
+          }
 
-        if (data.durations && data.durations[0]) {
-          // Find the intersection with minimum duration
-          let minDuration = Infinity;
-          let optimalIntersectionIndex = 0;
-
-          data.durations[0].forEach((duration, index) => {
-            if (duration !== null && duration < minDuration) {
-              minDuration = duration;
-              optimalIntersectionIndex = index;
-            }
-          });
-
-          // Set the optimal intersection as next intersection
-          nextIntersection = candidateIntersections[optimalIntersectionIndex];
-
-          console.log(`Matrix API: Selected intersection ${optimalIntersectionIndex + 1} of ${candidateIntersections.length}`);
-          console.log(`Travel time: ${Math.round(minDuration / 60)} minutes, Distance: ${Math.round(data.distances[0][optimalIntersectionIndex] / 1000)} km`);
-
-          // Highlight the selected return intersection with a different color
-          if (map.getSource('return-intersection')) {
-            map.getSource('return-intersection').setData({
-              type: 'Feature',
-              geometry: {
-                type: 'Point',
-                coordinates: nextIntersection.location
+          if (data.durations && data.durations[0]) {
+            data.durations[0].forEach((duration, index) => {
+              if (duration !== null) {
+                allResults.push({
+                  intersection: batch[index],
+                  duration,
+                  distance: data.distances[0][index]
+                });
               }
             });
           }
-        } else {
-          // Fallback to closest by straight-line distance
-          nextIntersection = candidateIntersections[0];
-          console.log('Matrix API failed, using closest intersection by distance');
+        } catch (error) {
+          console.error(`Matrix batch ${b + 1} error:`, error);
+          continue;
         }
-      } catch (error) {
-        console.error('Matrix API error:', error);
-        // Fallback to closest by straight-line distance
-        nextIntersection = candidateIntersections[0];
+
+      }
+
+      console.log(`Matrix API: processed ${batches.length} batches, ${allResults.length} results`);
+
+      // Sort by duration and store all results for sequential option picking
+      allResults.sort((a, b) => a.duration - b.duration);
+
+      if (allResults.length === 0) {
+        topIntersections = [filteredCandidates[0]];
+        allMatrixResults = [];
+        return;
+      }
+
+      // Store all results; createReturnRoutes will pick options sequentially
+      allMatrixResults = allResults.map(r => ({
+        ...r.intersection,
+        matrixDuration: r.duration,
+        matrixDistance: r.distance
+      }));
+
+      // Set option 1 (best duration) immediately so the button can be enabled
+      topIntersections = [allMatrixResults[0]];
+
+      console.log(`Matrix API: ${allMatrixResults.length} results, best: ${Math.round(allMatrixResults[0].matrixDuration / 60)} min`);
+
+      // Display option 1 marker
+      if (map.getSource('return-intersection-0')) {
+        map.getSource('return-intersection-0').setData({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: topIntersections[0].location }
+        });
       }
     }
 
     // Create deviation and return routes
     async function createDeviationRoutes() {
-      if (!deviationStartPoint || !driverPosition || !nearestIntersection || !nextIntersection) {
+      if (!deviationStartPoint || !driverPosition || !nearestIntersection || topIntersections.length === 0) {
         alert('Please select both deviation start and driver position');
         return;
       }
@@ -1207,11 +1298,8 @@ title: Return to Route Demo
       btn.innerHTML = '<span class="spinner">⟳</span> Creating routes...';
 
       try {
-        // Create deviation route (from intersection to driver position)
         await createDeviationRoute();
-
-        // Create return route (from driver position back to next intersection, excluding original deviation point)
-        await createReturnRoute();
+        await createReturnRoutes();
 
         btn.innerHTML = '✅ Routes Created';
         setTimeout(() => {
@@ -1229,10 +1317,8 @@ title: Return to Route Demo
 
     // Create deviation route from intersection to driver position
     async function createDeviationRoute() {
-      // Get all intersections along the main route except the selected deviation start
       const allMainRouteIntersections = [...entryOnlyIntersections, ...exitOnlyIntersections, ...dualIntersections];
 
-      // Create exclude parameters for all main route intersections except the selected one
       const excludePoints = allMainRouteIntersections
         .filter(intersection =>
           intersection.location[0] !== nearestIntersection.location[0] ||
@@ -1246,136 +1332,233 @@ title: Return to Route Demo
         `?access_token=${mapboxgl.accessToken}` +
         `&geometries=geojson&overview=full`;
 
-      // Add exclude parameters if there are any intersections to exclude
       if (excludePoints.length > 0) {
-        // Mapbox Directions API has a limit on the exclude parameter length
-        // We'll take the first 20 closest intersections to avoid if there are too many
         const limitedExcludes = excludePoints.slice(0, 20);
         url += `&exclude=${encodeURIComponent(limitedExcludes.join(','))}`;
-        console.log(`Excluding ${limitedExcludes.length} intersections from deviation route`);
       }
 
       const response = await fetch(url);
       const data = await response.json();
 
       if (data.routes && data.routes.length > 0) {
-        // Display deviation route
+        deviationRouteGeometry = data.routes[0].geometry;
         map.getSource('deviation-route').setData({
           type: 'Feature',
-          geometry: data.routes[0].geometry
+          geometry: deviationRouteGeometry
         });
       }
     }
 
-    // Create return route from driver position to next intersection
-    async function createReturnRoute() {
-      // First, get the deviation route coordinates from the purple line
-      const deviationSource = map.getSource('deviation-route');
-      let excludePoints = [];
+    // Truncate return route at first crossing with main route
+    function truncateAtMainRouteCrossing(returnGeometry, mainRouteLine, deviationProjection) {
+      const returnLine = turf.lineString(returnGeometry.coordinates);
+      const crossings = turf.lineIntersect(returnLine, mainRouteLine);
 
-      if (deviationSource && deviationSource._data && deviationSource._data.geometry) {
-        const deviationCoords = deviationSource._data.geometry.coordinates;
-
-        if (deviationCoords && deviationCoords.length > 0) {
-          // Get only the last 5 points from the deviation route (near the driver's position)
-          const last5 = deviationCoords.slice(Math.max(0, deviationCoords.length - 5));
-
-          // Create exclude points only from the last portion of the deviation route
-          excludePoints = last5.map(coord => `point(${coord[0]} ${coord[1]})`);
-
-          console.log(`Excluding ${excludePoints.length} points from deviation route (last 5 points near driver)`);
-        }
+      if (crossings.features.length === 0) {
+        return { geometry: returnGeometry, wasTruncated: false };
       }
 
+      // Only keep crossings ahead of the deviation point on the main route
+      const validCrossings = crossings.features.filter(crossing => {
+        const crossingOnMain = turf.nearestPointOnLine(mainRouteLine, crossing);
+        return crossingOnMain.properties.location > deviationProjection.properties.location;
+      });
+
+      if (validCrossings.length === 0) {
+        return { geometry: returnGeometry, wasTruncated: false };
+      }
+
+      // Find the first valid crossing along the return route (closest to driver)
+      const crossingsWithReturnPos = validCrossings.map(crossing => {
+        const onReturn = turf.nearestPointOnLine(returnLine, crossing);
+        return { point: crossing, returnLocation: onReturn.properties.location };
+      });
+      crossingsWithReturnPos.sort((a, b) => a.returnLocation - b.returnLocation);
+      const firstCrossing = crossingsWithReturnPos[0].point;
+
+      // Skip truncation if crossing is very close to the route endpoint
+      const returnEnd = turf.point(returnGeometry.coordinates[returnGeometry.coordinates.length - 1]);
+      if (turf.distance(firstCrossing, returnEnd, { units: 'meters' }) < 50) {
+        return { geometry: returnGeometry, wasTruncated: false };
+      }
+
+      // Truncate at first crossing
+      const returnStart = turf.point(returnGeometry.coordinates[0]);
+      const sliced = turf.lineSlice(returnStart, firstCrossing, returnLine);
+      return { geometry: sliced.geometry, wasTruncated: true };
+    }
+
+    // Compute a single return route to a target intersection, with truncation
+    async function computeReturnRoute(target, excludePoints, mainRouteLine, deviationProjection) {
       let url = `https://api.mapbox.com/directions/v5/mapbox/driving/` +
         `${driverPosition[0]},${driverPosition[1]};` +
-        `${nextIntersection.location[0]},${nextIntersection.location[1]}` +
+        `${target.location[0]},${target.location[1]}` +
         `?access_token=${mapboxgl.accessToken}` +
         `&geometries=geojson&overview=full`;
 
-      // Add exclude parameters if we have points to exclude
       if (excludePoints.length > 0) {
         url += `&exclude=${encodeURIComponent(excludePoints.join(','))}`;
       }
 
-      const response = await fetch(url);
-      const data = await response.json();
+      let response = await fetch(url);
+      let data = await response.json();
+      let routeGeometry = null;
 
       if (data.routes && data.routes.length > 0) {
-        // Display return route
-        map.getSource('return-route').setData({
-          type: 'Feature',
-          geometry: data.routes[0].geometry
-        });
-      } else {
-        // If exclusion fails, try without it
-        console.log('Exclusion failed, trying without exclude parameters');
+        routeGeometry = data.routes[0].geometry;
+      } else if (excludePoints.length > 0) {
+        console.log('Exclusion failed, retrying without excludes');
         const fallbackUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/` +
           `${driverPosition[0]},${driverPosition[1]};` +
-          `${nextIntersection.location[0]},${nextIntersection.location[1]}` +
+          `${target.location[0]},${target.location[1]}` +
           `?access_token=${mapboxgl.accessToken}` +
           `&geometries=geojson&overview=full`;
-
-        const fallbackResponse = await fetch(fallbackUrl);
-        const fallbackData = await fallbackResponse.json();
-
+        const fallbackResp = await fetch(fallbackUrl);
+        const fallbackData = await fallbackResp.json();
         if (fallbackData.routes && fallbackData.routes.length > 0) {
-          map.getSource('return-route').setData({
-            type: 'Feature',
-            geometry: fallbackData.routes[0].geometry
-          });
+          routeGeometry = fallbackData.routes[0].geometry;
         }
+      }
+
+      if (!routeGeometry) return null;
+
+      const result = truncateAtMainRouteCrossing(routeGeometry, mainRouteLine, deviationProjection);
+      return result;
+    }
+
+    // Create return routes sequentially — each option starts past the previous re-entry point
+    async function createReturnRoutes() {
+      let excludePoints = [];
+      if (deviationRouteGeometry) {
+        const coords = deviationRouteGeometry.coordinates;
+        if (coords && coords.length > 0) {
+          const last5 = coords.slice(Math.max(0, coords.length - 5));
+          excludePoints = last5.map(coord => `point(${coord[0]} ${coord[1]})`);
+        }
+      }
+
+      const mainRouteLine = turf.lineString(mainRoute.geometry.coordinates);
+      const deviationProjection = turf.nearestPointOnLine(mainRouteLine, turf.point(nearestIntersection.location));
+
+      // Reset topIntersections — we'll build it option by option
+      topIntersections = [];
+      let lastReentryRouteLocation = deviationProjection.properties.location;
+      let candidateStartIdx = 0; // Track position in allMatrixResults
+
+      for (let i = 0; i < 3; i++) {
+        let foundOption = false;
+
+        // Try candidates sequentially until we find one with a distinct re-entry point
+        while (candidateStartIdx < allMatrixResults.length) {
+          const candidate = allMatrixResults[candidateStartIdx];
+          candidateStartIdx++;
+
+          // Skip candidates behind the last re-entry point
+          if (candidate.routeLocation <= lastReentryRouteLocation) continue;
+
+          try {
+            const result = await computeReturnRoute(candidate, excludePoints, mainRouteLine, deviationProjection);
+            if (!result) continue;
+
+            // Determine the effective re-entry point
+            const routeEnd = result.geometry.coordinates[result.geometry.coordinates.length - 1];
+            const reentryOnRoute = turf.nearestPointOnLine(mainRouteLine, turf.point(routeEnd));
+            const reentryRouteLocation = reentryOnRoute.properties.location;
+
+            // Skip if this re-entry is at the same point as the previous option (within 50m)
+            // Skip if this re-entry matches ANY previous option (within 50m)
+            const isDuplicate = topIntersections.some(prev => {
+              const prevEnd = prev.truncatedLocation || prev.location;
+              return turf.distance(turf.point(routeEnd), turf.point(prevEnd), { units: 'meters' }) < 50;
+            });
+            if (isDuplicate) {
+              console.log(`Option ${i + 1}: Skipping candidate (same re-entry as existing option)`);
+              continue;
+            }
+
+            const option = { ...candidate };
+
+            map.getSource(`return-route-${i}`).setData({
+              type: 'Feature',
+              geometry: result.geometry
+            });
+
+            // Compute actual route distance
+            option.routeDistance = turf.length(turf.lineString(result.geometry.coordinates), { units: 'kilometers' });
+
+            if (result.wasTruncated) {
+              option.truncatedLocation = routeEnd;
+              map.getSource(`return-intersection-${i}`).setData({
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: routeEnd }
+              });
+              console.log(`Option ${i + 1}: Truncated at main route crossing`);
+            } else {
+              map.getSource(`return-intersection-${i}`).setData({
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: candidate.location }
+              });
+            }
+
+            topIntersections.push(option);
+            lastReentryRouteLocation = reentryRouteLocation;
+            foundOption = true;
+
+            console.log(`Option ${i + 1}: ${Math.round(candidate.matrixDuration / 60)} min, re-entry at route location ${lastReentryRouteLocation.toFixed(2)}`);
+            break;
+          } catch (error) {
+            console.error(`Error computing route for candidate:`, error);
+          }
+        }
+
+        if (!foundOption) {
+          console.log(`Option ${i + 1}: No more distinct candidates available`);
+          break;
+        }
+      }
+
+      if (topIntersections.length > 0) {
+        populateReturnOptionsUI();
+        selectReturnOption(0);
       }
     }
 
     // Clear only deviation-related data
     function clearDeviation() {
-      // Clear deviation points
       deviationStartPoint = null;
       driverPosition = null;
       nearestIntersection = null;
-      nextIntersection = null;
+      topIntersections = [];
+      allMatrixResults = [];
+      selectedReturnOption = null;
+      deviationRouteGeometry = null;
 
-      // Remove deviation markers (only driver marker now)
       if (driverMarker) driverMarker.remove();
       driverMarker = null;
 
-      // Clear deviation-related map sources
       if (map.getSource('deviation-route')) {
-        map.getSource('deviation-route').setData({
-          type: 'FeatureCollection',
-          features: []
-        });
-      }
-      if (map.getSource('return-route')) {
-        map.getSource('return-route').setData({
-          type: 'FeatureCollection',
-          features: []
-        });
+        map.getSource('deviation-route').setData({ type: 'FeatureCollection', features: [] });
       }
       if (map.getSource('highlight-intersection')) {
-        map.getSource('highlight-intersection').setData({
-          type: 'FeatureCollection',
-          features: []
-        });
+        map.getSource('highlight-intersection').setData({ type: 'FeatureCollection', features: [] });
       }
-      if (map.getSource('return-intersection')) {
-        map.getSource('return-intersection').setData({
-          type: 'FeatureCollection',
-          features: []
-        });
+      for (let i = 0; i < 3; i++) {
+        if (map.getSource(`return-route-${i}`)) {
+          map.getSource(`return-route-${i}`).setData({ type: 'FeatureCollection', features: [] });
+        }
+        if (map.getSource(`return-intersection-${i}`)) {
+          map.getSource(`return-intersection-${i}`).setData({ type: 'FeatureCollection', features: [] });
+        }
       }
 
-      // Reset deviation UI
       document.getElementById('deviation-start-coords').textContent = 'Not set';
       document.getElementById('deviation-start-coords').classList.add('not-set');
       document.getElementById('driver-coords').textContent = 'Not set';
       document.getElementById('driver-coords').classList.add('not-set');
-
-      // Disable create deviation button
       document.getElementById('create-deviation').disabled = true;
+      document.getElementById('return-options').style.display = 'none';
+      document.getElementById('return-options-list').innerHTML = '';
 
-      // Keep the mode as deviation so user can immediately select new deviation points
       if (currentMode === 'deviation') {
         showInstruction('Click on the route to set where the deviation started');
       }
@@ -1389,13 +1572,15 @@ title: Return to Route Demo
       deviationStartPoint = null;
       driverPosition = null;
       nearestIntersection = null;
-      nextIntersection = null;
+      topIntersections = [];
+      allMatrixResults = [];
+      selectedReturnOption = null;
+      deviationRouteGeometry = null;
       mainRoute = null;
       entryOnlyIntersections = [];
       exitOnlyIntersections = [];
       dualIntersections = [];
 
-      // Remove markers
       if (startMarker) startMarker.remove();
       if (endMarker) endMarker.remove();
       if (driverMarker) driverMarker.remove();
@@ -1403,57 +1588,24 @@ title: Return to Route Demo
       endMarker = null;
       driverMarker = null;
 
-      // Clear map sources
-      if (map.getSource('main-route')) {
-        map.getSource('main-route').setData({
-          type: 'FeatureCollection',
-          features: []
-        });
-      }
-      if (map.getSource('entry-intersections')) {
-        map.getSource('entry-intersections').setData({
-          type: 'FeatureCollection',
-          features: []
-        });
-      }
-      if (map.getSource('exit-intersections')) {
-        map.getSource('exit-intersections').setData({
-          type: 'FeatureCollection',
-          features: []
-        });
-      }
-      if (map.getSource('dual-intersections')) {
-        map.getSource('dual-intersections').setData({
-          type: 'FeatureCollection',
-          features: []
-        });
-      }
-      if (map.getSource('deviation-route')) {
-        map.getSource('deviation-route').setData({
-          type: 'FeatureCollection',
-          features: []
-        });
-      }
-      if (map.getSource('return-route')) {
-        map.getSource('return-route').setData({
-          type: 'FeatureCollection',
-          features: []
-        });
-      }
-      if (map.getSource('highlight-intersection')) {
-        map.getSource('highlight-intersection').setData({
-          type: 'FeatureCollection',
-          features: []
-        });
-      }
-      if (map.getSource('return-intersection')) {
-        map.getSource('return-intersection').setData({
-          type: 'FeatureCollection',
-          features: []
-        });
+      const sourcesToClear = [
+        'main-route', 'entry-intersections', 'exit-intersections',
+        'dual-intersections', 'deviation-route', 'highlight-intersection'
+      ];
+      sourcesToClear.forEach(src => {
+        if (map.getSource(src)) {
+          map.getSource(src).setData({ type: 'FeatureCollection', features: [] });
+        }
+      });
+      for (let i = 0; i < 3; i++) {
+        if (map.getSource(`return-route-${i}`)) {
+          map.getSource(`return-route-${i}`).setData({ type: 'FeatureCollection', features: [] });
+        }
+        if (map.getSource(`return-intersection-${i}`)) {
+          map.getSource(`return-intersection-${i}`).setData({ type: 'FeatureCollection', features: [] });
+        }
       }
 
-      // Reset UI
       document.getElementById('start-coords').textContent = 'Not set';
       document.getElementById('start-coords').classList.add('not-set');
       document.getElementById('end-coords').textContent = 'Not set';
@@ -1463,12 +1615,57 @@ title: Return to Route Demo
       document.getElementById('driver-coords').textContent = 'Not set';
       document.getElementById('driver-coords').classList.add('not-set');
       document.getElementById('intersection-count').textContent = '0';
+      document.getElementById('return-options').style.display = 'none';
+      document.getElementById('return-options-list').innerHTML = '';
 
       document.getElementById('generate-route').disabled = true;
       document.getElementById('create-deviation').disabled = true;
 
-      // Reset to points mode
       setMode('points');
+    }
+
+    // Populate return options UI panel
+    function populateReturnOptionsUI() {
+      const container = document.getElementById('return-options-list');
+      const panel = document.getElementById('return-options');
+      container.innerHTML = '';
+
+      topIntersections.forEach((opt, i) => {
+        const durationMin = opt.matrixDuration ? Math.round(opt.matrixDuration / 60) : '?';
+        const distanceKm = opt.routeDistance ? opt.routeDistance.toFixed(1) : (opt.matrixDistance ? (opt.matrixDistance / 1000).toFixed(1) : '?');
+
+        const item = document.createElement('div');
+        item.className = 'return-option-item';
+        item.style.color = RETURN_OPTION_COLORS[i];
+        item.innerHTML = `
+          <div class="return-option-swatch" style="background: ${RETURN_OPTION_COLORS[i]}"></div>
+          <div class="return-option-details">
+            <div class="option-label">${RETURN_OPTION_LABELS[i]}</div>
+            <div class="option-stats">${durationMin} min · ${distanceKm} km</div>
+          </div>
+          ${opt.truncatedLocation ? '<span class="return-option-truncated">Truncated</span>' : ''}
+        `;
+        item.addEventListener('click', () => selectReturnOption(i));
+        container.appendChild(item);
+      });
+
+      panel.style.display = 'block';
+    }
+
+    // Select and emphasize a return route option
+    function selectReturnOption(index) {
+      selectedReturnOption = index;
+
+      const items = document.querySelectorAll('.return-option-item');
+      items.forEach((item, i) => item.classList.toggle('selected', i === index));
+
+      for (let i = 0; i < topIntersections.length; i++) {
+        const isSelected = (i === index);
+        map.setPaintProperty(`return-route-layer-${i}`, 'line-width', isSelected ? 5 : 3);
+        map.setPaintProperty(`return-route-layer-${i}`, 'line-opacity', isSelected ? 0.9 : 0.35);
+        map.setPaintProperty(`return-intersection-layer-${i}`, 'circle-opacity', isSelected ? 0.9 : 0.4);
+        map.setPaintProperty(`return-intersection-layer-${i}`, 'circle-radius', isSelected ? 12 : 8);
+      }
     }
 
     // Show instruction message
