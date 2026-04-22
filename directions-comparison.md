@@ -186,6 +186,45 @@ js: directions-comparison.js
     }
     .avoid-option:hover { background: #f5f5f5; }
     .avoid-option input[type="checkbox"] { cursor: pointer; }
+
+    /* Batch modal */
+    #batch-modal {
+      display: none; position: fixed; inset: 0; z-index: 500;
+      background: rgba(0,0,0,0.45); overflow-y: auto; padding: 40px 20px;
+    }
+    #batch-modal.open { display: block; }
+    #batch-panel {
+      background: white; border-radius: 12px;
+      max-width: 1100px; margin: 0 auto;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2); overflow: hidden;
+    }
+    #batch-panel-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 20px; border-bottom: 1px solid #e0e0e0; background: #fafafa;
+    }
+    #batch-panel-title { font-size: 15px; font-weight: 700; flex: 1; margin: 0; }
+    #batch-progress { font-size: 13px; color: #666; white-space: nowrap; }
+    .batch-table-wrap { overflow-x: auto; max-height: calc(100vh - 180px); overflow-y: auto; }
+    #batch-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    #batch-table thead th {
+      position: sticky; top: 0; z-index: 1;
+      background: #f8f9fa; padding: 8px 12px;
+      font-weight: 600; border-bottom: 1px solid #e0e0e0;
+      white-space: nowrap; text-align: right;
+    }
+    #batch-table thead th:first-child { text-align: left; }
+    #batch-table .col-group-mapbox { background: #e8f0fe; color: #1a73e8; text-align: center; }
+    #batch-table .col-group-google { background: #fce8e6; color: #d93025; text-align: center; }
+    #batch-table .col-group-delta  { background: #f0f0f0; color: #555;    text-align: center; }
+    #batch-table tbody td {
+      padding: 7px 12px; border-bottom: 1px solid #f0f0f0;
+      text-align: right; white-space: nowrap;
+    }
+    #batch-table tbody td:first-child { text-align: left; font-weight: 500; }
+    #batch-table tbody tr:hover td { background: #f5f7ff; }
+    .batch-cell-loading { color: #aaa; font-size: 12px; text-align: center !important; }
+    .batch-cell-error { color: #ea4335; font-size: 12px; text-align: center !important; }
+    .batch-cell-skip { color: #aaa; text-align: center !important; }
   </style>
 </head>
 <body>
@@ -205,9 +244,8 @@ js: directions-comparison.js
   <select id="travel-mode">
     <option value="driving">車</option>
     <option value="driving-traffic">車 (交通情報)</option>
-    <option value="walking">徒歩</option>
-    <option value="cycling">自転車</option>
   </select>
+  <button class="btn" id="batch-btn" disabled>バッチ実行</button>
   <div class="spacer"></div>
   <div id="google-key-group">
     <label for="google-key-input">Google API Key</label>
@@ -281,6 +319,35 @@ js: directions-comparison.js
           <span>出発地と目的地を設定するとルートが表示されます</span>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<div id="batch-modal">
+  <div id="batch-panel">
+    <div id="batch-panel-header">
+      <h2 id="batch-panel-title">バッチ実行結果</h2>
+      <span id="batch-progress"></span>
+      <button class="btn" id="batch-csv-btn" disabled>CSVダウンロード</button>
+      <button class="btn btn-clear" id="batch-close-btn">閉じる</button>
+    </div>
+    <div class="batch-table-wrap">
+      <table id="batch-table">
+        <thead>
+          <tr>
+            <th rowspan="2">ルート</th>
+            <th colspan="4" class="col-group-mapbox">Mapbox</th>
+            <th colspan="4" class="col-group-google">Google</th>
+            <th colspan="4" class="col-group-delta">Δ (Mapbox − Google)</th>
+          </tr>
+          <tr>
+            <th>所要時間</th><th>距離</th><th>右左折</th><th>ステップ数</th>
+            <th>所要時間</th><th>距離</th><th>右左折</th><th>ステップ数</th>
+            <th>所要時間</th><th>距離</th><th>右左折</th><th>ステップ数</th>
+          </tr>
+        </thead>
+        <tbody id="batch-tbody"></tbody>
+      </table>
     </div>
   </div>
 </div>
