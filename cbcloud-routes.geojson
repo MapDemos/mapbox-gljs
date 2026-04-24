@@ -18,6 +18,78 @@
         "address": "仙台市太白区柳生５－１３－１"
       },
       "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route": "愛知県海部郡大治町八ツ屋字山畔61 → 愛知県名古屋市西区笠取町２丁目１３０",
+        "role": "origin",
+        "address": "愛知県海部郡大治町八ツ屋字山畔61"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route": "愛知県海部郡大治町八ツ屋字山畔61 → 愛知県名古屋市西区笠取町２丁目１３０",
+        "role": "destination",
+        "address": "愛知県名古屋市西区笠取町２丁目１３０"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route": "宮崎県延岡市（陸） → 宮崎県延岡市（離島）",
+        "role": "origin",
+        "address": "宮崎県延岡市"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route": "宮崎県延岡市（陸） → 宮崎県延岡市（離島）",
+        "role": "destination",
+        "address": "宮崎県延岡市島浦島"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route": "岐阜県高山市匠ケ丘町２３９−１ → 栃木県小山市横倉新田４００",
+        "role": "origin",
+        "address": "〒506-0057 岐阜県高山市匠ケ丘町２３９−１"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route": "岐阜県高山市匠ケ丘町２３９−１ → 栃木県小山市横倉新田４００",
+        "role": "destination",
+        "address": "〒323-0819 栃木県小山市横倉新田４００"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route": "東京都江東区東雲２－９－７ → 茨城県取手市中央町２−５",
+        "role": "origin",
+        "address": "東京都江東区東雲２－９－７"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route": "東京都江東区東雲２－９－７ → 茨城県取手市中央町２−５",
+        "role": "destination",
+        "address": "茨城県取手市中央町２−５"
+      },
+      "geometry": null
     }
   ]
 }
