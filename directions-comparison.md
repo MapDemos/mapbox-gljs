@@ -336,14 +336,14 @@ js: directions-comparison.js
         <thead>
           <tr>
             <th rowspan="2">ルート</th>
-            <th colspan="4" class="col-group-mapbox">Mapbox</th>
-            <th colspan="4" class="col-group-google">Google</th>
-            <th colspan="4" class="col-group-delta">Δ (Mapbox − Google)</th>
+            <th colspan="3" class="col-group-mapbox">Mapbox</th>
+            <th colspan="3" class="col-group-google">Google</th>
+            <th colspan="3" class="col-group-delta">Δ (Mapbox − Google)</th>
           </tr>
           <tr>
-            <th>所要時間</th><th>距離</th><th>右左折</th><th>ステップ数</th>
-            <th>所要時間</th><th>距離</th><th>右左折</th><th>ステップ数</th>
-            <th>所要時間</th><th>距離</th><th>右左折</th><th>ステップ数</th>
+            <th>所要時間</th><th>距離</th><th>ステップ数</th>
+            <th>所要時間</th><th>距離</th><th>ステップ数</th>
+            <th>所要時間</th><th>距離</th><th>ステップ数</th>
           </tr>
         </thead>
         <tbody id="batch-tbody"></tbody>

@@ -609,7 +609,7 @@ function buildResultHTML({ durationSec, distanceM, turnCount, summary, stepTexts
   const moreHTML = '';
 
   return `
-    <div class="result-summary" style="grid-template-columns: 1fr 1fr 1fr;">
+    <div class="result-summary" style="grid-template-columns: 1fr 1fr;">
       <div class="metric-card">
         <div class="metric-label">所要時間</div>
         <div class="metric-value">${formatDuration(durationSec)}<span class="metric-unit">${formatDurationUnit(durationSec)}</span></div>
@@ -618,10 +618,12 @@ function buildResultHTML({ durationSec, distanceM, turnCount, summary, stepTexts
         <div class="metric-label">距離</div>
         <div class="metric-value">${formatDistance(distanceM)}<span class="metric-unit">${formatDistanceUnit(distanceM)}</span></div>
       </div>
+      <!--
       <div class="metric-card">
         <div class="metric-label">右左折</div>
         <div class="metric-value">${turnCount}<span class="metric-unit">回</span></div>
       </div>
+      -->
     </div>
     ${summaryHTML}
     <div class="steps-title">ステップ (全${totalSteps}件)</div>
@@ -656,13 +658,13 @@ function renderMapboxResult(route) {
   console.groupEnd();
 
   // Place numbered markers at each turn point
-  turnSteps.forEach((step, i) => {
+  /* turnSteps.forEach((step, i) => {
     const [lng, lat] = step.maneuver.location;
     const marker = new mapboxgl.Marker({ element: createTurnMarkerElement(i) })
       .setLngLat([lng, lat])
       .addTo(mapboxMap);
     mapboxTurnMarkers.push(marker);
-  });
+  }); */
 
   document.getElementById('mapbox-result-content').innerHTML = buildResultHTML({
     durationSec,
@@ -702,7 +704,7 @@ function renderGoogleResult(route) {
   console.groupEnd();
 
   // Place numbered markers at each turn point
-  turnSteps.forEach((step, i) => {
+  /* turnSteps.forEach((step, i) => {
     const marker = new google.maps.Marker({
       position: step.start_location,
       map: googleMap,
@@ -718,7 +720,7 @@ function renderGoogleResult(route) {
       zIndex: 500,
     });
     googleTurnMarkers.push(marker);
-  });
+  }); */
 
   document.getElementById('google-result-content').innerHTML = buildResultHTML({
     durationSec,
@@ -829,15 +831,15 @@ function fetchGoogleRouteData(origin, destination) {
  */
 function renderBatchCells(data, error, skipped) {
   if (skipped) {
-    return '<td colspan="4" class="batch-cell-skip">—</td>';
+    return '<td colspan="3" class="batch-cell-skip">—</td>';
   }
   if (error) {
-    return `<td colspan="4" class="batch-cell-error">${error}</td>`;
+    return `<td colspan="3" class="batch-cell-error">${error}</td>`;
   }
   return `
     <td>${formatDuration(data.durationSec)}<span class="metric-unit">${formatDurationUnit(data.durationSec)}</span></td>
     <td>${formatDistance(data.distanceM)}<span class="metric-unit">${formatDistanceUnit(data.distanceM)}</span></td>
-    <td>${data.turnCount}</td>
+    <!-- <td>${data.turnCount}</td> -->
     <td>${data.stepCount}</td>
   `;
 }
@@ -848,12 +850,12 @@ function renderBatchCells(data, error, skipped) {
  */
 function renderDeltaCells(m, g, googleSkipped) {
   if (googleSkipped || !m || !g) {
-    return '<td colspan="4" class="batch-cell-skip">—</td>';
+    return '<td colspan="3" class="batch-cell-skip">—</td>';
   }
 
   const timeΔ = Math.round(m.durationSec / 60) - Math.round(g.durationSec / 60);
   const distΔ = parseFloat((m.distanceM / 1000).toFixed(1)) - parseFloat((g.distanceM / 1000).toFixed(1));
-  const turnΔ = m.turnCount - g.turnCount;
+  // const turnΔ = m.turnCount - g.turnCount;
   const stepΔ = m.stepCount - g.stepCount;
 
   const cell = (v, unit) => {
@@ -865,7 +867,7 @@ function renderDeltaCells(m, g, googleSkipped) {
     return `<td>${sign}${v.toFixed(1)}<span class="metric-unit">km</span></td>`;
   };
 
-  return `${cell(timeΔ, 'min')}${cellKm(distΔ)}${cell(turnΔ, '')}${cell(stepΔ, '')}`;
+  return `${cell(timeΔ, 'min')}${cellKm(distΔ)}${cell(stepΔ, '')}`;
 }
 
 function updateBatchRow(i, mapboxData, mapboxError, googleData, googleError, googleSkipped) {
@@ -910,7 +912,7 @@ async function runRouteForBatch(group, i) {
   } catch (err) {
     batchResults[i] = { name: group.name, error: err.message };
     const row = document.getElementById(`batch-row-${i}`);
-    if (row) row.innerHTML = `<td>${group.name}</td><td colspan="8" class="batch-cell-error">エラー: ${err.message}</td>`;
+    if (row) row.innerHTML = `<td>${group.name}</td><td colspan="9" class="batch-cell-error">エラー: ${err.message}</td>`;
   }
 
   batchCompleted++;
