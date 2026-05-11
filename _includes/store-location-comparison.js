@@ -252,7 +252,7 @@ function loadBrandIcon(brand) {
 function initMapboxMap() {
   mapboxMap = new mapboxgl.Map({
     container: 'mapbox-map',
-    style: 'mapbox://styles/kenji-shima/cmmtz45at001501sm99f0eima',
+    style: 'mapbox://styles/kenji-shima/cmp0s13iw000101sdhqok52gy',
     center: [139.7671, 35.6812],
     zoom: 15,
     pitch: 0,
