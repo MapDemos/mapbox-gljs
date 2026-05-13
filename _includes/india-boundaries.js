@@ -44,7 +44,7 @@ const lookupCache = {};
 
 const fetchLookup = async (type) => {
     if (lookupCache[type]) return lookupCache[type];
-    const res = await fetch(`/data/india-${type}.json`);
+    const res = await fetch(`data/india-${type}.json`);
     lookupCache[type] = await res.json();
     return lookupCache[type];
 };
