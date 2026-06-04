@@ -439,7 +439,16 @@ async function fetchRoute() {
     map.getSource('s1-route').setData({ type: 'Feature', geometry: route.geometry, properties: {} });
     const mins = Math.round(route.duration / 60);
     const km = (route.distance / 1000).toFixed(0);
-    document.getElementById('route-info').innerHTML = `<div class="info-row"><span>🕐 Duration</span><b>${Math.floor(mins/60)}h ${mins%60}m</b></div><div class="info-row"><span>📏 Distance</span><b>${km} km</b></div><div class="info-row"><span>🏁 ETA</span><b>${SHIPMENT.to.eta}</b></div>`;
+
+    // Fetch remaining duration from latest position → destination for accurate ETA
+    const remainingUrl = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${latest.lng},${latest.lat};${to.lng},${to.lat}?access_token=${mapboxgl.accessToken}`;
+    const remainingRes = await fetch(remainingUrl);
+    const remainingData = await remainingRes.json();
+    const remainingSecs = remainingData.routes?.[0]?.duration ?? route.duration;
+    const eta = new Date(Date.now() + remainingSecs * 1000);
+    const etaStr = eta.toLocaleString('en-GB', { timeZone: 'Europe/Amsterdam', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    document.getElementById('route-info').innerHTML = `<div class="info-row"><span>🕐 Total duration</span><b>${Math.floor(mins/60)}h ${mins%60}m</b></div><div class="info-row"><span>📏 Distance</span><b>${km} km</b></div><div class="info-row"><span>🏁 ETA (Amsterdam)</span><b>${etaStr}</b></div>`;
     btn.textContent = 'Route Shown ✓';
     setLayerVisibility('s1-route-casing', true);
     setLayerVisibility('s1-route', true);
