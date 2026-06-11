@@ -855,8 +855,8 @@ title: Logistics Checkout Demo
       <a href="https://docs.mapbox.com/api/maps/static-images/" target="_blank" rel="noopener">Static Images API</a>
     </footer>
 
-    <script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.js"></script>
+    <script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
     <script id="search-js" src="https://api.mapbox.com/search-js/v1.0.0/web.js"></script>
     <script>
     // 3PL Handoff Demo — Mapbox Search JS + GL JS + Static Images API
