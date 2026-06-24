@@ -965,37 +965,33 @@ function downloadBatchCSV() {
   const skipGoogle = state.travelMode === 'cycling' || !googleApiKey;
   const headers = [
     'ルート',
-    'Mapbox 所要時間(min)', 'Mapbox 距離(km)', 'Mapbox 右左折', 'Mapbox ステップ数',
-    'Google 所要時間(min)', 'Google 距離(km)', 'Google 右左折', 'Google ステップ数',
-    'Δ 所要時間(min)', 'Δ 距離(km)', 'Δ 右左折', 'Δ ステップ数',
+    'Mapbox 所要時間(min)', 'Mapbox 距離(km)', 'Mapbox ステップ数',
+    'Google 所要時間(min)', 'Google 距離(km)', 'Google ステップ数',
+    'Δ 所要時間(min)', 'Δ 距離(km)', 'Δ ステップ数',
   ];
 
   const toMin = (sec) => Math.round(sec / 60);
   const toKm  = (m)   => (m / 1000).toFixed(2);
 
   const rows = batchResults.map((r) => {
-    if (!r) return ['-', '', '', '', '', '', '', '', '', '', '', '', ''];
+    if (!r) return ['-', '', '', '', '', '', '', ''];
     const m = r.mapbox;
     const g = r.google;
     const na = skipGoogle ? 'スキップ' : 'エラー';
 
-    // Compute Δ after rounding each side (same values shown in the table)
     const timeΔ = (m && g) ? toMin(m.durationSec) - toMin(g.durationSec) : '';
     const distΔ = (m && g) ? (parseFloat(toKm(m.distanceM)) - parseFloat(toKm(g.distanceM))).toFixed(2) : '';
-    const turnΔ = (m && g) ? m.turnCount - g.turnCount : '';
     const stepΔ = (m && g) ? m.stepCount - g.stepCount : '';
 
     return [
       r.name,
       m ? toMin(m.durationSec) : 'エラー',
       m ? toKm(m.distanceM)   : 'エラー',
-      m ? m.turnCount         : 'エラー',
       m ? m.stepCount         : 'エラー',
       g ? toMin(g.durationSec) : na,
       g ? toKm(g.distanceM)   : na,
-      g ? g.turnCount         : na,
       g ? g.stepCount         : na,
-      timeΔ, distΔ, turnΔ, stepΔ,
+      timeΔ, distΔ, stepΔ,
     ];
   });
 
