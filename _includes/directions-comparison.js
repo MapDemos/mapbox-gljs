@@ -890,8 +890,8 @@ async function runRouteForBatch(group, i) {
 
   try {
     const [origin, destination] = await Promise.all([
-      geocodeV6(group.origin.properties.address),
-      geocodeV6(group.destination.properties.address),
+      resolveLocation(group.origin),
+      resolveLocation(group.destination),
     ]);
 
     const tasks = [fetchMapboxRouteData(origin, destination)];
@@ -939,8 +939,26 @@ async function runBatch() {
   document.getElementById('batch-csv-btn').disabled = true;
   document.getElementById('batch-modal').classList.add('open');
 
-  // All routes fire concurrently; rows update as each one resolves
-  await Promise.all(presetGroups.map((group, i) => runRouteForBatch(group, i)));
+  // Concurrency semaphore: max 400 routes in-flight (~800 req/s), no artificial delay
+  const MAX_CONCURRENT = 400;
+  let active = 0;
+  let idx = 0;
+
+  await new Promise(resolve => {
+    function next() {
+      while (active < MAX_CONCURRENT && idx < presetGroups.length) {
+        const i = idx++;
+        active++;
+        runRouteForBatch(presetGroups[i], i).finally(() => {
+          active--;
+          if (idx < presetGroups.length) next();
+          else if (active === 0) resolve();
+        });
+      }
+      if (idx >= presetGroups.length && active === 0) resolve();
+    }
+    next();
+  });
 }
 
 function downloadBatchCSV() {
@@ -1067,9 +1085,19 @@ function updateHints() {
 // Groups: [{ name, origin: feature, destination: feature }, ...]
 let presetGroups = [];
 
-async function loadPresetRoutes() {
+async function loadPresetRoutes(url = 'cbcloud-routes.geojson') {
+  const presetSelect = document.getElementById('route-preset');
+  const batchBtn = document.getElementById('batch-btn');
+
+  // Reset preset dropdown to its placeholder before loading
+  presetSelect.innerHTML = '<option value="">-- ルートを選択 --</option>';
+  presetSelect.disabled = true;
+  batchBtn.disabled = true;
+  presetGroups = [];
+
   try {
-    const res = await fetch('cbcloud-routes.geojson');
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     const data = await res.json();
     const features = data.features || [];
 
@@ -1082,20 +1110,29 @@ async function loadPresetRoutes() {
     });
     presetGroups = [...map.values()].filter(g => g.origin && g.destination);
 
-    const select = document.getElementById('route-preset');
     presetGroups.forEach((group, i) => {
       const opt = document.createElement('option');
       opt.value = i;
       opt.textContent = group.name;
-      select.appendChild(opt);
+      presetSelect.appendChild(opt);
     });
 
     if (presetGroups.length > 0) {
-      document.getElementById('batch-btn').disabled = false;
+      batchBtn.disabled = false;
     }
   } catch (err) {
-    console.error('Failed to load preset routes:', err);
+    console.error(`Failed to load preset routes from ${url}:`, err);
+  } finally {
+    presetSelect.disabled = false;
   }
+}
+
+function resolveLocation(feature) {
+  if (feature.geometry?.coordinates) {
+    const [lng, lat] = feature.geometry.coordinates;
+    return Promise.resolve({ lat, lng });
+  }
+  return geocodeV6(feature.properties.address);
 }
 
 async function geocodeV6(address) {
@@ -1116,8 +1153,8 @@ async function applyPresetRoute(group) {
   select.disabled = true;
   try {
     const [origin, destination] = await Promise.all([
-      geocodeV6(group.origin.properties.address),
-      geocodeV6(group.destination.properties.address),
+      resolveLocation(group.origin),
+      resolveLocation(group.destination),
     ]);
 
     state.origin      = origin;
@@ -1264,6 +1301,12 @@ function setupEventListeners() {
     if (idx === '') return;
     applyPresetRoute(presetGroups[Number(idx)]);
   });
+
+  // Route-source dropdown — swap the underlying preset GeoJSON
+  document.getElementById('route-source').addEventListener('change', (e) => {
+    clearAll();
+    loadPresetRoutes(e.target.value);
+  });
 }
 
 // ============================================================
@@ -1292,7 +1335,7 @@ async function init() {
   setupGoogleKeyInput();
   updateHints();
   initMapboxMap();
-  loadPresetRoutes();
+  loadPresetRoutes(document.getElementById('route-source').value);
 
   if (googleApiKey) {
     await initGoogleMap();

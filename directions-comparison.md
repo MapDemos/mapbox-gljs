@@ -238,6 +238,11 @@ js: directions-comparison.js
     <button class="mode-btn active" id="btn-origin">A&nbsp; 出発地を設定</button>
     <button class="mode-btn" id="btn-destination">B&nbsp; 目的地を設定</button>
   </div>
+  <select id="route-source">
+    <option value="cbcloud-routes.geojson">CBcloud 配送ルート</option>
+    <option value="japan-ferry-routes.geojson">日本のフェリー航路</option>
+    <option value="japan-nav-routes.geojson">日本ナビ検証ルート (1000件)</option>
+  </select>
   <select id="route-preset">
     <option value="">-- ルートを選択 --</option>
   </select>
