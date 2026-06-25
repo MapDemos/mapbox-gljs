@@ -20,9 +20,9 @@ function isMapboxTurn(step) {
 }
 
 const GOOGLE_TURN_MANEUVERS = new Set([
-  'turn-slight-left', 'turn-sharp-left', 'uturn-left', 'turn-left',
-  'turn-slight-right', 'turn-sharp-right', 'uturn-right', 'turn-right',
-  'roundabout-left', 'roundabout-right',
+  'TURN_SLIGHT_LEFT', 'TURN_SHARP_LEFT', 'UTURN_LEFT', 'TURN_LEFT',
+  'TURN_SLIGHT_RIGHT', 'TURN_SHARP_RIGHT', 'UTURN_RIGHT', 'TURN_RIGHT',
+  'ROUNDABOUT_LEFT', 'ROUNDABOUT_RIGHT',
 ]);
 let googleApiKey = localStorage.getItem(GOOGLE_KEY_STORAGE) || '';
 const INITIAL_CENTER = [139.7671, 35.6812]; // Tokyo
@@ -45,8 +45,7 @@ let state = {
 // ============================================================
 let mapboxMap = null;
 let googleMap = null;
-let directionsService = null;
-let directionsRenderer = null;
+let googleRoutePolyline = null;
 let isSyncing = false;
 
 let mapboxOriginMarker = null;
@@ -87,12 +86,6 @@ async function initGoogleMap() {
     mapId: 'DEMO_MAP_ID',
   });
 
-  directionsService = new google.maps.DirectionsService();
-  directionsRenderer = new google.maps.DirectionsRenderer({
-    suppressMarkers: true, // We add our own markers
-  });
-  directionsRenderer.setMap(googleMap);
-
   googleMap.addListener('click', (e) => {
     handleMapClick(e.latLng.lat(), e.latLng.lng());
   });
@@ -100,6 +93,21 @@ async function initGoogleMap() {
   ['center_changed', 'zoom_changed'].forEach((event) => {
     googleMap.addListener(event, syncFromGoogle);
   });
+}
+
+function decodePolyline(encoded) {
+  const points = [];
+  let index = 0, lat = 0, lng = 0;
+  while (index < encoded.length) {
+    let b, shift = 0, result = 0;
+    do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lat += result & 1 ? ~(result >> 1) : result >> 1;
+    shift = 0; result = 0;
+    do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lng += result & 1 ? ~(result >> 1) : result >> 1;
+    points.push({ lat: lat / 1e5, lng: lng / 1e5 });
+  }
+  return points;
 }
 
 // ============================================================
@@ -406,21 +414,7 @@ async function fetchBothRoutes() {
     </div>`;
 
   document.getElementById('mapbox-result-content').innerHTML = loadingHTML;
-
-  // Google Directions API does not support cycling in Japan — show notice immediately
-  if (state.travelMode === 'cycling') {
-    document.getElementById('google-result-content').innerHTML = `
-      <div class="result-placeholder" style="padding: 24px; color: #999; font-size: 13px; text-align: center;">
-        <span class="icon">🚲</span>
-        <span>Google Directions API は日本での自転車ルートに対応していません</span>
-      </div>`;
-    if (directionsRenderer) {
-      directionsRenderer.setMap(null);
-      directionsRenderer.setMap(googleMap);
-    }
-  } else {
-    document.getElementById('google-result-content').innerHTML = loadingHTML;
-  }
+  document.getElementById('google-result-content').innerHTML = loadingHTML;
 
   const controls = ['btn-origin', 'btn-destination', 'travel-mode', 'clear-btn', 'mapbox-avoid-btn', 'google-avoid-btn', 'mapbox-execute-btn', 'google-execute-btn'];
   controls.forEach(id => document.getElementById(id).disabled = true);
@@ -486,51 +480,71 @@ async function fetchMapboxRoute(fetchId) {
 }
 
 /**
- * Fetches a route from the Google Directions API and renders the result.
+ * Fetches a route from the Google Routes API v2 and renders the result.
  */
-function fetchGoogleRoute(fetchId) {
-  return new Promise((resolve) => {
-    const { origin, destination, travelMode } = state;
+async function fetchGoogleRoute(fetchId) {
+  const { origin, destination, travelMode } = state;
 
-    const modeMap = {
-      driving: google.maps.TravelMode.DRIVING,
-      'driving-traffic': google.maps.TravelMode.DRIVING,
-      walking: google.maps.TravelMode.WALKING,
-      cycling: google.maps.TravelMode.BICYCLING,
-    };
+  const travelModeMap = {
+    driving: 'DRIVE',
+    'driving-traffic': 'DRIVE',
+    walking: 'WALK',
+    cycling: 'BICYCLE',
+  };
+  const routingPreference = travelMode === 'driving-traffic'
+    ? 'TRAFFIC_AWARE_OPTIMAL' : 'TRAFFIC_AWARE';
 
-    const requestParams = {
-      origin: { lat: origin.lat, lng: origin.lng },
-      destination: { lat: destination.lat, lng: destination.lng },
-      travelMode: modeMap[travelMode] || google.maps.TravelMode.DRIVING,
+  const body = {
+    origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
+    destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
+    travelMode: travelModeMap[travelMode] || 'DRIVE',
+    routingPreference,
+    languageCode: 'ja',
+    routeModifiers: {
       avoidTolls: state.googleAvoid.includes('tolls'),
       avoidHighways: state.googleAvoid.includes('highways'),
       avoidFerries: state.googleAvoid.includes('ferries'),
-    };
+    },
+  };
 
-    // driving-traffic: request traffic-aware duration (Google equivalent)
-    if (travelMode === 'driving-traffic') {
-      requestParams.drivingOptions = {
-        departureTime: new Date(),
-        trafficModel: google.maps.TrafficModel.BEST_GUESS,
-      };
+  try {
+    const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': googleApiKey,
+        'X-Goog-FieldMask': 'routes.legs,routes.polyline,routes.description',
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+
+    if (fetchId !== currentFetchId) return;
+
+    if (!res.ok || !data.routes?.length) {
+      const msg = data.error?.message || res.statusText;
+      console.error('Google Routes error:', msg);
+      showErrorPlaceholder('google-result-content', `ルートが見つかりませんでした (${msg})。`);
+      return;
     }
 
-    directionsService.route(
-      requestParams,
-      (result, status) => {
-        if (fetchId !== currentFetchId) { resolve(); return; }
-        if (status === google.maps.DirectionsStatus.OK) {
-          directionsRenderer.setDirections(result);
-          renderGoogleResult(result.routes[0]);
-        } else {
-          console.error('Google Directions error:', status);
-          showErrorPlaceholder('google-result-content', `ルートが見つかりませんでした (${status})。`);
-        }
-        resolve();
-      }
-    );
-  });
+    const route = data.routes[0];
+
+    // Draw polyline on Google map
+    if (googleRoutePolyline) googleRoutePolyline.setMap(null);
+    googleRoutePolyline = new google.maps.Polyline({
+      path: decodePolyline(route.polyline.encodedPolyline),
+      map: googleMap,
+      strokeColor: '#ea4335',
+      strokeWeight: 5,
+      strokeOpacity: 0.9,
+    });
+
+    renderGoogleResult(route.legs[0], route.description || '');
+  } catch (err) {
+    console.error('Google Routes error:', err);
+    showErrorPlaceholder('google-result-content', 'ルートの取得に失敗しました。');
+  }
 }
 
 // ============================================================
@@ -676,51 +690,28 @@ function renderMapboxResult(route) {
 }
 
 /**
- * Renders a Google Directions route into the right result panel.
- * @param {object} route - routes[0] from the Google Directions API response
+ * Renders a Google Routes API leg into the right result panel.
+ * @param {object} leg - routes[0].legs[0] from the Google Routes API response
+ * @param {string} summary - routes[0].description
  */
-function renderGoogleResult(route) {
-  const leg = route.legs[0];
-  // Prefer duration_in_traffic when available (driving-traffic mode)
-  const durationSec = (leg.duration_in_traffic ?? leg.duration).value;
-  const distanceM = leg.distance.value;
-  const summary = route.summary || '';
+function renderGoogleResult(leg, summary) {
+  const durationSec = parseInt(leg.duration);
+  const distanceM = leg.distanceMeters;
   const steps = leg.steps || [];
 
-  // Keep <b> formatting from Google instructions, strip other tags
-  const stepTexts = steps.map((s) =>
-    (s.instructions || '').replace(/<(?!\/?b\b)[^>]*>/gi, '')
-  );
-  const turnSteps = steps.filter((s) => GOOGLE_TURN_MANEUVERS.has(s.maneuver));
+  const stepTexts = steps.map((s) => s.navigationInstruction?.instructions || '');
+  const turnSteps = steps.filter((s) => GOOGLE_TURN_MANEUVERS.has(s.navigationInstruction?.maneuver));
 
   // Debug: log every maneuver with its type and whether it was counted
   let turnIdx = 0;
   console.group(`[Google] maneuvers (${steps.length} steps, ${turnSteps.length} turns)`);
   steps.forEach((s) => {
-    const counted = GOOGLE_TURN_MANEUVERS.has(s.maneuver);
+    const maneuver = s.navigationInstruction?.maneuver || '(none)';
+    const counted = GOOGLE_TURN_MANEUVERS.has(maneuver);
     const label = counted ? `✅ #${++turnIdx}` : '  —  ';
-    console.log(`${label}  [${s.maneuver || '(none)'}]  ${(s.instructions || '').replace(/<[^>]*>/g, '')}`);
+    console.log(`${label}  [${maneuver}]  ${s.navigationInstruction?.instructions || ''}`);
   });
   console.groupEnd();
-
-  // Place numbered markers at each turn point
-  /* turnSteps.forEach((step, i) => {
-    const marker = new google.maps.Marker({
-      position: step.start_location,
-      map: googleMap,
-      label: { text: String(i + 1), color: 'white', fontSize: '10px', fontWeight: 'bold' },
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: 10,
-        fillColor: '#f5a623',
-        fillOpacity: 1,
-        strokeColor: '#ffffff',
-        strokeWeight: 2,
-      },
-      zIndex: 500,
-    });
-    googleTurnMarkers.push(marker);
-  }); */
 
   document.getElementById('google-result-content').innerHTML = buildResultHTML({
     durationSec,
@@ -781,49 +772,53 @@ async function fetchMapboxRouteData(origin, destination) {
 }
 
 /**
- * Fetches a Google route and returns metrics only — no map or UI update.
+ * Fetches a Google route via Routes API v2 and returns metrics only — no map or UI update.
  */
-function fetchGoogleRouteData(origin, destination) {
-  return new Promise((resolve, reject) => {
-    const modeMap = {
-      driving: google.maps.TravelMode.DRIVING,
-      'driving-traffic': google.maps.TravelMode.DRIVING,
-      walking: google.maps.TravelMode.WALKING,
-      cycling: google.maps.TravelMode.BICYCLING,
-    };
+async function fetchGoogleRouteData(origin, destination) {
+  const travelModeMap = {
+    driving: 'DRIVE',
+    'driving-traffic': 'DRIVE',
+    walking: 'WALK',
+    cycling: 'BICYCLE',
+  };
+  const routingPreference = state.travelMode === 'driving-traffic'
+    ? 'TRAFFIC_AWARE_OPTIMAL' : 'TRAFFIC_AWARE';
 
-    const requestParams = {
-      origin: { lat: origin.lat, lng: origin.lng },
-      destination: { lat: destination.lat, lng: destination.lng },
-      travelMode: modeMap[state.travelMode] || google.maps.TravelMode.DRIVING,
+  const body = {
+    origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
+    destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
+    travelMode: travelModeMap[state.travelMode] || 'DRIVE',
+    routingPreference,
+    languageCode: 'ja',
+    routeModifiers: {
       avoidTolls: state.googleAvoid.includes('tolls'),
       avoidHighways: state.googleAvoid.includes('highways'),
       avoidFerries: state.googleAvoid.includes('ferries'),
-    };
+    },
+  };
 
-    if (state.travelMode === 'driving-traffic') {
-      requestParams.drivingOptions = {
-        departureTime: new Date(),
-        trafficModel: google.maps.TrafficModel.BEST_GUESS,
-      };
-    }
-
-    directionsService.route(requestParams, (result, status) => {
-      if (status !== google.maps.DirectionsStatus.OK) {
-        reject(new Error(status));
-        return;
-      }
-      const leg = result.routes[0].legs[0];
-      const durationSec = (leg.duration_in_traffic ?? leg.duration).value;
-      const steps = leg.steps || [];
-      resolve({
-        durationSec,
-        distanceM: leg.distance.value,
-        turnCount: steps.filter(s => GOOGLE_TURN_MANEUVERS.has(s.maneuver)).length,
-        stepCount: steps.length,
-      });
-    });
+  const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': googleApiKey,
+      'X-Goog-FieldMask': 'routes.legs.duration,routes.legs.distanceMeters,routes.legs.steps',
+    },
+    body: JSON.stringify(body),
   });
+  const data = await res.json();
+  if (!res.ok || !data.routes?.length) {
+    throw new Error(data.error?.message || res.statusText);
+  }
+
+  const leg = data.routes[0].legs[0];
+  const steps = leg.steps || [];
+  return {
+    durationSec: parseInt(leg.duration),
+    distanceM: leg.distanceMeters,
+    turnCount: steps.filter(s => GOOGLE_TURN_MANEUVERS.has(s.navigationInstruction?.maneuver)).length,
+    stepCount: steps.length,
+  };
 }
 
 /**
@@ -893,7 +888,7 @@ function updateBatchRow(i, mapboxData, mapboxError, googleData, googleError, goo
  * Results stream in as they complete; table order is preserved by row index.
  */
 async function runRouteForBatch(group, i) {
-  const googleSkipped = state.travelMode === 'cycling' || !googleApiKey || !directionsService;
+  const googleSkipped = !googleApiKey;
 
   try {
     const [origin, destination] = await Promise.all([
@@ -969,7 +964,7 @@ async function runBatch() {
 }
 
 function downloadBatchCSV() {
-  const skipGoogle = state.travelMode === 'cycling' || !googleApiKey;
+  const skipGoogle = !googleApiKey;
   const headers = [
     'ルート', '出発地', '目的地',
     'Mapbox 所要時間(min)', 'Mapbox 距離(km)', 'Mapbox ステップ数',
@@ -1048,10 +1043,7 @@ function clearAll() {
   }
 
   // Clear Google route
-  if (directionsRenderer) {
-    directionsRenderer.setMap(null);
-    directionsRenderer.setMap(googleMap);
-  }
+  if (googleRoutePolyline) { googleRoutePolyline.setMap(null); googleRoutePolyline = null; }
 
   // Reset result panels to placeholder
   const placeholder = `<div class="result-placeholder" style="padding: 24px; color: #999; font-size: 14px; text-align: center;">出発地と目的地を設定するとルートが表示されます</div>`;

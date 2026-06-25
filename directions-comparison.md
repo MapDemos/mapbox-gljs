@@ -286,7 +286,7 @@ js: directions-comparison.js
     </div>
     <div class="map-pane">
       <div class="map-header">
-        <span>Google Directions API</span>
+        <span>Google Routes API</span>
         <div class="param-group">
           <span class="param-label">パラメータ</span>
           <div class="avoid-dropdown" id="google-avoid-dropdown">
@@ -299,7 +299,7 @@ js: directions-comparison.js
           </div>
           <button class="btn" id="google-execute-btn">実行</button>
         </div>
-        <span class="api-badge google-badge">maps/api/directions</span>
+        <span class="api-badge google-badge">routes/v2</span>
       </div>
       <div id="google-map" class="map-container"></div>
       <div class="click-hint" id="google-hint">クリックして出発地 (A) を設定</div>
