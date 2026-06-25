@@ -1220,13 +1220,14 @@
       "type": "Feature",
       "properties": {
         "route": "都市 東京 041",
-        "role": "destination"
+        "role": "destination",
+        "address": "鹿骨６丁目３番"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          139.7025,
-          35.6733861
+          139.8844972,
+          35.7122833
         ]
       }
     },
@@ -2464,13 +2465,14 @@
       "type": "Feature",
       "properties": {
         "route": "都市 東京 083",
-        "role": "origin"
+        "role": "origin",
+        "address": "高井戸東１丁目７番７号"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          139.7025,
-          35.6733861
+          139.6212167,
+          35.6789139
         ]
       }
     },
@@ -7248,13 +7250,14 @@
       "type": "Feature",
       "properties": {
         "route": "都市 大阪・京都 242",
-        "role": "destination"
+        "role": "destination",
+        "address": "東一津屋１番４５号"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          135.6429306,
-          34.8205556
+          135.5672889,
+          34.76745
         ]
       }
     },
@@ -8582,13 +8585,14 @@
       "type": "Feature",
       "properties": {
         "route": "都市 大阪・京都 287",
-        "role": "origin"
+        "role": "origin",
+        "address": "東奈良２丁目１２番１４号"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          135.6503917,
-          34.837475
+          135.5699611,
+          34.8032917
         ]
       }
     },
@@ -8911,13 +8915,14 @@
       "type": "Feature",
       "properties": {
         "route": "都市 大阪・京都 298",
-        "role": "origin"
+        "role": "origin",
+        "address": "佐竹台２丁目１番Ａ１９号"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          135.5437028,
-          34.8269722
+          135.5118778,
+          34.7922667
         ]
       }
     },
@@ -10860,13 +10865,14 @@
       "type": "Feature",
       "properties": {
         "route": "都市 札幌 363",
-        "role": "origin"
+        "role": "origin",
+        "address": "美園７条３丁目１番１３号"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          141.3948778,
-          42.9980611
+          141.3819694,
+          43.0397278
         ]
       }
     },
@@ -10874,13 +10880,14 @@
       "type": "Feature",
       "properties": {
         "route": "都市 札幌 363",
-        "role": "destination"
+        "role": "destination",
+        "address": "石山１０３９番地５"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          141.3948778,
-          42.9980611
+          141.3260472,
+          42.9524583
         ]
       }
     },
@@ -10978,13 +10985,14 @@
       "type": "Feature",
       "properties": {
         "route": "都市 札幌 367",
-        "role": "origin"
+        "role": "origin",
+        "address": "流通センター５丁目７番３１号"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          141.2380778,
-          43.0971167
+          141.4482444,
+          43.0315139
         ]
       }
     },
@@ -11292,13 +11300,14 @@
       "type": "Feature",
       "properties": {
         "route": "都市 札幌 377",
-        "role": "destination"
+        "role": "destination",
+        "address": "北４９条東１７丁目６番"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          141.5900361,
-          43.0533833
+          141.3668333,
+          43.1231667
         ]
       }
     },
@@ -13586,13 +13595,14 @@
       "type": "Feature",
       "properties": {
         "route": "都市 横浜・川崎 454",
-        "role": "origin"
+        "role": "origin",
+        "address": "樽町３丁目９番１１号"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          139.6506694,
-          35.4707917
+          139.6453472,
+          35.5323806
         ]
       }
     },
@@ -13960,13 +13970,14 @@
       "type": "Feature",
       "properties": {
         "route": "都市 横浜・川崎 466",
-        "role": "destination"
+        "role": "destination",
+        "address": "永田東２丁目２番１３号"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          139.6476278,
-          35.4682167
+          139.5972361,
+          35.4361917
         ]
       }
     },
@@ -15054,13 +15065,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 003",
-        "role": "origin"
+        "role": "origin",
+        "address": "鳩が丘１丁目５番１０号"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.0583611,
-          43.0079333
+          141.7779278,
+          43.1975111
         ]
       }
     },
@@ -15188,13 +15200,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 007",
-        "role": "destination"
+        "role": "destination",
+        "address": "栗沢町最上５１４番地８"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          141.9672556,
-          43.4524
+          141.7480611,
+          43.1098528
         ]
       }
     },
@@ -15457,13 +15470,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 016",
-        "role": "destination"
+        "role": "destination",
+        "address": "陸別原野基線３３７番地１"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.6602528,
-          43.9920389
+          143.7572694,
+          43.4758917
         ]
       }
     },
@@ -15531,13 +15545,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 019",
-        "role": "origin"
+        "role": "origin",
+        "address": "１００９番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.5207333,
-          43.5290667
+          141.7230889,
+          43.3783333
         ]
       }
     },
@@ -15605,13 +15620,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 021",
-        "role": "destination"
+        "role": "destination",
+        "address": "東３条南１５丁目１６９番地４"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.20685,
-          43.0339361
+          141.9035611,
+          43.4703083
         ]
       }
     },
@@ -15724,13 +15740,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 025",
-        "role": "destination"
+        "role": "destination",
+        "address": "栗沢町栗丘１２１番地２"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.6600556,
-          43.6640778
+          141.7481083,
+          43.0859806
         ]
       }
     },
@@ -15783,13 +15800,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 027",
-        "role": "destination"
+        "role": "destination",
+        "address": "留辺蘂町大富２７４番地３"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.5353639,
-          43.5128889
+          143.5719528,
+          43.7734583
         ]
       }
     },
@@ -15827,13 +15845,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 029",
-        "role": "origin"
+        "role": "origin",
+        "address": "落合８７０番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.3951194,
-          43.5171194
+          142.6782139,
+          43.1247278
         ]
       }
     },
@@ -15976,13 +15995,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 034",
-        "role": "origin"
+        "role": "origin",
+        "address": "栗沢町茂世丑２３３１番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          143.3795722,
-          43.1170528
+          141.8032528,
+          43.1296111
         ]
       }
     },
@@ -16170,13 +16190,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 040",
-        "role": "destination"
+        "role": "destination",
+        "address": "西御料２条１丁目１番２８号"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          143.7458028,
-          43.0705222
+          142.3740722,
+          43.7280528
         ]
       }
     },
@@ -16184,13 +16205,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 041",
-        "role": "origin"
+        "role": "origin",
+        "address": "中里３０番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.9491528,
-          43.8413306
+          141.7898778,
+          43.0444639
         ]
       }
     },
@@ -16378,13 +16400,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 047",
-        "role": "destination"
+        "role": "destination",
+        "address": "９線１１号５番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          141.9672556,
-          43.4524
+          142.3755194,
+          43.8456
         ]
       }
     },
@@ -16407,13 +16430,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 048",
-        "role": "destination"
+        "role": "destination",
+        "address": "奈井江１１５番地３"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          141.9783222,
-          43.3393972
+          141.894325,
+          43.4517139
         ]
       }
     },
@@ -16451,13 +16475,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 050",
-        "role": "origin"
+        "role": "origin",
+        "address": "弥生１６８番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.5207333,
-          43.5290667
+          143.728725,
+          43.7727583
         ]
       }
     },
@@ -16525,13 +16550,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 052",
-        "role": "destination"
+        "role": "destination",
+        "address": "美原４１９番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          141.692225,
-          43.6888306
+          141.5619306,
+          43.1691361
         ]
       }
     },
@@ -16539,13 +16565,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 053",
-        "role": "origin"
+        "role": "origin",
+        "address": "東雲町２丁目３番地５"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          141.9488611,
-          43.7567722
+          141.6781417,
+          43.93295
         ]
       }
     },
@@ -16553,13 +16580,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 053",
-        "role": "destination"
+        "role": "destination",
+        "address": "緑丘２９８番地１"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.1676444,
-          43.1536139
+          143.740675,
+          43.7138444
         ]
       }
     },
@@ -16702,13 +16730,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 058",
-        "role": "destination"
+        "role": "destination",
+        "address": "ウッカ２０５番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          141.9020194,
-          43.3465417
+          142.0964306,
+          43.8427972
         ]
       }
     },
@@ -16776,13 +16805,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 061",
-        "role": "origin"
+        "role": "origin",
+        "address": "大町６丁目１番２７号"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          141.9179833,
-          43.9349722
+          141.911775,
+          43.56395
         ]
       }
     },
@@ -16850,13 +16880,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 063",
-        "role": "destination"
+        "role": "destination",
+        "address": "人舞１６８番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.4807556,
-          43.6068361
+          142.9314583,
+          43.0111833
         ]
       }
     },
@@ -16939,13 +16970,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 066",
-        "role": "destination"
+        "role": "destination",
+        "address": "上芦別町５１１番地４"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.9491528,
-          43.8413306
+          142.2092583,
+          43.4905806
         ]
       }
     },
@@ -16983,13 +17015,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 068",
-        "role": "origin"
+        "role": "origin",
+        "address": "赤平６０６番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.20685,
-          43.0339361
+          142.0618139,
+          43.5444861
         ]
       }
     },
@@ -17057,13 +17090,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 070",
-        "role": "destination"
+        "role": "destination",
+        "address": "宮前１条３丁目２番１８号"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.1676444,
-          43.1536139
+          142.3725944,
+          43.7585333
         ]
       }
     },
@@ -17116,13 +17150,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 072",
-        "role": "destination"
+        "role": "destination",
+        "address": "江部乙町１２４４番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.3968556,
-          43.2832667
+          141.9438222,
+          43.6542806
         ]
       }
     },
@@ -17235,13 +17270,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 076",
-        "role": "destination"
+        "role": "destination",
+        "address": "士幌東２線１５５番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.1676444,
-          43.1536139
+          143.2717028,
+          43.157175
         ]
       }
     },
@@ -17294,13 +17330,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 078",
-        "role": "destination"
+        "role": "destination",
+        "address": "８線１１号６番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.1676444,
-          43.1536139
+          142.3813028,
+          43.8426611
         ]
       }
     },
@@ -17383,13 +17420,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 081",
-        "role": "destination"
+        "role": "destination",
+        "address": "角田１３０番地２０"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          141.7238722,
-          43.3566556
+          141.8105639,
+          43.0339083
         ]
       }
     },
@@ -17397,13 +17435,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 082",
-        "role": "origin"
+        "role": "origin",
+        "address": "沖内１６５番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          141.9796028,
-          43.3562528
+          141.7542111,
+          43.9958861
         ]
       }
     },
@@ -17426,13 +17465,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 083",
-        "role": "origin"
+        "role": "origin",
+        "address": "東和東１線３６番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.1366083,
-          43.6015333
+          143.243675,
+          43.0099222
         ]
       }
     },
@@ -17575,13 +17615,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 088",
-        "role": "origin"
+        "role": "origin",
+        "address": "西町１丁目１番２６号"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.4041028,
-          43.3240222
+          142.4585333,
+          43.5885472
         ]
       }
     },
@@ -17679,13 +17720,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 091",
-        "role": "destination"
+        "role": "destination",
+        "address": "永山町３丁目１０２番地２１"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          141.7690639,
-          43.4345222
+          142.4162417,
+          43.7838694
         ]
       }
     },
@@ -17783,13 +17825,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 095",
-        "role": "origin"
+        "role": "origin",
+        "address": "北村豊正４１２５番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.1676444,
-          43.1536139
+          141.6951028,
+          43.29845
         ]
       }
     },
@@ -17827,13 +17870,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 096",
-        "role": "destination"
+        "role": "destination",
+        "address": "西町３丁目３７２番地７"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.9881833,
-          43.8930583
+          142.4967639,
+          43.6959111
         ]
       }
     },
@@ -17856,13 +17900,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 北海道内陸 097",
-        "role": "destination"
+        "role": "destination",
+        "address": "末広２条１丁目４番１０号"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          142.5245972,
-          43.5864917
+          142.3795333,
+          43.8041917
         ]
       }
     },
@@ -18620,13 +18665,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 東北・秋田 123",
-        "role": "origin"
+        "role": "origin",
+        "address": "協和小種車田９９番地２"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          140.3822139,
-          39.5264194
+          140.2510472,
+          39.5439556
         ]
       }
     },
@@ -18769,13 +18815,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 東北・秋田 128",
-        "role": "origin"
+        "role": "origin",
+        "address": "南外梨木田９６番地１"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          140.067625,
-          39.7955861
+          140.3751917,
+          39.4605972
         ]
       }
     },
@@ -19818,13 +19865,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 東北・岩手 163",
-        "role": "origin"
+        "role": "origin",
+        "address": "新庄下八木田５９番地４１"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          140.9962972,
-          39.0555167
+          141.2008944,
+          39.6948083
         ]
       }
     },
@@ -19967,13 +20015,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 東北・岩手 168",
-        "role": "origin"
+        "role": "origin",
+        "address": "磐井町３番７号"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          140.9816056,
-          39.680325
+          141.1334667,
+          38.9333194
         ]
       }
     },
@@ -20041,13 +20090,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 東北・岩手 170",
-        "role": "destination"
+        "role": "destination",
+        "address": "東山町長坂小豆用４６番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          141.0659528,
-          39.7316139
+          141.2731083,
+          39.0158528
         ]
       }
     },
@@ -20175,13 +20225,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 東北・岩手 175",
-        "role": "origin"
+        "role": "origin",
+        "address": "胆沢小山大袋２２６番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          140.9816056,
-          39.680325
+          141.0634361,
+          39.0594556
         ]
       }
     },
@@ -20234,13 +20285,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 東北・岩手 177",
-        "role": "origin"
+        "role": "origin",
+        "address": "東和町前田１区５２番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          140.9816056,
-          39.680325
+          141.2197583,
+          39.4229778
         ]
       }
     },
@@ -20263,13 +20315,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 東北・岩手 178",
-        "role": "origin"
+        "role": "origin",
+        "address": "胆沢若柳中横沢原１６１番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          140.9816056,
-          39.680325
+          140.9811639,
+          39.1069278
         ]
       }
     },
@@ -20577,13 +20630,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 東北・岩手 188",
-        "role": "destination"
+        "role": "destination",
+        "address": "六原下真栄木３１番地２"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          140.9331972,
-          39.0912222
+          141.0477278,
+          39.252325
         ]
       }
     },
@@ -20636,13 +20690,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 東北・岩手 190",
-        "role": "destination"
+        "role": "destination",
+        "address": "口内町宝積３２番地４"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          140.9816056,
-          39.680325
+          141.2256778,
+          39.2879111
         ]
       }
     },
@@ -20830,13 +20885,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 東北・岩手 197",
-        "role": "origin"
+        "role": "origin",
+        "address": "水沢南大鐘９３番地３"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          140.9816056,
-          39.680325
+          141.1389639,
+          39.1266833
         ]
       }
     },
@@ -21369,13 +21425,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 東北・岩手 215",
-        "role": "origin"
+        "role": "origin",
+        "address": "胆沢小山森下２７番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          141.026825,
-          39.0516722
+          141.1122056,
+          39.11885
         ]
       }
     },
@@ -24263,13 +24320,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 高知 311",
-        "role": "destination"
+        "role": "destination",
+        "address": "浦ノ内今川内３３７番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          133.1366417,
-          33.4767028
+          133.4115139,
+          33.4206472
         ]
       }
     },
@@ -24502,13 +24560,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 高知 319",
-        "role": "destination"
+        "role": "destination",
+        "address": "父野川上３２８番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          133.22405,
-          33.6994778
+          132.8685778,
+          33.3290611
         ]
       }
     },
@@ -24531,13 +24590,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 高知 320",
-        "role": "destination"
+        "role": "destination",
+        "address": "波介１２４４番地１"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          132.9192111,
-          33.3379528
+          133.4213639,
+          33.4826361
         ]
       }
     },
@@ -26300,13 +26360,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 宮崎 379",
-        "role": "destination"
+        "role": "destination",
+        "address": "財部町南俣１９０２番地４"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          131.3238889,
-          32.3358472
+          131.0063056,
+          31.7223889
         ]
       }
     },
@@ -28504,13 +28565,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 長野 453",
-        "role": "origin"
+        "role": "origin",
+        "address": "芳田１４６３番地１１"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          138.1866167,
-          36.1998194
+          138.2998889,
+          36.388825
         ]
       }
     },
@@ -28848,13 +28910,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 長野 464",
-        "role": "destination"
+        "role": "destination",
+        "address": "和田４０２０番地７"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          138.1866167,
-          36.1998194
+          137.9024806,
+          36.1919778
         ]
       }
     },
@@ -29447,13 +29510,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 岐阜 484",
-        "role": "destination"
+        "role": "destination",
+        "address": "白鳥町白鳥４５番地２"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          137.1903944,
-          35.7891833
+          136.8585,
+          35.8825
         ]
       }
     },
@@ -29611,13 +29675,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 岐阜 490",
-        "role": "origin"
+        "role": "origin",
+        "address": "出屋敷３１番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          136.8863472,
-          36.0651722
+          136.8310944,
+          35.5203778
         ]
       }
     },
@@ -29805,13 +29870,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 岐阜 496",
-        "role": "destination"
+        "role": "destination",
+        "address": "上之保２４５２３番地"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          136.7420972,
-          35.8317889
+          137.0717917,
+          35.6744639
         ]
       }
     },
@@ -29819,13 +29885,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 岐阜 497",
-        "role": "origin"
+        "role": "origin",
+        "address": "朝日町青屋２０４３番地２"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          136.6226,
-          35.9496111
+          137.3915056,
+          36.0934528
         ]
       }
     },
@@ -29893,13 +29960,14 @@
       "type": "Feature",
       "properties": {
         "route": "地方 岐阜 499",
-        "role": "destination"
+        "role": "destination",
+        "address": "久田見８９７番地１－５"
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          136.8863472,
-          36.0651722
+          137.1816972,
+          35.5273111
         ]
       }
     },
