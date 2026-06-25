@@ -1109,7 +1109,10 @@ async function loadPresetRoutes(url = 'cbcloud-routes.geojson') {
     presetGroups.forEach((group, i) => {
       const opt = document.createElement('option');
       opt.value = i;
-      opt.textContent = group.name;
+      const originAddr = group.origin.properties.address;
+      const destAddr   = group.destination.properties.address;
+      const addrLabel  = (originAddr && destAddr) ? ` (${originAddr} → ${destAddr})` : '';
+      opt.textContent  = group.name + addrLabel;
       presetSelect.appendChild(opt);
     });
 
