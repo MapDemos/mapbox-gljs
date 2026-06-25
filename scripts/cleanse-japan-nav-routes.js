@@ -41,7 +41,7 @@ async function reverseGeocode(feature) {
   const [lng, lat] = feature.geometry.coordinates;
   const url =
     `https://api.mapbox.com/search/geocode/v6/reverse` +
-    `?longitude=${lng}&latitude=${lat}&language=ja&access_token=${token}`;
+    `?longitude=${lng}&latitude=${lat}&types=address&language=ja&access_token=${token}`;
 
   await acquireToken();
   const res = await fetch(url);
