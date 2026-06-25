@@ -870,11 +870,18 @@ function renderDeltaCells(m, g, googleSkipped) {
   return `${cell(timeΔ, 'min')}${cellKm(distΔ)}${cell(stepΔ, '')}`;
 }
 
+function routeNameCell(group) {
+  const o = group.origin.properties.address || '';
+  const d = group.destination.properties.address || '';
+  const sub = (o || d) ? `<div style="font-size:11px;color:#999;margin-top:2px">${o} → ${d}</div>` : '';
+  return `<td>${group.name}${sub}</td>`;
+}
+
 function updateBatchRow(i, mapboxData, mapboxError, googleData, googleError, googleSkipped) {
   const row = document.getElementById(`batch-row-${i}`);
   if (!row) return;
   row.innerHTML = `
-    <td>${presetGroups[i].name}</td>
+    ${routeNameCell(presetGroups[i])}
     ${renderBatchCells(mapboxData, mapboxError, false)}
     ${renderBatchCells(googleData, googleError, googleSkipped)}
     ${renderDeltaCells(mapboxData, googleData, googleSkipped)}
@@ -907,12 +914,12 @@ async function runRouteForBatch(group, i) {
     const googleError = (!googleSkipped && googleSettled?.status === 'rejected')
       ? googleSettled.reason?.message || 'エラー' : null;
 
-    batchResults[i] = { name: group.name, mapbox: mapboxData, google: googleData };
+    batchResults[i] = { name: group.name, group, mapbox: mapboxData, google: googleData };
     updateBatchRow(i, mapboxData, mapboxError, googleData, googleError, googleSkipped);
   } catch (err) {
-    batchResults[i] = { name: group.name, error: err.message };
+    batchResults[i] = { name: group.name, group, error: err.message };
     const row = document.getElementById(`batch-row-${i}`);
-    if (row) row.innerHTML = `<td>${group.name}</td><td colspan="9" class="batch-cell-error">エラー: ${err.message}</td>`;
+    if (row) row.innerHTML = `${routeNameCell(group)}<td colspan="9" class="batch-cell-error">エラー: ${err.message}</td>`;
   }
 
   batchCompleted++;
@@ -930,7 +937,7 @@ async function runBatch() {
   const tbody = document.getElementById('batch-tbody');
   tbody.innerHTML = presetGroups.map((g, i) => `
     <tr id="batch-row-${i}">
-      <td>${g.name}</td>
+      ${routeNameCell(g)}
       <td colspan="8" class="batch-cell-loading">処理中...</td>
     </tr>
   `).join('');
@@ -964,7 +971,7 @@ async function runBatch() {
 function downloadBatchCSV() {
   const skipGoogle = state.travelMode === 'cycling' || !googleApiKey;
   const headers = [
-    'ルート',
+    'ルート', '出発地', '目的地',
     'Mapbox 所要時間(min)', 'Mapbox 距離(km)', 'Mapbox ステップ数',
     'Google 所要時間(min)', 'Google 距離(km)', 'Google ステップ数',
     'Δ 所要時間(min)', 'Δ 距離(km)', 'Δ ステップ数',
@@ -974,17 +981,19 @@ function downloadBatchCSV() {
   const toKm  = (m)   => (m / 1000).toFixed(2);
 
   const rows = batchResults.map((r) => {
-    if (!r) return ['-', '', '', '', '', '', '', ''];
+    if (!r) return ['-', '', '', '', '', '', '', '', '', ''];
     const m = r.mapbox;
     const g = r.google;
     const na = skipGoogle ? 'スキップ' : 'エラー';
+    const originAddr = r.group?.origin.properties.address || '';
+    const destAddr   = r.group?.destination.properties.address || '';
 
     const timeΔ = (m && g) ? toMin(m.durationSec) - toMin(g.durationSec) : '';
     const distΔ = (m && g) ? (parseFloat(toKm(m.distanceM)) - parseFloat(toKm(g.distanceM))).toFixed(2) : '';
     const stepΔ = (m && g) ? m.stepCount - g.stepCount : '';
 
     return [
-      r.name,
+      r.name, originAddr, destAddr,
       m ? toMin(m.durationSec) : 'エラー',
       m ? toKm(m.distanceM)   : 'エラー',
       m ? m.stepCount         : 'エラー',
