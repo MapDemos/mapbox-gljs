@@ -24,6 +24,15 @@ const GOOGLE_TURN_MANEUVERS = new Set([
   'TURN_SLIGHT_RIGHT', 'TURN_SHARP_RIGHT', 'UTURN_RIGHT', 'TURN_RIGHT',
   'ROUNDABOUT_LEFT', 'ROUNDABOUT_RIGHT',
 ]);
+
+const CONGESTION_COLORS = {
+  moderate:    '#ff9800',
+  heavy:       '#f44336',
+  severe:      '#f44336',
+  SLOW:        '#ff9800',
+  TRAFFIC_JAM: '#f44336',
+};
+const DEFAULT_ROUTE_COLOR = '#4285f4';
 let googleApiKey = localStorage.getItem(GOOGLE_KEY_STORAGE) || '';
 const INITIAL_CENTER = [139.7671, 35.6812]; // Tokyo
 const INITIAL_ZOOM = 12;
@@ -45,7 +54,7 @@ let state = {
 // ============================================================
 let mapboxMap = null;
 let googleMap = null;
-let googleRoutePolyline = null;
+let googleRoutePolylines = [];
 let isSyncing = false;
 
 let mapboxOriginMarker = null;
@@ -59,6 +68,7 @@ let googleTurnMarkers = [];
 let currentFetchId = 0;
 let mapboxStyleLoaded = false;
 let pendingGeometry = null;
+let pendingCongestionData = null;
 
 // ============================================================
 // GOOGLE MAPS
@@ -129,13 +139,19 @@ function initMapboxMap() {
     );
     const beforeId = firstSymbol ? firstSymbol.id : undefined;
 
-    // Route source
+    // Route source (full geometry — used for casing)
     mapboxMap.addSource('route', {
       type: 'geojson',
       data: { type: 'FeatureCollection', features: [] },
     });
 
-    // Casing layer (wider, slightly transparent)
+    // Congestion source (per-segment features with congestion property)
+    mapboxMap.addSource('route-congestion', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+    });
+
+    // Casing layer (wider, on full geometry)
     mapboxMap.addLayer({
       id: 'route-line-casing',
       type: 'line',
@@ -148,14 +164,19 @@ function initMapboxMap() {
       },
     }, beforeId);
 
-    // Main route line (thinner, on top)
+    // Main route line colored by congestion segment
     mapboxMap.addLayer({
       id: 'route-line',
       type: 'line',
-      source: 'route',
-      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      source: 'route-congestion',
+      layout: { 'line-join': 'round', 'line-cap': 'butt' },
       paint: {
-        'line-color': '#4285f4',
+        'line-color': ['match', ['get', 'congestion'],
+          'moderate', '#ff9800',
+          'heavy',    '#f44336',
+          'severe',   '#f44336',
+          'rgba(0,0,0,0)',
+        ],
         'line-width': 5,
         'line-opacity': 0.9,
       },
@@ -164,6 +185,10 @@ function initMapboxMap() {
     if (pendingGeometry) {
       mapboxMap.getSource('route').setData({ type: 'Feature', geometry: pendingGeometry, properties: {} });
       pendingGeometry = null;
+    }
+    if (pendingCongestionData) {
+      mapboxMap.getSource('route-congestion').setData(pendingCongestionData);
+      pendingCongestionData = null;
     }
   });
 
@@ -439,12 +464,13 @@ async function fetchMapboxRoute(fetchId) {
   const excludeParam = state.mapboxExclude.length > 0
     ? `&exclude=${state.mapboxExclude.join(',')}`
     : '';
+  const annotationParam = travelMode === 'driving-traffic' ? '&annotations=congestion' : '';
 
   const url =
     `https://api.mapbox.com/directions/v5/${profile}/` +
     `${origin.lng},${origin.lat};${destination.lng},${destination.lat}` +
     `?steps=true&geometries=geojson&overview=full&language=ja` +
-    `${excludeParam}` +
+    `${excludeParam}${annotationParam}` +
     `&access_token=${mapboxgl.accessToken}`;
 
   try {
@@ -463,13 +489,41 @@ async function fetchMapboxRoute(fetchId) {
     }
 
     const route = data.routes[0];
+    const coords = route.geometry.coordinates;
+    const congestionArr = route.legs[0]?.annotation?.congestion || [];
 
-    // Update route geometry on map
-    const geom = { type: 'Feature', geometry: route.geometry, properties: {} };
+    // Full geometry → casing source
+    const fullGeom = { type: 'Feature', geometry: route.geometry, properties: {} };
     if (mapboxStyleLoaded && mapboxMap.getSource('route')) {
-      mapboxMap.getSource('route').setData(geom);
+      mapboxMap.getSource('route').setData(fullGeom);
     } else {
       pendingGeometry = route.geometry;
+    }
+
+    // Group consecutive same-congestion segments into one LineString each
+    const segFeatures = [];
+    if (coords.length > 1) {
+      let cur = { congestion: congestionArr[0] || null, coordinates: [coords[0]] };
+      for (let i = 1; i < coords.length; i++) {
+        cur.coordinates.push(coords[i]);
+        const next = congestionArr[i] || null;
+        if (next !== cur.congestion || i === coords.length - 1) {
+          segFeatures.push({
+            type: 'Feature',
+            properties: { congestion: cur.congestion },
+            geometry: { type: 'LineString', coordinates: cur.coordinates },
+          });
+          cur = { congestion: next, coordinates: [coords[i]] };
+        }
+      }
+    } else {
+      segFeatures.push({ type: 'Feature', properties: {}, geometry: route.geometry });
+    }
+    const congData = { type: 'FeatureCollection', features: segFeatures };
+    if (mapboxStyleLoaded && mapboxMap.getSource('route-congestion')) {
+      mapboxMap.getSource('route-congestion').setData(congData);
+    } else {
+      pendingCongestionData = congData;
     }
 
     renderMapboxResult(route);
@@ -491,6 +545,7 @@ async function fetchGoogleRoute(fetchId) {
     walking: 'WALK',
     cycling: 'BICYCLE',
   };
+  const isDrive = travelMode === 'driving' || travelMode === 'driving-traffic';
   const routingPreference = travelMode === 'driving-traffic'
     ? 'TRAFFIC_AWARE_OPTIMAL' : 'TRAFFIC_AWARE';
 
@@ -498,7 +553,8 @@ async function fetchGoogleRoute(fetchId) {
     origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
     destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
     travelMode: travelModeMap[travelMode] || 'DRIVE',
-    routingPreference,
+    ...(isDrive && { routingPreference }),
+    ...(travelMode === 'driving-traffic' && { extraComputations: ['TRAFFIC_ON_POLYLINE'] }),
     languageCode: 'ja',
     routeModifiers: {
       avoidTolls: state.googleAvoid.includes('tolls'),
@@ -513,7 +569,7 @@ async function fetchGoogleRoute(fetchId) {
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': googleApiKey,
-        'X-Goog-FieldMask': 'routes.legs,routes.polyline,routes.description',
+        'X-Goog-FieldMask': 'routes.legs,routes.polyline,routes.description,routes.travelAdvisory.speedReadingIntervals',
       },
       body: JSON.stringify(body),
     });
@@ -530,15 +586,32 @@ async function fetchGoogleRoute(fetchId) {
 
     const route = data.routes[0];
 
-    // Draw polyline on Google map
-    if (googleRoutePolyline) googleRoutePolyline.setMap(null);
-    googleRoutePolyline = new google.maps.Polyline({
-      path: decodePolyline(route.polyline.encodedPolyline),
-      map: googleMap,
-      strokeColor: '#ea4335',
-      strokeWeight: 5,
-      strokeOpacity: 0.9,
-    });
+    // Draw congestion-colored polyline segments on Google map
+    googleRoutePolylines.forEach(p => p.setMap(null));
+    googleRoutePolylines = [];
+    const points = decodePolyline(route.polyline.encodedPolyline);
+    const intervals = route.travelAdvisory?.speedReadingIntervals || [];
+    if (intervals.length > 0) {
+      intervals.forEach(iv => {
+        const seg = points.slice(iv.startPolylinePointIndex, iv.endPolylinePointIndex + 1);
+        if (seg.length < 2) return;
+        googleRoutePolylines.push(new google.maps.Polyline({
+          path: seg,
+          map: googleMap,
+          strokeColor: CONGESTION_COLORS[iv.speed] || DEFAULT_ROUTE_COLOR,
+          strokeWeight: 5,
+          strokeOpacity: 0.9,
+        }));
+      });
+    } else {
+      googleRoutePolylines.push(new google.maps.Polyline({
+        path: points,
+        map: googleMap,
+        strokeColor: DEFAULT_ROUTE_COLOR,
+        strokeWeight: 5,
+        strokeOpacity: 0.9,
+      }));
+    }
 
     renderGoogleResult(route.legs[0], route.description || '');
   } catch (err) {
@@ -1038,12 +1111,13 @@ function clearAll() {
 
   // Clear Mapbox route
   const source = mapboxMap.getSource('route');
-  if (source) {
-    source.setData({ type: 'FeatureCollection', features: [] });
-  }
+  if (source) source.setData({ type: 'FeatureCollection', features: [] });
+  const congSource = mapboxMap.getSource('route-congestion');
+  if (congSource) congSource.setData({ type: 'FeatureCollection', features: [] });
 
   // Clear Google route
-  if (googleRoutePolyline) { googleRoutePolyline.setMap(null); googleRoutePolyline = null; }
+  googleRoutePolylines.forEach(p => p.setMap(null));
+  googleRoutePolylines = [];
 
   // Reset result panels to placeholder
   const placeholder = `<div class="result-placeholder" style="padding: 24px; color: #999; font-size: 14px; text-align: center;">出発地と目的地を設定するとルートが表示されます</div>`;
