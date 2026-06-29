@@ -7,6 +7,7 @@ js: dhl-demo.js
 <html lang="en">
 <head>
   {% include common_head.html %}
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.45.0"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { height: 100vh; display: flex; flex-direction: column; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; overflow: hidden; }
@@ -121,6 +122,27 @@ js: dhl-demo.js
     }
     .style-btn:hover { border-color: #D40511; color: #D40511; }
     .style-btn.active { background: #D40511; border-color: #D40511; color: white; font-weight: 600; }
+
+    /* Case 1 split bar */
+    .split-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; width: 100%; margin: 4px 0; }
+    .split-bar-driven { background: #9ca3af; transition: width 0.4s; }
+    .split-bar-remaining { background: #D40511; flex: 1; }
+    #s7-telemetry-chart { height: 160px; width: 100%; }
+    #s7-chart-overlay {
+      display: none; position: absolute; top: 10px; left: 10px; z-index: 10;
+      width: 540px; background: rgba(255,255,255,0.95); border-radius: 8px;
+      padding: 8px 10px 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+    }
+    #s7-chart-overlay .chart-title { font-size: 11px; font-weight: 600; color: #555; margin-bottom: 2px; }
+    #s7-now-line { display: none; position: absolute; width: 2px; background: #D40511; pointer-events: none; z-index: 12; }
+    #s7-now-line span { position: absolute; top: -16px; left: 3px; background: #D40511; color: white; font-size: 9px; font-weight: 600; padding: 1px 4px; border-radius: 2px; white-space: nowrap; }
+
+    /* Case 2 bundle list */
+    .bundle-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; transition: background 0.15s; font-size: 12px; }
+    .bundle-row:hover { background: #f9f9f9; }
+    .bundle-row.selected { background: #fef3f3; font-weight: 600; }
+    .bundle-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .hub-badge { font-size: 10px; background: #FFCC00; color: #D40511; font-weight: 700; padding: 1px 5px; border-radius: 10px; flex-shrink: 0; margin-left: auto; }
   </style>
 </head>
 <body>
@@ -138,11 +160,19 @@ js: dhl-demo.js
     <button class="tab-btn" data-scenario="4">4. Fleet Clustering</button>
     <button class="tab-btn" data-scenario="5">5. Geofencing</button>
     <button class="tab-btn optional" data-scenario="6">6. What3Words ✦</button>
+    <button class="tab-btn" data-scenario="7">7. Route + Telemetry</button>
+    <button class="tab-btn" data-scenario="8">8. Bundle Order</button>
   </div>
 </div>
 
 <div id="main">
   <div id="map">
+    <div id="s7-chart-overlay">
+      <div class="chart-title">TEMP &amp; HUMIDITY</div>
+      <div id="s7-telemetry-chart"></div>
+      <div id="s7-now-line"><span>NOW</span></div>
+      <div id="s7-conditions" style="font-size:12px;padding:6px 4px 2px;border-top:1px solid #f0f0f0;margin-top:2px;color:#444"></div>
+    </div>
     <div id="style-switcher">
       <button class="style-btn active" data-style="standard">Standard</button>
       <button class="style-btn" data-style="satellite">Satellite</button>
@@ -306,6 +336,61 @@ js: dhl-demo.js
       <div class="info-box">
         <b>what3words</b> divides the world into 3m × 3m squares, each with a unique 3-word address.<br><br>
         Useful for precise delivery location specification, especially in areas without formal addresses.
+      </div>
+    </div>
+
+    <!-- Panel 7: Route + Telemetry -->
+    <div class="side-panel" id="panel-7">
+      <div class="panel-title">7. Route + Telemetry</div>
+      <div class="panel-desc">Frankfurt → Paris CDG · order DE-FR-100245789. Planned route with the driven (green) vs remaining (dashed) split, the real GPS telemetry trail, and temp/humidity sensor data.</div>
+
+      <div class="control-group">
+        <div class="control-label">DISTANCE PROGRESS</div>
+        <div class="split-bar">
+          <div class="split-bar-driven" id="s7-bar-driven" style="width:0%"></div>
+          <div class="split-bar-remaining"></div>
+        </div>
+        <div id="s7-split-info" class="info-box">Loading route…</div>
+      </div>
+
+      <div class="control-group">
+        <button class="btn-primary" id="s7-play-btn" disabled>▶ Animate Vehicle</button>
+        <label class="toggle-row" style="margin-top:6px">
+          <input type="checkbox" id="s7-route-toggle" disabled>
+          Use road network route
+        </label>
+        <label class="toggle-row">
+          <input type="checkbox" id="s7-snap-toggle">
+          Snap markers to road
+        </label>
+      </div>
+
+    </div>
+
+    <!-- Panel 8: Bundle Order -->
+    <div class="side-panel" id="panel-8">
+      <div class="panel-title">8. Bundle Order</div>
+      <div class="panel-desc">Bundle BUNDLE-2026-0006-0042 — 14 sub-routes. 6 routes share the Cologne DC hub.</div>
+
+      <div class="status-legend">
+        <div class="control-label">STATUS</div>
+        <div class="status-row"><span class="dot" style="background:#22c55e"></span> Completed (2)</div>
+        <div class="status-row"><span class="dot" style="background:#2563eb"></span> In Transit (10)</div>
+        <div class="status-row"><span class="dot" style="background:#9ca3af"></span> Not Started (2)</div>
+      </div>
+
+      <div class="control-group" style="margin-top:4px">
+        <label class="toggle-row">
+          <input type="checkbox" id="s8-route-toggle" disabled>
+          Use road network route
+        </label>
+      </div>
+
+      <div id="s8-load-note" style="font-size:11px;color:#999;text-align:right;min-height:16px"></div>
+      <div id="bundle-list" style="display:flex;flex-direction:column;gap:3px;overflow-y:auto;flex:1;border:1px solid #e0e0e0;border-radius:6px;padding:6px"></div>
+
+      <div class="info-box" style="border-left:3px solid #FFCC00;background:#fffbeb;color:#92400e;font-size:11px">
+        <b>★ Hub routes</b> — 6 shipments share the Cologne DC hub origin.
       </div>
     </div>
 
