@@ -1,918 +1,826 @@
 ---
-layout: default
-title: Indoor Airport Navigation
+layout: none
+title: Indoor Airports - Search
 ---
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
-  <meta charset="utf-8">
-  <title>Indoor Airport Navigation with Floor Selector</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  {% include common_head.html %}
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    }
-    #map {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 100%;
-    }
+    <title>Indoor Airports - Search</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="shortcut icon" href="https://static-assets.mapbox.com/branding/favicon/v1/favicon.ico">
+    <link rel="apple-touch-icon" href="https://static-assets.mapbox.com/branding/favicon/v1/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --tarmac: #0b0f14;
+            --glass: rgba(13, 18, 25, 0.72);
+            --hairline: rgba(255, 255, 255, 0.10);
+            --amber: #ffb000;
+            --ink: #eef2f6;
+            --muted: rgba(238, 242, 246, 0.55);
+        }
 
-    /* Info panel */
-    .info-panel {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      background: white;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      max-width: 380px;
-      z-index: 1;
-    }
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--tarmac);
+            color: var(--ink);
+            font-family: 'IBM Plex Mono', ui-monospace, monospace;
+        }
 
-    .info-panel h2 {
-      margin: 0 0 10px 0;
-      font-size: 20px;
-      color: #333;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
 
-    .info-panel p {
-      margin: 0 0 15px 0;
-      font-size: 14px;
-      color: #666;
-      line-height: 1.5;
-    }
+        /* Light preset selector (dawn / day / dusk / night) — dark glass pill */
+        .radio-group {
+            position: absolute;
+            z-index: 2;
+            top: 18px;
+            left: 18px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px;
+            border-radius: 999px;
+            background: var(--glass);
+            -webkit-backdrop-filter: blur(18px) saturate(140%);
+            backdrop-filter: blur(18px) saturate(140%);
+            border: 1px solid var(--hairline);
+            box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+        }
 
-    /* Airport selection */
-    .airport-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-      margin-bottom: 20px;
-    }
+        .radio-wrapper {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s ease;
+        }
 
-    .airport-btn {
-      padding: 12px;
-      border: 2px solid #e5e7eb;
-      background: white;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
+        .radio-wrapper:hover {
+            background: rgba(255, 255, 255, 0.07);
+        }
 
-    .airport-btn:hover {
-      background: #f8f9fa;
-      border-color: #3b82f6;
-      transform: translateY(-2px);
-    }
+        .radiobutton {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
 
-    .airport-btn.active {
-      background: #eff6ff;
-      border-color: #3b82f6;
-      color: #3b82f6;
-    }
+        .radio-group svg {
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+        }
 
-    .airport-code {
-      font-size: 18px;
-      font-weight: 700;
-      letter-spacing: 1px;
-    }
+        /* Theme the inline icons for dark glass (CSS overrides the SVG presentation attrs) */
+        .radio-group svg circle {
+            fill: transparent;
+            transition: fill 0.2s ease;
+        }
 
-    .airport-name {
-      font-size: 11px;
-      color: #6b7280;
-    }
+        .radio-group svg path {
+            stroke: rgba(238, 242, 246, 0.5);
+            transition: stroke 0.2s ease;
+        }
 
+        .radio-group label:hover svg path {
+            stroke: var(--ink);
+        }
 
-    /* Airport info box */
-    .airport-info {
-      background: #f0f9ff;
-      border: 1px solid #bae6fd;
-      border-radius: 8px;
-      padding: 12px;
-      margin-top: 15px;
-      font-size: 13px;
-      display: none;
-    }
+        .radio-group input:checked + svg circle {
+            fill: var(--amber);
+        }
 
-    .airport-info.visible {
-      display: block;
-    }
+        .radio-group input:checked + svg path {
+            stroke: var(--tarmac);
+        }
 
-    .airport-info-title {
-      font-weight: 600;
-      color: #0c4a6e;
-      margin-bottom: 6px;
-      font-size: 14px;
-    }
+        /* Airport search — compact flight-information bar */
+        .search-bar {
+            position: absolute;
+            z-index: 2;
+            left: 206px;
+            top: 18px;
+            width: 360px;
+            max-width: calc(100vw - 224px);
+            border-radius: 14px;
+            background: var(--glass);
+            -webkit-backdrop-filter: blur(22px) saturate(140%);
+            backdrop-filter: blur(22px) saturate(140%);
+            border: 1px solid var(--hairline);
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+        }
 
-    .airport-info-detail {
-      color: #0369a1;
-      line-height: 1.5;
-    }
+        .search-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 13px;
+        }
 
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 4px 0;
-      border-bottom: 1px solid #e0f2fe;
-    }
+        .search-icon {
+            flex: none;
+            width: 16px;
+            height: 16px;
+            color: var(--muted);
+        }
 
-    .info-row:last-child {
-      border-bottom: none;
-    }
+        .search-icon svg {
+            width: 100%;
+            height: 100%;
+        }
 
-    .info-label {
-      font-weight: 500;
-      color: #0c4a6e;
-    }
+        #airport-input {
+            flex: 1;
+            min-width: 0;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--ink);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 13px;
+            letter-spacing: 0.02em;
+        }
 
-    .info-value {
-      color: #0369a1;
-    }
+        #airport-input::placeholder {
+            color: var(--muted);
+        }
 
-    /* Feature highlight */
-    .feature-info {
-      position: absolute;
-      bottom: 30px;
-      left: 20px;
-      background: white;
-      padding: 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      max-width: 300px;
-      display: none;
-      z-index: 1;
-    }
+        .search-clear {
+            flex: none;
+            display: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 13px;
+            line-height: 1;
+        }
 
-    .feature-info.visible {
-      display: block;
-    }
+        .search-clear.visible {
+            display: block;
+        }
 
-    .feature-title {
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 6px;
-      color: #333;
-    }
+        .search-clear:hover {
+            color: var(--ink);
+            background: rgba(255, 255, 255, 0.16);
+        }
 
-    .feature-details {
-      font-size: 12px;
-      color: #666;
-      line-height: 1.4;
-    }
+        /* Suggestion dropdown, filtered from the in-memory airport list */
+        .search-dropdown {
+            display: none;
+            max-height: 280px;
+            overflow-y: auto;
+            border-top: 1px solid var(--hairline);
+        }
 
-    /* Loading spinner */
-    .loading {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      display: none;
-      z-index: 1000;
-    }
+        .search-dropdown.visible {
+            display: block;
+        }
 
-    .loading.visible {
-      display: block;
-    }
+        .search-option {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            padding: 9px 13px;
+            cursor: pointer;
+            transition: background 0.12s ease;
+        }
 
-    .spinner {
-      width: 50px;
-      height: 50px;
-      border: 4px solid #e5e7eb;
-      border-top-color: #3b82f6;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
+        .search-option:hover,
+        .search-option.highlighted {
+            background: rgba(255, 176, 0, 0.12);
+        }
 
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
+        .search-option .opt-code {
+            flex: none;
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 16px;
+            letter-spacing: 1px;
+            color: var(--amber);
+            width: 40px;
+        }
 
-    /* User location puck styling */
-    .mapboxgl-user-location-dot {
-      width: 15px !important;
-      height: 15px !important;
-      border: 3px solid #fff !important;
-      background-color: #3b82f6 !important;
-      box-shadow: 0 0 10px rgba(59, 130, 246, 0.4) !important;
-    }
+        .search-option .opt-name {
+            flex: 1;
+            min-width: 0;
+            font-size: 12px;
+            color: var(--ink);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
 
-    .mapboxgl-user-location-dot::after {
-      display: none !important;
-    }
+        .search-empty {
+            padding: 12px 13px;
+            font-size: 12px;
+            color: var(--muted);
+        }
 
-    .mapboxgl-user-location-accuracy-circle {
-      background-color: rgba(59, 130, 246, 0.15) !important;
-      border: 2px solid rgba(59, 130, 246, 0.3) !important;
-    }
+        /* Status / current-selection readout beneath the search field */
+        .search-status {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            padding: 0 13px 11px;
+        }
 
-    .mapboxgl-user-heading-indicator {
-      display: none !important;
-    }
+        .search-status.visible {
+            display: flex;
+        }
 
-    /* Pulse animation for user location and button */
-    @keyframes pulse {
-      0% {
-        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
-      }
-      70% {
-        box-shadow: 0 0 0 20px rgba(59, 130, 246, 0);
-      }
-      100% {
-        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
-      }
-    }
+        .status-dot {
+            flex: none;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--amber);
+        }
 
-    /* Special pulse animation for location button hint */
-    @keyframes buttonPulse {
-      0%, 100% {
-        transform: scale(1);
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      }
-      50% {
-        transform: scale(1.1);
-        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
-      }
-    }
+        .status-text {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
 
-    .mapboxgl-user-location-dot {
-      animation: pulse 2s infinite !important;
-    }
+        .status-title {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 17px;
+            line-height: 1;
+            letter-spacing: 1px;
+            color: var(--ink);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
 
-    /* Manual location button */
-    .location-button {
-      position: absolute;
-      bottom: 100px;
-      left: 20px;  /* Changed from right to left */
-      background: white;
-      border: 2px solid #3b82f6;
-      border-radius: 50%;
-      width: 48px;
-      height: 48px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      z-index: 1;
-      font-size: 24px;
-    }
+        .status-sub {
+            font-size: 10px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
 
-    .location-button:hover {
-      background: #eff6ff;
-    }
+        /* Theme Mapbox's built-in indoor floor selector to match the board */
+        /* Float the indoor floor selector vertically centered on the right edge */
+        .mapboxgl-ctrl-top-right {
+            top: 0 !important;
+            right: 16px !important;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-end;
+            transform: none !important;
+        }
 
-    .location-button.active {
-      background: #3b82f6;
-      color: white;
-    }
+        .mapboxgl-ctrl-group {
+            background: var(--glass) !important;
+            -webkit-backdrop-filter: blur(18px) saturate(140%);
+            backdrop-filter: blur(18px) saturate(140%);
+            border: 1px solid var(--hairline) !important;
+            border-radius: 12px !important;
+            box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5) !important;
+            overflow: hidden;
+        }
 
-    /* Move the indoor floor selector to the left side */
-    /* The floor selector might use different class names depending on Mapbox version */
-    .mapboxgl-ctrl-indoor,
-    .mapboxgl-indoor-control,
-    .mapboxgl-ctrl-group.mapboxgl-ctrl-indoor,
-    .mapboxgl-ctrl-top-right .mapboxgl-ctrl:has(button[aria-label*="floor"]),
-    .mapboxgl-ctrl-top-right .mapboxgl-ctrl:has(button[aria-label*="Floor"]),
-    .mapboxgl-ctrl-top-right .mapboxgl-ctrl:has(button[aria-label*="level"]),
-    .mapboxgl-ctrl-top-right .mapboxgl-ctrl:has(button[aria-label*="Level"]) {
-      position: fixed !important;
-      left: 10px !important;
-      right: auto !important;
-      top: 50% !important;
-      transform: translateY(-50%) !important;
-      margin: 0 !important;
-    }
+        .mapboxgl-ctrl-group button {
+            width: 36px;
+            height: 36px;
+            background: transparent !important;
+        }
 
-    /* Alternative: Move ALL controls in top-right to top-left */
-    /* This approach moves the entire control container */
-    .mapboxgl-ctrl-top-right {
-      left: 10px;
-      right: auto;
-    }
+        .mapboxgl-ctrl-group button + button {
+            border-top: 1px solid var(--hairline) !important;
+        }
 
-    /* Ensure navigation controls stay on the right if needed */
-    .mapboxgl-ctrl-top-right .mapboxgl-ctrl-nav {
-      position: fixed;
-      right: 10px;
-      left: auto;
-    }
+        .mapboxgl-ctrl-level-button {
+            font-family: 'IBM Plex Mono', monospace !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            color: var(--muted) !important;
+            background: transparent !important;
+        }
 
-    /* Adjust for mobile if needed */
-    @media (max-width: 640px) {
-      .mapboxgl-ctrl-indoor,
-      .mapboxgl-indoor-control,
-      .mapboxgl-ctrl-group.mapboxgl-ctrl-indoor {
-        left: 5px !important;
-      }
-    }
+        .mapboxgl-ctrl-level-button:hover {
+            color: var(--ink) !important;
+            background: rgba(255, 255, 255, 0.07) !important;
+        }
 
-    /* Mobile responsive */
-    @media (max-width: 640px) {
-      .info-panel {
-        left: 10px;
-        right: 10px;
-        max-width: none;
-      }
+        .mapboxgl-ctrl-level-button-selected {
+            color: var(--amber) !important;
+            background: rgba(255, 176, 0, 0.1) !important;
+            font-weight: 700 !important;
+            box-shadow: inset 3px 0 0 var(--amber) !important;
+            text-shadow: 0 0 12px rgba(255, 176, 0, 0.75);
+        }
 
-      .airport-grid {
-        grid-template-columns: 1fr;
-      }
+        .mapboxgl-ctrl-level-button-selected:hover {
+            background: rgba(255, 176, 0, 0.16) !important;
+            color: var(--amber) !important;
+        }
 
-      .location-button {
-        bottom: 80px;
-        left: 10px;  /* Changed from right to left for mobile too */
-      }
-    }
-  </style>
+        .mapboxgl-ctrl-indoor-toggle .mapboxgl-ctrl-icon {
+            filter: invert(1) brightness(1.7);
+            opacity: 0.75;
+        }
+
+        @media (max-width: 640px) {
+            .search-bar {
+                left: 10px;
+                right: 10px;
+                width: auto;
+                max-width: none;
+            }
+        }
+    </style>
+    <!-- Indoor maps require Mapbox GL JS v3.21+ (experimental indoor feature) -->
+    <script src='https://api.mapbox.com/mapbox-gl-js/v3.21.0/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v3.21.0/mapbox-gl.css' rel='stylesheet' />
+    <!-- Shared helpers; sets mapboxgl.accessToken (must load after mapbox-gl.js) -->
+    <script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
 </head>
+
 <body>
-  <div id="map"></div>
-
-  <div class="loading" id="loading">
-    <div class="spinner"></div>
-  </div>
-
-  <!-- Info panel commented out
-  <div class="info-panel">
-    <h2>
-      <span>✈️</span>
-      Indoor Airport Navigation
-    </h2>
-    <p>Select an airport to explore its indoor mapping with floor-by-floor navigation.</p>
-
-    <div class="airport-grid">
-      <button class="airport-btn" onclick="flyToAirport('SFO')">
-        <span class="airport-code">SFO</span>
-        <span class="airport-name">San Francisco</span>
-      </button>
-      <button class="airport-btn" onclick="flyToAirport('LAX')">
-        <span class="airport-code">LAX</span>
-        <span class="airport-name">Los Angeles</span>
-      </button>
-      <button class="airport-btn" onclick="flyToAirport('HND')">
-        <span class="airport-code">HND</span>
-        <span class="airport-name">Tokyo Haneda</span>
-      </button>
-      <button class="airport-btn" onclick="flyToAirport('LHR')">
-        <span class="airport-code">LHR</span>
-        <span class="airport-name">London Heathrow</span>
-      </button>
-      <button class="airport-btn" onclick="flyToAirport('AMS')">
-        <span class="airport-code">AMS</span>
-        <span class="airport-name">Amsterdam</span>
-      </button>
-      <button class="airport-btn" onclick="flyToAirport('LAS')">
-        <span class="airport-code">LAS</span>
-        <span class="airport-name">Las Vegas</span>
-      </button>
+    <!-- Light preset selector -->
+    <div class="radio-group">
+        <label class="radio-wrapper">
+        <input type="radio" name="light" value="dawn" class="radiobutton">
+        <svg width="38" height="38" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <g>
+            <circle cx="19" cy="19" r="18.5" fill="white"></circle>
+            <path d="M29.9414 29.9673L7.44141 29.9673" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M24.717 29.9669C24.717 26.8095 22.1574 24.25 19.0001 24.25C15.8427 24.25 13.2832 26.8095 13.2832 29.9669" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M18.998 17.9084V20.3202" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M18.998 12.7725L18.998 6.53246" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M22.1094 8.33984L19.0723 5.95312" stroke="#282828" stroke-width="2" stroke-linecap="round"></path>
+            <path d="M15.8867 8.33984L18.9238 5.95312" stroke="#282828" stroke-width="2" stroke-linecap="round"></path>
+            <path d="M10.4746 21.4402L12.1786 23.1458" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M27.5245 21.4402L25.8184 23.1458" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+          </g>
+        </svg>
+      </label>
+        <label class="radio-wrapper">
+        <input type="radio" name="light" value="day" class="radiobutton" checked>
+        <svg width="38" height="38" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <g>
+            <circle cx="19" cy="19.0002" r="18.5" fill="white"></circle>
+            <path d="M19 24.5467C22.0635 24.5467 24.5469 22.0632 24.5469 18.9998C24.5469 15.9363 22.0635 13.4529 19 13.4529C15.9366 13.4529 13.4531 15.9363 13.4531 18.9998C13.4531 22.0632 15.9366 24.5467 19 24.5467Z" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M19 7.30005V9.6401" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M10.7285 10.7268L12.3819 12.3817" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M7.30078 18.9998H9.64083" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M10.7285 27.2725L12.3834 25.6182" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M19 30.6999V28.3589" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M27.2726 27.2725L25.6172 25.6182" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M30.6994 19.0002H28.3594" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M27.2726 10.7268L25.6172 12.3817" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+          </g>
+        </svg>
+      </label>
+        <label class="radio-wrapper">
+        <input type="radio" name="light" class="radiobutton" value="dusk">
+        <svg width="38" height="38" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <g>
+            <circle cx="19" cy="19" r="18.5" fill="white"></circle>
+            <path d="M24.4979 28.9589C24.4979 25.923 22.0368 23.4619 19.0009 23.4619C15.965 23.4619 13.5039 25.923 13.5039 28.9589" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M19 17.3643V19.6833" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M10.8008 20.7603L12.4393 22.4003" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M30.25 28.9592L7.75 28.9592" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M27.1991 20.7603L25.5586 22.4003" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M18.998 5.90894L18.998 12.1489" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M15.8887 10.3416L18.9258 12.7283" stroke="#282828" stroke-width="2" stroke-linecap="round"></path>
+            <path d="M22.1113 10.3416L19.0742 12.7283" stroke="#282828" stroke-width="2" stroke-linecap="round"></path>
+          </g>
+        </svg>
+      </label>
+        <label class="radio-wrapper">
+        <input type="radio" name="light" class="radiobutton" value="night">
+        <svg width="38" height="38" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <g>
+            <circle cx="19" cy="19" r="18.5" fill="white"></circle>
+            <path d="M18.53 27.9489C14.9462 28.7919 11.3593 27.5714 9.01172 25.0631C10.617 25.5423 12.3651 25.6235 14.1138 25.2139C19.4467 23.9597 22.7537 18.6189 21.4996 13.2864C21.0884 11.5378 20.2364 10.01 19.0919 8.78589C22.3837 9.77013 25.0744 12.4361 25.9173 16.0214C27.1705 21.3549 23.864 26.6947 18.53 27.9489Z" stroke="#282828" stroke-width="2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path>
+          </g>
+        </svg>
+      </label>
     </div>
 
-    <div class="airport-info" id="airport-info">
-      <div class="airport-info-title" id="airport-title">Airport Information</div>
-      <div class="airport-info-detail">
-        <div class="info-row">
-          <span class="info-label">Terminal:</span>
-          <span class="info-value" id="terminal-info">-</span>
+    <div id="map"></div>
+
+    <!-- Airport search -->
+    <div class="search-bar" id="search-bar">
+        <div class="search-row">
+            <span class="search-icon">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"></circle>
+                    <path d="M20 20L16.5 16.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+                </svg>
+            </span>
+            <input id="airport-input" type="text" placeholder="Search for an airport…" autocomplete="off" spellcheck="false">
+            <button class="search-clear" id="search-clear" aria-label="Clear search">✕</button>
         </div>
-        <div class="info-row">
-          <span class="info-label">Current Floor:</span>
-          <span class="info-value" id="floor-info">Ground</span>
+        <div class="search-dropdown" id="search-dropdown"></div>
+        <div class="search-status" id="search-status">
+            <span class="status-dot"></span>
+            <div class="status-text">
+                <span class="status-title" id="status-title"></span>
+                <span class="status-sub" id="status-sub"></span>
+            </div>
         </div>
-        <div class="info-row">
-          <span class="info-label">Available Floors:</span>
-          <span class="info-value" id="floors-available">-</span>
-        </div>
-      </div>
     </div>
-  </div>
-  -->
 
-  <div class="feature-info" id="feature-info">
-    <div class="feature-title" id="feature-title">-</div>
-    <div class="feature-details" id="feature-details">-</div>
-  </div>
+    <script>
+        // mapboxgl.accessToken is set by utils.js (loaded in <head>).
 
-  <!-- Manual location button for mobile -->
-  <button class="location-button" id="location-button" title="Show my location">
-    📍
-  </button>
+        // In-memory airport directory. Coordinates were resolved once via the
+        // Google Places Text Search API and baked in here so the demo's fly-to
+        // is instant and does not depend on a live geocoding call at search time.
+        const AIRPORTS = [
+            { code: 'LGA', name: 'LaGuardia Airport', lat: 40.776639, lng: -73.87425 },
+            { code: 'JFK', name: 'John F Kennedy International Airport', lat: 40.644616, lng: -73.779722 },
+            { code: 'SFO', name: 'San Francisco International Airport', lat: 37.619114, lng: -122.381627 },
+            { code: 'BOS', name: 'Logan International Airport', lat: 42.365602, lng: -71.009614 },
+            { code: 'MCO', name: 'Orlando International Airport', lat: 28.424442, lng: -81.310459 },
+            { code: 'ORD', name: 'Chicago O\'Hare International Airport', lat: 41.980259, lng: -87.908986 },
+            { code: 'LAS', name: 'Harry Reid International Airport', lat: 36.083091, lng: -115.148224 },
+            { code: 'EWR', name: 'Newark Liberty International Airport', lat: 40.688484, lng: -74.176864 },
+            { code: 'MIA', name: 'Miami International Airport', lat: 25.79235, lng: -80.282306 },
+            { code: 'LAX', name: 'Los Angeles International Airport', lat: 33.942153, lng: -118.403605 },
+            { code: 'ATL', name: 'Hartsfield Jackson Atlanta International Airport', lat: 33.632419, lng: -84.433312 },
+            { code: 'CGH', name: 'Congonhas Airport', lat: -23.625602, lng: -46.658472 },
+            { code: 'GRU', name: 'Guarulhos - Governador André Franco Montoro International Airport', lat: -23.430217, lng: -46.471671 },
+            { code: 'SEA', name: 'Seattle–Tacoma International Airport', lat: 47.448365, lng: -122.308593 },
+            { code: 'SYD', name: 'Sydney Kingsford Smith International Airport', lat: -33.950033, lng: 151.181696 },
+            { code: 'LCY', name: 'London City Airport', lat: 51.505141, lng: 0.052062 },
+            { code: 'LGW', name: 'London Gatwick Airport', lat: 51.153662, lng: -0.182063 },
+            { code: 'MEX', name: 'Benito Juárez International Airport', lat: 19.436076, lng: -99.071908 },
+            { code: 'LHR', name: 'London Heathrow Airport', lat: 51.46799, lng: -0.455047 },
+            { code: 'YYZ', name: 'Toronto Lester B. Pearson International Airport', lat: 43.679835, lng: -79.628383 },
+            { code: 'DFW', name: 'Dallas Fort Worth International Airport', lat: 32.892198, lng: -97.039123 },
+            { code: 'PHX', name: 'Phoenix Sky Harbor International Airport', lat: 33.435249, lng: -112.010124 },
+            { code: 'IAH', name: 'George Bush Intercontinental Houston Airport', lat: 29.993106, lng: -95.341625 },
+            { code: 'DEN', name: 'Denver International Airport', lat: 39.856349, lng: -104.676406 },
+            { code: 'DCA', name: 'Ronald Reagan Washington National Airport', lat: 38.850108, lng: -77.039176 },
+            { code: 'SAN', name: 'San Diego International Airport', lat: 32.732891, lng: -117.189713 },
+            { code: 'FLL', name: 'Fort Lauderdale Hollywood International Airport', lat: 26.073173, lng: -80.151232 },
+            { code: 'TPA', name: 'Tampa International Airport', lat: 27.976865, lng: -82.53028 },
+            { code: 'PHL', name: 'Philadelphia International Airport', lat: 39.87298, lng: -75.243699 },
+            { code: 'AUS', name: 'Austin Bergstrom International Airport', lat: 30.194085, lng: -97.671089 },
+            { code: 'HKG', name: 'Hong Kong International Airport', lat: 22.313474, lng: 113.913728 },
+            { code: 'MEL', name: 'Melbourne International Airport', lat: -37.670823, lng: 144.842976 },
+            { code: 'ORY', name: 'Paris-Orly Airport', lat: 48.729918, lng: 2.37323 },
+            { code: 'MAD', name: 'Adolfo Suárez Madrid–Barajas Airport', lat: 40.489515, lng: -3.564276 },
+            { code: 'CDG', name: 'Charles de Gaulle International Airport', lat: 49.007883, lng: 2.550786 },
+            { code: 'BNA', name: 'Nashville International Airport', lat: 36.124885, lng: -86.676218 },
+            { code: 'IAD', name: 'Washington Dulles International Airport', lat: 38.952248, lng: -77.457889 },
+            { code: 'AMS', name: 'Amsterdam Airport Schiphol', lat: 52.312787, lng: 4.74017 },
+            { code: 'MAN', name: 'Manchester Airport', lat: 53.355357, lng: -2.277162 },
+            { code: 'MSY', name: 'Louis Armstrong New Orleans International Airport', lat: 29.994032, lng: -90.259657 },
+            { code: 'STN', name: 'London Stansted Airport', lat: 51.886375, lng: 0.241316 },
+            { code: 'BNE', name: 'Brisbane International Airport', lat: -27.394621, lng: 153.12369 },
+            { code: 'MSP', name: 'Minneapolis–Saint Paul International Airport / Wold–Chamberlain Field', lat: 44.885059, lng: -93.214435 },
+            { code: 'MDW', name: 'Chicago Midway International Airport', lat: 41.786776, lng: -87.752188 },
+            { code: 'YUL', name: 'Montreal / Pierre Elliott Trudeau International Airport', lat: 45.465787, lng: -73.745404 },
+            { code: 'PER', name: 'Perth International Airport', lat: -31.938548, lng: 115.967249 },
+            { code: 'CLT', name: 'Charlotte Douglas International Airport', lat: 35.216299, lng: -80.953943 },
+            { code: 'DTW', name: 'Detroit Metropolitan Wayne County Airport', lat: 42.21322, lng: -83.352482 },
+            { code: 'BWI', name: 'Baltimore/Washington International Thurgood Marshall Airport', lat: 39.177414, lng: -76.668393 },
+            { code: 'DEL', name: 'Indira Gandhi International Airport', lat: 28.556144, lng: 77.099962 },
+            { code: 'DXB', name: 'Dubai International Airport', lat: 25.25154, lng: 55.368307 },
+            { code: 'BLR', name: 'Kempegowda International Airport', lat: 13.198909, lng: 77.706893 },
+            { code: 'SLC', name: 'Salt Lake City International Airport', lat: 40.790315, lng: -111.977144 },
+            { code: 'ZRH', name: 'Zürich Airport', lat: 47.461714, lng: 8.55086 },
+            { code: 'BOM', name: 'Chhatrapati Shivaji International Airport', lat: 19.090218, lng: 72.862812 },
+            { code: 'FRA', name: 'Frankfurt Airport', lat: 50.037725, lng: 8.559256 },
+            { code: 'HND', name: 'Tokyo Haneda International Airport', lat: 35.548296, lng: 139.777995 },
+            { code: 'YVR', name: 'Vancouver International Airport', lat: 49.193374, lng: -123.175128 },
+            { code: 'SJC', name: 'Norman Y. Mineta San Jose International Airport', lat: 37.36353, lng: -121.928593 },
+            { code: 'SNA', name: 'John Wayne Orange County International Airport', lat: 33.674687, lng: -117.869242 },
+            { code: 'PDX', name: 'Portland International Airport', lat: 45.58527, lng: -122.591718 },
+            { code: 'LIS', name: 'Humberto Delgado Airport (Lisbon Portela Airport)', lat: 38.778845, lng: -9.131976 },
+            { code: 'VIE', name: 'Vienna International Airport', lat: 48.117948, lng: 16.566258 },
+            { code: 'LTN', name: 'London Luton Airport', lat: 51.875462, lng: -0.372755 },
+            { code: 'RDU', name: 'Raleigh Durham International Airport', lat: 35.879768, lng: -78.785551 },
+            { code: 'OAK', name: 'San Francisco Bay Oakland International Airport', lat: 37.719037, lng: -122.219589 },
+            { code: 'AKL', name: 'Auckland International Airport', lat: -37.008937, lng: 174.786381 },
+            { code: 'HNL', name: 'Daniel K Inouye International Airport', lat: 21.318662, lng: -157.925402 },
+            { code: 'DAL', name: 'Dallas Love Field', lat: 32.843835, lng: -96.848495 },
+            { code: 'BCN', name: 'Josep Tarradellas Barcelona-El Prat Airport', lat: 41.29834, lng: 2.08001 },
+            { code: 'PBI', name: 'Palm Beach International Airport', lat: 26.685748, lng: -80.092816 },
+            { code: 'STL', name: 'St. Louis Lambert International Airport', lat: 38.74994, lng: -90.374819 },
+            { code: 'BUR', name: 'Hollywood Burbank Airport', lat: 34.198312, lng: -118.357404 },
+            { code: 'HOU', name: 'William P Hobby Airport', lat: 29.645914, lng: -95.276895 },
+            { code: 'RSW', name: 'Southwest Florida International Airport', lat: 26.531872, lng: -81.759565 },
+            { code: 'PIT', name: 'Pittsburgh International Airport', lat: 40.492854, lng: -80.237294 },
+            { code: 'BHX', name: 'Birmingham Airport', lat: 52.452374, lng: -1.743508 },
+            { code: 'GIG', name: 'Rio Galeão – Tom Jobim International Airport', lat: -22.80527, lng: -43.256628 },
+            { code: 'RUH', name: 'King Khaled International Airport', lat: 24.959443, lng: 46.701083 },
+            { code: 'YYC', name: 'Calgary International Airport', lat: 51.121653, lng: -114.008052 },
+            { code: 'NCE', name: 'Nice-Côte d\'Azur Airport', lat: 43.65987, lng: 7.214201 },
+            { code: 'MCI', name: 'Kansas City International Airport', lat: 39.301409, lng: -94.710454 },
+            { code: 'SMF', name: 'Sacramento International Airport', lat: 38.694402, lng: -121.588812 },
+            { code: 'BER', name: 'Berlin Brandenburg Airport', lat: 52.364965, lng: 13.501047 },
+            { code: 'IND', name: 'Indianapolis International Airport', lat: 39.722299, lng: -86.301956 },
+            { code: 'SAT', name: 'San Antonio International Airport', lat: 29.533128, lng: -98.470542 },
+            { code: 'ATH', name: 'Athens Eleftherios Venizelos International Airport', lat: 37.936175, lng: 23.946526 },
+            { code: 'MUC', name: 'Munich Airport', lat: 48.353641, lng: 11.783185 },
+            { code: 'HYD', name: 'Rajiv Gandhi International Airport', lat: 17.240283, lng: 78.429358 },
+            { code: 'PRG', name: 'Václav Havel Airport Prague', lat: 50.101791, lng: 14.263181 },
+            { code: 'AGP', name: 'Málaga-Costa del Sol Airport', lat: 36.676743, lng: -4.49387 },
+            { code: 'SCL', name: 'Comodoro Arturo Merino Benítez International Airport', lat: -33.389761, lng: -70.794402 },
+            { code: 'SJU', name: 'Luis Munoz Marin International Airport', lat: 18.439504, lng: -65.999227 },
+            { code: 'CLE', name: 'Cleveland Hopkins International Airport', lat: 41.405799, lng: -81.853867 },
+            { code: 'OOL', name: 'Gold Coast Airport', lat: -28.163169, lng: 153.506841 },
+            { code: 'EDI', name: 'Edinburgh Airport', lat: 55.947178, lng: -3.360795 },
+            { code: 'ARN', name: 'Stockholm-Arlanda Airport', lat: 59.649393, lng: 17.934294 },
+            { code: 'JAX', name: 'Jacksonville International Airport', lat: 30.494331, lng: -81.68715 },
+            { code: 'CHS', name: 'Charleston International Airport', lat: 32.891665, lng: -80.039523 },
+            { code: 'DUB', name: 'Dublin Airport', lat: 53.425632, lng: -6.257375 },
+            { code: 'CMH', name: 'John Glenn Columbus International Airport', lat: 39.99994, lng: -82.887177 },
+            { code: 'BOG', name: 'El Dorado International Airport', lat: 4.700969, lng: -74.146093 },
+            { code: 'CVG', name: 'Cincinnati Northern Kentucky International Airport', lat: 39.051351, lng: -84.667145 },
+            { code: 'BRU', name: 'Brussels Airport', lat: 50.90024, lng: 4.485944 },
+            { code: 'MTY', name: 'Monterrey International Airport', lat: 25.778831, lng: -100.109465 },
+            { code: 'TPE', name: 'Taiwan Taoyuan International Airport', lat: 25.080488, lng: 121.231158 },
+            { code: 'ADL', name: 'Adelaide International Airport', lat: -34.946237, lng: 138.531202 },
+            { code: 'FCO', name: 'Rome–Fiumicino Leonardo da Vinci International Airport', lat: 41.803463, lng: 12.251921 },
+            { code: 'JNB', name: 'O.R. Tambo International Airport', lat: -26.139391, lng: 28.246795 },
+            { code: 'GDL', name: 'Guadalajara International Airport', lat: 20.525542, lng: -103.309643 },
+            { code: 'ONT', name: 'Ontario International Airport', lat: 34.055998, lng: -117.598092 },
+            { code: 'WAW', name: 'Warsaw Chopin Airport', lat: 52.164868, lng: 20.969163 },
+            { code: 'SDU', name: 'Santos Dumont Airport', lat: -22.909796, lng: -43.163816 },
+            { code: 'LIN', name: 'Milano Linate Airport', lat: 45.45333, lng: 9.276286 },
+            { code: 'OMA', name: 'Eppley Airfield', lat: 41.301475, lng: -95.894521 },
+            { code: 'OTP', name: 'Bucharest Henri Coandă International Airport', lat: 44.566864, lng: 26.094927 },
+            { code: 'CNF', name: 'Tancredo Neves International Airport', lat: -19.636976, lng: -43.965132 },
+            { code: 'AEP', name: 'Jorge Newbery Airpark', lat: -34.559018, lng: -58.415651 },
+            { code: 'ISL', name: 'İstanbul Atatürk Airport', lat: 40.978719, lng: 28.819564 },
+            { code: 'EZE', name: 'Minister Pistarini International Airport', lat: -34.81647, lng: -58.537242 },
+            { code: 'YEG', name: 'Edmonton International Airport', lat: 53.30266, lng: -113.576882 },
+            { code: 'CPT', name: 'Cape Town International Airport', lat: -33.968871, lng: 18.59976 },
+            { code: 'MXP', name: 'Milan Malpensa International Airport', lat: 45.622714, lng: 8.728235 },
+            { code: 'BSB', name: 'Presidente Juscelino Kubitschek International Airport', lat: -15.87069, lng: -47.919348 },
+            { code: 'BDL', name: 'Bradley International Airport', lat: 41.938874, lng: -72.686031 },
+            { code: 'SPU', name: 'Split Airport', lat: 43.536704, lng: 16.299025 },
+            { code: 'YOW', name: 'Ottawa Macdonald-Cartier International Airport', lat: 45.320169, lng: -75.665622 },
+            { code: 'PVD', name: 'Theodore Francis Green State Airport', lat: 41.723512, lng: -71.426988 },
+            { code: 'MRS', name: 'Marseille Provence Airport', lat: 43.43835, lng: 5.214457 },
+            { code: 'CCU', name: 'Netaji Subhash Chandra Bose International Airport', lat: 22.653564, lng: 88.445085 },
+            { code: 'BRS', name: 'Bristol Airport', lat: 51.383053, lng: -2.717168 },
+            { code: 'WLG', name: 'Wellington International Airport', lat: -41.326957, lng: 174.807619 },
+            { code: 'MKE', name: 'General Mitchell International Airport', lat: 42.943886, lng: -87.900765 },
+            { code: 'HPN', name: 'Westchester County Airport', lat: 41.068333, lng: -73.708664 },
+            { code: 'GLA', name: 'Glasgow International Airport', lat: 55.870042, lng: -4.434543 },
+            { code: 'LGB', name: 'Long Beach Airport (Daugherty Field)', lat: 33.816106, lng: -118.151256 },
+            { code: 'PTY', name: 'Tocumen International Airport', lat: 9.069088, lng: -79.38301 },
+            { code: 'DOH', name: 'Hamad International Airport', lat: 25.260059, lng: 51.614917 },
+            { code: 'ORF', name: 'Norfolk International Airport', lat: 36.893511, lng: -76.199371 },
+            { code: 'MDE', name: 'Jose Maria Córdova International Airport', lat: 6.17149, lng: -75.427945 },
+            { code: 'LYS', name: 'Lyon Saint-Exupéry Airport', lat: 45.723418, lng: 5.088777 },
+            { code: 'BUD', name: 'Budapest Liszt Ferenc International Airport', lat: 47.438516, lng: 19.25403 },
+            { code: 'SRQ', name: 'Sarasota Bradenton International Airport', lat: 27.395077, lng: -82.553799 },
+            { code: 'DUS', name: 'Düsseldorf Airport', lat: 51.287468, lng: 6.768555 },
+            { code: 'GVA', name: 'Geneva Cointrin International Airport', lat: 46.227174, lng: 6.102626 },
+            { code: 'LIM', name: 'Jorge Chávez International Airport', lat: -12.029701, lng: -77.116228 },
+            { code: 'PSP', name: 'Palm Springs International Airport', lat: 33.830319, lng: -116.507047 },
+            { code: 'ICN', name: 'Incheon International Airport', lat: 37.458666, lng: 126.441968 },
+            { code: 'SAV', name: 'Savannah Hilton Head International Airport', lat: 32.129423, lng: -81.201871 },
+            { code: 'BUF', name: 'Buffalo Niagara International Airport', lat: 42.939405, lng: -78.733501 },
+            { code: 'SDF', name: 'Louisville Muhammad Ali International Airport', lat: 38.170655, lng: -85.730767 },
+            { code: 'RNO', name: 'Reno Tahoe International Airport', lat: 39.50531, lng: -119.771053 },
+            { code: 'OKC', name: 'Will Rogers World Airport', lat: 35.388842, lng: -97.600118 },
+            { code: 'CBR', name: 'Canberra International Airport', lat: -35.305303, lng: 149.193307 },
+            { code: 'NRT', name: 'Narita International Airport', lat: 35.770178, lng: 140.384322 },
+            { code: 'CWB', name: 'Afonso Pena Airport', lat: -25.531499, lng: -49.174026 },
+            { code: 'CHC', name: 'Christchurch International Airport', lat: -43.48763, lng: 172.537403 },
+            { code: 'YTZ', name: 'Billy Bishop Toronto City Centre Airport', lat: 43.628947, lng: -79.39442 },
+            { code: 'SAW', name: 'Istanbul Sabiha Gökçen International Airport', lat: 40.894475, lng: 29.313093 },
+            { code: 'AMD', name: 'Sardar Vallabh Bhai Patel International Airport', lat: 23.076396, lng: 72.631 },
+            { code: 'SSA', name: 'Deputado Luiz Eduardo Magalhães International Airport', lat: -12.915734, lng: -38.335014 },
+            { code: 'RIC', name: 'Richmond International Airport', lat: 37.510556, lng: -77.326699 },
+            { code: 'VCP', name: 'Viracopos International Airport', lat: -23.004982, lng: -47.142572 },
+            { code: 'FLN', name: 'Hercílio Luz International Airport', lat: -27.674547, lng: -48.546156 },
+            { code: 'HEL', name: 'Helsinki Vantaa Airport', lat: 60.317945, lng: 24.949624 },
+            { code: 'TLS', name: 'Toulouse-Blagnac Airport', lat: 43.631346, lng: 1.36449 },
+            { code: 'LPL', name: 'Liverpool John Lennon Airport', lat: 53.335116, lng: -2.852346 },
+            { code: 'SVQ', name: 'Sevilla Airport', lat: 37.42027, lng: -5.890794 },
+            { code: 'SJO', name: 'Juan Santamaría International Airport', lat: 9.998166, lng: -84.20476 },
+            { code: 'YWG', name: 'Winnipeg / James Armstrong Richardson International Airport', lat: 49.909744, lng: -97.236391 },
+            { code: 'CNS', name: 'Cairns International Airport', lat: -16.877763, lng: 145.749935 },
+            { code: 'CGN', name: 'Cologne Bonn Airport', lat: 50.866807, lng: 7.139732 },
+            { code: 'YHZ', name: 'Halifax / Stanfield International Airport', lat: 44.882503, lng: -63.515175 },
+            { code: 'TUS', name: 'Tucson International Airport / Morris Air National Guard Base', lat: 32.131032, lng: -110.949114 },
+            { code: 'NCL', name: 'Newcastle International Airport', lat: 55.039346, lng: -1.693128 },
+            { code: 'OPO', name: 'Francisco de Sá Carneiro Airport', lat: 41.247399, lng: -8.680664 },
+            { code: 'MEM', name: 'Memphis International Airport', lat: 35.044336, lng: -89.976619 },
+            { code: 'CAI', name: 'Cairo International Airport', lat: 30.116034, lng: 31.417173 },
+            { code: 'GSP', name: 'Greenville Spartanburg International Airport', lat: 34.895901, lng: -82.217234 },
+            { code: 'LBA', name: 'Leeds Bradford Airport', lat: 53.866705, lng: -1.658628 },
+            { code: 'BHM', name: 'Birmingham-Shuttlesworth International Airport', lat: 33.562509, lng: -86.754157 },
+            { code: 'ITM', name: 'Osaka Itami Airport', lat: 34.786161, lng: 135.438048 },
+            { code: 'HAM', name: 'Hamburg Airport', lat: 53.631899, lng: 9.9958 },
+            { code: 'VCE', name: 'Venice Marco Polo Airport', lat: 45.504684, lng: 12.34663 },
+            { code: 'OGG', name: 'Kahului International Airport', lat: 20.894598, lng: -156.436074 },
+            { code: 'AUH', name: 'Zayed International Airport', lat: 24.451426, lng: 54.642123 },
+            { code: 'BOI', name: 'Boise Air Terminal/Gowen Field', lat: 43.560949, lng: -116.217449 },
+            { code: 'SJD', name: 'Aeropuerto Internacional de Los Cabos', lat: 23.145536, lng: -109.718266 },
+            { code: 'KRK', name: 'Kraków John Paul II International Airport', lat: 50.078785, lng: 19.788722 },
+            { code: 'COK', name: 'Cochin International Airport', lat: 10.153213, lng: 76.39332 },
+            { code: 'JED', name: 'King Abdulaziz International Airport', lat: 21.682999, lng: 39.166715 },
+            { code: 'MAA', name: 'Chennai International Airport', lat: 12.99396, lng: 80.170665 },
+            { code: 'DMM', name: 'King Fahd International Airport', lat: 26.469966, lng: 49.798435 },
+            { code: 'CUN', name: 'Aeropuerto Internacional de Cancún', lat: 21.041923, lng: -86.874384 },
+            { code: 'SFB', name: 'Orlando Sanford International Airport', lat: 28.776016, lng: -81.234467 },
+            { code: 'FOR', name: 'Pinto Martins International Airport', lat: -3.778791, lng: -38.540554 },
+            { code: 'TIJ', name: 'Aeropuerto Internacional Gral. Abelardo Rodriguez', lat: 32.540845, lng: -116.969053 },
+            { code: 'SBA', name: 'Santa Barbara Municipal', lat: 34.427479, lng: -119.842027 },
+            { code: 'ROC', name: 'Greater Rochester International', lat: 43.116411, lng: -77.674777 },
+            { code: 'CTS', name: 'New Chitose Airport', lat: 42.779132, lng: 141.686636 },
+            { code: 'PMI', name: 'Palma de Mallorca Airport', lat: 39.552471, lng: 2.73938 },
+            { code: 'GMP', name: 'Gimpo International Airport', lat: 37.565538, lng: 126.801328 },
+            { code: 'BOD', name: 'Bordeaux-Mérignac Airport', lat: 44.82968, lng: -0.712904 }
+        ];
 
-  <script>
-    mapboxgl.accessToken = "pk.eyJ1IjoibWFwYm94LW1hcC1kZXNpZ24iLCJhIjoiY2syeHpiaHlrMDJvODNidDR5azU5NWcwdiJ9.x0uSqSWGXdoFKuHZC5Eo_Q"
-    // Airport configurations
-    const airports = {
-      SFO: {
-        name: 'San Francisco International Airport',
-        center: [-122.3816, 37.6193],
-        zoom: 17,
-        floors: [-1, 0, 1, 2, 3],
-        terminals: ['Terminal 1', 'Terminal 2', 'Terminal 3', 'International']
-      },
-      LAX: {
-        name: 'Los Angeles International Airport',
-        center: [-118.4085, 33.9425],
-        zoom: 16,
-        floors: [0, 1, 2],
-        terminals: ['Tom Bradley International', 'Terminal 1-8']
-      },
-      HND: {
-        name: 'Tokyo Haneda Airport',
-        center: [139.7853, 35.5494],
-        zoom: 16,
-        floors: [0, 1, 2, 3],
-        terminals: ['Terminal 1', 'Terminal 2', 'Terminal 3 (International)']
-      },
-      LHR: {
-        name: 'London Heathrow Airport',
-        center: [-0.4543, 51.4700],
-        zoom: 16,
-        floors: [0, 1, 2],
-        terminals: ['Terminal 2', 'Terminal 3', 'Terminal 4', 'Terminal 5']
-      },
-      AMS: {
-        name: 'Amsterdam Airport Schiphol',
-        center: [4.7639, 52.3086],
-        zoom: 16,
-        floors: [-1, 0, 1],
-        terminals: ['Schiphol Plaza', 'Departures', 'Lounges']
-      },
-      LAS: {
-        name: 'McCarran International Airport',
-        center: [-115.1523, 36.0840],
-        zoom: 16,
-        floors: [0, 1, 2],
-        terminals: ['Terminal 1', 'Terminal 3']
-      }
-    };
-
-    // Initialize map with indoor-enabled style
-    const map = new mapboxgl.Map({
-      container: 'map',
-      style: 'mapbox://styles/mapbox-map-design/cmjd8dsg7003m01qw0snc8bmc', // Indoor-enabled style with tilesets
-      center: [139.7853, 35.5494], // Default to HND
-      zoom: 17,
-      pitch: 45, // Slight pitch for 3D effect
-      bearing: -17.6
-    });
-
-    // Add navigation controls
-    map.addControl(new mapboxgl.NavigationControl());
-
-    // Add geolocation control for user location
-    const geolocateControl = new mapboxgl.GeolocateControl({
-      positionOptions: {
-        enableHighAccuracy: true,
-        timeout: 10000,  // Increased timeout to 10 seconds for better reliability
-        maximumAge: 0     // Always get fresh location (no caching)
-      },
-      trackUserLocation: true,
-      showUserHeading: true,
-      showUserLocation: true,
-      showAccuracyCircle: true,
-      fitBoundsOptions: {
-        maxZoom: 18
-      }
-    });
-    map.addControl(geolocateControl);
-
-    // Current state
-    let currentAirport = null;
-    let currentFloor = 0;
-    let availableFloors = [];
-    let indoorFeatures = [];
-    let userMarker = null;
-
-    // Monitor floor changes from the built-in control
-    function detectCurrentFloor() {
-      // The built-in control manages floor selection
-      // We can detect the current floor by querying visible features
-      if (!map.getStyle()) return;
-
-      const features = map.queryRenderedFeatures();
-      const floors = new Set();
-
-      features.forEach(f => {
-        if (f.properties && f.properties.floor_level !== undefined) {
-          floors.add(f.properties.floor_level);
-        }
-      });
-
-      // Update floor info based on what's visible
-      if (floors.size === 1) {
-        currentFloor = Array.from(floors)[0];
-        const floorName = currentFloor >= 0 ? `Floor ${currentFloor}` : `Basement ${Math.abs(currentFloor)}`;
-        document.getElementById('floor-info').textContent = floorName;
-      }
-    }
-
-
-    // Fly to selected airport
-    function flyToAirport(code) {
-      const airport = airports[code];
-      if (!airport) return;
-
-      currentAirport = code;
-
-      // Update UI
-      document.querySelectorAll('.airport-btn').forEach(btn => {
-        btn.classList.remove('active');
-      });
-      event.target.closest('.airport-btn').classList.add('active');
-
-      // Show loading
-      document.getElementById('loading').classList.add('visible');
-
-      // Fly to airport
-      map.flyTo({
-        center: airport.center,
-        zoom: airport.zoom,
-        pitch: 45,
-        bearing: -17.6,
-        essential: true,
-        duration: 2000
-      });
-
-      // Wait for movement to end
-      map.once('moveend', () => {
-        document.getElementById('loading').classList.remove('visible');
-
-        // Update airport info
-        document.getElementById('airport-title').textContent = airport.name;
-        document.getElementById('terminal-info').textContent = airport.terminals[0];
-        document.getElementById('floors-available').textContent =
-          airport.floors.map(f => f >= 0 ? f : `B${Math.abs(f)}`).join(', ');
-        document.getElementById('airport-info').classList.add('visible');
-
-        // Store available floors for this airport
-        availableFloors = airport.floors;
-
-        // The built-in floor control will handle floor selection
-        // We just monitor for changes
-        detectCurrentFloor();
-      });
-    }
-
-    // Handle map click for feature info
-    map.on('click', (e) => {
-      // Query features at click point
-      const features = map.queryRenderedFeatures(e.point);
-
-      // Look for indoor features
-      const indoorFeature = features.find(f => {
-        const props = f.properties;
-        return props && (
-          props.class ||
-          props.type ||
-          props.name ||
-          props.facility_name
-        );
-      });
-
-      if (indoorFeature) {
-        const props = indoorFeature.properties;
-        const name = props.name || props.facility_name || 'Indoor Feature';
-        const type = props.class || props.type || 'Unknown';
-        const floor = props.floor_level || props.level || currentFloor;
-
-        // Show feature info
-        document.getElementById('feature-title').textContent = name;
-        document.getElementById('feature-details').innerHTML = `
-          <strong>Type:</strong> ${type}<br>
-          <strong>Floor:</strong> ${floor >= 0 ? floor : `B${Math.abs(floor)}`}
-          ${props.facility_type ? `<br><strong>Facility:</strong> ${props.facility_type}` : ''}
-        `;
-        document.getElementById('feature-info').classList.add('visible');
-
-        // Auto-hide after 5 seconds
-        setTimeout(() => {
-          document.getElementById('feature-info').classList.remove('visible');
-        }, 5000);
-      }
-    });
-
-    // Change cursor on hover over interactive features
-    map.on('mousemove', (e) => {
-      const features = map.queryRenderedFeatures(e.point);
-      const hasIndoorFeature = features.some(f => {
-        const props = f.properties;
-        return props && (props.class || props.type || props.name);
-      });
-
-      map.getCanvas().style.cursor = hasIndoorFeature ? 'pointer' : '';
-    });
-
-    // Monitor for floor changes and update UI
-    map.on('idle', () => {
-      if (!currentAirport) return;
-
-      // Detect current floor from visible features
-      detectCurrentFloor();
-    });
-
-    // Function to programmatically request location permission
-    async function requestLocationPermission() {
-      try {
-        // Check if Permissions API is available
-        if ('permissions' in navigator) {
-          const result = await navigator.permissions.query({ name: 'geolocation' });
-          console.log('Current permission state:', result.state);
-
-          if (result.state === 'granted') {
-            // Permission already granted, start tracking
-            console.log('Location permission already granted');
-            geolocateControl.trigger();
-            return true;
-          } else if (result.state === 'prompt') {
-            // Need to request permission
-            console.log('Location permission will be requested');
-            // This will trigger the browser's permission prompt
-            return new Promise((resolve) => {
-              navigator.geolocation.getCurrentPosition(
-                (position) => {
-                  console.log('Location permission granted (fresh):', position.coords);
-                  geolocateControl.trigger();
-                  resolve(true);
-                },
-                (error) => {
-                  console.error('Location permission denied or error:', error);
-                  resolve(false);
-                },
-                {
-                  enableHighAccuracy: true,
-                  timeout: 10000,
-                  maximumAge: 0  // Always get fresh location (no caching)
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: "mapbox://styles/mapbox/standard",
+            zoom: 1.6,
+            pitch: 0,
+            bearing: 0,
+            center: [10, 25],
+            // Enable Mapbox Indoor Maps (backed by the mapbox-geodata.indoor-v3-0-1 tileset).
+            // Coverage varies by airport — indoor floors render automatically at
+            // zoom 16+ wherever the building has indoor data.
+            config: {
+                basemap: {
+                    showIndoor: true
                 }
-              );
+            }
+        });
+
+        // Built-in floor / level selector. Auto-populates when the view contains
+        // a building with indoor data (zoom 16+).
+        map.addControl(new mapboxgl.IndoorControl(), 'top-right');
+
+        map.on('style.load', () => {
+            // Light preset selector (dawn / day / dusk / night)
+            document.querySelectorAll('input[type="radio"]').forEach((radioButton) => {
+                radioButton.addEventListener('change', function () {
+                    map.setConfigProperty('basemap', 'lightPreset', this.value);
+                });
             });
-          } else if (result.state === 'denied') {
-            console.log('Location permission denied - user must enable in browser settings');
-            return false;
-          }
+        });
 
-          // Listen for permission changes
-          result.addEventListener('change', () => {
-            console.log('Permission state changed to:', result.state);
-            if (result.state === 'granted') {
-              geolocateControl.trigger();
+        // ---- Searchable airport list -------------------------------------------
+        const inputEl = document.getElementById('airport-input');
+        const clearEl = document.getElementById('search-clear');
+        const dropdownEl = document.getElementById('search-dropdown');
+        const statusEl = document.getElementById('search-status');
+        const statusTitleEl = document.getElementById('status-title');
+        const statusSubEl = document.getElementById('status-sub');
+
+        let matches = [];
+        let highlightedIndex = -1;
+
+        function normalize(s) {
+            return s.toLowerCase();
+        }
+
+        // Filter the in-memory list by IATA code prefix or substring match on name.
+        function filterAirports(query) {
+            const q = normalize(query.trim());
+            if (!q) return [];
+            const startsWithCode = [];
+            const nameMatch = [];
+            for (const a of AIRPORTS) {
+                const code = normalize(a.code);
+                const name = normalize(a.name);
+                if (code.startsWith(q)) startsWithCode.push(a);
+                else if (name.includes(q)) nameMatch.push(a);
             }
-          });
-        } else {
-          // Permissions API not available, try direct request
-          console.log('Permissions API not available, trying direct request');
-          return new Promise((resolve) => {
-            navigator.geolocation.getCurrentPosition(
-              (position) => {
-                console.log('Location obtained (fresh):', position.coords);
-                geolocateControl.trigger();
-                resolve(true);
-              },
-              (error) => {
-                console.error('Location error:', error);
-                resolve(false);
-              },
-              {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0  // Always get fresh location (no caching)
-              }
-            );
-          });
+            return startsWithCode.concat(nameMatch).slice(0, 8);
         }
-      } catch (error) {
-        console.error('Error checking permissions:', error);
-        return false;
-      }
-    }
 
-    // Manual location button handler
-    let isTrackingLocation = false;
-    document.getElementById('location-button').addEventListener('click', async () => {
-      if (!isTrackingLocation) {
-        // Request location permission programmatically
-        const granted = await requestLocationPermission();
-
-        if (granted) {
-          isTrackingLocation = true;
-          document.getElementById('location-button').classList.add('active');
-        } else {
-          // Check permission state to provide appropriate message
-          if ('permissions' in navigator) {
-            const result = await navigator.permissions.query({ name: 'geolocation' });
-            if (result.state === 'denied') {
-              alert('Location access is blocked. Please enable it in your browser settings:\n\n' +
-                    'Chrome Android: Tap the lock icon in address bar → Site settings → Location → Allow\n\n' +
-                    'Or go to Chrome Settings → Site settings → Location');
-            } else {
-              alert('Unable to access location. Please check your device location settings.');
+        function renderDropdown() {
+            dropdownEl.innerHTML = '';
+            highlightedIndex = -1;
+            if (!matches.length) {
+                dropdownEl.classList.remove('visible');
+                return;
             }
-          } else {
-            alert('Unable to access location. Please enable location services and try again.');
-          }
+            matches.forEach((a) => {
+                const row = document.createElement('div');
+                row.className = 'search-option';
+                row.innerHTML = `<span class="opt-code">${a.code}</span><span class="opt-name">${a.name}</span>`;
+                row.addEventListener('mousedown', (e) => {
+                    // mousedown (not click) so it fires before the input's blur
+                    e.preventDefault();
+                    chooseAirport(a);
+                });
+                dropdownEl.appendChild(row);
+            });
+            dropdownEl.classList.add('visible');
         }
-      } else {
-        // Stop tracking
-        geolocateControl.trigger(); // This toggles the tracking
-        isTrackingLocation = false;
-        document.getElementById('location-button').classList.remove('active');
-      }
-    });
 
-    // Update button state based on geolocate control state
-    geolocateControl.on('trackuserlocationstart', () => {
-      isTrackingLocation = true;
-      document.getElementById('location-button').classList.add('active');
-    });
-
-    geolocateControl.on('trackuserlocationend', () => {
-      isTrackingLocation = false;
-      document.getElementById('location-button').classList.remove('active');
-    });
-
-    // Initialize with configurations on load
-    map.on('load', () => {
-      // For Japanese labels, we need to update the text fields
-      // This style might have Japanese name fields available
-      const style = map.getStyle();
-
-      // Update all symbol layers to use Japanese labels where available
-      style.layers.forEach(layer => {
-        if (layer.type === 'symbol' && layer.layout && layer.layout['text-field']) {
-          const layerId = layer.id;
-
-          // Common patterns for label layers
-          if (layerId.includes('label') || layerId.includes('name') || layerId.includes('text')) {
-            try {
-              // Try to use coalesce to fallback from Japanese to default name
-              // This expression tries name:ja first, then name_ja, then falls back to name
-              const japaneseTextField = [
-                'coalesce',
-                ['get', 'name:ja'],
-                ['get', 'name_ja'],
-                ['get', 'name']
-              ];
-
-              map.setLayoutProperty(layerId, 'text-field', japaneseTextField);
-            } catch (e) {
-              // Some layers might not support this modification
-              console.log(`Could not update layer ${layerId}:`, e.message);
+        function setHighlight(index) {
+            const rows = dropdownEl.querySelectorAll('.search-option');
+            rows.forEach(r => r.classList.remove('highlighted'));
+            if (index >= 0 && index < rows.length) {
+                rows[index].classList.add('highlighted');
+                rows[index].scrollIntoView({ block: 'nearest' });
             }
-          }
+            highlightedIndex = index;
         }
-      });
 
-      // Try to lower indoor zoom threshold if the style supports it
-      try {
-        // This style might use different config properties
-        map.setConfigProperty('basemap', 'indoorMapZoomThreshold', 14);
-      } catch (e) {
-        // Config might not be supported
-        console.log('Could not set indoor zoom threshold:', e.message);
-      }
+        function closeDropdown() {
+            dropdownEl.classList.remove('visible');
+            dropdownEl.innerHTML = '';
+            matches = [];
+            highlightedIndex = -1;
+        }
 
-      // Check location permission status on load
-      checkAndRequestLocationPermission();
-    });
+        function chooseAirport(airport) {
+            inputEl.value = `${airport.code} — ${airport.name}`;
+            closeDropdown();
+            searchAirport(airport);
+        }
 
-    // Function to check permission and optionally auto-enable location
-    async function checkAndRequestLocationPermission() {
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        inputEl.addEventListener('input', () => {
+            clearEl.classList.toggle('visible', inputEl.value.length > 0);
+            matches = filterAirports(inputEl.value);
+            renderDropdown();
+        });
 
-      try {
-        if ('permissions' in navigator) {
-          const result = await navigator.permissions.query({ name: 'geolocation' });
-          console.log('Initial permission state:', result.state);
-
-          if (result.state === 'granted') {
-            // Permission already granted, auto-enable location
-            setTimeout(() => {
-              geolocateControl.trigger();
-              console.log('Auto-enabling location (permission already granted)');
-              document.getElementById('location-button').classList.add('active');
-              isTrackingLocation = true;
-            }, 1000);
-          } else if (result.state === 'prompt') {
-            if (!isMobile) {
-              // On desktop, auto-request permission
-              setTimeout(() => {
-                console.log('Desktop: Auto-requesting location permission');
-                requestLocationPermission();
-              }, 1500);
-            } else {
-              // On mobile, show a hint to the user
-              console.log('Mobile: User needs to tap location button');
-              // Flash the location button to draw attention
-              setTimeout(() => {
-                const btn = document.getElementById('location-button');
-                btn.style.animation = 'buttonPulse 2s ease-in-out 3';
-                // Animation will stop automatically after 3 iterations (6 seconds)
-                btn.addEventListener('animationend', () => {
-                  btn.style.animation = '';
-                }, { once: true });
-              }, 2000);
+        inputEl.addEventListener('keydown', (e) => {
+            if (!dropdownEl.classList.contains('visible')) return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setHighlight(Math.min(highlightedIndex + 1, matches.length - 1));
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setHighlight(Math.max(highlightedIndex - 1, 0));
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                const pick = matches[highlightedIndex >= 0 ? highlightedIndex : 0];
+                if (pick) chooseAirport(pick);
+            } else if (e.key === 'Escape') {
+                closeDropdown();
             }
-          } else if (result.state === 'denied') {
-            console.log('Location permission is denied');
-            // Could show a non-intrusive message about enabling location
-          }
-        } else {
-          // Permissions API not available
-          if (!isMobile) {
-            // Try to auto-enable on desktop
-            setTimeout(() => {
-              geolocateControl.trigger();
-              console.log('Desktop: Attempting to enable location');
-            }, 1000);
-          }
+        });
+
+        inputEl.addEventListener('blur', () => {
+            // Slight delay so a mousedown-selected option still registers.
+            setTimeout(closeDropdown, 120);
+        });
+
+        clearEl.addEventListener('click', () => {
+            inputEl.value = '';
+            clearEl.classList.remove('visible');
+            closeDropdown();
+            statusEl.classList.remove('visible');
+            inputEl.focus();
+        });
+
+        function showStatus(title, sub) {
+            statusEl.classList.add('visible');
+            statusTitleEl.textContent = title;
+            statusSubEl.textContent = sub;
         }
-      } catch (error) {
-        console.error('Error checking initial permissions:', error);
-      }
 
-    }
+        // Fly to the airport's pre-resolved coordinates (see AIRPORTS above —
+        // baked in via a one-time Google Places lookup rather than a live geocode
+        // per search, since worldwide free-text airport queries are unreliable to
+        // resolve on the fly without a location bias).
+        function searchAirport(airport) {
+            showStatus(airport.name, airport.code);
 
-    // Handle geolocation events
-    geolocateControl.on('geolocate', (e) => {
-      console.log('User location:', e.coords.latitude, e.coords.longitude);
-      console.log('Accuracy:', e.coords.accuracy, 'meters');
-
-      // Check if user is near any of our airports
-      const userLng = e.coords.longitude;
-      const userLat = e.coords.latitude;
-
-      // Check proximity to airports (within ~5km)
-      for (const [code, airport] of Object.entries(airports)) {
-        const distance = getDistance(
-          [userLng, userLat],
-          airport.center
-        );
-
-        if (distance < 5) { // Within 5km
-          console.log(`User is near ${code} airport`);
-          // Could auto-select the nearby airport
-          // flyToAirport(code);
-          break;
+            map.flyTo({
+                center: [airport.lng, airport.lat],
+                zoom: 16,
+                pitch: 45,
+                bearing: 0,
+                duration: 2500,
+                essential: true
+            });
         }
-      }
-    });
-
-    // Handle geolocation errors
-    geolocateControl.on('error', (error) => {
-      console.error('Geolocation error:', error);
-      if (error.code === 1) {
-        console.log('Location permission denied. Please enable location access for this site.');
-        alert('Location permission denied. Please enable location access in your browser settings.');
-      } else if (error.code === 2) {
-        console.log('Position unavailable');
-        alert('Unable to retrieve your location. Please check your device settings.');
-      } else if (error.code === 3) {
-        console.log('Timeout getting location');
-        alert('Timeout getting location. Please try again.');
-      }
-    });
-
-    // Log when tracking starts
-    geolocateControl.on('trackuserlocationstart', () => {
-      console.log('Started tracking user location');
-    });
-
-    // Log when tracking ends
-    geolocateControl.on('trackuserlocationend', () => {
-      console.log('Stopped tracking user location');
-    });
-
-    // Calculate distance between two points in km
-    function getDistance(coord1, coord2) {
-      const R = 6371; // Earth's radius in km
-      const dLat = toRad(coord2[1] - coord1[1]);
-      const dLon = toRad(coord2[0] - coord1[0]);
-      const lat1 = toRad(coord1[1]);
-      const lat2 = toRad(coord2[1]);
-
-      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(lat1) * Math.cos(lat2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return R * c;
-    }
-
-    function toRad(deg) {
-      return deg * (Math.PI/180);
-    }
-  </script>
+    </script>
 </body>
+
 </html>
