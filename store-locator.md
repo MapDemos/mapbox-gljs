@@ -282,15 +282,17 @@ js: store-locator.js
     /* Popup styles */
     .mapboxgl-popup-content {
       padding: 0;
-      border-radius: 4px;
+      border-radius: 0;
       overflow: hidden;
-      min-width: 420px;
+      width: 380px;
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
 
     .popup-header {
       background-color: #ED1C24;
       color: white;
-      padding: 15px;
+      padding: 10px 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -299,14 +301,13 @@ js: store-locator.js
     .popup-header h3 {
       margin: 0;
       font-size: 16px;
-      font-weight: 600;
+      font-weight: 700;
     }
 
     .popup-close {
-      background: none;
+      background: #fff;
       border: none;
-      color: white;
-      font-size: 20px;
+      border-radius: 50%;
       cursor: pointer;
       padding: 0;
       width: 24px;
@@ -342,45 +343,63 @@ js: store-locator.js
     }
 
     .popup-value {
-      color: #666;
+      color: #333;
       line-height: 1.5;
       flex: 1;
     }
 
     .popup-value-bold {
-      font-weight: 600;
-      font-size: 21px;
+      font-weight: 500;
+      font-size: 18px;
     }
 
-    .popup-amenities {
+    .popup-value-amenities {
+      font-size: 16px;
+    }
+
+    .popup-footer {
       display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    .amenity-tag {
-      background-color: #f0f0f0;
-      padding: 4px 8px;
-      border-radius: 3px;
-      font-size: 12px;
-      color: #555;
+      gap: 10px;
+      padding: 10px 16px;
+      border-top: 1px solid rgb(239, 239, 239);
+      background-color: white;
     }
 
     .popup-details-btn {
+      flex: 1;
       background-color: #ED1C24;
       color: white;
       border: none;
-      padding: 10px 20px;
+      padding: 10px 16px;
       border-radius: 4px;
       cursor: pointer;
-      width: 100%;
       font-size: 14px;
       font-weight: 600;
-      margin-top: 15px;
+      text-align: center;
+      text-decoration: none;
     }
 
     .popup-details-btn:hover {
       background-color: #d11920;
+    }
+
+    .popup-menu-btn {
+      flex: 1;
+      display: inline-block;
+      background-color: rgb(51, 146, 249);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: center;
+      text-decoration: none;
+    }
+
+    .popup-menu-btn:hover {
+      background-color: #2f7fd6;
     }
 
     /* Custom marker styles */
@@ -447,34 +466,29 @@ js: store-locator.js
       display: flex;
       cursor: pointer;
       font-size: 12px;
-      font-weight: 600;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-      transition: transform 0.2s;
-    }
-
-    .area-group-marker:hover {
-      transform: scale(1.05);
+      font-weight: 400;
+      border: 1px solid #555;
+      border-radius: 2px;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
     }
 
     .area-label {
       background-color: white;
-      color: black;
-      padding: 4px 8px;
-      border: 1.5px solid black;
-      border-right: none;
+      color: #000;
+      padding: 5px 4px;
+      line-height: 12px;
       white-space: nowrap;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
     }
 
     .area-count {
       background-color: #ED1C24;
       color: white;
-      padding: 4px 8px;
-      border: 1.5px solid black;
+      padding: 5px 4px;
+      line-height: 12px;
       white-space: nowrap;
-      min-width: 24px;
+      min-width: 20px;
       text-align: center;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
     }
   </style>
 </head>

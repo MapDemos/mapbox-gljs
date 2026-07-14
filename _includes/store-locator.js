@@ -296,6 +296,11 @@ async function loadStoresFromAPI(mapBounds) {
         // Option 1: Pre-parse address once at load time for performance
         const parsedAddress = ADDRESS_PARSER.parseAddress(store.address);
 
+        // Extract real menu URL from HTML-wrapped link field (key confirmed across all 4 supported brands)
+        const menuHtml = extra['メニューURL'] || extra['メニュー情報（メニュー紹介）PC用'] || '';
+        const menuUrlMatch = menuHtml.match(/href="([^"]+)"/);
+        const menuUrl = menuUrlMatch ? menuUrlMatch[1] : null;
+
         return {
           type: 'Feature',
           geometry: {
@@ -317,7 +322,8 @@ async function loadStoresFromAPI(mapBounds) {
             prefecture: parsedAddress.prefecture,
             wardCity: parsedAddress.wardCity,
             hasParking: parkingInfo.hasParking,
-            hasDisabledParking: parkingInfo.hasDisabledParking
+            hasDisabledParking: parkingInfo.hasDisabledParking,
+            menuUrl: menuUrl
           }
         };
       })
@@ -406,9 +412,9 @@ const ADDRESS_PARSER = {
 
   // Get administrative area based on zoom level
   getAdminArea(address, zoom) {
-    if (zoom >= 12) {
+    if (zoom >= 13) {
       return null; // Show individual stores
-    } else if (zoom >= 9) {
+    } else if (zoom >= 11) {
       return this.parseWardCity(address); // Group by ward/city
     } else {
       return this.parsePrefecture(address); // Group by prefecture
@@ -425,9 +431,9 @@ function groupStoresByArea(stores, zoom) {
     // Option 1: Use pre-parsed address properties instead of parsing on every call
     // This is MUCH faster than parsing strings with regex
     let adminArea;
-    if (zoom >= 12) {
+    if (zoom >= 13) {
       adminArea = null; // Show individual stores
-    } else if (zoom >= 9) {
+    } else if (zoom >= 11) {
       adminArea = feature.properties.wardCity; // Use pre-parsed ward/city
     } else {
       adminArea = feature.properties.prefecture; // Use pre-parsed prefecture
@@ -464,30 +470,38 @@ function calculateCentroid(coordinates) {
   return [sum[0] / coordinates.length, sum[1] / coordinates.length];
 }
 
-// No longer needed - using two-layer native symbol approach instead
+// Currently rendered area-group DOM markers, tracked so they can be cleared on each update
+let areaGroupMarkers = [];
 
-// Create GeoJSON features for area groups
-function createGroupFeatures(groups) {
-  return Object.entries(groups).map(([areaName, group]) => {
+// Render area-group markers as DOM elements (label + count pill), matching
+// the reference store-locator UI. Native symbol layers can't render a
+// two-tone bordered pill, so these use mapboxgl.Marker instead.
+function renderAreaGroupMarkers(groups) {
+  areaGroupMarkers.forEach(marker => marker.remove());
+  areaGroupMarkers = [];
+
+  Object.entries(groups).forEach(([areaName, group]) => {
     const centroid = calculateCentroid(group.coordinates);
+    const count = group.stores.length;
 
-    return {
-      type: 'Feature',
-      geometry: {
-        type: 'Point',
-        coordinates: centroid
-      },
-      properties: {
-        type: 'area-group',
-        name: areaName,
-        count: group.stores.length,
-        storeIds: group.stores.map(s => s.properties.id)
-      }
-    };
+    const el = document.createElement('div');
+    el.className = 'area-group-marker';
+    el.innerHTML = `<span class="area-label">${areaName}</span><span class="area-count">${count}</span>`;
+    el.addEventListener('click', () => {
+      map.easeTo({
+        center: centroid,
+        zoom: Math.min(currentZoom + 3, 16),
+        duration: 1000
+      });
+    });
+
+    const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+      .setLngLat(centroid)
+      .addTo(map);
+
+    areaGroupMarkers.push(marker);
   });
 }
-
-// No longer needed - using native symbol layers instead
 
 // Load brand icon image for map markers
 function loadBrandIcon(brand) {
@@ -517,7 +531,7 @@ function loadBrandIcon(brand) {
 function initMap() {
   map = new mapboxgl.Map({
     container: 'map',
-    style: 'mapbox://styles/kenji-shima/cmmtz45at001501sm99f0eima',
+    style: 'mapbox://styles/kenji-shima/cmp0s13iw000101sdhqok52gy',
     center: [139.7025, 35.6895], // Center on Tokyo
     zoom: 11,
     language: 'ja'
@@ -567,49 +581,12 @@ function initMap() {
 
     // Wait for all images to load, then add layers
     Promise.all(imagePromises).then(() => {
-      // Add source for area groups
-      map.addSource('area-groups', {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: []
-        }
-      });
-
       // Add source for individual stores
       map.addSource('stores', {
         type: 'geojson',
         data: {
           type: 'FeatureCollection',
           features: []
-        }
-      });
-
-      // Add symbol layer for area groups - Combined layer with formatted text
-      // Using a single layer ensures the name and count are treated as one atomic unit
-      // for collision detection, so they always appear/disappear together
-      map.addLayer({
-        id: 'area-groups-labels',
-        type: 'symbol',
-        source: 'area-groups',
-        layout: {
-          'text-field': [
-            'format',
-            ['get', 'name'], { 'text-color': 'black' },
-            ' ', {},
-            ['to-string', ['get', 'count']], { 'text-color': '#ED1C24' }  // Red count
-          ],
-          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-          'text-size': 26,
-          'text-allow-overlap': false,
-          'text-ignore-placement': false,
-          'text-padding': 2,
-          'symbol-sort-key': ['-', ['get', 'count']]  // Higher count = higher priority
-        },
-        paint: {
-          'text-halo-width': 8,
-          'text-halo-blur': 0,
-          'text-halo-color': 'white'  // White halo for entire text
         }
       });
 
@@ -648,22 +625,6 @@ function initMap() {
         }
       });
 
-      // Add click handler for area groups - handle both name and count layers
-      const handleAreaGroupClick = (e) => {
-        if (e.features && e.features.length > 0) {
-          const feature = e.features[0];
-          const coords = feature.geometry.coordinates;
-          map.easeTo({
-            center: coords,
-            zoom: Math.min(currentZoom + 3, 16),
-            duration: 1000
-          });
-        }
-      };
-
-      // Click handler for area group labels (combined layer)
-      map.on('click', 'area-groups-labels', handleAreaGroupClick);
-
       // Add click handler for store icons
       map.on('click', 'store-icons', (e) => {
         if (e.features && e.features.length > 0) {
@@ -684,15 +645,6 @@ function initMap() {
             showPopup(feature);
           });
         }
-      });
-
-      // Change cursor on hover for area groups
-      map.on('mouseenter', 'area-groups-labels', () => {
-        map.getCanvas().style.cursor = 'pointer';
-      });
-
-      map.on('mouseleave', 'area-groups-labels', () => {
-        map.getCanvas().style.cursor = '';
       });
 
       // Change cursor on hover for store icons
@@ -741,8 +693,8 @@ function initMap() {
 
 // Get zoom level category
 function getZoomLevel(zoom) {
-  if (zoom >= 12) return 'individual';
-  if (zoom >= 9) return 'ward';
+  if (zoom >= 13) return 'individual';
+  if (zoom >= 11) return 'ward';
   return 'prefecture';
 }
 
@@ -763,7 +715,7 @@ function getVisibleStores(allStores, mapBounds, padding = 0.15) {
 
 // Update map layers based on current zoom and filtered stores
 function updateMapLayers() {
-  if (!map.getSource('stores') || !map.getSource('area-groups')) return;
+  if (!map.getSource('stores')) return;
 
   const zoom = map.getZoom();
   const bounds = map.getBounds();
@@ -774,14 +726,8 @@ function updateMapLayers() {
 
   const { groups, individualStores } = groupStoresByArea(visibleStores, zoom);
 
-  // Create features for area groups (no image generation needed)
-  const groupFeatures = createGroupFeatures(groups);
-
-  // Update area groups source
-  map.getSource('area-groups').setData({
-    type: 'FeatureCollection',
-    features: groupFeatures
-  });
+  // Render area-group markers as DOM pills (label + count)
+  renderAreaGroupMarkers(groups);
 
   // Update individual stores source
   map.getSource('stores').setData({
@@ -789,7 +735,7 @@ function updateMapLayers() {
     features: individualStores
   });
 
-  console.log(`Zoom ${zoom.toFixed(1)}: ${visibleStores.length} visible of ${filteredStores.length} total | ${groupFeatures.length} groups, ${individualStores.length} individual stores`);
+  console.log(`Zoom ${zoom.toFixed(1)}: ${visibleStores.length} visible of ${filteredStores.length} total | ${Object.keys(groups).length} groups, ${individualStores.length} individual stores`);
 }
 
 // Calculate center offset to position store south of center
@@ -832,17 +778,28 @@ function createPopupContent(feature) {
     ? JSON.parse(props.hours)
     : props.hours;
 
+  const amenitiesText = amenities.length ? amenities.join('／') : 'なし';
+
+  const menuButton = props.menuUrl
+    ? `<a class="popup-menu-btn" href="${props.menuUrl}" target="_blank" rel="noopener">メニュー表示</a>`
+    : '';
+
   return `
     <div class="popup-header">
       <h3>${props.name}</h3>
-      <button class="popup-close" onclick="closePopup()">×</button>
+      <button class="popup-close" onclick="closePopup()">
+        <svg width="14" height="14" viewBox="0 0 14 14">
+          <line x1="1" y1="1" x2="13" y2="13" stroke="#000" stroke-width="1.1"/>
+          <line x1="13" y1="1" x2="1" y2="13" stroke="#000" stroke-width="1.1"/>
+        </svg>
+      </button>
     </div>
     <div class="popup-body">
       <div class="popup-section">
         <div class="popup-label">営業時間</div>
         <div class="popup-value popup-value-bold">
-          平日: ${hours.weekday}<br>
-          土日祝: ${hours.weekend}
+          （平日）：${hours.weekday}<br>
+          （土日祝日）：${hours.weekend}
         </div>
       </div>
       <div class="popup-section">
@@ -859,10 +816,12 @@ function createPopupContent(feature) {
       ` : ''}
       <div class="popup-section">
         <div class="popup-label">設備・サービス</div>
-        <div class="popup-amenities">
-          ${amenities.map(a => `<span class="amenity-tag">${a}</span>`).join('')}
-        </div>
+        <div class="popup-value popup-value-amenities">${amenitiesText}</div>
       </div>
+    </div>
+    <div class="popup-footer">
+      <button class="popup-details-btn">詳細</button>
+      ${menuButton}
     </div>
   `;
 }
@@ -891,11 +850,6 @@ function closePopup() {
 
 // Make closePopup available globally for the popup close button
 window.closePopup = closePopup;
-
-// Show details (placeholder function)
-window.showDetails = function(storeId) {
-  alert(`店舗詳細ページへ移動します (Store ID: ${storeId})`);
-};
 
 // Update markers on map
 function updateMarkers() {
