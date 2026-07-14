@@ -632,7 +632,7 @@ function initMap() {
         layout: {
           'text-field': 'P',
           'text-size': 16,
-          'text-offset': [1.5, -2.0],
+          'text-offset': PARKING_BASE_OFFSET,
           'text-allow-overlap': true,
           'text-ignore-placement': true,
           'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold']
@@ -788,6 +788,7 @@ function updateSymbolState() {
 
 // Heartbeat pulse animation for the selected store's icon only
 const STORE_ICON_BASE_SIZE = 0.6;
+const PARKING_BASE_OFFSET = [1.5, -4.0];
 let pulseAnimationId = null;
 
 function startSelectedStorePulse() {
@@ -799,12 +800,21 @@ function startSelectedStorePulse() {
       return;
     }
     const scale = STORE_ICON_BASE_SIZE + Math.abs(Math.sin(timestamp / 500)) * 0.25;
+    const scaleRatio = scale / STORE_ICON_BASE_SIZE;
     map.setLayoutProperty('store-icons', 'icon-size', [
       'case',
       ['==', ['get', 'id'], selectedStoreId],
       scale,
       STORE_ICON_BASE_SIZE
     ]);
+    if (map.getLayer('parking-text')) {
+      map.setLayoutProperty('parking-text', 'text-offset', [
+        'case',
+        ['==', ['get', 'id'], selectedStoreId],
+        ['literal', [PARKING_BASE_OFFSET[0] * scaleRatio, PARKING_BASE_OFFSET[1] * scaleRatio]],
+        ['literal', PARKING_BASE_OFFSET]
+      ]);
+    }
     pulseAnimationId = requestAnimationFrame(animate);
   }
 
@@ -818,6 +828,9 @@ function stopSelectedStorePulse() {
   }
   if (map.getLayer('store-icons')) {
     map.setLayoutProperty('store-icons', 'icon-size', STORE_ICON_BASE_SIZE);
+  }
+  if (map.getLayer('parking-text')) {
+    map.setLayoutProperty('parking-text', 'text-offset', PARKING_BASE_OFFSET);
   }
 }
 
