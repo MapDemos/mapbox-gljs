@@ -250,21 +250,13 @@ async function loadStoresFromAPI(mapBounds) {
       features: storesArray.map((store, index) => {
         const extra = store.extra_fields || {};
 
-        // Map brand codes to brand names
-        const brandMapping = {
-          '0101': 'ガスト',
-          '0102': 'バーミヤン',
-          '0103': 'しゃぶ葉',
-          '0104': '夢庵',
-          '0105': 'ジョナサン',
-          '0106': 'ステーキガスト',
-          '0107': 'むさしの森珈琲',
-          '0108': 'から好し',
-          '0110': '藍屋'
-        };
-
+        // Brand name and icon come directly from the record's own marker data,
+        // rather than a hand-maintained code->name table (which drifted out of
+        // sync with the real category codes actually present in the data).
         const brandCode = extra.カテゴリ || '0101';
-        const brandName = brandMapping[brandCode] || 'その他';
+        const marker = (store.marker && store.marker.ja) || {};
+        const brandName = marker.name || 'その他';
+        const brandIcon = `assets/brand-icons/${brandCode}.png`;
 
         // Build amenities array from flags (excluding parking - shown separately)
         const amenities = [];
@@ -293,6 +285,10 @@ async function loadStoresFromAPI(mapBounds) {
           hasDisabledParking: extra['身障者用駐車場フラグ'] === '1'
         };
 
+        // Build amenity filter flags (used by the 絞り込み検索 sidebar filter)
+        const amenityFlags = {};
+        AMENITY_FILTERS.forEach(f => { amenityFlags[f.id] = extra[f.key] === '1'; });
+
         // Option 1: Pre-parse address once at load time for performance
         const parsedAddress = ADDRESS_PARSER.parseAddress(store.address);
 
@@ -311,6 +307,7 @@ async function loadStoresFromAPI(mapBounds) {
             id: parseInt(store.key) || index + 1,
             name: store.name,
             brand: brandName,
+            brandIcon: brandIcon,
             address: store.address,
             phone: extra['電話番号'] || 'お問い合わせください',
             hours: {
@@ -323,19 +320,14 @@ async function loadStoresFromAPI(mapBounds) {
             wardCity: parsedAddress.wardCity,
             hasParking: parkingInfo.hasParking,
             hasDisabledParking: parkingInfo.hasDisabledParking,
-            menuUrl: menuUrl
+            menuUrl: menuUrl,
+            amenityFlags: amenityFlags
           }
         };
       })
     };
 
-    // Filter to only include brands we have icons for
-    const supportedBrands = Object.keys(brandIconURLs);
-    storeData.features = storeData.features.filter(feature =>
-      supportedBrands.includes(feature.properties.brand)
-    );
-
-    console.log(`Filtered to ${storeData.features.length} stores with supported brands`);
+    console.log(`Loaded ${storeData.features.length} stores across all brands`);
 
   } catch (error) {
     console.error('Failed to load from local file, falling back to dummy data:', error);
@@ -346,13 +338,35 @@ async function loadStoresFromAPI(mapBounds) {
   }
 }
 
-// Brand icon URLs (locally hosted)
-const brandIconURLs = {
-  'ガスト': 'assets/brand-icons/gusto.png',
-  'ジョナサン': 'assets/brand-icons/jonathan.png',
-  'バーミヤン': 'assets/brand-icons/bamiyan.png',
-  'しゃぶ葉': 'assets/brand-icons/shabuyo.png'
-};
+// 絞り込み検索 (amenity filter) definitions: single source of truth for
+// data extraction (loadStoresFromAPI) and sidebar UI generation (initAmenityFilters)
+const AMENITY_FILTERS = [
+  { id: 'delivery', label: '宅配あり', key: '宅配フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/439ff93d-ead7-47e1-8482-63e1e65638d2.png' },
+  { id: 'takeout', label: 'テイクアウト可', key: '持ち帰りフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/64872114-7eee-4ca6-bb88-cd8079e61c88.png' },
+  { id: 'ubereats', label: 'Uber Eatsあり', key: 'ubereatsフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-stg-static-local/images/skylark/17f825fc-0795-4b68-b602-5c278e6a34f0.png' },
+  { id: 'demaecan', label: '出前館', key: 'demaecanフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-stg-static-local/images/skylark/c5b0c90c-f4fe-481d-9fd7-325b46f58b97.png' },
+  { id: 'qrPayment', label: 'QR決済対応', key: 'QR決済（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/16a23b90-0055-4cdd-bf65-b5cdb0edaf58.png' },
+  { id: 'open24h', label: '全日24時間', key: '全日２４時間フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/c91b1e5e-d25f-4b21-b2f1-70cc8bdbdce1.png' },
+  { id: 'reservation', label: '予約可', key: '予約フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/b17ab33c-c32f-4111-82cf-b0abb179cfc3.png' },
+  { id: 'credit', label: 'クレジット可', key: 'クレジット（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/e464aa68-7fde-4a89-96b7-f35583731790.png' },
+  { id: 'emoney', label: '電子マネー可', key: '電子マネー（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/ed7a28c3-89db-4b71-b327-48eebac3b990.png' },
+  { id: 'wifi', label: 'Wi-Fiあり', key: 'ｗｉ－ｆｉ（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/76e25fa3-70bc-4b39-9532-bc26d1299e8e.png' },
+  { id: 'parking', label: '駐車場あり', key: '駐車場（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/e623fc3c-ff59-45f5-847b-12bad0257c31.png' },
+  { id: 'disabledParking', label: '身障者用駐車場あり', key: '身障者用駐車場フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/f2c1fb52-bd24-45fd-bb58-c6fdd1703b16.png' },
+  { id: 'wheelchair', label: '車椅子入店可', key: '車椅子対応フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/cb06972e-8bdf-4600-93c2-e9ee6564a89a.png' },
+  { id: 'elevator', label: 'エレベーターあり', key: 'エレベーターフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/eb9c9a01-179d-4b52-a362-bbeda06c8468.png' },
+  { id: 'petTerrace', label: 'テラス席に限りペット同伴可', key: 'ペット同伴可', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/fa865921-a681-47d8-aec2-0eaed140d4f7.png' },
+  { id: 'diaper', label: 'おむつ替え台あり', key: 'おむつ替え台フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/743b216e-a674-401f-8a9d-ca44e76aff0a.png' },
+  { id: 'multiToilet', label: '多目的トイレあり', key: '多目的トイレフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/d3c0afc9-46ac-4767-a705-d4caa991dfb4.png' },
+  { id: 'partyRoom', label: 'パーティールームあり', key: 'パーティーフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/12537778-a007-4c3f-8d4d-f7e1ba6811c7.png' },
+  { id: 'tatami', label: '座敷(大・小) あり', key: '座敷フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/65d6701a-cb6e-4449-aa21-1d4c1a4e2ff3.png' },
+  { id: 'sunken', label: '小上がり(畳席) あり', key: '小上がりフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/a17a137d-7351-40fe-a4b9-770ddb70904a.png' },
+  { id: 'privateRoom', label: '個室・個室風席あり', key: '個室フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/b728a741-b1fd-4320-83a8-71fde462af02.png' },
+  { id: 'counter', label: 'カウンター席あり', key: 'カウンター席フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/2ec594ce-5e1f-425f-9c61-ca21c6b2f4ed.png' },
+  { id: 'digitalMenu', label: 'デジタルメニューブック', key: 'デジタルメニューブック（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/996d345e-c9df-402d-a239-b31a5fe60644.png' },
+  { id: 'serviceRobot', label: 'サービスロボットあり', key: 'サービスロボット（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/fa6b95c8-3fd1-4252-9650-00d1b13c2ed4.png' },
+  { id: 'noSmoking', label: '禁煙', key: '完全禁煙フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/bbb828bc-dd36-4d7b-ba71-4b678da474b9.png' }
+];
 
 // Brand colors for map markers
 const brandColors = {
@@ -504,7 +518,7 @@ function renderAreaGroupMarkers(groups) {
 }
 
 // Load brand icon image for map markers
-function loadBrandIcon(brand) {
+function loadBrandIcon(iconPath) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -522,8 +536,8 @@ function loadBrandIcon(brand) {
       resolve(imageData);
     };
 
-    img.onerror = () => reject(new Error(`Failed to load icon for ${brand}`));
-    img.src = brandIconURLs[brand];
+    img.onerror = () => reject(new Error(`Failed to load icon: ${iconPath}`));
+    img.src = iconPath;
   });
 }
 
@@ -570,10 +584,15 @@ function initMap() {
     // Add navigation controls
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-    // Load brand icons for map
-    const brands = Object.keys(brandIconURLs);
-    const imagePromises = brands.map(brand => {
-      return loadBrandIcon(brand).then(imageData => {
+    // Load brand icons for map - one per distinct brand actually present in the data
+    const brandIconsByName = {};
+    storeData.features.forEach(f => {
+      if (!brandIconsByName[f.properties.brand]) {
+        brandIconsByName[f.properties.brand] = f.properties.brandIcon;
+      }
+    });
+    const imagePromises = Object.entries(brandIconsByName).map(([brand, iconPath]) => {
+      return loadBrandIcon(iconPath).then(imageData => {
         const imageId = `brand-${brand}`;
         map.addImage(imageId, imageData);
       });
@@ -598,6 +617,7 @@ function initMap() {
         layout: {
           'icon-image': ['concat', 'brand-', ['get', 'brand']],
           'icon-size': 0.6,
+          'icon-anchor': 'bottom',
           'icon-allow-overlap': true,
           'icon-ignore-placement': true
         }
@@ -759,8 +779,45 @@ function updateSymbolState() {
       1,
       0.7
     ]);
+    startSelectedStorePulse();
   } else {
     map.setPaintProperty('store-icons', 'icon-opacity', 1);
+    stopSelectedStorePulse();
+  }
+}
+
+// Heartbeat pulse animation for the selected store's icon only
+const STORE_ICON_BASE_SIZE = 0.6;
+let pulseAnimationId = null;
+
+function startSelectedStorePulse() {
+  if (pulseAnimationId) return; // already running
+
+  function animate(timestamp) {
+    if (!selectedStoreId || !map.getLayer('store-icons')) {
+      pulseAnimationId = null;
+      return;
+    }
+    const scale = STORE_ICON_BASE_SIZE + Math.abs(Math.sin(timestamp / 500)) * 0.25;
+    map.setLayoutProperty('store-icons', 'icon-size', [
+      'case',
+      ['==', ['get', 'id'], selectedStoreId],
+      scale,
+      STORE_ICON_BASE_SIZE
+    ]);
+    pulseAnimationId = requestAnimationFrame(animate);
+  }
+
+  pulseAnimationId = requestAnimationFrame(animate);
+}
+
+function stopSelectedStorePulse() {
+  if (pulseAnimationId) {
+    cancelAnimationFrame(pulseAnimationId);
+    pulseAnimationId = null;
+  }
+  if (map.getLayer('store-icons')) {
+    map.setLayoutProperty('store-icons', 'icon-size', STORE_ICON_BASE_SIZE);
   }
 }
 
@@ -789,8 +846,8 @@ function createPopupContent(feature) {
       <h3>${props.name}</h3>
       <button class="popup-close" onclick="closePopup()">
         <svg width="14" height="14" viewBox="0 0 14 14">
-          <line x1="1" y1="1" x2="13" y2="13" stroke="#000" stroke-width="1.1"/>
-          <line x1="13" y1="1" x2="1" y2="13" stroke="#000" stroke-width="1.1"/>
+          <line x1="1" y1="1" x2="13" y2="13" stroke="#ED1C24" stroke-width="1.1"/>
+          <line x1="13" y1="1" x2="1" y2="13" stroke="#ED1C24" stroke-width="1.1"/>
         </svg>
       </button>
     </div>
@@ -828,10 +885,13 @@ function createPopupContent(feature) {
 
 // Show popup
 function showPopup(feature) {
-  closePopup();
+  if (currentPopup) {
+    currentPopup.remove();
+    currentPopup = null;
+  }
 
   currentPopup = new mapboxgl.Popup({
-    offset: 25,
+    offset: 90,
     closeButton: false,
     closeOnClick: false
   })
@@ -846,6 +906,9 @@ function closePopup() {
     currentPopup.remove();
     currentPopup = null;
   }
+  selectedStoreId = null;
+  updateSymbolState();
+  document.querySelectorAll('.store-item.active').forEach(item => item.classList.remove('active'));
 }
 
 // Make closePopup available globally for the popup close button
@@ -892,18 +955,23 @@ function selectStore(storeId) {
 
 // Initialize brand filters
 function initBrandFilters() {
-  const brands = [...new Set(storeData.features.map(f => f.properties.brand))];
+  const brandIconsByName = {};
+  storeData.features.forEach(f => {
+    if (!brandIconsByName[f.properties.brand]) {
+      brandIconsByName[f.properties.brand] = f.properties.brandIcon;
+    }
+  });
   const brandFiltersContainer = document.getElementById('brand-filters');
 
   // Clear existing filters
   brandFiltersContainer.innerHTML = '';
 
-  brands.forEach((brand, index) => {
+  Object.entries(brandIconsByName).forEach(([brand, iconPath]) => {
     const button = document.createElement('button');
-    button.className = 'brand-filter active';
+    button.className = 'brand-filter';
     button.dataset.brand = brand;
     button.innerHTML = `
-      <img src="${brandIconURLs[brand]}" class="brand-icon" alt="${brand}">
+      <img src="${iconPath}" class="brand-icon" alt="${brand}">
       <span class="brand-name">${brand}</span>
     `;
 
@@ -916,18 +984,47 @@ function initBrandFilters() {
   });
 }
 
+// Initialize amenity (絞り込み検索) filter checkboxes
+function initAmenityFilters() {
+  const container = document.getElementById('amenity-filters');
+  container.innerHTML = '';
+
+  AMENITY_FILTERS.forEach(filterDef => {
+    const button = document.createElement('button');
+    button.className = 'amenity-filter';
+    button.dataset.amenityId = filterDef.id;
+    button.innerHTML = `
+      <img src="${filterDef.icon}" class="amenity-filter-icon" alt="">
+      <span class="amenity-filter-name">${filterDef.label}</span>
+    `;
+
+    button.addEventListener('click', () => {
+      button.classList.toggle('active');
+      applyFilters();
+    });
+
+    container.appendChild(button);
+  });
+}
+
 // Apply filters
 function applyFilters() {
   const searchText = document.getElementById('search-box').value.toLowerCase();
   const selectedBrands = Array.from(
     document.querySelectorAll('#brand-filters .brand-filter.active')
   ).map(btn => btn.dataset.brand);
+  const selectedAmenities = Array.from(
+    document.querySelectorAll('#amenity-filters .amenity-filter.active')
+  ).map(btn => btn.dataset.amenityId);
+
+  // With no brand selected, show all brands; selecting one or more narrows to just those
+  document.getElementById('brand-filters').classList.toggle('has-selection', selectedBrands.length > 0);
 
   filteredStores = storeData.features.filter(feature => {
     const props = feature.properties;
 
     // Brand filter
-    if (!selectedBrands.includes(props.brand)) {
+    if (selectedBrands.length > 0 && !selectedBrands.includes(props.brand)) {
       return false;
     }
 
@@ -935,6 +1032,13 @@ function applyFilters() {
     if (searchText) {
       const searchableText = `${props.name} ${props.address} ${props.brand}`.toLowerCase();
       if (!searchableText.includes(searchText)) {
+        return false;
+      }
+    }
+
+    // Amenity filter (絞り込み検索) - AND logic across all selected amenities
+    if (selectedAmenities.length > 0) {
+      if (!selectedAmenities.every(id => props.amenityFlags[id])) {
         return false;
       }
     }
@@ -955,6 +1059,9 @@ function applyFilters() {
   updateStoreListImmediate(); // Direct call for immediate response to filter clicks
   updateMapLayers(); // Direct call - no debouncing needed for discrete filter actions
   updateStoreCount();
+
+  const hasActiveFilters = selectedAmenities.length > 0 || selectedBrands.length > 0;
+  document.getElementById('floating-clear-filters').classList.toggle('visible', hasActiveFilters);
 }
 
 // Update store list
@@ -1031,7 +1138,7 @@ function appendStoreListBatch() {
       : '';
 
     storeItem.innerHTML = `
-      <img src="${brandIconURLs[props.brand]}" class="store-brand-icon" alt="${props.brand}">
+      <img src="${props.brandIcon}" class="store-brand-icon" alt="${props.brand}">
       <div class="store-info">
         <div class="store-name">${parkingBadge}${props.name}</div>
         <div class="store-address">${props.address}</div>
@@ -1133,9 +1240,14 @@ function clearFilters() {
   // Clear search box
   document.getElementById('search-box').value = '';
 
-  // Check all brand filters
+  // Deselect all brand filters (no selection = show all brands)
   document.querySelectorAll('#brand-filters .brand-filter').forEach(btn => {
-    btn.classList.add('active');
+    btn.classList.remove('active');
+  });
+
+  // Uncheck all amenity filters
+  document.querySelectorAll('#amenity-filters .amenity-filter').forEach(btn => {
+    btn.classList.remove('active');
   });
 
   // Clear selection
@@ -1359,19 +1471,31 @@ function initUIEvents() {
 
   brandFilterToggle.addEventListener('click', () => {
     brandFilters.classList.toggle('active');
-    const icon = brandFilterToggle.querySelector('.toggle-icon');
-    icon.textContent = brandFilters.classList.contains('active') ? '▲' : '▼';
+    brandFilterToggle.querySelector('.toggle-icon').classList.toggle('expanded', brandFilters.classList.contains('active'));
   });
 
   // Open brand filters by default
   brandFilters.classList.add('active');
-  brandFilterToggle.querySelector('.toggle-icon').textContent = '▲';
+  brandFilterToggle.querySelector('.toggle-icon').classList.add('expanded');
+
+  // Amenity filter (絞り込み検索) toggle - collapsed by default
+  const amenityFilterToggle = document.getElementById('amenity-filter-toggle');
+  const amenityFilters = document.getElementById('amenity-filters');
+
+  amenityFilterToggle.addEventListener('click', () => {
+    amenityFilters.classList.toggle('active');
+    amenityFilterToggle.querySelector('.toggle-icon').classList.toggle('expanded', amenityFilters.classList.contains('active'));
+  });
+
+  // Floating clear-filters button (shown over the map when a filter is active)
+  document.getElementById('floating-clear-filters').addEventListener('click', clearFilters);
 }
 
 // Initialize everything
 function init() {
   initMap();
   initBrandFilters();
+  initAmenityFilters();
   initUIEvents();
   updateStoreListImmediate(); // Immediate update on init
   updateStoreCount();
