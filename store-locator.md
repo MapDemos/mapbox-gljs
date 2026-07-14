@@ -20,6 +20,7 @@ js: store-locator.js
       display: flex;
       height: 100vh;
       width: 100vw;
+      position: relative;
     }
 
     /* Sidebar styles */
@@ -115,22 +116,21 @@ js: store-locator.js
 
     #clear-filters {
       width: 100%;
-      padding: 12px 15px;
-      background-color: #ED1C24;
+      padding: 8px 15px;
+      background: none;
       color: white;
       border: none;
-      border-radius: 0;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 13px;
       margin: 0;
-      transition: background-color 0.2s;
-      font-weight: 500;
+      transition: opacity 0.2s;
+      font-weight: 400;
       display: block;
       text-align: right;
     }
 
     #clear-filters:hover {
-      background-color: #d11920;
+      opacity: 0.8;
     }
 
     .filter-section {
@@ -159,6 +159,16 @@ js: store-locator.js
       background-color: #fafafa;
     }
 
+    .toggle-icon {
+      display: flex;
+      align-items: center;
+      transition: transform 0.3s ease-out;
+    }
+
+    .toggle-icon.expanded {
+      transform: rotate(180deg);
+    }
+
     .filter-content {
       padding: 15px 15px 10px 15px;
       display: none;
@@ -171,40 +181,129 @@ js: store-locator.js
       flex-wrap: wrap;
     }
 
-    .brand-filter {
-      display: inline-flex;
+    #brand-filters {
       flex-direction: column;
-      align-items: center;
-      cursor: pointer;
-      padding: 8px;
-      border: none;
-      background: none;
-      margin: 0 8px 12px 0;
-      transition: opacity 0.2s;
-      opacity: 0.4;
+      flex-wrap: nowrap;
+      align-items: stretch;
     }
 
-    .brand-filter.active {
+    .brand-filter {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      padding: 8px 6px;
+      border: none;
+      background: none;
+      border-radius: 4px;
+      width: 100%;
+      text-align: left;
+      transition: opacity 0.2s, background-color 0.15s;
       opacity: 1;
     }
 
     .brand-filter:hover {
-      opacity: 0.7;
+      background-color: #fafafa;
+    }
+
+    /* Once any brand is selected, dim the rest so only selected brands read as "on" */
+    #brand-filters.has-selection .brand-filter {
+      opacity: 0.4;
+    }
+
+    #brand-filters.has-selection .brand-filter.active {
+      opacity: 1;
     }
 
     .brand-icon {
-      width: 48px;
-      height: 48px;
+      width: 36px;
+      height: 36px;
       object-fit: contain;
-      margin-bottom: 6px;
+      flex-shrink: 0;
       display: block;
     }
 
     .brand-name {
-      font-size: 11px;
+      font-size: 13px;
       color: #333;
-      text-align: center;
       line-height: 1.2;
+    }
+
+    /* Amenity filter (絞り込み検索) styles */
+    .amenity-filters {
+      flex-direction: column;
+      flex-wrap: nowrap;
+      align-items: stretch;
+    }
+
+    .amenity-filter {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 6px;
+      border: none;
+      background: none;
+      border-radius: 4px;
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+      transition: background-color 0.15s;
+    }
+
+    .amenity-filter:hover {
+      background-color: #fafafa;
+    }
+
+    .amenity-filter.active {
+      background-color: rgba(237, 28, 36, 0.08);
+    }
+
+    .amenity-filter-icon {
+      width: 24px;
+      height: 24px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    .amenity-filter-name {
+      font-size: 13px;
+      color: #333;
+    }
+
+    .amenity-filter.active .amenity-filter-name {
+      font-weight: 600;
+      color: #ED1C24;
+    }
+
+    .floating-clear-btn {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      align-items: center;
+      gap: 5px;
+      box-sizing: border-box;
+      height: 24px;
+      background-color: white;
+      color: #333;
+      border: 1px solid #e5e5e5;
+      border-radius: 500px;
+      padding: 0 15px;
+      font-size: 12px;
+      font-weight: 400;
+      cursor: pointer;
+      box-shadow: 0 1px 4px -1px rgba(0,0,0,0.3);
+      z-index: 10;
+      transition: background-color 0.2s;
+    }
+
+    .floating-clear-btn:hover {
+      background-color: #f5f5f5;
+    }
+
+    .floating-clear-btn.visible {
+      display: flex;
     }
 
     #store-count {
@@ -512,10 +611,28 @@ js: store-locator.js
         <div class="filter-section">
           <button class="filter-header" id="brand-filter-toggle">
             ブランドを選ぶ
-            <span class="toggle-icon">▼</span>
+            <span class="toggle-icon">
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                <polyline fill="none" stroke="#000" stroke-width="1.1" points="1 3.5 6 8.5 11 3.5"></polyline>
+              </svg>
+            </span>
           </button>
           <div class="filter-content" id="brand-filters">
             <!-- Brand filters will be populated dynamically -->
+          </div>
+        </div>
+
+        <div class="filter-section">
+          <button class="filter-header" id="amenity-filter-toggle">
+            絞り込み検索
+            <span class="toggle-icon">
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                <polyline fill="none" stroke="#000" stroke-width="1.1" points="1 3.5 6 8.5 11 3.5"></polyline>
+              </svg>
+            </span>
+          </button>
+          <div class="filter-content amenity-filters" id="amenity-filters">
+            <!-- Amenity filters will be populated dynamically -->
           </div>
         </div>
       </div>
@@ -527,6 +644,13 @@ js: store-locator.js
     </div>
 
     <div id="map"></div>
+    <button id="floating-clear-filters" class="floating-clear-btn">
+      <svg width="10" height="10" viewBox="0 0 20 20">
+        <path fill="none" stroke="#333" stroke-width="1.5" d="M16,16 L4,4"></path>
+        <path fill="none" stroke="#333" stroke-width="1.5" d="M16,4 L4,16"></path>
+      </svg>
+      条件をクリアする
+    </button>
   </div>
 
   <script>
