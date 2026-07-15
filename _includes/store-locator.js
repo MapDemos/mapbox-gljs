@@ -584,6 +584,28 @@ function initMap() {
     // Add navigation controls
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
+    // Add current-location control, matching the reference site's locate-me
+    // button: shows a marker at the user's position and zooms in to it.
+    const geolocateControl = new mapboxgl.GeolocateControl({
+      positionOptions: { enableHighAccuracy: true },
+      trackUserLocation: false,
+      showUserLocation: true,
+      fitBoundsOptions: { maxZoom: 15 }
+    });
+    map.addControl(geolocateControl, 'top-right');
+
+    // Trigger it automatically on load so the map centers on the user's
+    // location right away, without requiring them to click the button first.
+    // GeolocateControl attaches itself to the map asynchronously (it checks
+    // geolocation support via navigator.permissions first), so poll until
+    // it's actually ready rather than guessing a fixed delay.
+    const triggerWhenReady = setInterval(() => {
+      if (geolocateControl._map) {
+        clearInterval(triggerWhenReady);
+        geolocateControl.trigger();
+      }
+    }, 50);
+
     // Load brand icons for map - one per distinct brand actually present in the data
     const brandIconsByName = {};
     storeData.features.forEach(f => {
@@ -1488,10 +1510,6 @@ function initUIEvents() {
     brandFilters.classList.toggle('active');
     brandFilterToggle.querySelector('.toggle-icon').classList.toggle('expanded', brandFilters.classList.contains('active'));
   });
-
-  // Open brand filters by default
-  brandFilters.classList.add('active');
-  brandFilterToggle.querySelector('.toggle-icon').classList.add('expanded');
 
   // Amenity filter (絞り込み検索) toggle - collapsed by default
   const amenityFilterToggle = document.getElementById('amenity-filter-toggle');
