@@ -317,8 +317,6 @@ js: store-locator.js
     }
 
     #store-list {
-      flex: 1;
-      overflow-y: auto;
       background-color: #f8f8f8;
       padding: 0;
     }
