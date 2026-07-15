@@ -1120,9 +1120,11 @@ function updateStoreListImmediate() {
   // Show initial batch
   appendStoreListBatch();
 
-  // Add scroll listener for progressive loading
-  storeList.removeEventListener('scroll', handleStoreListScroll);
-  storeList.addEventListener('scroll', handleStoreListScroll);
+  // Add scroll listener for progressive loading (the sidebar itself scrolls,
+  // not store-list, since header/filters/list all share one scroll region)
+  const sidebar = document.getElementById('sidebar');
+  sidebar.removeEventListener('scroll', handleStoreListScroll);
+  sidebar.addEventListener('scroll', handleStoreListScroll);
 }
 
 // Append a batch of stores to the list
@@ -1219,10 +1221,10 @@ function appendStoreListBatch() {
 
 // Handle scroll event for progressive loading
 function handleStoreListScroll() {
-  const storeList = document.getElementById('store-list');
-  const scrollTop = storeList.scrollTop;
-  const scrollHeight = storeList.scrollHeight;
-  const clientHeight = storeList.clientHeight;
+  const sidebar = document.getElementById('sidebar');
+  const scrollTop = sidebar.scrollTop;
+  const scrollHeight = sidebar.scrollHeight;
+  const clientHeight = sidebar.clientHeight;
 
   // Load more when user scrolls to bottom (with 100px threshold)
   if (scrollTop + clientHeight >= scrollHeight - 100) {
