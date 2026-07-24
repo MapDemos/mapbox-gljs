@@ -554,6 +554,12 @@ title: Flight Map - SF to London (scrubber + chase camera)
         source: '3d-model-source',
         slot: 'top',
         paint: {
+          // Without this, Standard's built-in terrain adds ground elevation
+          // underneath the model's z-elevation (real barometric altitude),
+          // making the plane bob with the terrain instead of holding a
+          // steady altitude. 'sea' keeps altitude referenced to sea level
+          // regardless of terrain.
+          'model-elevation-reference': 'sea',
           'model-translation': [0, 0, ['feature-state', 'z-elevation']],
           // A zoom expression can't be mixed with feature-state inside a
           // 'case' (not a supported composite form), so the mode-dependent
