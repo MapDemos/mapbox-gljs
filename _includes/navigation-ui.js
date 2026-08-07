@@ -26,13 +26,13 @@ class NavigationUI {
       <div class="nav-ui-container">
         <!-- Controls -->
         <div class="nav-controls">
-          <button id="nav-stop-btn" class="nav-button nav-button-danger" title="Stop Navigation">
+          <button id="nav-stop-btn" class="nav-button nav-button-danger" title="${t('stopNavigation')}">
             ✕
           </button>
-          <button id="nav-voice-toggle" class="nav-button nav-button-secondary" title="Toggle Voice">
+          <button id="nav-voice-toggle" class="nav-button nav-button-secondary" title="${t('toggleVoice')}">
             🔊
           </button>
-          <button id="nav-recenter" class="nav-button nav-button-secondary" title="Recenter">
+          <button id="nav-recenter" class="nav-button nav-button-secondary" title="${t('recenter')}">
             📍
           </button>
         </div>
@@ -42,7 +42,7 @@ class NavigationUI {
           <div class="nav-turn-icon" aria-hidden="true"><span class="chevron"></span></div>
           <div class="nav-instruction-text">
             <div class="nav-instruction-primary" id="nav-instruction">
-              Waiting for route...
+              ${t('waitingForRoute')}
             </div>
             <div class="nav-instruction-distance" id="nav-distance-to-step">
               --
@@ -53,15 +53,15 @@ class NavigationUI {
         <!-- Info Panel -->
         <div class="nav-info-panel">
           <div class="nav-info-item">
-            <div class="nav-info-label">Total Distance</div>
+            <div class="nav-info-label" id="nav-label-distance">${t('totalDistance')}</div>
             <div class="nav-info-value" id="nav-distance-remaining">--</div>
           </div>
           <div class="nav-info-item">
-            <div class="nav-info-label">Time Remaining</div>
+            <div class="nav-info-label" id="nav-label-time">${t('timeRemaining')}</div>
             <div class="nav-info-value" id="nav-time-remaining">--</div>
           </div>
           <div class="nav-info-item">
-            <div class="nav-info-label">Arrival</div>
+            <div class="nav-info-label" id="nav-label-eta">${t('arrival')}</div>
             <div class="nav-info-value" id="nav-eta">--</div>
           </div>
         </div>
@@ -395,24 +395,51 @@ class NavigationUI {
     // Subscribe to navigation events
     this.navigation.callbacks.onProgressUpdate = (data) => this._updateProgress(data);
     this.navigation.callbacks.onInstructionAdvance = (data) => this._updateInstruction(data);
-    this.navigation.callbacks.onOffRoute = () => this._showStatus('Off route, recalculating...', 'warning');
+    this.navigation.callbacks.onOffRoute = () => this._showStatus(t('offRoute'), 'warning');
     this.navigation.callbacks.onRouteUpdate = (data) => {
       if (data.isReroute) {
-        this._showStatus('Route updated', 'success', 2000);
+        this._showStatus(t('routeUpdated'), 'success', 2000);
       }
     };
     this.navigation.callbacks.onArrival = () => {
       // Only show arrival message once to prevent flickering
       if (!this.arrivalMessageShown) {
         console.log('🎉 Arrival callback triggered - showing status message');
-        this._showStatus('You have arrived!', 'success', 3000);
+        this._showStatus(t('arrived'), 'success', 3000);
         this.arrivalMessageShown = true;
       }
       // Keep navigation UI visible - user can manually return to setup
     };
     this.navigation.callbacks.onError = (data) => {
-      this._showStatus('Error: ' + data.message, 'error', 3000);
+      this._showStatus(t('error') + ': ' + data.message, 'error', 3000);
     };
+  }
+
+  /**
+   * Re-apply the current UI language to the static chrome (button titles,
+   * info-panel labels). The live instruction/distance text is driven by
+   * route data in navigation.config.language instead, so it's left alone
+   * here unless no route has been fetched yet.
+   */
+  applyLanguage() {
+    const stopBtn = document.getElementById('nav-stop-btn');
+    const voiceToggle = document.getElementById('nav-voice-toggle');
+    const recenterBtn = document.getElementById('nav-recenter');
+    if (stopBtn) stopBtn.title = t('stopNavigation');
+    if (voiceToggle) voiceToggle.title = t('toggleVoice');
+    if (recenterBtn) recenterBtn.title = t('recenter');
+
+    const labelDistance = document.getElementById('nav-label-distance');
+    const labelTime = document.getElementById('nav-label-time');
+    const labelEta = document.getElementById('nav-label-eta');
+    if (labelDistance) labelDistance.textContent = t('totalDistance');
+    if (labelTime) labelTime.textContent = t('timeRemaining');
+    if (labelEta) labelEta.textContent = t('arrival');
+
+    const instructionEl = document.getElementById('nav-instruction');
+    if (instructionEl && (!this.navigation.state || !this.navigation.state.currentRoute)) {
+      instructionEl.textContent = t('waitingForRoute');
+    }
   }
 
   /**

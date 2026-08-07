@@ -706,6 +706,14 @@ title: Turn-by-Turn Navigation Demo
     <h2>🧭 Turn-by-Turn Navigation</h2>
     <p class="intro-text">Set a departure and destination, then start navigation. Your current location is used as the departure point unless you set one.</p>
 
+    <div class="input-group">
+      <label>Language</label>
+      <select id="language-select">
+        <option value="en">🇺🇸 English</option>
+        <option value="ja">🇯🇵 Japanese</option>
+      </select>
+    </div>
+
     <!-- Location Status -->
     <div class="location-status loading" id="location-status">
       <div class="status-header">
@@ -767,14 +775,6 @@ title: Turn-by-Turn Navigation Demo
         <option value="mapbox.tmp.valhalla-zenrin/driving-traffic">🚗 Driving (with traffic)</option>
         <option value="mapbox.tmp.valhalla-zenrin/walking">🚶 Walking</option>
         <option value="mapbox.tmp.valhalla-zenrin/cycling">🚴 Cycling</option>
-      </select>
-    </div>
-
-    <div class="input-group">
-      <label>Language</label>
-      <select id="language-select">
-        <option value="en">🇺🇸 English</option>
-        <option value="ja">🇯🇵 Japanese</option>
       </select>
     </div>
 
@@ -847,6 +847,280 @@ title: Turn-by-Turn Navigation Demo
     let departureMarker = null;
     let isMapPickerMode = false;
     let mapPickerTarget = 'destination';
+
+    // --- UI language (menu labels + map labels) -------------------------------
+    // Shared by both <script> blocks on this page: this one and the earlier one
+    // that includes navigation-ui.js. Classic (non-module) script tags share a
+    // single top-level scope, so t()/uiLang declared here are already in scope
+    // by the time navigation-ui.js's methods run (they're only invoked later,
+    // from event callbacks, after both scripts have finished executing).
+    let uiLang = 'en';
+
+    const STRINGS = {
+      en: {
+        title: '🧭 Turn-by-Turn Navigation',
+        intro: 'Set a departure and destination, then start navigation. Your current location is used as the departure point unless you set one.',
+        departureLabel: 'Departure',
+        departureHint: '(optional — defaults to your location)',
+        destinationLabel: 'Destination',
+        departurePlaceholder: 'e.g., 139.7671,35.6812 (defaults to your location)',
+        destinationPlaceholder: 'e.g., 139.7671,35.6812 (Tokyo Station)',
+        pickOnMap: '🗺️ Pick on Map',
+        useMyLocation: '📍 Use My Location',
+        nearby: '📍 Nearby',
+        quickExamples: 'Or use quick examples',
+        selectDestination: 'Select a destination...',
+        navProfile: 'Navigation Profile',
+        driving: '🚗 Driving (with traffic)',
+        walking: '🚶 Walking',
+        cycling: '🚴 Cycling',
+        languageLabel: 'Language',
+        simulationLabel: '🎬 Use simulation mode (for testing)',
+        startNavigation: 'Start Navigation',
+        waitingForLocation: '⏳ Waiting for location...',
+        locationRequired: 'Location Required',
+        mapPickerTitle: '📍 Tap the map',
+        mapPickerDeparture: 'Select your departure point',
+        mapPickerDestination: 'Select your destination',
+        cancel: '✕ Cancel',
+        simTitle: '🎬 Route Simulation',
+        play: '▶️ Play',
+        pause: '⏸️ Pause',
+        slower: '🐢 Slower',
+        faster: '🐰 Faster',
+        backToSetup: 'Back to Setup',
+        debugDirections: 'Directions:',
+        debugMapMatching: 'Map Matching:',
+
+        gettingLocation: 'Getting your location...',
+        gettingLocationDetails: 'This may take a few seconds. Please allow location permissions if prompted.',
+        locationConfirmed: 'Location confirmed',
+        longitude: 'Longitude',
+        latitude: 'Latitude',
+        accuracy: 'Accuracy',
+        meters: 'meters',
+        locationUnavailable: 'Location unavailable',
+        permissionDeniedDetails: '<strong>Permission denied.</strong> Please:<br>' +
+          '• Allow location access in your browser<br>' +
+          '• Check browser settings<br>' +
+          '• Ensure location services are enabled',
+        positionUnavailableDetails: '<strong>Position unavailable.</strong> Please:<br>' +
+          '• Check GPS signal<br>' +
+          '• Try moving to an open area<br>' +
+          '• Ensure location services are on',
+        timeoutDetails: '<strong>Request timed out.</strong> Please:<br>' +
+          '• Check your GPS signal<br>' +
+          '• Try again in a moment',
+        anErrorOccurred: 'An error occurred',
+        tryAgain: 'Try Again',
+        destinationRequired: 'Destination required',
+        destinationRequiredDetails: 'Please enter a destination or select from examples.',
+        enterDestination: 'Enter Destination',
+        locationNotAvailable: 'Location not available',
+        locationNotAvailableStartDetails: 'Please wait for location to be obtained, set a departure point, or try again.',
+        retryLocation: 'Retry Location',
+        locationNotAvailableNearbyDetails: 'Please wait for location to be obtained first.',
+        getLocation: 'Get Location',
+        invalidCoordinates: 'Invalid coordinates',
+        invalidCoordinatesDetails: 'Please use format: <strong>longitude,latitude</strong><br>Example: 139.7671,35.6812',
+        fixInput: 'Fix Input',
+        navigationFailed: 'Navigation failed',
+        error: 'Error',
+        navigationFailedDetails: 'Please check your connection and try again.',
+        retryNavigation: 'Retry Navigation',
+
+        waitingForRoute: 'Waiting for route...',
+        totalDistance: 'Total Distance',
+        timeRemaining: 'Time Remaining',
+        arrival: 'Arrival',
+        stopNavigation: 'Stop Navigation',
+        toggleVoice: 'Toggle Voice',
+        recenter: 'Recenter',
+        offRoute: 'Off route, recalculating...',
+        routeUpdated: 'Route updated',
+        arrived: 'You have arrived!',
+
+        yourLocation: 'Your Location',
+        nearbyDestination: 'Nearby Destination',
+        oneKmFromLocation: '(~1km from your location)',
+        departurePointPopup: 'Departure Point'
+      },
+      ja: {
+        title: '🧭 ターンバイターン ナビ',
+        intro: '出発地と目的地を設定してナビを開始します。出発地を指定しない場合は現在地が使用されます。',
+        departureLabel: '出発地',
+        departureHint: '（任意 — 未設定の場合は現在地）',
+        destinationLabel: '目的地',
+        departurePlaceholder: '例: 139.7671,35.6812（未設定の場合は現在地）',
+        destinationPlaceholder: '例: 139.7671,35.6812（東京駅）',
+        pickOnMap: '🗺️ 地図で選択',
+        useMyLocation: '📍 現在地を使う',
+        nearby: '📍 近くの地点',
+        quickExamples: 'またはサンプルから選択',
+        selectDestination: '目的地を選択...',
+        navProfile: '移動手段',
+        driving: '🚗 車（渋滞情報あり）',
+        walking: '🚶 徒歩',
+        cycling: '🚴 自転車',
+        languageLabel: '言語',
+        simulationLabel: '🎬 シミュレーションモードを使う（テスト用）',
+        startNavigation: 'ナビを開始',
+        waitingForLocation: '⏳ 現在地を取得中...',
+        locationRequired: '現在地が必要です',
+        mapPickerTitle: '📍 地図をタップ',
+        mapPickerDeparture: '出発地を選択してください',
+        mapPickerDestination: '目的地を選択してください',
+        cancel: '✕ キャンセル',
+        simTitle: '🎬 ルートシミュレーション',
+        play: '▶️ 再生',
+        pause: '⏸️ 一時停止',
+        slower: '🐢 遅く',
+        faster: '🐰 速く',
+        backToSetup: '設定に戻る',
+        debugDirections: 'ルート検索:',
+        debugMapMatching: 'マップマッチング:',
+
+        gettingLocation: '現在地を取得中...',
+        gettingLocationDetails: '数秒かかる場合があります。位置情報の利用を求められたら許可してください。',
+        locationConfirmed: '現在地を確認しました',
+        longitude: '経度',
+        latitude: '緯度',
+        accuracy: '精度',
+        meters: 'メートル',
+        locationUnavailable: '現在地を取得できません',
+        permissionDeniedDetails: '<strong>位置情報の利用が許可されていません。</strong><br>' +
+          '• ブラウザで位置情報の利用を許可してください<br>' +
+          '• ブラウザの設定を確認してください<br>' +
+          '• 位置情報サービスが有効か確認してください',
+        positionUnavailableDetails: '<strong>現在地を特定できません。</strong><br>' +
+          '• GPSの電波状況を確認してください<br>' +
+          '• 見晴らしの良い場所に移動してみてください<br>' +
+          '• 位置情報サービスが有効か確認してください',
+        timeoutDetails: '<strong>タイムアウトしました。</strong><br>' +
+          '• GPSの電波状況を確認してください<br>' +
+          '• しばらくしてからもう一度お試しください',
+        anErrorOccurred: 'エラーが発生しました',
+        tryAgain: '再試行',
+        destinationRequired: '目的地を入力してください',
+        destinationRequiredDetails: '目的地を入力するか、サンプルから選択してください。',
+        enterDestination: '目的地を入力',
+        locationNotAvailable: '現在地が利用できません',
+        locationNotAvailableStartDetails: '現在地の取得を待つか、出発地を設定するか、もう一度お試しください。',
+        retryLocation: '現在地を再取得',
+        locationNotAvailableNearbyDetails: 'まず現在地の取得をお待ちください。',
+        getLocation: '現在地を取得',
+        invalidCoordinates: '座標の形式が正しくありません',
+        invalidCoordinatesDetails: '「<strong>経度,緯度</strong>」の形式で入力してください<br>例: 139.7671,35.6812',
+        fixInput: '入力を修正',
+        navigationFailed: 'ナビを開始できませんでした',
+        error: 'エラー',
+        navigationFailedDetails: '接続を確認してもう一度お試しください。',
+        retryNavigation: 'ナビを再試行',
+
+        waitingForRoute: 'ルート待機中...',
+        totalDistance: '総距離',
+        timeRemaining: '残り時間',
+        arrival: '到着予定',
+        stopNavigation: 'ナビを終了',
+        toggleVoice: '音声のオン/オフ',
+        recenter: '現在地に戻す',
+        offRoute: 'ルートを外れました。再計算中...',
+        routeUpdated: 'ルートを更新しました',
+        arrived: '目的地に到着しました！',
+
+        yourLocation: '現在地',
+        nearbyDestination: '近くの目的地',
+        oneKmFromLocation: '（現在地から約1km）',
+        departurePointPopup: '出発地点'
+      }
+    };
+
+    function t(key) {
+      return STRINGS[uiLang][key];
+    }
+
+    // Whatever is currently shown in #location-status, re-render-able in the
+    // active language. Every call site that sets the status also registers
+    // itself here, so switching language mid-flow doesn't leave a stale
+    // English (or Japanese) message on screen.
+    let currentStatusRender = null;
+    function setStatus(renderFn) {
+      currentStatusRender = renderFn;
+      renderFn();
+    }
+
+    // The Start Navigation button's disabled/label state, tracked explicitly so
+    // applyUILanguage() can re-render it in the new language without having to
+    // sniff its current text.
+    let startBtnState = 'waiting'; // 'waiting' | 'ready' | 'required'
+    function setStartBtnState(state) {
+      startBtnState = state;
+      if (state === 'ready') {
+        startBtn.disabled = false;
+        startBtn.textContent = t('startNavigation');
+      } else if (state === 'required') {
+        startBtn.disabled = true;
+        startBtn.textContent = t('locationRequired');
+      } else {
+        startBtn.disabled = true;
+        startBtn.textContent = t('waitingForLocation');
+      }
+    }
+
+    // Push the current language across every static label in the sidebar, the
+    // map picker banner, the simulation panel, and the debug panel. Called once
+    // on load (a no-op re-statement of the English HTML) and again whenever the
+    // language dropdown changes.
+    function applyUILanguage() {
+      document.querySelector('#setup-panel h2').textContent = t('title');
+      document.querySelector('#setup-panel .intro-text').textContent = t('intro');
+
+      const departureLabel = document.querySelector('#departure-input').closest('.input-group').querySelector('label');
+      departureLabel.childNodes[0].textContent = t('departureLabel') + ' ';
+      departureLabel.querySelector('.hint').textContent = t('departureHint');
+      document.querySelector('#destination-input').closest('.input-group').querySelector('label').textContent = t('destinationLabel');
+      document.getElementById('departure-input').placeholder = t('departurePlaceholder');
+      document.getElementById('destination-input').placeholder = t('destinationPlaceholder');
+
+      document.querySelectorAll('button[onclick^="openMapPicker"]').forEach(btn => btn.textContent = t('pickOnMap'));
+      document.querySelector('button[onclick="useMyLocationAsDeparture()"]').textContent = t('useMyLocation');
+      document.getElementById('nearby-btn').textContent = t('nearby');
+
+      document.querySelector('#example-destinations').closest('.input-group').querySelector('label').textContent = t('quickExamples');
+      document.querySelector('#example-destinations option[value=""]').textContent = t('selectDestination');
+
+      document.querySelector('#profile-select').closest('.input-group').querySelector('label').textContent = t('navProfile');
+      document.querySelector('#profile-select option[value$="driving-traffic"]').textContent = t('driving');
+      document.querySelector('#profile-select option[value$="walking"]').textContent = t('walking');
+      document.querySelector('#profile-select option[value$="cycling"]').textContent = t('cycling');
+
+      document.querySelector('#language-select').closest('.input-group').querySelector('label').textContent = t('languageLabel');
+      document.querySelector('label[for="simulation-mode"]').textContent = t('simulationLabel');
+
+      document.getElementById('map-picker-subtitle').textContent =
+        mapPickerTarget === 'departure' ? t('mapPickerDeparture') : t('mapPickerDestination');
+      document.querySelector('.map-picker-title').textContent = t('mapPickerTitle');
+      document.querySelector('.btn-close-picker').textContent = t('cancel');
+
+      document.querySelector('.sim-title').textContent = t('simTitle');
+      document.getElementById('sim-play-pause').textContent = simulationPaused ? t('play') : t('pause');
+      document.querySelector('button[onclick="changeSimSpeed(-1)"]').textContent = t('slower');
+      document.querySelector('button[onclick="changeSimSpeed(1)"]').textContent = t('faster');
+
+      document.getElementById('back-to-setup-btn').title = t('backToSetup');
+      document.querySelector('#debug-panel .debug-item:nth-child(1) .debug-key').textContent = t('debugDirections');
+      document.querySelector('#debug-panel .debug-item:nth-child(2) .debug-key').textContent = t('debugMapMatching');
+
+      setStartBtnState(startBtnState);
+
+      if (navigationUI) {
+        navigationUI.applyLanguage();
+      }
+
+      if (currentStatusRender) {
+        currentStatusRender();
+      }
+    }
 
     // Simulation variables
     let simulationMode = false;
@@ -1326,7 +1600,7 @@ title: Turn-by-Turn Navigation Demo
       // Sidebar/sheet stays visible - the map remains clickable alongside it
       document.getElementById('map-picker-banner').classList.remove('hidden');
       document.getElementById('map-picker-subtitle').textContent =
-        mapPickerTarget === 'departure' ? 'Select your departure point' : 'Select your destination';
+        mapPickerTarget === 'departure' ? t('mapPickerDeparture') : t('mapPickerDestination');
 
       // On mobile the panel is a bottom sheet that covers a lot of the map - collapse it
       // down to a peek strip while picking so there's room to tap the map
@@ -1358,7 +1632,7 @@ title: Turn-by-Turn Navigation Demo
       })
         .setLngLat([lng, lat])
         .setPopup(new mapboxgl.Popup().setHTML(
-          `<strong>Destination</strong><br>
+          `<strong>${t('destinationLabel')}</strong><br>
            ${lng.toFixed(6)}, ${lat.toFixed(6)}`
         ))
         .addTo(map);
@@ -1382,7 +1656,7 @@ title: Turn-by-Turn Navigation Demo
       })
         .setLngLat([lng, lat])
         .setPopup(new mapboxgl.Popup().setHTML(
-          `<strong>Departure Point</strong><br>
+          `<strong>${t('departurePointPopup')}</strong><br>
            ${lng.toFixed(6)}, ${lat.toFixed(6)}`
         ))
         .addTo(map);
@@ -1394,8 +1668,7 @@ title: Turn-by-Turn Navigation Demo
       }
 
       // Allow starting navigation even if geolocation hasn't resolved yet
-      startBtn.disabled = false;
-      startBtn.textContent = 'Start Navigation';
+      setStartBtnState('ready');
 
       console.log('🚩 Departure set:', lng.toFixed(6), lat.toFixed(6));
       return departureMarker;
@@ -1418,15 +1691,14 @@ title: Turn-by-Turn Navigation Demo
         })
           .setLngLat([userLocation.lng, userLocation.lat])
           .setPopup(new mapboxgl.Popup().setHTML(
-            `<strong>Your Location</strong><br>
-             Accuracy: ±${Math.round(locationAccuracy)}m`
+            `<strong>${t('yourLocation')}</strong><br>
+             ${t('accuracy')}: ±${Math.round(locationAccuracy)}m`
           ))
           .addTo(map);
       }
 
       if (!userLocation && !document.getElementById('simulation-mode').checked) {
-        startBtn.disabled = true;
-        startBtn.textContent = '⏳ Waiting for location...';
+        setStartBtnState('waiting');
       }
 
       console.log('📍 Departure reset to current location');
@@ -1453,8 +1725,7 @@ title: Turn-by-Turn Navigation Demo
 
     // Get user location
     function getUserLocation() {
-      updateLocationStatus('loading', 'Getting your location...',
-        'This may take a few seconds. Please allow location permissions if prompted.');
+      setStatus(() => updateLocationStatus('loading', t('gettingLocation'), t('gettingLocationDetails')));
 
       if (!navigator.geolocation) {
         handleLocationError(new Error('Geolocation not supported by your browser'));
@@ -1481,14 +1752,13 @@ title: Turn-by-Turn Navigation Demo
       locationAccuracy = position.coords.accuracy;
 
       // Update status UI
-      updateLocationStatus('success', 'Location confirmed',
-        `<strong>Longitude:</strong> ${userLocation.lng.toFixed(6)}<br>
-         <strong>Latitude:</strong> ${userLocation.lat.toFixed(6)}<br>
-         <strong>Accuracy:</strong> ±${Math.round(locationAccuracy)} meters`);
+      setStatus(() => updateLocationStatus('success', t('locationConfirmed'),
+        `<strong>${t('longitude')}:</strong> ${userLocation.lng.toFixed(6)}<br>
+         <strong>${t('latitude')}:</strong> ${userLocation.lat.toFixed(6)}<br>
+         <strong>${t('accuracy')}:</strong> ±${Math.round(locationAccuracy)} ${t('meters')}`));
 
       // Enable buttons
-      startBtn.disabled = false;
-      startBtn.textContent = 'Start Navigation';
+      setStartBtnState('ready');
       nearbyBtn.disabled = false;
 
       // Add user marker on map
@@ -1501,8 +1771,8 @@ title: Turn-by-Turn Navigation Demo
       })
         .setLngLat([userLocation.lng, userLocation.lat])
         .setPopup(new mapboxgl.Popup().setHTML(
-          `<strong>Your Location</strong><br>
-           Accuracy: ±${Math.round(locationAccuracy)}m`
+          `<strong>${t('yourLocation')}</strong><br>
+           ${t('accuracy')}: ±${Math.round(locationAccuracy)}m`
         ))
         .addTo(map);
 
@@ -1577,38 +1847,28 @@ title: Turn-by-Turn Navigation Demo
 
     // Handle location error
     function handleLocationError(error) {
-      let errorMsg = 'Location unavailable';
-      let errorDetails = '';
+      setStatus(() => {
+        let errorDetails;
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorDetails = t('permissionDeniedDetails');
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorDetails = t('positionUnavailableDetails');
+            break;
+          case error.TIMEOUT:
+            errorDetails = t('timeoutDetails');
+            break;
+          default:
+            errorDetails = `<strong>${t('anErrorOccurred')}:</strong> ${error.message}`;
+        }
 
-      switch(error.code) {
-        case error.PERMISSION_DENIED:
-          errorDetails = `<strong>Permission denied.</strong> Please:<br>
-            • Allow location access in your browser<br>
-            • Check browser settings<br>
-            • Ensure location services are enabled`;
-          break;
-        case error.POSITION_UNAVAILABLE:
-          errorDetails = `<strong>Position unavailable.</strong> Please:<br>
-            • Check GPS signal<br>
-            • Try moving to an open area<br>
-            • Ensure location services are on`;
-          break;
-        case error.TIMEOUT:
-          errorDetails = `<strong>Request timed out.</strong> Please:<br>
-            • Check your GPS signal<br>
-            • Try again in a moment`;
-          break;
-        default:
-          errorDetails = `<strong>An error occurred:</strong> ${error.message}<br>
-            <button class="btn-retry" onclick="getUserLocation()">🔄 Try Again</button>`;
-      }
-
-      updateLocationStatus('error', errorMsg, errorDetails +
-        '<br><button class="btn-retry" onclick="getUserLocation()">🔄 Try Again</button>');
+        updateLocationStatus('error', t('locationUnavailable'), errorDetails +
+          `<br><button class="btn-retry" onclick="getUserLocation()">🔄 ${t('tryAgain')}</button>`);
+      });
 
       // Disable buttons
-      startBtn.disabled = true;
-      startBtn.textContent = 'Location Required';
+      setStartBtnState('required');
       nearbyBtn.disabled = true;
 
       console.error('Location error:', error);
@@ -1654,30 +1914,34 @@ title: Turn-by-Turn Navigation Demo
       }
     });
 
-    // Update navigation language when user changes selection
+    // Update navigation language, map labels, and menu labels when user changes selection
     document.getElementById('language-select').addEventListener('change', (e) => {
+      uiLang = e.target.value;
+
       if (navigation) {
-        navigation.config.language = e.target.value;
-        console.log('📝 Navigation language changed to:', e.target.value);
+        navigation.config.language = uiLang;
+        console.log('📝 Navigation language changed to:', uiLang);
       }
+
+      // map.setLanguage() is a Map-level API (distinct from the Standard style's
+      // own config schema, which has no "language" key - setConfigProperty()
+      // for it was a silent no-op). It reloads the vector sources with the
+      // requested language baked in, without a full setStyle() that would
+      // wipe our custom route/puck layers.
+      map.setLanguage(uiLang);
+
+      applyUILanguage();
     });
 
     // Enable/disable start button based on simulation mode
     document.getElementById('simulation-mode').addEventListener('change', (e) => {
       if (e.target.checked) {
         // In simulation mode, location not required
-        startBtn.disabled = false;
-        startBtn.textContent = 'Start Navigation';
+        setStartBtnState('ready');
         console.log('🎬 Simulation mode enabled - location not required');
       } else {
         // Normal mode, check if location is available
-        if (userLocation || customDeparture) {
-          startBtn.disabled = false;
-          startBtn.textContent = 'Start Navigation';
-        } else {
-          startBtn.disabled = true;
-          startBtn.textContent = '⏳ Waiting for location...';
-        }
+        setStartBtnState(userLocation || customDeparture ? 'ready' : 'waiting');
       }
     });
 
@@ -1836,7 +2100,7 @@ title: Turn-by-Turn Navigation Demo
         })
           .setLngLat([customDeparture.lng, customDeparture.lat])
           .setPopup(new mapboxgl.Popup().setHTML(
-            `<strong>Departure Point</strong><br>
+            `<strong>${t('departurePointPopup')}</strong><br>
              ${customDeparture.lng.toFixed(6)}, ${customDeparture.lat.toFixed(6)}`
           ))
           .addTo(map);
@@ -1847,8 +2111,8 @@ title: Turn-by-Turn Navigation Demo
         })
           .setLngLat([userLocation.lng, userLocation.lat])
           .setPopup(new mapboxgl.Popup().setHTML(
-            `<strong>Your Location</strong><br>
-             Accuracy: ±${Math.round(locationAccuracy)}m`
+            `<strong>${t('yourLocation')}</strong><br>
+             ${t('accuracy')}: ±${Math.round(locationAccuracy)}m`
           ))
           .addTo(map);
       }
@@ -1872,17 +2136,17 @@ title: Turn-by-Turn Navigation Demo
       const isSimulationMode = document.getElementById('simulation-mode').checked;
 
       if (!destInput) {
-        updateLocationStatus('error', 'Destination required',
-          'Please enter a destination or select from examples.<br>' +
-          '<button class="btn-retry" onclick="document.getElementById(\'destination-input\').focus()">📍 Enter Destination</button>');
+        setStatus(() => updateLocationStatus('error', t('destinationRequired'),
+          t('destinationRequiredDetails') + '<br>' +
+          `<button class="btn-retry" onclick="document.getElementById('destination-input').focus()">📍 ${t('enterDestination')}</button>`));
         return;
       }
 
       // In simulation mode, use map center as starting point if no location or custom departure
       if (!userLocation && !customDeparture && !isSimulationMode) {
-        updateLocationStatus('error', 'Location not available',
-          'Please wait for location to be obtained, set a departure point, or try again.<br>' +
-          '<button class="btn-retry" onclick="getUserLocation()">🔄 Retry Location</button>');
+        setStatus(() => updateLocationStatus('error', t('locationNotAvailable'),
+          t('locationNotAvailableStartDetails') + '<br>' +
+          `<button class="btn-retry" onclick="getUserLocation()">🔄 ${t('retryLocation')}</button>`));
         return;
       }
 
@@ -1891,10 +2155,9 @@ title: Turn-by-Turn Navigation Demo
         const [lng, lat] = destInput.split(',').map(s => parseFloat(s.trim()));
 
         if (isNaN(lng) || isNaN(lat)) {
-          updateLocationStatus('error', 'Invalid coordinates',
-            'Please use format: <strong>longitude,latitude</strong><br>' +
-            'Example: 139.7671,35.6812<br>' +
-            '<button class="btn-retry" onclick="document.getElementById(\'destination-input\').select()">✏️ Fix Input</button>');
+          setStatus(() => updateLocationStatus('error', t('invalidCoordinates'),
+            t('invalidCoordinatesDetails') + '<br>' +
+            `<button class="btn-retry" onclick="document.getElementById('destination-input').select()">✏️ ${t('fixInput')}</button>`));
           return;
         }
 
@@ -1955,10 +2218,10 @@ title: Turn-by-Turn Navigation Demo
 
       } catch (error) {
         console.error('Navigation error:', error);
-        updateLocationStatus('error', 'Navigation failed',
-          `<strong>Error:</strong> ${error.message}<br>` +
-          'Please check your connection and try again.<br>' +
-          '<button class="btn-retry" onclick="startNavigation()">🔄 Retry Navigation</button>');
+        setStatus(() => updateLocationStatus('error', t('navigationFailed'),
+          `<strong>${t('error')}:</strong> ${error.message}<br>` +
+          t('navigationFailedDetails') + '<br>' +
+          `<button class="btn-retry" onclick="startNavigation()">🔄 ${t('retryNavigation')}</button>`));
         const backBtn = document.getElementById('back-to-setup-btn');
         backBtn.classList.add('hidden');
         backBtn.style.display = 'none';
@@ -1972,9 +2235,9 @@ title: Turn-by-Turn Navigation Demo
     // Use nearby location as destination (for testing)
     function useCurrentLocationAsDestination() {
       if (!userLocation) {
-        updateLocationStatus('error', 'Location not available',
-          'Please wait for location to be obtained first.<br>' +
-          '<button class="btn-retry" onclick="getUserLocation()">🔄 Get Location</button>');
+        setStatus(() => updateLocationStatus('error', t('locationNotAvailable'),
+          t('locationNotAvailableNearbyDetails') + '<br>' +
+          `<button class="btn-retry" onclick="getUserLocation()">🔄 ${t('getLocation')}</button>`));
         return;
       }
 
@@ -1996,9 +2259,9 @@ title: Turn-by-Turn Navigation Demo
       })
         .setLngLat([nearbyLng, nearbyLat])
         .setPopup(new mapboxgl.Popup().setHTML(
-          `<strong>Nearby Destination</strong><br>
+          `<strong>${t('nearbyDestination')}</strong><br>
            ${nearbyLng.toFixed(6)}, ${nearbyLat.toFixed(6)}<br>
-           <small>(~1km from your location)</small>`
+           <small>${t('oneKmFromLocation')}</small>`
         ))
         .addTo(map);
 
