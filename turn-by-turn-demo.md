@@ -10,17 +10,55 @@ title: Turn-by-Turn Navigation Demo
   <title>Turn-by-Turn Navigation Demo</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   {% include common_head.html %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
+    :root {
+      /* Route Green - MUTCD highway guide-sign green */
+      --green: #0E6B3A;
+      --green-dark: #0A4C29;
+      --green-tint: #E3EEE7;
+      /* Reflective sheeting cream */
+      --cream: #F6F3EA;
+      /* Instrument-cluster asphalt */
+      --asphalt: #1C1D1F;
+      /* Caution amber / stop red */
+      --amber: #F2A900;
+      --red: #C8102E;
+      --ink: #2A2A28;
+      --line: rgba(14, 107, 58, 0.22);
+
+      --font-display: 'Overpass', sans-serif;
+      --font-body: 'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'IBM Plex Mono', 'Monaco', 'Courier New', monospace;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
     body {
       margin: 0;
       padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      font-family: var(--font-body);
+      color: var(--ink);
+    }
+    button, input, select {
+      font-family: inherit;
+    }
+    :focus-visible {
+      outline: 2px solid var(--amber);
+      outline-offset: 2px;
     }
     #map {
       position: absolute;
       top: 0;
       bottom: 0;
-      width: 100%;
+      left: 380px;
+      right: 0;
     }
     .mapboxgl-ctrl-geocoder {
       min-width: 240px;
@@ -32,29 +70,57 @@ title: Turn-by-Turn Navigation Demo
       pointer-events: auto;
     }
     #setup-panel {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: white;
-      padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-      z-index: 2000;
-      max-width: 400px;
-      width: 90%;
-      max-height: 90vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      background: var(--cream);
+      padding: 0 24px 30px;
+      border-right: 1px solid var(--line);
+      z-index: 1400;
+      width: 380px;
+      max-width: 85vw;
+      box-sizing: border-box;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
     }
+    .sheet-handle {
+      display: none;
+    }
+    /* Full-bleed guide-sign header band, escaping the panel's own padding */
     #setup-panel h2 {
-      margin-top: 0;
-      margin-bottom: 10px;
-      color: #333;
-      font-size: 24px;
+      position: relative;
+      overflow: hidden;
+      margin: 0 -24px 20px;
+      padding: 22px 24px 18px;
+      background: var(--green);
+      color: var(--cream);
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 19px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      line-height: 1.3;
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      #setup-panel h2::after {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -60%;
+        width: 40%;
+        height: 200%;
+        background: linear-gradient(115deg, transparent, rgba(255,255,255,0.35), transparent);
+        transform: rotate(8deg);
+        animation: sheen-sweep 1.1s ease-out 0.15s 1;
+      }
+    }
+    @keyframes sheen-sweep {
+      from { left: -60%; }
+      to { left: 130%; }
     }
     #setup-panel p {
-      color: #666;
+      color: #5B5B57;
       line-height: 1.5;
       font-size: 14px;
       margin-bottom: 15px;
@@ -64,22 +130,81 @@ title: Turn-by-Turn Navigation Demo
     }
     .input-group label {
       display: block;
-      margin-bottom: 5px;
-      color: #555;
-      font-weight: 600;
-      font-size: 14px;
+      margin-bottom: 6px;
+      color: var(--green-dark);
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
-    .input-group input {
+    /* Plain-language caption, not a field name - keep it out of the sign-label treatment */
+    label[for="simulation-mode"] {
+      display: inline;
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-weight: 500;
+      font-size: 14px;
+      text-transform: none;
+      letter-spacing: normal;
+    }
+    .input-group label .hint {
+      display: block;
+      margin-top: 2px;
+      color: #8A8A83;
+      font-family: var(--font-body);
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: normal;
+    }
+    .input-group input,
+    .input-group select {
       width: 100%;
       padding: 10px;
-      border: 2px solid #e5e7eb;
-      border-radius: 6px;
-      font-size: 14px;
+      border: 2px solid var(--line);
+      border-radius: 4px;
+      background: #fff;
+      color: var(--ink);
+      font-family: var(--font-mono);
+      font-size: 13px;
       box-sizing: border-box;
     }
-    .input-group input:focus {
+    .input-group select {
+      font-family: var(--font-body);
+      font-size: 14px;
+    }
+    .input-group input:focus,
+    .input-group select:focus {
       outline: none;
-      border-color: #667eea;
+      border-color: var(--green);
+    }
+    /* Departure / Destination guide-sign cards - the sidebar's one bold move */
+    .trip-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--green);
+      border-radius: 4px;
+      padding: 16px 16px 14px;
+      margin-bottom: 20px;
+    }
+    .trip-card .input-group:last-child {
+      margin-bottom: 0;
+    }
+    .trip-card .input-group label {
+      display: inline-block;
+      background: var(--green);
+      color: var(--cream);
+      padding: 3px 9px;
+      border-radius: 3px;
+      margin-bottom: 10px;
+    }
+    .trip-card .input-group label .hint {
+      display: inline;
+      color: rgba(246,243,234,0.8);
+      margin-top: 0;
+    }
+    .trip-card .button-group {
+      margin-top: 12px;
     }
     .button-group {
       display: flex;
@@ -90,48 +215,57 @@ title: Turn-by-Turn Navigation Demo
       flex: 1;
       padding: 12px;
       border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
+      border-radius: 5px;
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
       cursor: pointer;
-      transition: all 0.2s;
+      box-sizing: border-box;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease;
     }
     .btn-primary {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
+      background: var(--green);
+      color: var(--cream);
+      box-shadow: 0 3px 0 var(--green-dark);
     }
     .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      background: #0F7A41;
+    }
+    .btn-primary:active {
+      transform: translateY(3px);
+      box-shadow: 0 0 0 var(--green-dark);
     }
     .btn-secondary {
-      background: #f3f4f6;
-      color: #374151;
+      background: var(--cream);
+      color: var(--green-dark);
+      border: 2px solid var(--green);
     }
     .btn-secondary:hover {
-      background: #e5e7eb;
+      background: var(--green-tint);
     }
     .hidden {
       display: none !important;
     }
     .location-status {
-      background: #f9fafb;
-      border: 2px solid #e5e7eb;
-      border-radius: 8px;
+      background: #F0EFE8;
+      border: 2px solid var(--line);
+      border-radius: 4px;
       padding: 15px;
       margin-bottom: 20px;
     }
     .location-status.loading {
-      border-color: #3b82f6;
-      background: #eff6ff;
+      border-color: #00539B;
+      background: #E8F0F8;
     }
     .location-status.success {
-      border-color: #10b981;
-      background: #ecfdf5;
+      border-color: var(--green);
+      background: var(--green-tint);
     }
     .location-status.error {
-      border-color: #ef4444;
-      background: #fef2f2;
+      border-color: var(--red);
+      background: #FBE9EB;
     }
     .status-header {
       display: flex;
@@ -151,74 +285,77 @@ title: Turn-by-Turn Navigation Demo
       to { transform: rotate(360deg); }
     }
     .status-text {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 600;
-      color: #374151;
+      color: var(--ink);
       flex: 1;
     }
     .status-details {
       font-size: 13px;
-      color: #6b7280;
+      color: #6B6B65;
       margin-top: 8px;
       line-height: 1.5;
+      font-family: var(--font-mono);
     }
     .status-details strong {
-      color: #374151;
+      color: var(--ink);
+      font-family: var(--font-body);
     }
     .btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
       transform: none !important;
+      box-shadow: none !important;
     }
     .btn-retry {
       margin-top: 10px;
       padding: 8px 16px;
-      background: #3b82f6;
-      color: white;
+      background: var(--amber);
+      color: var(--asphalt);
       border: none;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
+      border-radius: 4px;
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
       cursor: pointer;
     }
     .btn-retry:hover {
-      background: #2563eb;
+      background: #D99500;
     }
 
-    /* Map Picker Overlay */
-    #map-picker-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      z-index: 1500;
-      pointer-events: none;
-    }
-    #map-picker-overlay * {
-      pointer-events: auto;
-    }
-    .map-picker-banner {
-      position: absolute;
+    /* Map Picker Banner - floats over the map without blocking the sidebar or the rest of the map */
+    #map-picker-banner {
+      position: fixed;
       top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 20px 30px;
-      border-radius: 12px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      left: calc(380px + 20px);
+      right: 70px;
+      margin: 0 auto;
+      max-width: 420px;
+      z-index: 1500;
+      background: var(--green);
+      color: var(--cream);
+      padding: 18px 24px;
+      border: 3px solid var(--cream);
+      box-shadow: 0 0 0 2px var(--green-dark), 0 10px 40px rgba(0,0,0,0.3);
+      border-radius: 4px;
       display: flex;
       align-items: center;
-      gap: 20px;
-      max-width: 90%;
+      gap: 16px;
+    }
+    #map-picker-banner.hidden {
+      display: none !important;
     }
     .map-picker-text {
       flex: 1;
     }
     .map-picker-title {
-      font-size: 18px;
-      font-weight: 700;
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
       margin-bottom: 5px;
     }
     .map-picker-subtitle {
@@ -226,33 +363,36 @@ title: Turn-by-Turn Navigation Demo
       opacity: 0.9;
     }
     .btn-close-picker {
-      background: rgba(255,255,255,0.2);
-      border: 2px solid white;
-      color: white;
+      background: rgba(255,255,255,0.15);
+      border: 2px solid var(--cream);
+      color: var(--cream);
       padding: 10px 20px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
+      border-radius: 4px;
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
       cursor: pointer;
       white-space: nowrap;
     }
     .btn-close-picker:hover {
-      background: rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.28);
     }
 
     /* Back to Setup Button - styled to match navigation control buttons */
     #back-to-setup-btn {
       position: fixed;
-      left: 10px;
+      left: 400px;
       top: 50%;
       transform: translateY(-50%);
       z-index: 1001;
-      background: #f3f4f6;
-      color: #374151;
-      border: none;
+      background: var(--cream);
+      color: var(--green-dark);
+      border: 2px solid var(--green);
       width: 40px;
       height: 40px;
-      border-radius: 8px;
+      border-radius: 6px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.2);
       font-size: 16px;
       cursor: pointer;
@@ -266,7 +406,7 @@ title: Turn-by-Turn Navigation Demo
       display: none !important;
     }
     #back-to-setup-btn:hover {
-      background: #e5e7eb;
+      background: var(--green-tint);
     }
     #back-to-setup-btn:active {
       transform: translateY(-50%) scale(0.95);
@@ -278,11 +418,11 @@ title: Turn-by-Turn Navigation Demo
       top: 155px;
       right: 10px;
       z-index: 1000;
-      background: rgba(0, 0, 0, 0.85);
-      color: white;
+      background: rgba(28, 29, 31, 0.92);
+      color: var(--cream);
       padding: 10px 14px;
-      border-radius: 8px;
-      font-family: 'Monaco', 'Courier New', monospace;
+      border-radius: 6px;
+      font-family: var(--font-mono);
       font-size: 11px;
       box-shadow: 0 2px 12px rgba(0,0,0,0.3);
       pointer-events: auto;
@@ -304,8 +444,8 @@ title: Turn-by-Turn Navigation Demo
       font-size: 11px;
     }
     .debug-value {
-      font-weight: 700;
-      color: #60a5fa;
+      font-weight: 600;
+      color: var(--amber);
       font-size: 13px;
     }
 
@@ -317,28 +457,31 @@ title: Turn-by-Turn Navigation Demo
       z-index: 1000;
     }
     .sim-panel {
-      background: white;
-      border-radius: 12px;
+      background: #fff;
+      border-radius: 6px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.2);
       min-width: 280px;
+      overflow: hidden;
     }
     .sim-header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
+      background: var(--green);
+      color: var(--cream);
       padding: 12px 15px;
-      border-radius: 12px 12px 0 0;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
     .sim-title {
-      font-weight: 600;
-      font-size: 14px;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
     .sim-close {
-      background: rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.18);
       border: none;
-      color: white;
+      color: var(--cream);
       width: 24px;
       height: 24px;
       border-radius: 50%;
@@ -357,7 +500,8 @@ title: Turn-by-Turn Navigation Demo
       justify-content: space-between;
       margin-bottom: 10px;
       font-size: 13px;
-      color: #666;
+      font-family: var(--font-mono);
+      color: #6B6B65;
     }
     .sim-controls-buttons {
       display: flex;
@@ -366,21 +510,23 @@ title: Turn-by-Turn Navigation Demo
     .sim-btn {
       flex: 1;
       padding: 6px 8px;
-      border: 2px solid #e5e7eb;
-      background: white;
-      border-radius: 6px;
+      border: 2px solid var(--line);
+      background: #fff;
+      color: var(--green-dark);
+      border-radius: 4px;
       font-size: 12px;
+      font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
     }
     .sim-btn:hover {
-      background: #f3f4f6;
-      border-color: #667eea;
+      background: var(--green-tint);
+      border-color: var(--green);
     }
     .sim-btn.active {
-      background: #667eea;
-      color: white;
-      border-color: #667eea;
+      background: var(--green);
+      color: var(--cream);
+      border-color: var(--green);
     }
 
     /* Mobile-specific styles */
@@ -389,24 +535,45 @@ title: Turn-by-Turn Navigation Demo
         height: 100%;
         overflow: hidden;
       }
+      /* The sidebar becomes a bottom sheet overlay on mobile, not a split - map stays full width */
+      #map {
+        left: 0;
+      }
       #setup-panel {
-        padding: 15px;
-        padding-bottom: 20px;
-        width: 95%;
-        max-height: 95vh;
-        max-height: 95dvh; /* Use dynamic viewport height for iOS */
+        left: 0;
+        right: 0;
+        top: auto;
+        bottom: 0;
+        padding: 12px 16px 20px;
+        width: 100%;
+        max-width: 100%;
+        max-height: 65vh;
+        max-height: 65dvh; /* Use dynamic viewport height for iOS */
         height: auto;
-        border-radius: 8px;
-        top: 50%;
-        transform: translate(-50%, -50%);
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -4px 24px rgba(0,0,0,0.25);
+        transform: none;
         overflow-y: auto;
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
         overscroll-behavior: contain;
+        transition: transform 0.25s ease;
+      }
+      #setup-panel.picking-collapsed {
+        transform: translateY(calc(100% - 56px));
+      }
+      .sheet-handle {
+        display: block;
+        width: 40px;
+        height: 4px;
+        background: #d1d5db;
+        border-radius: 2px;
+        margin: 0 auto 12px;
       }
       #setup-panel h2 {
-        font-size: 20px;
-        margin-bottom: 8px;
+        margin: 0 -16px 12px;
+        padding: 16px 16px 12px;
+        font-size: 17px;
       }
       #setup-panel p {
         font-size: 13px;
@@ -457,10 +624,13 @@ title: Turn-by-Turn Navigation Demo
         padding: 6px 12px;
         font-size: 12px;
       }
-      .map-picker-banner {
-        padding: 15px 20px;
-        gap: 15px;
+      #map-picker-banner {
+        left: 10px;
+        right: 10px;
         top: 10px;
+        max-width: none;
+        padding: 14px 16px;
+        gap: 12px;
       }
       .map-picker-title {
         font-size: 16px;
@@ -532,8 +702,9 @@ title: Turn-by-Turn Navigation Demo
   </div>
 
   <div id="setup-panel">
+    <div class="sheet-handle"></div>
     <h2>🧭 Turn-by-Turn Navigation</h2>
-    <p class="intro-text">Enter your destination to start navigation. Your current location will be used as the starting point.</p>
+    <p class="intro-text">Set a departure and destination, then start navigation. Your current location is used as the departure point unless you set one.</p>
 
     <!-- Location Status -->
     <div class="location-status loading" id="location-status">
@@ -546,9 +717,53 @@ title: Turn-by-Turn Navigation Demo
       </div>
     </div>
 
+    <div class="trip-card">
+      <div class="input-group">
+        <label>Departure <span class="hint">(optional — defaults to your location)</span></label>
+        <input type="text" id="departure-input" placeholder="e.g., 139.7671,35.6812 (defaults to your location)">
+      </div>
+
+      <div class="button-group">
+        <button class="btn btn-secondary" style="flex: 1;" onclick="openMapPicker('departure')">
+          🗺️ Pick on Map
+        </button>
+        <button class="btn btn-secondary" style="flex: 1;" onclick="useMyLocationAsDeparture()">
+          📍 Use My Location
+        </button>
+      </div>
+    </div>
+
+    <div class="trip-card">
+      <div class="input-group">
+        <label>Destination</label>
+        <input type="text" id="destination-input" placeholder="e.g., 139.7671,35.6812 (Tokyo Station)">
+      </div>
+
+      <div class="button-group">
+        <button class="btn btn-secondary" style="flex: 1;" onclick="openMapPicker('destination')">
+          🗺️ Pick on Map
+        </button>
+        <button class="btn btn-secondary" id="nearby-btn" onclick="useCurrentLocationAsDestination()" disabled>
+          📍 Nearby
+        </button>
+      </div>
+
+      <div class="input-group" style="margin-top: 12px; margin-bottom: 0;">
+        <label>Or use quick examples</label>
+        <select id="example-destinations">
+          <option value="">Select a destination...</option>
+          <option value="139.7671,35.6812">Tokyo Station</option>
+          <option value="-122.4194,37.7749">San Francisco</option>
+          <option value="-0.1276,51.5074">London</option>
+          <option value="2.3522,48.8566">Paris</option>
+          <option value="-74.0060,40.7128">New York</option>
+        </select>
+      </div>
+    </div>
+
     <div class="input-group">
       <label>Navigation Profile</label>
-      <select id="profile-select" class="input-group input" style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+      <select id="profile-select">
         <option value="mapbox.tmp.valhalla-zenrin/driving-traffic">🚗 Driving (with traffic)</option>
         <option value="mapbox.tmp.valhalla-zenrin/walking">🚶 Walking</option>
         <option value="mapbox.tmp.valhalla-zenrin/cycling">🚴 Cycling</option>
@@ -557,35 +772,9 @@ title: Turn-by-Turn Navigation Demo
 
     <div class="input-group">
       <label>Language</label>
-      <select id="language-select" class="input-group input" style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+      <select id="language-select">
         <option value="en">🇺🇸 English</option>
         <option value="ja">🇯🇵 Japanese</option>
-      </select>
-    </div>
-
-    <div class="input-group">
-      <label>Destination Coordinates</label>
-      <input type="text" id="destination-input" placeholder="e.g., 139.7671,35.6812 (Tokyo Station)">
-    </div>
-
-    <div class="button-group" style="margin-bottom: 15px;">
-      <button class="btn btn-secondary" style="flex: 1;" onclick="openMapPicker()">
-        🗺️ Pick on Map
-      </button>
-      <button class="btn btn-secondary" id="nearby-btn" onclick="useCurrentLocationAsDestination()" disabled>
-        📍 Nearby
-      </button>
-    </div>
-
-    <div class="input-group">
-      <label>Or use quick examples:</label>
-      <select id="example-destinations" class="input-group input" style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
-        <option value="">Select a destination...</option>
-        <option value="139.7671,35.6812">Tokyo Station</option>
-        <option value="-122.4194,37.7749">San Francisco</option>
-        <option value="-0.1276,51.5074">London</option>
-        <option value="2.3522,48.8566">Paris</option>
-        <option value="-74.0060,40.7128">New York</option>
       </select>
     </div>
 
@@ -601,15 +790,13 @@ title: Turn-by-Turn Navigation Demo
     </div>
   </div>
 
-  <!-- Map Picker Overlay -->
-  <div id="map-picker-overlay" class="hidden">
-    <div class="map-picker-banner">
-      <div class="map-picker-text">
-        <div class="map-picker-title">📍 Tap anywhere on the map</div>
-        <div class="map-picker-subtitle">Select your destination</div>
-      </div>
-      <button class="btn-close-picker" onclick="closeMapPicker()">✕ Cancel</button>
+  <!-- Map Picker Banner (floats over the map; the map stays visible and clickable) -->
+  <div id="map-picker-banner" class="hidden">
+    <div class="map-picker-text">
+      <div class="map-picker-title">📍 Tap the map</div>
+      <div class="map-picker-subtitle" id="map-picker-subtitle">Select your destination</div>
     </div>
+    <button class="btn-close-picker" onclick="closeMapPicker()">✕ Cancel</button>
   </div>
 
   <!-- Simulation Controls -->
@@ -656,7 +843,10 @@ title: Turn-by-Turn Navigation Demo
     let userMarker = null;
     let locationAccuracy = null;
     let destinationMarker = null;
+    let customDeparture = null;
+    let departureMarker = null;
     let isMapPickerMode = false;
+    let mapPickerTarget = 'destination';
 
     // Simulation variables
     let simulationMode = false;
@@ -1130,18 +1320,116 @@ title: Turn-by-Turn Navigation Demo
     }
 
     // Map picker functions
-    function openMapPicker() {
+    function openMapPicker(target) {
       isMapPickerMode = true;
-      document.getElementById('setup-panel').classList.add('hidden');
-      document.getElementById('map-picker-overlay').classList.remove('hidden');
-      console.log('📍 Map picker mode activated');
+      mapPickerTarget = target || 'destination';
+      // Sidebar/sheet stays visible - the map remains clickable alongside it
+      document.getElementById('map-picker-banner').classList.remove('hidden');
+      document.getElementById('map-picker-subtitle').textContent =
+        mapPickerTarget === 'departure' ? 'Select your departure point' : 'Select your destination';
+
+      // On mobile the panel is a bottom sheet that covers a lot of the map - collapse it
+      // down to a peek strip while picking so there's room to tap the map
+      if (window.matchMedia('(max-width: 768px)').matches) {
+        document.getElementById('setup-panel').classList.add('picking-collapsed');
+      }
+
+      console.log('📍 Map picker mode activated for', mapPickerTarget);
     }
 
     function closeMapPicker() {
       isMapPickerMode = false;
-      document.getElementById('setup-panel').classList.remove('hidden');
-      document.getElementById('map-picker-overlay').classList.add('hidden');
+      document.getElementById('map-picker-banner').classList.add('hidden');
+      document.getElementById('setup-panel').classList.remove('picking-collapsed');
       console.log('📍 Map picker mode closed');
+    }
+
+    // Set destination marker + input from a lng/lat pair
+    function setDestinationPoint(lng, lat) {
+      document.getElementById('destination-input').value = `${lng.toFixed(6)},${lat.toFixed(6)}`;
+
+      if (destinationMarker) {
+        destinationMarker.remove();
+      }
+
+      destinationMarker = new mapboxgl.Marker({
+        color: '#C8102E',
+        scale: 1.2
+      })
+        .setLngLat([lng, lat])
+        .setPopup(new mapboxgl.Popup().setHTML(
+          `<strong>Destination</strong><br>
+           ${lng.toFixed(6)}, ${lat.toFixed(6)}`
+        ))
+        .addTo(map);
+
+      console.log('📍 Destination set:', lng.toFixed(6), lat.toFixed(6));
+      return destinationMarker;
+    }
+
+    // Set departure marker + input from a lng/lat pair (overrides live GPS location as nav origin)
+    function setDeparturePoint(lng, lat) {
+      customDeparture = { lng, lat };
+      document.getElementById('departure-input').value = `${lng.toFixed(6)},${lat.toFixed(6)}`;
+
+      if (departureMarker) {
+        departureMarker.remove();
+      }
+
+      departureMarker = new mapboxgl.Marker({
+        color: '#0E6B3A',
+        scale: 1.2
+      })
+        .setLngLat([lng, lat])
+        .setPopup(new mapboxgl.Popup().setHTML(
+          `<strong>Departure Point</strong><br>
+           ${lng.toFixed(6)}, ${lat.toFixed(6)}`
+        ))
+        .addTo(map);
+
+      // Custom departure overrides the live location marker as the nav starting point
+      if (userMarker) {
+        userMarker.remove();
+        userMarker = null;
+      }
+
+      // Allow starting navigation even if geolocation hasn't resolved yet
+      startBtn.disabled = false;
+      startBtn.textContent = 'Start Navigation';
+
+      console.log('🚩 Departure set:', lng.toFixed(6), lat.toFixed(6));
+      return departureMarker;
+    }
+
+    // Reset departure back to the user's live location
+    function useMyLocationAsDeparture() {
+      customDeparture = null;
+      document.getElementById('departure-input').value = '';
+
+      if (departureMarker) {
+        departureMarker.remove();
+        departureMarker = null;
+      }
+
+      if (userLocation && !userMarker) {
+        userMarker = new mapboxgl.Marker({
+          color: '#4264fb',
+          scale: 1.2
+        })
+          .setLngLat([userLocation.lng, userLocation.lat])
+          .setPopup(new mapboxgl.Popup().setHTML(
+            `<strong>Your Location</strong><br>
+             Accuracy: ±${Math.round(locationAccuracy)}m`
+          ))
+          .addTo(map);
+      }
+
+      if (!userLocation && !document.getElementById('simulation-mode').checked) {
+        startBtn.disabled = true;
+        startBtn.textContent = '⏳ Waiting for location...';
+      }
+
+      console.log('📍 Departure reset to current location');
     }
 
     // Update location status UI
@@ -1383,13 +1671,29 @@ title: Turn-by-Turn Navigation Demo
         console.log('🎬 Simulation mode enabled - location not required');
       } else {
         // Normal mode, check if location is available
-        if (userLocation) {
+        if (userLocation || customDeparture) {
           startBtn.disabled = false;
           startBtn.textContent = 'Start Navigation';
         } else {
           startBtn.disabled = true;
           startBtn.textContent = '⏳ Waiting for location...';
         }
+      }
+    });
+
+    // Handle manual departure coordinate entry
+    document.getElementById('departure-input').addEventListener('change', (e) => {
+      const val = e.target.value.trim();
+
+      if (!val) {
+        useMyLocationAsDeparture();
+        return;
+      }
+
+      const [lng, lat] = val.split(',').map(s => parseFloat(s.trim()));
+      if (!isNaN(lng) && !isNaN(lat)) {
+        setDeparturePoint(lng, lat);
+        map.flyTo({ center: [lng, lat], zoom: 13, duration: 1000 });
       }
     });
 
@@ -1409,7 +1713,7 @@ title: Turn-by-Turn Navigation Demo
 
           // Add destination marker
           destinationMarker = new mapboxgl.Marker({
-            color: '#ef4444',
+            color: '#C8102E',
             scale: 1.2
           })
             .setLngLat([lng, lat])
@@ -1524,11 +1828,19 @@ title: Turn-by-Turn Navigation Demo
       backBtn.classList.add('hidden');
       backBtn.style.display = 'none';
 
-      // Show setup panel
-      document.getElementById('setup-panel').classList.remove('hidden');
-
-      // Restore user location marker if available
-      if (userLocation && !userMarker) {
+      // Restore departure/location marker if available
+      if (customDeparture && !departureMarker) {
+        departureMarker = new mapboxgl.Marker({
+          color: '#0E6B3A',
+          scale: 1.2
+        })
+          .setLngLat([customDeparture.lng, customDeparture.lat])
+          .setPopup(new mapboxgl.Popup().setHTML(
+            `<strong>Departure Point</strong><br>
+             ${customDeparture.lng.toFixed(6)}, ${customDeparture.lat.toFixed(6)}`
+          ))
+          .addTo(map);
+      } else if (userLocation && !userMarker && !customDeparture) {
         userMarker = new mapboxgl.Marker({
           color: '#4264fb',
           scale: 1.2
@@ -1566,10 +1878,10 @@ title: Turn-by-Turn Navigation Demo
         return;
       }
 
-      // In simulation mode, use map center as starting point if no location
-      if (!userLocation && !isSimulationMode) {
+      // In simulation mode, use map center as starting point if no location or custom departure
+      if (!userLocation && !customDeparture && !isSimulationMode) {
         updateLocationStatus('error', 'Location not available',
-          'Please wait for location to be obtained or try again.<br>' +
+          'Please wait for location to be obtained, set a departure point, or try again.<br>' +
           '<button class="btn-retry" onclick="getUserLocation()">🔄 Retry Location</button>');
         return;
       }
@@ -1588,10 +1900,14 @@ title: Turn-by-Turn Navigation Demo
 
         const destination = { lng, lat };
 
-        // Use map center as origin in simulation mode if no user location
-        const origin = userLocation || { lng: map.getCenter().lng, lat: map.getCenter().lat };
+        // Precedence: explicit departure point > live user location > map center (simulation fallback)
+        const origin = customDeparture || userLocation || { lng: map.getCenter().lng, lat: map.getCenter().lat };
 
-        // Remove user marker (navigation will handle it)
+        // Remove departure/user markers (navigation will handle showing the puck)
+        if (departureMarker) {
+          departureMarker.remove();
+          departureMarker = null;
+        }
         if (userMarker) {
           userMarker.remove();
           userMarker = null;
@@ -1618,9 +1934,6 @@ title: Turn-by-Turn Navigation Demo
         // Prime speech synthesis for iOS (must be done from user interaction)
         navigation.primeSpeechSynthesis();
 
-        // Hide setup panel
-        document.getElementById('setup-panel').classList.add('hidden');
-
         // Show navigation UI
         navigationUI.show();
 
@@ -1646,7 +1959,6 @@ title: Turn-by-Turn Navigation Demo
           `<strong>Error:</strong> ${error.message}<br>` +
           'Please check your connection and try again.<br>' +
           '<button class="btn-retry" onclick="startNavigation()">🔄 Retry Navigation</button>');
-        document.getElementById('setup-panel').classList.remove('hidden');
         const backBtn = document.getElementById('back-to-setup-btn');
         backBtn.classList.add('hidden');
         backBtn.style.display = 'none';
@@ -1679,7 +1991,7 @@ title: Turn-by-Turn Navigation Demo
 
       // Add destination marker
       destinationMarker = new mapboxgl.Marker({
-        color: '#ef4444',
+        color: '#C8102E',
         scale: 1.2
       })
         .setLngLat([nearbyLng, nearbyLat])
@@ -1700,70 +2012,55 @@ title: Turn-by-Turn Navigation Demo
 
       // Show feedback
       const destInput = document.getElementById('destination-input');
-      destInput.style.borderColor = '#10b981';
-      destInput.style.backgroundColor = '#ecfdf5';
+      destInput.style.borderColor = '#0E6B3A';
+      destInput.style.backgroundColor = '#E3EEE7';
       setTimeout(() => {
         destInput.style.borderColor = '';
         destInput.style.backgroundColor = '';
       }, 1000);
     }
 
-    // Allow clicking on map to set destination
+    // Allow clicking on map to set departure or destination
     map.on('click', (e) => {
-      const setupPanel = document.getElementById('setup-panel');
+      const isNavigating = navigation && navigation.state && navigation.state.isNavigating;
 
-      // Check if in map picker mode or if panel is visible
-      if (isMapPickerMode || !setupPanel.classList.contains('hidden')) {
+      // Check if in map picker mode, or setting up (not yet navigating)
+      if (isMapPickerMode || !isNavigating) {
         const lng = e.lngLat.lng;
         const lat = e.lngLat.lat;
 
-        // Update input field
-        document.getElementById('destination-input').value = `${lng.toFixed(6)},${lat.toFixed(6)}`;
-
-        // Remove previous destination marker if exists
-        if (destinationMarker) {
-          destinationMarker.remove();
-        }
-
-        // Add new destination marker
-        destinationMarker = new mapboxgl.Marker({
-          color: '#ef4444', // Red color for destination
-          scale: 1.2
-        })
-          .setLngLat([lng, lat])
-          .setPopup(new mapboxgl.Popup().setHTML(
-            `<strong>Destination</strong><br>
-             ${lng.toFixed(6)}, ${lat.toFixed(6)}`
-          ))
-          .addTo(map);
-
-        console.log('📍 Destination set on map:', lng.toFixed(6), lat.toFixed(6));
+        // Outside of explicit map-picker mode, plain clicks always set the destination
+        const target = isMapPickerMode ? mapPickerTarget : 'destination';
+        const marker = target === 'departure' ? setDeparturePoint(lng, lat) : setDestinationPoint(lng, lat);
 
         // If in map picker mode, show confirmation and close picker
         if (isMapPickerMode) {
-          destinationMarker.togglePopup();
+          marker.togglePopup();
           setTimeout(() => {
-            if (destinationMarker.getPopup().isOpen()) {
-              destinationMarker.togglePopup();
+            if (marker.getPopup().isOpen()) {
+              marker.togglePopup();
             }
             closeMapPicker();
           }, 1500);
         } else {
           // Normal mode - show popup briefly
-          destinationMarker.togglePopup();
+          marker.togglePopup();
           setTimeout(() => {
-            if (destinationMarker.getPopup().isOpen()) {
-              destinationMarker.togglePopup();
+            if (marker.getPopup().isOpen()) {
+              marker.togglePopup();
             }
           }, 2000);
 
           // Visual feedback on input field
-          const destInput = document.getElementById('destination-input');
-          destInput.style.borderColor = '#ef4444';
-          destInput.style.backgroundColor = '#fef2f2';
+          const inputId = target === 'departure' ? 'departure-input' : 'destination-input';
+          const targetInput = document.getElementById(inputId);
+          const color = target === 'departure' ? '#0E6B3A' : '#C8102E';
+          const bg = target === 'departure' ? '#E3EEE7' : '#FBE9EB';
+          targetInput.style.borderColor = color;
+          targetInput.style.backgroundColor = bg;
           setTimeout(() => {
-            destInput.style.borderColor = '';
-            destInput.style.backgroundColor = '';
+            targetInput.style.borderColor = '';
+            targetInput.style.backgroundColor = '';
           }, 1000);
         }
       }

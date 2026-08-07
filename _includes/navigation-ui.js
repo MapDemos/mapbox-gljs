@@ -39,6 +39,7 @@ class NavigationUI {
 
         <!-- Instruction Banner -->
         <div class="nav-instruction-banner">
+          <div class="nav-turn-icon" aria-hidden="true"><span class="chevron"></span></div>
           <div class="nav-instruction-text">
             <div class="nav-instruction-primary" id="nav-instruction">
               Waiting for route...
@@ -87,12 +88,12 @@ class NavigationUI {
       .nav-ui-container {
         position: relative;
         z-index: 1000;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        font-family: var(--font-body, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
       }
 
       .nav-controls {
         position: fixed;
-        left: 10px;
+        left: 400px;
         top: 50%;
         transform: translateY(-50%);
         display: flex;
@@ -105,8 +106,8 @@ class NavigationUI {
         width: 40px;
         height: 40px;
         padding: 0;
-        border: none;
-        border-radius: 8px;
+        border: 2px solid var(--green, #0E6B3A);
+        border-radius: 6px;
         font-size: 16px;
         cursor: pointer;
         transition: all 0.2s;
@@ -116,17 +117,48 @@ class NavigationUI {
         box-shadow: 0 2px 8px rgba(0,0,0,0.2);
       }
 
+      /* Turn instruction - rendered as a highway guide-sign panel (the page's signature element) */
       .nav-instruction-banner {
         position: fixed;
         top: 10px;
-        left: 10px;
+        left: 400px;
         right: 10px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 15px 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        background: var(--green, #0E6B3A);
+        color: var(--cream, #F6F3EA);
+        padding: 14px 20px;
+        border: 3px solid var(--cream, #F6F3EA);
+        box-shadow: 0 0 0 2px var(--green-dark, #0A4C29), 0 4px 20px rgba(0,0,0,0.3);
+        border-radius: 4px;
         z-index: 1000;
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .nav-instruction-banner {
+          animation: nav-sign-drop 0.45s ease-out;
+        }
+      }
+      @keyframes nav-sign-drop {
+        from { opacity: 0; transform: translateY(-14px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .nav-turn-icon {
+        flex: none;
+        width: 34px;
+        height: 34px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .nav-turn-icon .chevron {
+        width: 16px;
+        height: 16px;
+        border-top: 4px solid var(--cream, #F6F3EA);
+        border-right: 4px solid var(--cream, #F6F3EA);
+        transform: rotate(45deg);
       }
 
       .nav-instruction-text {
@@ -134,25 +166,31 @@ class NavigationUI {
       }
 
       .nav-instruction-primary {
+        font-family: var(--font-body, sans-serif);
         font-size: 16px;
         font-weight: 600;
-        margin-bottom: 5px;
+        margin-bottom: 4px;
       }
 
       .nav-instruction-distance {
-        font-size: 22px;
-        font-weight: 700;
+        font-family: var(--font-display, sans-serif);
+        font-size: 24px;
+        font-weight: 800;
+        color: #FFC94D;
+        letter-spacing: 0.01em;
+        font-variant-numeric: tabular-nums;
       }
 
+      /* Trip computer - dashboard instrument-cluster motif, distinct material from the sign banner */
       .nav-info-panel {
         position: fixed;
         top: 95px;
         right: 10px;
-        background: rgba(128, 128, 128, 0.8);
-        color: white;
+        background: var(--asphalt, #1C1D1F);
+        color: var(--cream, #F6F3EA);
         padding: 12px 16px;
-        border-radius: 12px;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+        border-radius: 6px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.3);
         z-index: 1000;
         display: flex;
         gap: 20px;
@@ -165,54 +203,77 @@ class NavigationUI {
       }
 
       .nav-info-label {
-        font-size: 11px;
-        opacity: 0.9;
-        font-weight: 500;
+        font-family: var(--font-display, sans-serif);
+        font-size: 10px;
+        color: rgba(242, 169, 0, 0.85);
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 3px;
+        letter-spacing: 0.06em;
+        margin-bottom: 4px;
       }
 
       .nav-info-value {
+        font-family: var(--font-mono, monospace);
         font-size: 16px;
-        font-weight: 700;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
       }
 
       .nav-button-danger {
-        background: #ef4444;
-        color: white;
+        background: var(--red, #C8102E);
+        color: var(--cream, #F6F3EA);
+        border-color: var(--red, #C8102E);
       }
 
       .nav-button-danger:hover {
-        background: #dc2626;
+        background: #A50D26;
       }
 
       .nav-button-secondary {
-        background: #f3f4f6;
-        color: #374151;
+        background: var(--cream, #F6F3EA);
+        color: var(--green-dark, #0A4C29);
       }
 
       .nav-button-secondary:hover {
-        background: #e5e7eb;
+        background: var(--green-tint, #E3EEE7);
       }
 
       .nav-button-secondary.active {
-        background: #667eea;
-        color: white;
+        background: var(--green, #0E6B3A);
+        color: var(--cream, #F6F3EA);
       }
 
+      /* Status banner - amber caution by default, with a hazard-stripe edge */
       .nav-status {
         position: fixed;
         top: 195px;
-        left: 10px;
+        left: 400px;
         right: 10px;
-        background: #fbbf24;
-        color: #92400e;
-        padding: 12px;
-        border-radius: 8px;
-        font-weight: 600;
+        background: var(--amber, #F2A900);
+        color: var(--asphalt, #1C1D1F);
+        padding: 12px 12px 12px 20px;
+        border-radius: 4px;
+        font-family: var(--font-body, sans-serif);
+        font-weight: 700;
         text-align: center;
         z-index: 1000;
+        overflow: hidden;
+      }
+
+      .nav-status::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 8px;
+        background: repeating-linear-gradient(
+          -45deg,
+          var(--asphalt, #1C1D1F),
+          var(--asphalt, #1C1D1F) 4px,
+          var(--amber, #F2A900) 4px,
+          var(--amber, #F2A900) 8px
+        );
       }
 
       .nav-status.hidden {
@@ -220,13 +281,21 @@ class NavigationUI {
       }
 
       .nav-status.error {
-        background: #ef4444;
-        color: white;
+        background: var(--red, #C8102E);
+        color: var(--cream, #F6F3EA);
+      }
+
+      .nav-status.error::before {
+        background: var(--red, #C8102E);
       }
 
       .nav-status.success {
-        background: #10b981;
-        color: white;
+        background: var(--green, #0E6B3A);
+        color: var(--cream, #F6F3EA);
+      }
+
+      .nav-status.success::before {
+        background: var(--green, #0E6B3A);
       }
 
       @media (max-width: 768px) {
@@ -242,7 +311,17 @@ class NavigationUI {
           top: 5px;
           left: 5px;
           right: 5px;
-          padding: 12px 15px;
+          padding: 10px 15px;
+          gap: 10px;
+        }
+        .nav-turn-icon {
+          width: 26px;
+          height: 26px;
+        }
+        .nav-turn-icon .chevron {
+          width: 12px;
+          height: 12px;
+          border-width: 3px;
         }
         .nav-instruction-primary {
           font-size: 14px;
@@ -266,7 +345,7 @@ class NavigationUI {
           top: 175px;
           left: 5px;
           right: 5px;
-          padding: 10px;
+          padding: 10px 10px 10px 18px;
           font-size: 13px;
         }
       }

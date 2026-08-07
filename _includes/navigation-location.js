@@ -116,15 +116,15 @@ class GLJSLocationPuckController {
                     </filter>
                 </defs>
 
-                <!-- White border -->
-                <circle cx="20" cy="20" r="12" fill="white"/>
+                <!-- Reflective border -->
+                <circle cx="20" cy="20" r="12" fill="var(--cream, #F6F3EA)"/>
 
-                <!-- Blue circle background -->
-                <circle cx="20" cy="20" r="10" fill="#4285F4"/>
+                <!-- Route Green circle background -->
+                <circle cx="20" cy="20" r="10" fill="var(--green, #0E6B3A)"/>
 
                 <!-- Directional triangle with dented back (points upward) -->
                 <path d="M 20 10 L 26 22 L 20 18 L 14 22 Z"
-                      fill="white"
+                      fill="var(--cream, #F6F3EA)"
                       stroke="none"/>
             </svg>
         `;
