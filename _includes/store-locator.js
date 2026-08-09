@@ -470,6 +470,10 @@ let currentZoom = 11;
 // (e.g. a full address) for display, which must not be treated as a filter query.
 let searchFilterQuery = '';
 
+// Set by initMobileSheet() once wired up; collapses the mobile bottom sheet so
+// the map (and any popup) is visible after a store is selected.
+let collapseMobileSheet = null;
+
 // Will be initialized after data loads
 let filteredStores = [];
 
@@ -1098,7 +1102,15 @@ function showPopup(feature) {
   currentPopup = new mapboxgl.Popup({
     offset: 90,
     closeButton: false,
-    closeOnClick: false
+    closeOnClick: false,
+    // Always show the popup above the marker, not auto-detected: the
+    // selected store is deliberately positioned south-of-center via
+    // getCenterOffset() to leave room above it for exactly this. Without
+    // forcing it, Mapbox can pick 'top' (box below the marker) based on a
+    // stale height measurement taken before the popup's image/content
+    // finishes loading, which then overflows into (or behind) the mobile
+    // bottom sheet.
+    anchor: 'bottom'
   })
     .setLngLat(feature.geometry.coordinates)
     .setHTML(createPopupContent(feature))
@@ -1156,6 +1168,10 @@ function selectStore(storeId) {
       duration: 1000
     });
   }
+
+  // On mobile, reveal the map (and the popup about to show on it) instead of
+  // leaving the bottom sheet expanded over it. No-op/inert on desktop.
+  if (collapseMobileSheet) collapseMobileSheet();
 }
 
 // Initialize brand filters
@@ -1718,6 +1734,78 @@ function initUIEvents() {
 
   // Floating clear-filters button (shown over the map when a filter is active)
   document.getElementById('floating-clear-filters').addEventListener('click', clearFilters);
+
+  initMobileSheet();
+}
+
+// Mobile bottom-sheet: drag-to-resize (R055) + explicit リスト/地図 tabs (R053)
+// with 3 snap states. CSS-inert on desktop (the media query gives these
+// elements/classes their positioning), so this is safe to always wire up.
+function initMobileSheet() {
+  const sidebar = document.getElementById('sidebar');
+  const handleBar = document.getElementById('sheet-handle-bar');
+  const tabList = document.getElementById('tab-list');
+  const tabMap = document.getElementById('tab-map');
+
+  const COLLAPSED_PX = 76;
+  const getDefaultPx = () => window.innerHeight * 0.45;
+  const getExpandedPx = () => window.innerHeight * 0.9;
+
+  function setSheetState(state) {
+    sidebar.classList.remove('sheet-collapsed', 'sheet-expanded');
+    sidebar.style.height = ''; // let CSS drive height for the target state
+    if (state === 'collapsed') sidebar.classList.add('sheet-collapsed');
+    if (state === 'expanded') sidebar.classList.add('sheet-expanded');
+    tabList.classList.toggle('active', state === 'expanded');
+    tabMap.classList.toggle('active', state === 'collapsed');
+  }
+
+  tabList.addEventListener('click', () => setSheetState('expanded'));
+  tabMap.addEventListener('click', () => setSheetState('collapsed'));
+
+  // Collapse the sheet when a store is selected, so the map (and its popup)
+  // is actually visible - mirrors the "地図" tab, but automatic.
+  collapseMobileSheet = () => setSheetState('collapsed');
+
+  let dragStartY = null;
+  let dragStartHeight = null;
+
+  handleBar.addEventListener('pointerdown', (e) => {
+    dragStartY = e.clientY;
+    dragStartHeight = sidebar.getBoundingClientRect().height;
+    sidebar.classList.add('sheet-dragging');
+    handleBar.setPointerCapture(e.pointerId);
+  });
+
+  handleBar.addEventListener('pointermove', (e) => {
+    if (dragStartY === null) return;
+    const delta = dragStartY - e.clientY; // dragging up = taller sheet
+    const newHeight = Math.min(getExpandedPx(), Math.max(COLLAPSED_PX, dragStartHeight + delta));
+    sidebar.style.height = `${newHeight}px`;
+  });
+
+  function endDrag() {
+    if (dragStartY === null) return;
+    const currentHeight = sidebar.getBoundingClientRect().height;
+    dragStartY = null;
+    sidebar.classList.remove('sheet-dragging');
+
+    // Snap to whichever of the 3 states is closest to where the drag ended
+    const targets = { collapsed: COLLAPSED_PX, default: getDefaultPx(), expanded: getExpandedPx() };
+    let closest = 'default';
+    let closestDist = Infinity;
+    Object.entries(targets).forEach(([state, px]) => {
+      const dist = Math.abs(currentHeight - px);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closest = state;
+      }
+    });
+    setSheetState(closest);
+  }
+
+  handleBar.addEventListener('pointerup', endDrag);
+  handleBar.addEventListener('pointercancel', endDrag);
 }
 
 // Initialize everything

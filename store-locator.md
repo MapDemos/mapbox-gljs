@@ -377,11 +377,21 @@ js: store-locator.js
     }
 
     /* Popup styles */
+    .mapboxgl-popup {
+      /* Above the mobile bottom sheet (z-index 10) - the sheet is an overlay
+         Mapbox's own container-based collision detection doesn't know about,
+         so an anchor choice that places the popup low can still end up
+         visually behind the sheet without this. */
+      z-index: 50;
+    }
+
     .mapboxgl-popup-content {
       padding: 0;
       border-radius: 0;
       overflow: hidden;
       width: 380px;
+      max-width: 100%; /* respect Mapbox's own edge-avoidance max-width on the wrapper */
+      box-sizing: border-box;
       background: rgba(255, 255, 255, 0.95);
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
@@ -604,19 +614,107 @@ js: store-locator.js
       box-shadow: 0 3px 10px rgba(0,0,0,0.4);
     }
 
-    /* Mobile responsive */
+    /* Bottom-sheet drag handle + list/map tabs - mobile only, hidden on desktop */
+    #sheet-handle-bar {
+      display: none;
+    }
+
+    #mobile-view-tabs {
+      display: none;
+    }
+
+    /* Mobile responsive - map fills the screen, sidebar becomes a draggable
+       bottom sheet over it with 3 snap states (collapsed/default/expanded) */
     @media (max-width: 768px) {
       #container {
+        position: relative;
         flex-direction: column;
       }
 
-      #sidebar {
-        width: 100%;
-        height: 50vh;
+      #map {
+        height: 100%;
       }
 
-      #map {
-        height: 50vh;
+      /* Keep the whole popup (header+body+footer) comfortably short on
+         phones, so it fits above the bottom sheet regardless of which side
+         Mapbox chooses to anchor it toward. */
+      .popup-body {
+        max-height: 32vh;
+      }
+
+      #sidebar {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        height: 45vh; /* default state */
+        max-height: 90vh;
+        min-height: 76px;
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.3);
+        z-index: 10;
+        transition: height 0.25s ease;
+      }
+
+      #sidebar.sheet-dragging {
+        transition: none;
+      }
+
+      #sidebar.sheet-collapsed {
+        height: 76px;
+      }
+
+      #sidebar.sheet-expanded {
+        height: 90vh;
+      }
+
+      #sheet-handle-bar {
+        display: flex;
+        justify-content: center;
+        padding: 8px 0 6px;
+        background-color: white;
+        border-radius: 16px 16px 0 0;
+        touch-action: none;
+        cursor: grab;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        flex-shrink: 0;
+      }
+
+      #sheet-handle {
+        width: 36px;
+        height: 4px;
+        border-radius: 2px;
+        background-color: #ccc;
+      }
+
+      #mobile-view-tabs {
+        display: flex;
+        gap: 8px;
+        padding: 0 16px 10px;
+        background-color: white;
+        position: sticky;
+        top: 20px;
+        z-index: 2;
+        flex-shrink: 0;
+      }
+
+      .mobile-tab {
+        flex: 1;
+        padding: 9px;
+        border: none;
+        border-radius: 6px;
+        background-color: #eee;
+        color: #333;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .mobile-tab.active {
+        background-color: #ED1C24;
+        color: white;
       }
     }
 
@@ -673,6 +771,11 @@ js: store-locator.js
 <body>
   <div id="container">
     <div id="sidebar">
+      <div id="sheet-handle-bar" aria-hidden="true"><span id="sheet-handle"></span></div>
+      <div id="mobile-view-tabs">
+        <button id="tab-list" class="mobile-tab active" type="button">リスト</button>
+        <button id="tab-map" class="mobile-tab" type="button">地図</button>
+      </div>
       <div id="sidebar-header">
         <div class="search-container">
           <input type="text" id="search-box" name="search" placeholder="ブランド・地名・駅名で探す" autocomplete="off">
