@@ -137,6 +137,20 @@ js: store-locator.js
       opacity: 0.8;
     }
 
+    #store-list-link {
+      display: block;
+      padding: 0 15px 8px;
+      color: white;
+      font-size: 12px;
+      text-align: right;
+      opacity: 0.85;
+    }
+
+    #store-list-link:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+
     .filter-section {
       background-color: white;
       margin: 0;
@@ -950,6 +964,7 @@ js: store-locator.js
           <div id="search-suggestions"></div>
         </div>
         <button id="clear-filters">条件をクリアする</button>
+        <a id="store-list-link" href="store-list.html">全店舗一覧を見る</a>
 
         <div class="filter-section">
           <button class="filter-header" id="brand-filter-toggle">
