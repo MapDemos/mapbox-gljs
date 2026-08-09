@@ -2,6 +2,16 @@
 const SKYLARK_DATA_FILE = 'skylark-stores.json'; // Local JSON file with store data
 const USE_REAL_DATA = true; // Set to false to use dummy data only
 
+// Map configuration - initial view, zoom limits, and pan bounds
+const MAP_CONFIG = {
+  INITIAL_CENTER: [138.2529, 36.2048], // Japan-wide overview centroid
+  INITIAL_ZOOM: 5, // nationwide overview shown before geolocation resolves
+  MIN_ZOOM: 4,
+  MAX_ZOOM: 18,
+  MAX_BOUNDS: [[122.0, 20.0], [154.5, 46.5]], // SW/NE, Japan + margin (Okinawa-Hokkaido)
+  GEOLOCATE_ZOOM: 15 // zoom level flown to once the user's location is found
+};
+
 // Store data - will be populated from API or use dummy data as fallback
 let storeData = {
   type: 'FeatureCollection',
@@ -297,6 +307,9 @@ async function loadStoresFromAPI(mapBounds) {
         const menuUrlMatch = menuHtml.match(/href="([^"]+)"/);
         const menuUrl = menuUrlMatch ? menuUrlMatch[1] : null;
 
+        const reservationUrl = extra['Web予約サイトURL'] || null;
+        const notice = extra['お知らせ'] || null;
+
         return {
           type: 'Feature',
           geometry: {
@@ -321,6 +334,8 @@ async function loadStoresFromAPI(mapBounds) {
             hasParking: parkingInfo.hasParking,
             hasDisabledParking: parkingInfo.hasDisabledParking,
             menuUrl: menuUrl,
+            reservationUrl: reservationUrl,
+            notice: notice,
             amenityFlags: amenityFlags
           }
         };
@@ -389,6 +404,11 @@ let map;
 let selectedStoreId = null;
 let currentPopup = null;
 let currentZoom = 11;
+
+// The user's typed search query, tracked separately from #search-box's displayed
+// value - selecting a suggestion overwrites the input with a resolved place label
+// (e.g. a full address) for display, which must not be treated as a filter query.
+let searchFilterQuery = '';
 
 // Will be initialized after data loads
 let filteredStores = [];
@@ -546,8 +566,11 @@ function initMap() {
   map = new mapboxgl.Map({
     container: 'map',
     style: 'mapbox://styles/kenji-shima/cmp0s13iw000101sdhqok52gy',
-    center: [139.7025, 35.6895], // Center on Tokyo
-    zoom: 11,
+    center: MAP_CONFIG.INITIAL_CENTER,
+    zoom: MAP_CONFIG.INITIAL_ZOOM,
+    minZoom: MAP_CONFIG.MIN_ZOOM,
+    maxZoom: MAP_CONFIG.MAX_ZOOM,
+    maxBounds: MAP_CONFIG.MAX_BOUNDS,
     language: 'ja'
   });
 
@@ -590,9 +613,17 @@ function initMap() {
       positionOptions: { enableHighAccuracy: true },
       trackUserLocation: false,
       showUserLocation: true,
-      fitBoundsOptions: { maxZoom: 15 }
+      fitBoundsOptions: { maxZoom: MAP_CONFIG.GEOLOCATE_ZOOM }
     });
     map.addControl(geolocateControl, 'top-right');
+
+    // Fallback when location permission is denied or unavailable: stay on the
+    // Japan-wide overview (MAP_CONFIG.INITIAL_CENTER/INITIAL_ZOOM) rather than
+    // getting stuck - the store list still sorts by distance from that view's
+    // center via updateStoreListImmediate().
+    geolocateControl.on('error', () => {
+      console.log('Geolocation unavailable or denied — staying on default Japan-wide view');
+    });
 
     // Trigger it automatically on load so the map centers on the user's
     // location right away, without requiring them to click the button first.
@@ -780,6 +811,50 @@ function updateMapLayers() {
   console.log(`Zoom ${zoom.toFixed(1)}: ${visibleStores.length} visible of ${filteredStores.length} total | ${Object.keys(groups).length} groups, ${individualStores.length} individual stores`);
 }
 
+// Parse an "HH:MM～HH:MM" (or "24時間") hours string into minutes-of-day.
+// closeMin may exceed 1440 when the range crosses midnight.
+function parseHoursRange(text) {
+  if (!text) return null;
+  if (text.includes('24時間')) return { openMin: 0, closeMin: 1440 };
+  const m = text.match(/(\d{1,2}):(\d{2})[～\-~](\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const openMin = Number(m[1]) * 60 + Number(m[2]);
+  let closeMin = Number(m[3]) * 60 + Number(m[4]);
+  if (closeMin <= openMin) closeMin += 1440; // crosses midnight
+  return { openMin, closeMin };
+}
+
+// Whether a store is open right now, given its weekday/weekend hours text.
+// Returns true/false, or null if the hours text isn't parseable (e.g. "お問い合わせください").
+function getOpenStatus(weekdayHours, weekendHours) {
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun..6=Sat
+  const isWeekend = d => d === 0 || d === 6;
+  const todayText = isWeekend(day) ? weekendHours : weekdayHours;
+  const yesterdayText = isWeekend((day + 6) % 7) ? weekendHours : weekdayHours;
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+
+  const today = parseHoursRange(todayText);
+  if (today && nowMin >= today.openMin && nowMin < today.closeMin) return true;
+
+  // Carry-over check: still open from yesterday's overnight hours (e.g. 8:00-26:00)
+  const yesterday = parseHoursRange(yesterdayText);
+  if (yesterday && yesterday.closeMin > 1440 && nowMin < yesterday.closeMin - 1440) return true;
+
+  if (today || yesterday) return false;
+  return null;
+}
+
+// Great-circle distance in km between two [lng, lat] coordinates
+function getDistanceKm([lng1, lat1], [lng2, lat2]) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 // Calculate center offset to position store south of center
 function getCenterOffset(coordinates, zoom) {
   // Offset latitude to shift the visual center northward
@@ -871,13 +946,28 @@ function createPopupContent(feature) {
     : props.hours;
 
   const amenitiesText = amenities.length ? amenities.join('／') : 'なし';
+  const showAmenitiesToggle = amenities.length > 2;
 
   const menuButton = props.menuUrl
     ? `<a class="popup-menu-btn" href="${props.menuUrl}" target="_blank" rel="noopener">メニュー表示</a>`
     : '';
 
+  const reserveButton = props.reservationUrl
+    ? `<a class="popup-reserve-btn" href="${props.reservationUrl}" target="_blank" rel="noopener">予約する</a>`
+    : '';
+
+  const openStatus = getOpenStatus(hours.weekday, hours.weekend);
+  const openStatusBadge = openStatus === null
+    ? ''
+    : `<span class="popup-open-status ${openStatus ? 'is-open' : 'is-closed'}">${openStatus ? '営業中' : '営業時間外'}</span>`;
+
+  const noticeBanner = props.notice
+    ? `<div class="popup-notice">${props.notice}</div>`
+    : '';
+
   return `
     <div class="popup-header">
+      <img class="popup-brand-logo" src="${props.brandIcon}" alt="${props.brand}">
       <h3>${props.name}</h3>
       <button class="popup-close" onclick="closePopup()">
         <svg width="14" height="14" viewBox="0 0 14 14">
@@ -887,11 +977,16 @@ function createPopupContent(feature) {
       </button>
     </div>
     <div class="popup-body">
+      ${noticeBanner}
+      <div class="popup-section">
+        <div class="popup-label">住所</div>
+        <div class="popup-value">${props.address}</div>
+      </div>
       <div class="popup-section">
         <div class="popup-label">営業時間</div>
         <div class="popup-value popup-value-bold">
           （平日）：${hours.weekday}<br>
-          （土日祝日）：${hours.weekend}
+          （土日祝日）：${hours.weekend} ${openStatusBadge}
         </div>
       </div>
       <div class="popup-section">
@@ -908,12 +1003,20 @@ function createPopupContent(feature) {
       ` : ''}
       <div class="popup-section">
         <div class="popup-label">設備・サービス</div>
-        <div class="popup-value popup-value-amenities">${amenitiesText}</div>
+        <div class="popup-value">
+          <div class="popup-value-amenities">${amenitiesText}</div>
+          ${showAmenitiesToggle ? `<button class="popup-amenities-toggle" onclick="
+            const el = this.previousElementSibling;
+            const expanded = el.classList.toggle('expanded');
+            this.textContent = expanded ? '閉じる' : 'もっと見る';
+          ">もっと見る</button>` : ''}
+        </div>
       </div>
     </div>
     <div class="popup-footer">
       <button class="popup-details-btn">詳細</button>
       ${menuButton}
+      ${reserveButton}
     </div>
   `;
 }
@@ -1044,7 +1147,7 @@ function initAmenityFilters() {
 
 // Apply filters
 function applyFilters() {
-  const searchText = document.getElementById('search-box').value.toLowerCase();
+  const searchText = searchFilterQuery.toLowerCase();
   const selectedBrands = Array.from(
     document.querySelectorAll('#brand-filters .brand-filter.active')
   ).map(btn => btn.dataset.brand);
@@ -1134,7 +1237,17 @@ function updateStoreListImmediate() {
   // Filter by viewport WITHOUT padding - show only truly visible stores in list
   // (Map uses padding for smooth rendering, but list should match what user sees)
   const bounds = map.getBounds();
-  currentVisibleStores = getVisibleStores(filteredStores, bounds, 0); // No padding
+  const center = map.getCenter();
+  const centerCoords = [center.lng, center.lat];
+
+  // Sort by distance from the map's current center (not the user's GPS position),
+  // so the list re-orders live as the viewport pans/zooms.
+  currentVisibleStores = getVisibleStores(filteredStores, bounds, 0) // No padding
+    .slice()
+    .sort((a, b) =>
+      getDistanceKm(centerCoords, a.geometry.coordinates) -
+      getDistanceKm(centerCoords, b.geometry.coordinates)
+    );
 
   // Reset display counter
   displayedCount = 0;
@@ -1167,7 +1280,7 @@ function appendStoreListBatch() {
     const props = feature.properties;
 
     const storeItem = document.createElement('div');
-    storeItem.className = 'store-item';
+    storeItem.className = props.id === selectedStoreId ? 'store-item active' : 'store-item';
     storeItem.dataset.storeId = props.id;
 
     const parkingBadge = props.hasParking
@@ -1231,6 +1344,14 @@ function appendStoreListBatch() {
   storeList.appendChild(fragment);
   displayedCount += storesToAdd;
 
+  // If the selected store just got (re)rendered, scroll it into view - the
+  // list is rebuilt from scratch on every moveend, so this can't rely on the
+  // one-time scrollIntoView() in selectStore() surviving the rebuild.
+  if (selectedStoreId !== null && newStores.some(f => f.properties.id === selectedStoreId)) {
+    const activeItem = storeList.querySelector('.store-item.active');
+    if (activeItem) activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
   // Add loading indicator if there are more stores to show
   if (displayedCount < currentVisibleStores.length) {
     const loadingDiv = document.createElement('div');
@@ -1276,6 +1397,7 @@ function updateStoreCount() {
 function clearFilters() {
   // Clear search box
   document.getElementById('search-box').value = '';
+  searchFilterQuery = '';
 
   // Deselect all brand filters (no selection = show all brands)
   document.querySelectorAll('#brand-filters .brand-filter').forEach(btn => {
@@ -1296,8 +1418,8 @@ function clearFilters() {
 
   // Reset map view
   map.flyTo({
-    center: [139.7025, 35.6895],
-    zoom: 11,
+    center: MAP_CONFIG.INITIAL_CENTER,
+    zoom: MAP_CONFIG.INITIAL_ZOOM,
     duration: 1000
   });
 }
@@ -1434,8 +1556,10 @@ function initSearch() {
 
       const [lng, lat] = feature.geometry.coordinates;
 
-      // Update input with selected place name
+      // Update input with selected place name (a navigation label, not a filter
+      // query - clear the tracked query so it doesn't get treated as one)
       searchBox.value = suggestion.full_address || suggestion.place_formatted || suggestion.name;
+      searchFilterQuery = '';
 
       // Hide suggestions
       suggestionsContainer.classList.remove('active');
@@ -1457,6 +1581,7 @@ function initSearch() {
       if (suggestion.geometry && suggestion.geometry.coordinates) {
         const [lng, lat] = suggestion.geometry.coordinates;
         searchBox.value = suggestion.full_address || suggestion.name;
+        searchFilterQuery = '';
         suggestionsContainer.classList.remove('active');
         suggestionsContainer.innerHTML = '';
         sessionToken = generateSessionToken();
@@ -1474,7 +1599,9 @@ function initSearch() {
 
   // Add event listener with debounce
   searchBox.addEventListener('input', debounce((e) => {
-    getSuggestions(e.target.value.trim());
+    const query = e.target.value.trim();
+    searchFilterQuery = query;
+    getSuggestions(query);
   }, 300));
 
   // Close suggestions when clicking outside

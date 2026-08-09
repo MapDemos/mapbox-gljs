@@ -393,12 +393,23 @@ js: store-locator.js
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 10px;
+    }
+
+    .popup-brand-logo {
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      object-fit: contain;
+      background: white;
+      flex-shrink: 0;
     }
 
     .popup-header h3 {
       margin: 0;
       font-size: 16px;
       font-weight: 700;
+      flex: 1;
     }
 
     .popup-close {
@@ -452,6 +463,56 @@ js: store-locator.js
 
     .popup-value-amenities {
       font-size: 16px;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .popup-value-amenities.expanded {
+      -webkit-line-clamp: unset;
+      overflow: visible;
+    }
+
+    .popup-amenities-toggle {
+      background: none;
+      border: none;
+      padding: 2px 0 0;
+      margin: 0;
+      color: rgb(51, 146, 249);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .popup-open-status {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 12px;
+      font-weight: 700;
+      vertical-align: middle;
+    }
+
+    .popup-open-status.is-open {
+      background-color: #E6F4EA;
+      color: #1E7E34;
+    }
+
+    .popup-open-status.is-closed {
+      background-color: #F1F1F1;
+      color: #666;
+    }
+
+    .popup-notice {
+      background-color: #FFF3CD;
+      color: #664D03;
+      border: 1px solid #FFE69C;
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-size: 13px;
+      line-height: 1.4;
+      margin-bottom: 12px;
     }
 
     .popup-footer {
@@ -497,6 +558,25 @@ js: store-locator.js
 
     .popup-menu-btn:hover {
       background-color: #2f7fd6;
+    }
+
+    .popup-reserve-btn {
+      flex: 1;
+      display: inline-block;
+      background-color: #2E7D32;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: center;
+      text-decoration: none;
+    }
+
+    .popup-reserve-btn:hover {
+      background-color: #276a2b;
     }
 
     /* Custom marker styles */
