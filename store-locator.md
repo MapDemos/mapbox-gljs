@@ -542,6 +542,19 @@ js: store-locator.js
       overflow: visible;
     }
 
+    .popup-directions-link {
+      display: block;
+      margin-top: 4px;
+      color: rgb(51, 146, 249);
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .popup-directions-link:hover {
+      text-decoration: underline;
+    }
+
     .popup-amenities-toggle {
       background: none;
       border: none;

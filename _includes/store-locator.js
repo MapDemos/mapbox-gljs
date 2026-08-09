@@ -1085,7 +1085,10 @@ function createPopupContent(feature) {
       ${noticeBanner}
       <div class="popup-section">
         <div class="popup-label">住所</div>
-        <div class="popup-value">${props.address}</div>
+        <div class="popup-value">
+          ${props.address}
+          <a class="popup-directions-link" href="https://www.google.com/maps/dir/?api=1&destination=${feature.geometry.coordinates[1]},${feature.geometry.coordinates[0]}" target="_blank" rel="noopener">ルートを見る</a>
+        </div>
       </div>
       <div class="popup-section">
         <div class="popup-label">営業時間</div>
