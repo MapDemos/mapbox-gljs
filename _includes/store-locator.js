@@ -1578,7 +1578,7 @@ function initSearch() {
         `language=ja&` +
         `country=JP&` +
         `proximity=${center.lng},${center.lat}&` +
-        `types=place,address,poi,street,locality,neighborhood&` +
+        `types=region,place,address,poi,street,locality,neighborhood&` +
         `limit=5`
       );
 
@@ -1671,12 +1671,19 @@ function initSearch() {
       // Generate new session token for next search
       sessionToken = generateSessionToken();
 
-      // Fly to the location
-      map.flyTo({
-        center: [lng, lat],
-        zoom: 14,
-        duration: 1000
-      });
+      // Large results (prefectures, cities) come back with a bbox - fit to
+      // that instead of always flying to a fixed street-level zoom, which
+      // would show only a tiny corner of a whole prefecture.
+      if (feature.properties && feature.properties.bbox) {
+        const [west, south, east, north] = feature.properties.bbox;
+        map.fitBounds([[west, south], [east, north]], { padding: 40, duration: 1000 });
+      } else {
+        map.flyTo({
+          center: [lng, lat],
+          zoom: 14,
+          duration: 1000
+        });
+      }
     } catch (error) {
       console.error('Error retrieving suggestion details:', error);
       // Fallback: try to use coordinates from suggestion if available
