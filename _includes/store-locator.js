@@ -754,6 +754,22 @@ function initMap() {
         }
       });
 
+      // Route preview (walking/driving directions, R046/R047) - under markers
+      map.addSource('route', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+      map.addLayer({
+        id: 'route-line',
+        type: 'line',
+        source: 'route',
+        paint: {
+          'line-color': '#2684FF',
+          'line-width': 5,
+          'line-opacity': 0.8
+        }
+      });
+
       // Add symbol layer for individual stores (brand icons)
       map.addLayer({
         id: 'store-icons',
@@ -1087,7 +1103,11 @@ function createPopupContent(feature) {
         <div class="popup-label">住所</div>
         <div class="popup-value">
           ${props.address}
-          <a class="popup-directions-link" href="https://www.google.com/maps/dir/?api=1&destination=${feature.geometry.coordinates[1]},${feature.geometry.coordinates[0]}" target="_blank" rel="noopener">ルートを見る</a>
+          <div class="popup-route-actions">
+            <button type="button" onclick="showRouteToStore([${feature.geometry.coordinates[0]}, ${feature.geometry.coordinates[1]}], 'walking')">徒歩ルート</button>
+            <button type="button" onclick="showRouteToStore([${feature.geometry.coordinates[0]}, ${feature.geometry.coordinates[1]}], 'driving-traffic')">車ルート</button>
+            <a href="https://www.google.com/maps/dir/?api=1&destination=${feature.geometry.coordinates[1]},${feature.geometry.coordinates[0]}" target="_blank" rel="noopener">Google Mapsで開く</a>
+          </div>
         </div>
       </div>
       <div class="popup-section">
@@ -1170,6 +1190,14 @@ function showPopup(feature) {
     .setLngLat(feature.geometry.coordinates)
     .setHTML(createPopupContent(feature))
     .addTo(map);
+
+  // The popup (with a real, useful, focusable close button and route
+  // actions) is rendered as a child of #map, which is aria-hidden by
+  // default (R062 - map is decorative, list is the primary UI). Hiding an
+  // ancestor of focusable content is an accessibility anti-pattern the
+  // browser itself blocks (and warns about) - so lift aria-hidden while a
+  // popup with real content is actually open.
+  document.getElementById('map').removeAttribute('aria-hidden');
 }
 
 // Close popup
@@ -1181,7 +1209,85 @@ function closePopup() {
   selectedStoreId = null;
   updateSymbolState();
   document.querySelectorAll('.store-item.active').forEach(item => item.classList.remove('active'));
+  clearRoute();
+  // Restore the map's decorative aria-hidden state now that its only
+  // focusable content (the popup) is gone.
+  document.getElementById('map').setAttribute('aria-hidden', 'true');
 }
+
+// Remove any drawn route and hide the route info banner (R046/R047)
+function clearRoute() {
+  if (map.getSource('route')) {
+    map.getSource('route').setData({ type: 'FeatureCollection', features: [] });
+  }
+  const banner = document.getElementById('route-info-banner');
+  if (banner) banner.classList.remove('active');
+}
+window.clearRoute = clearRoute;
+
+// Show the info banner over the map with a route's distance/duration
+function showRouteInfo(profile, distanceKm, durationMin) {
+  const banner = document.getElementById('route-info-banner');
+  const label = profile === 'walking' ? '徒歩' : '車';
+  banner.innerHTML = `
+    <span>${label}ルート: ${distanceKm}km・約${durationMin}分</span>
+    <button onclick="clearRoute()" aria-label="ルートを閉じる" type="button">×</button>
+  `;
+  banner.classList.add('active');
+}
+
+// Fetch and draw a route from the user's current location to a store via
+// the Mapbox Directions API (R046 walking / R047 driving).
+function showRouteToStore(destination, profile) {
+  if (!navigator.geolocation) {
+    alert('この端末では現在地を取得できません');
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(async (position) => {
+    const origin = [position.coords.longitude, position.coords.latitude];
+
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/directions/v5/mapbox/${profile}/` +
+        `${origin[0]},${origin[1]};${destination[0]},${destination[1]}` +
+        `?geometries=geojson&overview=full&access_token=${mapboxgl.accessToken}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Directions API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const route = data.routes && data.routes[0];
+      if (!route) {
+        alert('ルートが見つかりませんでした');
+        return;
+      }
+
+      map.getSource('route').setData({
+        type: 'FeatureCollection',
+        features: [{ type: 'Feature', geometry: route.geometry, properties: {} }]
+      });
+
+      showRouteInfo(profile, (route.distance / 1000).toFixed(1), Math.round(route.duration / 60));
+
+      const coords = route.geometry.coordinates;
+      const bounds = coords.reduce(
+        (b, c) => b.extend(c),
+        new mapboxgl.LngLatBounds(coords[0], coords[0])
+      );
+      map.fitBounds(bounds, { padding: 60, duration: 1000 });
+    } catch (error) {
+      console.error('Directions error:', error);
+      alert('ルート取得中にエラーが発生しました');
+    }
+  }, (error) => {
+    console.error('Geolocation error:', error);
+    alert('現在地を取得できませんでした。位置情報の利用を許可してください。');
+  });
+}
+window.showRouteToStore = showRouteToStore;
 
 // Make closePopup available globally for the popup close button
 window.closePopup = closePopup;

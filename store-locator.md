@@ -361,6 +361,38 @@ js: store-locator.js
       display: flex;
     }
 
+    #route-info-banner {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background-color: white;
+      color: #333;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+      z-index: 10;
+    }
+
+    #route-info-banner.active {
+      display: flex;
+    }
+
+    #route-info-banner button {
+      background: none;
+      border: none;
+      color: #666;
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0;
+    }
+
     #store-count {
       padding: 12px 20px;
       background-color: white;
@@ -571,16 +603,28 @@ js: store-locator.js
       overflow: visible;
     }
 
-    .popup-directions-link {
-      display: block;
-      margin-top: 4px;
+    .popup-route-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .popup-route-actions button,
+    .popup-route-actions a {
+      background: none;
+      border: none;
+      padding: 0;
       color: rgb(51, 146, 249);
       font-size: 13px;
       font-weight: 600;
       text-decoration: none;
+      cursor: pointer;
+      font-family: inherit;
     }
 
-    .popup-directions-link:hover {
+    .popup-route-actions button:hover,
+    .popup-route-actions a:hover {
       text-decoration: underline;
     }
 
@@ -950,6 +994,7 @@ js: store-locator.js
     </div>
 
     <div id="map" aria-hidden="true"></div>
+    <div id="route-info-banner"></div>
     <button id="floating-clear-filters" class="floating-clear-btn">
       <svg width="10" height="10" viewBox="0 0 20 20">
         <path fill="none" stroke="#333" stroke-width="1.5" d="M16,16 L4,4"></path>
