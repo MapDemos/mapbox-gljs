@@ -590,9 +590,15 @@ let areaGroupMarkers = [];
 // Render area-group markers as DOM elements (label + count pill), matching
 // the reference store-locator UI. Native symbol layers can't render a
 // two-tone bordered pill, so these use mapboxgl.Marker instead.
-function renderAreaGroupMarkers(groups) {
+function renderAreaGroupMarkers(groups, tier) {
   areaGroupMarkers.forEach(marker => marker.remove());
   areaGroupMarkers = [];
+
+  // R009: a prefecture-level pill should land on ward/city level when
+  // clicked, not jump straight past it to individual stores; a ward-level
+  // pill can go straight to individual stores since that's the natural next
+  // step down.
+  const targetZoom = tier === 'prefecture' ? 12 : 14;
 
   Object.entries(groups).forEach(([areaName, group]) => {
     const centroid = calculateCentroid(group.coordinates);
@@ -604,7 +610,7 @@ function renderAreaGroupMarkers(groups) {
     el.addEventListener('click', () => {
       map.easeTo({
         center: centroid,
-        zoom: Math.min(currentZoom + 3, 16),
+        zoom: targetZoom,
         duration: 1000
       });
     });
@@ -882,10 +888,24 @@ function updateMapLayers() {
   // This reduces processing from ~255 stores to ~30-80 stores
   const visibleStores = getVisibleStores(filteredStores, bounds);
 
-  const { groups, individualStores } = groupStoresByArea(visibleStores, zoom);
+  // R009: once the viewport has narrowed to a single prefecture, switch to
+  // ward/city-level grouping even if the raw zoom hasn't crossed that
+  // threshold yet - a single giant "prefecture: N" pill isn't useful once
+  // the user has already isolated one prefecture by panning/zooming.
+  let effectiveZoom = zoom;
+  if (zoom < 11) {
+    const distinctPrefectures = new Set(
+      visibleStores.map(f => f.properties.prefecture).filter(Boolean)
+    );
+    if (distinctPrefectures.size === 1) {
+      effectiveZoom = 11;
+    }
+  }
+
+  const { groups, individualStores } = groupStoresByArea(visibleStores, effectiveZoom);
 
   // Render area-group markers as DOM pills (label + count)
-  renderAreaGroupMarkers(groups);
+  renderAreaGroupMarkers(groups, getZoomLevel(effectiveZoom));
 
   // Update individual stores source
   map.getSource('stores').setData({
