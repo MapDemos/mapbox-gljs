@@ -2088,7 +2088,25 @@ function initMobileSheet() {
 }
 
 // Initialize everything
+// Detect devices without WebGL, or with a major GPU performance caveat
+// (typically a software/low-end renderer), and show a clear message
+// instead of a blank map or a cryptic GL error (R066).
+function showWebglFallback() {
+  const mapEl = document.getElementById('map');
+  mapEl.removeAttribute('aria-hidden'); // this message is real content, not decorative
+  mapEl.innerHTML = `
+    <div class="webgl-fallback">
+      <p>お使いの端末・ブラウザは地図の表示に対応していません。</p>
+      <p>別の端末・ブラウザでアクセスするか、最新版のブラウザに更新してからお試しください。</p>
+    </div>
+  `;
+}
+
 function init() {
+  if (!mapboxgl.supported({ failIfMajorPerformanceCaveat: true })) {
+    showWebglFallback();
+    return;
+  }
   initMap();
   initBrandFilters();
   initAmenityFilters();

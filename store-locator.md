@@ -495,6 +495,24 @@ js: store-locator.js
       height: 100vh;
     }
 
+    .webgl-fallback {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 40px;
+      text-align: center;
+      color: #666;
+      background-color: #f8f8f8;
+      box-sizing: border-box;
+    }
+
+    .webgl-fallback p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
     /* Popup styles */
     .mapboxgl-popup {
       /* Above the mobile bottom sheet (z-index 10) - the sheet is an overlay
