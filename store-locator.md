@@ -230,7 +230,39 @@ js: store-locator.js
     }
 
     /* Amenity filter (絞り込み検索) styles */
+    #amenity-filter-wrapper.active {
+      flex-direction: column;
+      flex-wrap: nowrap;
+    }
+
+    .amenity-filter-mode {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .amenity-mode-btn {
+      flex: 1;
+      padding: 6px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background-color: white;
+      color: #666;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .amenity-mode-btn.active {
+      background-color: #ED1C24;
+      border-color: #ED1C24;
+      color: white;
+    }
+
     .amenity-filters {
+      display: flex;
       flex-direction: column;
       flex-wrap: nowrap;
       align-items: stretch;
@@ -812,8 +844,14 @@ js: store-locator.js
               </svg>
             </span>
           </button>
-          <div class="filter-content amenity-filters" id="amenity-filters">
-            <!-- Amenity filters will be populated dynamically -->
+          <div class="filter-content" id="amenity-filter-wrapper">
+            <div class="amenity-filter-mode" id="amenity-filter-mode">
+              <button class="amenity-mode-btn active" id="amenity-mode-and" type="button">すべて満たす</button>
+              <button class="amenity-mode-btn" id="amenity-mode-or" type="button">いずれか満たす</button>
+            </div>
+            <div class="amenity-filters" id="amenity-filters">
+              <!-- Amenity filters will be populated dynamically -->
+            </div>
           </div>
         </div>
       </div>

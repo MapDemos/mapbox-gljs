@@ -18,6 +18,7 @@ function parseUrlState() {
   const params = new URLSearchParams(window.location.search);
   const brands = (params.get('brands') || '').split(',').filter(Boolean);
   const amenities = (params.get('amenities') || '').split(',').filter(Boolean);
+  const amenityMode = params.get('amenityMode') === 'OR' ? 'OR' : 'AND';
   const lat = parseFloat(params.get('lat'));
   const lng = parseFloat(params.get('lng'));
   const zoom = parseFloat(params.get('zoom'));
@@ -25,6 +26,7 @@ function parseUrlState() {
   return {
     brands,
     amenities,
+    amenityMode,
     center: hasPosition ? [lng, lat] : null,
     zoom: hasPosition ? zoom : null,
     hasState: brands.length > 0 || amenities.length > 0 || hasPosition
@@ -45,7 +47,10 @@ function updateUrlFromState() {
 
   const params = new URLSearchParams();
   if (selectedBrands.length) params.set('brands', selectedBrands.join(','));
-  if (selectedAmenities.length) params.set('amenities', selectedAmenities.join(','));
+  if (selectedAmenities.length) {
+    params.set('amenities', selectedAmenities.join(','));
+    if (amenityFilterMode === 'OR') params.set('amenityMode', 'OR');
+  }
   if (map) {
     const center = map.getCenter();
     params.set('lat', center.lat.toFixed(5));
@@ -68,6 +73,12 @@ function restoreFiltersFromUrl() {
   document.querySelectorAll('#amenity-filters .amenity-filter').forEach(btn => {
     if (urlState.amenities.includes(btn.dataset.amenityId)) btn.classList.add('active');
   });
+
+  if (urlState.amenities.length > 0 && urlState.amenityMode === 'OR') {
+    amenityFilterMode = 'OR';
+    document.getElementById('amenity-mode-or').classList.add('active');
+    document.getElementById('amenity-mode-and').classList.remove('active');
+  }
 
   applyFilters();
 }
@@ -473,6 +484,11 @@ let searchFilterQuery = '';
 // Set by initMobileSheet() once wired up; collapses the mobile bottom sheet so
 // the map (and any popup) is visible after a store is selected.
 let collapseMobileSheet = null;
+
+// How multiple selected amenity filters combine: 'AND' (must have all of
+// them) or 'OR' (must have at least one). Toggled via the amenity filter
+// panel's mode buttons.
+let amenityFilterMode = 'AND';
 
 // Will be initialized after data loads
 let filteredStores = [];
@@ -1273,9 +1289,13 @@ function applyFilters() {
       }
     }
 
-    // Amenity filter (絞り込み検索) - AND logic across all selected amenities
+    // Amenity filter (絞り込み検索) - AND (must have all) or OR (must have
+    // at least one) across selected amenities, per amenityFilterMode
     if (selectedAmenities.length > 0) {
-      if (!selectedAmenities.every(id => props.amenityFlags[id])) {
+      const matchesAmenities = amenityFilterMode === 'OR'
+        ? selectedAmenities.some(id => props.amenityFlags[id])
+        : selectedAmenities.every(id => props.amenityFlags[id]);
+      if (!matchesAmenities) {
         return false;
       }
     }
@@ -1510,10 +1530,13 @@ function clearFilters() {
     btn.classList.remove('active');
   });
 
-  // Uncheck all amenity filters
+  // Uncheck all amenity filters and reset AND/OR mode back to the default
   document.querySelectorAll('#amenity-filters .amenity-filter').forEach(btn => {
     btn.classList.remove('active');
   });
+  amenityFilterMode = 'AND';
+  document.getElementById('amenity-mode-and').classList.add('active');
+  document.getElementById('amenity-mode-or').classList.remove('active');
 
   // Clear selection
   selectedStoreId = null;
@@ -1749,11 +1772,29 @@ function initUIEvents() {
 
   // Amenity filter (絞り込み検索) toggle - collapsed by default
   const amenityFilterToggle = document.getElementById('amenity-filter-toggle');
-  const amenityFilters = document.getElementById('amenity-filters');
+  const amenityFilterWrapper = document.getElementById('amenity-filter-wrapper');
 
   amenityFilterToggle.addEventListener('click', () => {
-    amenityFilters.classList.toggle('active');
-    amenityFilterToggle.querySelector('.toggle-icon').classList.toggle('expanded', amenityFilters.classList.contains('active'));
+    amenityFilterWrapper.classList.toggle('active');
+    amenityFilterToggle.querySelector('.toggle-icon').classList.toggle('expanded', amenityFilterWrapper.classList.contains('active'));
+  });
+
+  // AND/OR mode for combining multiple selected amenity filters (R034)
+  const amenityModeAnd = document.getElementById('amenity-mode-and');
+  const amenityModeOr = document.getElementById('amenity-mode-or');
+
+  amenityModeAnd.addEventListener('click', () => {
+    amenityFilterMode = 'AND';
+    amenityModeAnd.classList.add('active');
+    amenityModeOr.classList.remove('active');
+    applyFilters();
+  });
+
+  amenityModeOr.addEventListener('click', () => {
+    amenityFilterMode = 'OR';
+    amenityModeOr.classList.add('active');
+    amenityModeAnd.classList.remove('active');
+    applyFilters();
   });
 
   // Floating clear-filters button (shown over the map when a filter is active)
