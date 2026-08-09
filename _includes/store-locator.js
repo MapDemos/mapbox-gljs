@@ -784,9 +784,7 @@ function initMap() {
             duration: 500
           });
 
-          map.once('moveend', () => {
-            showPopup(feature);
-          });
+          scheduleShowPopupOnMoveEnd(feature);
         }
       });
 
@@ -1090,6 +1088,24 @@ function createPopupContent(feature) {
       ${reserveButton}
     </div>
   `;
+}
+
+// Show a popup once the current flyTo settles - but only if this is still the
+// most recent request. map.once('moveend', ...) alone isn't safe here: if the
+// user starts a new zoom/pan before a pending flyTo's own moveend fires, that
+// same stale listener still fires on the NEXT moveend (the user's unrelated
+// action), popping the old popup back up. A generation counter makes stale
+// requests silently no-op instead.
+let popupRequestId = 0;
+function scheduleShowPopupOnMoveEnd(feature) {
+  const requestId = ++popupRequestId;
+  const handler = () => {
+    map.off('moveend', handler);
+    if (requestId === popupRequestId) {
+      showPopup(feature);
+    }
+  };
+  map.on('moveend', handler);
 }
 
 // Show popup
@@ -1396,9 +1412,7 @@ function appendStoreListBatch() {
         });
 
         // Show popup after zoom animation completes
-        map.once('moveend', () => {
-          showPopup(feature);
-        });
+        scheduleShowPopupOnMoveEnd(feature);
       } else {
         // Already zoomed in, just center and show popup
         const targetZoom = Math.max(currentZoom, 15);
@@ -1410,9 +1424,7 @@ function appendStoreListBatch() {
           duration: 800
         });
 
-        map.once('moveend', () => {
-          showPopup(feature);
-        });
+        scheduleShowPopupOnMoveEnd(feature);
       }
     });
 
@@ -1473,9 +1485,18 @@ function updateStoreCount() {
   // Use no padding to match what's shown in the list
   const visibleStores = getVisibleStores(filteredStores, bounds, 0);
 
-  // Show count of visible stores
-  document.getElementById('store-count').textContent =
-    `${visibleStores.length}件見つかりました`;
+  // Show count of visible stores - 0 gets its own message, 100+ is capped
+  // rather than showing an exact (and unstably-changing) large number.
+  const count = visibleStores.length;
+  let text;
+  if (count === 0) {
+    text = '表示範囲に店舗が見つかりません';
+  } else if (count >= 100) {
+    text = '100件以上見つかりました';
+  } else {
+    text = `${count}件見つかりました`;
+  }
+  document.getElementById('store-count').textContent = text;
 }
 
 // Clear all filters
@@ -1498,15 +1519,11 @@ function clearFilters() {
   selectedStoreId = null;
   closePopup();
 
-  // Re-apply filters
+  // Re-apply filters. Deliberately NOT resetting the map view here - after
+  // searching somewhere and clicking "clear", the user should stay looking at
+  // that area with filters cleared, not get sent back to the Japan-wide
+  // overview (R024: Skylark explicitly flagged the old behavior as a bug).
   applyFilters();
-
-  // Reset map view
-  map.flyTo({
-    center: MAP_CONFIG.INITIAL_CENTER,
-    zoom: MAP_CONFIG.INITIAL_ZOOM,
-    duration: 1000
-  });
 }
 
 // Debounce function to limit API calls
