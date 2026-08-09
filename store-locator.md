@@ -353,6 +353,32 @@ js: store-locator.js
       padding: 0;
     }
 
+    .empty-state-nearest {
+      padding: 24px 20px;
+      text-align: center;
+      color: #666;
+    }
+
+    .empty-state-nearest p {
+      margin: 0 0 12px;
+      font-size: 14px;
+    }
+
+    .nearest-store-link {
+      background-color: #ED1C24;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .nearest-store-link:hover {
+      background-color: #d11920;
+    }
+
     .store-item {
       background-color: white;
       padding: 16px 20px;

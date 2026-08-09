@@ -1190,16 +1190,10 @@ function selectStore(storeId) {
     }
   });
 
-  // Fly to store location
-  const feature = storeData.features.find(f => f.properties.id === storeId);
-  if (feature) {
-    const offsetCenter = getCenterOffset(feature.geometry.coordinates, 12);
-    map.flyTo({
-      center: offsetCenter,
-      zoom: 12,
-      duration: 1000
-    });
-  }
+  // Camera movement is the caller's responsibility (both call sites already
+  // fly to the store while preserving/raising the current zoom rather than
+  // resetting it - R013 wants the current zoom level maintained when a
+  // marker is highlighted, not reset to a fixed value).
 
   // On mobile, reveal the map (and the popup about to show on it) instead of
   // leaving the bottom sheet expanded over it. No-op/inert on desktop.
@@ -1351,6 +1345,41 @@ let displayedCount = 0;
 const batchSize = 20;
 
 // Immediate list update (called by debouncer or when immediate update needed)
+// When no stores are visible in the current viewport, show a link to the
+// nearest one (by distance from the map center) instead of a blank list.
+function showNearestStoreLink(centerCoords) {
+  if (filteredStores.length === 0) return; // nothing to link to (e.g. filters exclude everything)
+
+  let nearest = null;
+  let nearestDist = Infinity;
+  filteredStores.forEach(feature => {
+    const dist = getDistanceKm(centerCoords, feature.geometry.coordinates);
+    if (dist < nearestDist) {
+      nearestDist = dist;
+      nearest = feature;
+    }
+  });
+  if (!nearest) return;
+
+  const storeList = document.getElementById('store-list');
+  const emptyState = document.createElement('div');
+  emptyState.className = 'empty-state-nearest';
+  emptyState.innerHTML = `
+    <p>この範囲には店舗がありません</p>
+    <button class="nearest-store-link" type="button">
+      最寄りの店舗「${nearest.properties.name}」へ移動（${nearestDist.toFixed(1)}km）
+    </button>
+  `;
+  emptyState.querySelector('.nearest-store-link').addEventListener('click', () => {
+    selectStore(nearest.properties.id);
+    const targetZoom = 15;
+    const offsetCenter = getCenterOffset(nearest.geometry.coordinates, targetZoom);
+    map.flyTo({ center: offsetCenter, zoom: targetZoom, duration: 1000 });
+    scheduleShowPopupOnMoveEnd(nearest);
+  });
+  storeList.appendChild(emptyState);
+}
+
 function updateStoreListImmediate() {
   const storeList = document.getElementById('store-list');
   storeList.innerHTML = '';
@@ -1375,6 +1404,12 @@ function updateStoreListImmediate() {
 
   // Show initial batch
   appendStoreListBatch();
+
+  // No stores in view - offer a way to jump to the nearest one instead of
+  // leaving the list area blank (R016)
+  if (currentVisibleStores.length === 0) {
+    showNearestStoreLink(centerCoords);
+  }
 
   // Add scroll listener for progressive loading (the sidebar itself scrolls,
   // not store-list, since header/filters/list all share one scroll region)
