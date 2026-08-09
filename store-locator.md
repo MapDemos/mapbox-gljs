@@ -99,6 +99,10 @@ js: store-locator.js
       background-color: #f5f5f5;
     }
 
+    .suggestion-item.highlighted {
+      background-color: #e8f0fe;
+    }
+
     .suggestion-item:last-child {
       border-bottom: none;
     }
@@ -233,6 +237,25 @@ js: store-locator.js
     #amenity-filter-wrapper.active {
       flex-direction: column;
       flex-wrap: nowrap;
+    }
+
+    .keyboard-guide-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      font-size: 13px;
+      color: #333;
+      line-height: 1.8;
+    }
+
+    .keyboard-guide-list kbd {
+      display: inline-block;
+      padding: 1px 6px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      background-color: #f8f8f8;
+      font-family: inherit;
+      font-size: 12px;
     }
 
     .amenity-filter-mode {
@@ -391,6 +414,12 @@ js: store-locator.js
     }
 
     .store-item:hover {
+      background-color: #fafafa;
+    }
+
+    .store-item:focus-visible {
+      outline: 3px solid #2684FF;
+      outline-offset: -3px;
       background-color: #fafafa;
     }
 
@@ -893,6 +922,25 @@ js: store-locator.js
             </div>
           </div>
         </div>
+
+        <div class="filter-section">
+          <button class="filter-header" id="keyboard-guide-toggle">
+            キーボード操作ガイド
+            <span class="toggle-icon">
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                <polyline fill="none" stroke="#000" stroke-width="1.1" points="1 3.5 6 8.5 11 3.5"></polyline>
+              </svg>
+            </span>
+          </button>
+          <div class="filter-content" id="keyboard-guide-content">
+            <ul class="keyboard-guide-list">
+              <li><kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> — 次/前の項目へ移動</li>
+              <li><kbd>Enter</kbd> / <kbd>Space</kbd> — 選択・実行</li>
+              <li><kbd>↑</kbd> / <kbd>↓</kbd> — 検索候補の選択</li>
+              <li><kbd>Esc</kbd> — 検索候補・ポップアップを閉じる</li>
+            </ul>
+          </div>
+        </div>
       </div>
 
       <div id="store-count">0件見つかりました</div>
@@ -901,7 +949,7 @@ js: store-locator.js
       </div>
     </div>
 
-    <div id="map"></div>
+    <div id="map" aria-hidden="true"></div>
     <button id="floating-clear-filters" class="floating-clear-btn">
       <svg width="10" height="10" viewBox="0 0 20 20">
         <path fill="none" stroke="#333" stroke-width="1.5" d="M16,16 L4,4"></path>

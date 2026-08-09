@@ -1461,9 +1461,14 @@ function appendStoreListBatch() {
     const storeItem = document.createElement('div');
     storeItem.className = props.id === selectedStoreId ? 'store-item active' : 'store-item';
     storeItem.dataset.storeId = props.id;
+    // A plain div isn't focusable or operable by keyboard by default - make
+    // it behave like a real button for WCAG 2.1 AA keyboard support (R060).
+    storeItem.tabIndex = 0;
+    storeItem.setAttribute('role', 'button');
+    storeItem.setAttribute('aria-label', `${props.name}、${props.address}`);
 
     const parkingBadge = props.hasParking
-      ? '<span style="background: #9C27B0; color: white; padding: 2px 5px; border-radius: 3px; font-size: 10px; font-weight: bold; margin-right: 4px;">P</span>'
+      ? '<span aria-label="駐車場あり" style="background: #9C27B0; color: white; padding: 2px 5px; border-radius: 3px; font-size: 10px; font-weight: bold; margin-right: 4px;">P</span>'
       : '';
 
     storeItem.innerHTML = `
@@ -1474,7 +1479,7 @@ function appendStoreListBatch() {
       </div>
     `;
 
-    storeItem.addEventListener('click', () => {
+    function activateStoreItem() {
       selectStore(props.id);
 
       // Check if map is zoomed in enough to show individual stores
@@ -1503,6 +1508,14 @@ function appendStoreListBatch() {
         });
 
         scheduleShowPopupOnMoveEnd(feature);
+      }
+    }
+
+    storeItem.addEventListener('click', activateStoreItem);
+    storeItem.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        activateStoreItem();
       }
     });
 
@@ -1630,6 +1643,7 @@ function initSearch() {
 
   // Store suggestion features with their mapbox_id for retrieval
   let currentSuggestions = [];
+  let highlightedSuggestionIndex = -1; // for arrow-key navigation (R060)
 
   // Generate UUIDv4 for session token
   function generateSessionToken() {
@@ -1677,9 +1691,18 @@ function initSearch() {
     }
   }
 
+  // Highlight the suggestion at highlightedSuggestionIndex (arrow-key nav, R060)
+  function updateSuggestionHighlight() {
+    Array.from(suggestionsContainer.querySelectorAll('.suggestion-item')).forEach((el, i) => {
+      el.classList.toggle('highlighted', i === highlightedSuggestionIndex);
+      if (i === highlightedSuggestionIndex) el.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
   // Function to display suggestions
   function displaySuggestions(suggestions) {
     suggestionsContainer.innerHTML = '';
+    highlightedSuggestionIndex = -1;
 
     if (!suggestions || suggestions.length === 0) {
       suggestionsContainer.innerHTML = '<div class="suggestion-item">検索結果が見つかりませんでした</div>';
@@ -1807,6 +1830,24 @@ function initSearch() {
       suggestionsContainer.classList.remove('active');
       suggestionsContainer.innerHTML = '';
       searchBox.blur();
+      return;
+    }
+
+    if (!currentSuggestions.length || !suggestionsContainer.classList.contains('active')) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      highlightedSuggestionIndex = (highlightedSuggestionIndex + 1) % currentSuggestions.length;
+      updateSuggestionHighlight();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      highlightedSuggestionIndex =
+        (highlightedSuggestionIndex - 1 + currentSuggestions.length) % currentSuggestions.length;
+      updateSuggestionHighlight();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const index = highlightedSuggestionIndex >= 0 ? highlightedSuggestionIndex : 0;
+      selectSuggestion(currentSuggestions[index], index);
     }
   });
 }
@@ -1835,6 +1876,15 @@ function initUIEvents() {
   amenityFilterToggle.addEventListener('click', () => {
     amenityFilterWrapper.classList.toggle('active');
     amenityFilterToggle.querySelector('.toggle-icon').classList.toggle('expanded', amenityFilterWrapper.classList.contains('active'));
+  });
+
+  // Keyboard operation guide (R061) - same collapsible pattern
+  const keyboardGuideToggle = document.getElementById('keyboard-guide-toggle');
+  const keyboardGuideContent = document.getElementById('keyboard-guide-content');
+
+  keyboardGuideToggle.addEventListener('click', () => {
+    keyboardGuideContent.classList.toggle('active');
+    keyboardGuideToggle.querySelector('.toggle-icon').classList.toggle('expanded', keyboardGuideContent.classList.contains('active'));
   });
 
   // AND/OR mode for combining multiple selected amenity filters (R034)
