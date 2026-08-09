@@ -12,6 +12,66 @@ const MAP_CONFIG = {
   GEOLOCATE_ZOOM: 15 // zoom level flown to once the user's location is found
 };
 
+// Read shared filter/view state (brands, amenities, map position) out of the URL
+// query string, so a shared link can reproduce the same search results (R035).
+function parseUrlState() {
+  const params = new URLSearchParams(window.location.search);
+  const brands = (params.get('brands') || '').split(',').filter(Boolean);
+  const amenities = (params.get('amenities') || '').split(',').filter(Boolean);
+  const lat = parseFloat(params.get('lat'));
+  const lng = parseFloat(params.get('lng'));
+  const zoom = parseFloat(params.get('zoom'));
+  const hasPosition = Number.isFinite(lat) && Number.isFinite(lng) && Number.isFinite(zoom);
+  return {
+    brands,
+    amenities,
+    center: hasPosition ? [lng, lat] : null,
+    zoom: hasPosition ? zoom : null,
+    hasState: brands.length > 0 || amenities.length > 0 || hasPosition
+  };
+}
+
+const urlState = parseUrlState();
+
+// Reflect current filter/view state back into the URL (replacing, not pushing,
+// so this never pollutes browser history) so the current view is always shareable.
+function updateUrlFromState() {
+  const selectedBrands = Array.from(
+    document.querySelectorAll('#brand-filters .brand-filter.active')
+  ).map(btn => btn.dataset.brand);
+  const selectedAmenities = Array.from(
+    document.querySelectorAll('#amenity-filters .amenity-filter.active')
+  ).map(btn => btn.dataset.amenityId);
+
+  const params = new URLSearchParams();
+  if (selectedBrands.length) params.set('brands', selectedBrands.join(','));
+  if (selectedAmenities.length) params.set('amenities', selectedAmenities.join(','));
+  if (map) {
+    const center = map.getCenter();
+    params.set('lat', center.lat.toFixed(5));
+    params.set('lng', center.lng.toFixed(5));
+    params.set('zoom', map.getZoom().toFixed(2));
+  }
+
+  const query = params.toString();
+  history.replaceState(null, '', query ? `?${query}` : window.location.pathname);
+}
+
+// Apply the brands/amenities from the URL (if any) to the filter buttons, once
+// they exist with real data, then run the normal filter pipeline once.
+function restoreFiltersFromUrl() {
+  if (!urlState.brands.length && !urlState.amenities.length) return;
+
+  document.querySelectorAll('#brand-filters .brand-filter').forEach(btn => {
+    if (urlState.brands.includes(btn.dataset.brand)) btn.classList.add('active');
+  });
+  document.querySelectorAll('#amenity-filters .amenity-filter').forEach(btn => {
+    if (urlState.amenities.includes(btn.dataset.amenityId)) btn.classList.add('active');
+  });
+
+  applyFilters();
+}
+
 // Store data - will be populated from API or use dummy data as fallback
 let storeData = {
   type: 'FeatureCollection',
@@ -566,8 +626,8 @@ function initMap() {
   map = new mapboxgl.Map({
     container: 'map',
     style: 'mapbox://styles/kenji-shima/cmp0s13iw000101sdhqok52gy',
-    center: MAP_CONFIG.INITIAL_CENTER,
-    zoom: MAP_CONFIG.INITIAL_ZOOM,
+    center: urlState.center || MAP_CONFIG.INITIAL_CENTER,
+    zoom: urlState.zoom ?? MAP_CONFIG.INITIAL_ZOOM,
     minZoom: MAP_CONFIG.MIN_ZOOM,
     maxZoom: MAP_CONFIG.MAX_ZOOM,
     maxBounds: MAP_CONFIG.MAX_BOUNDS,
@@ -596,6 +656,7 @@ function initMap() {
     updateStoreListImmediate(); // Immediate update on initial load
     updateStoreCount();
     initBrandFilters(); // Re-initialize brand filters with actual data
+    restoreFiltersFromUrl(); // Apply brands/amenities from a shared URL, if any
 
     // Add Japanese language support
     if (typeof MapboxLanguage !== 'undefined') {
@@ -626,16 +687,21 @@ function initMap() {
     });
 
     // Trigger it automatically on load so the map centers on the user's
-    // location right away, without requiring them to click the button first.
+    // location right away, without requiring them to click the button first -
+    // unless a shared URL already specifies a map position, in which case that
+    // shared view should win over the visitor's own current location. (A URL
+    // with only brands/amenities and no position still auto-geolocates as usual.)
     // GeolocateControl attaches itself to the map asynchronously (it checks
     // geolocation support via navigator.permissions first), so poll until
     // it's actually ready rather than guessing a fixed delay.
-    const triggerWhenReady = setInterval(() => {
-      if (geolocateControl._map) {
-        clearInterval(triggerWhenReady);
-        geolocateControl.trigger();
-      }
-    }, 50);
+    if (!urlState.center) {
+      const triggerWhenReady = setInterval(() => {
+        if (geolocateControl._map) {
+          clearInterval(triggerWhenReady);
+          geolocateControl.trigger();
+        }
+      }, 50);
+    }
 
     // Load brand icons for map - one per distinct brand actually present in the data
     const brandIconsByName = {};
@@ -760,6 +826,7 @@ function initMap() {
       updateMapLayers();
       updateStoreListImmediate();
       updateStoreCount();
+      updateUrlFromState(); // Keep the shareable URL's lat/lng/zoom current
     });
   });
 }
@@ -1200,6 +1267,8 @@ function applyFilters() {
 
   const hasActiveFilters = selectedAmenities.length > 0 || selectedBrands.length > 0;
   document.getElementById('floating-clear-filters').classList.toggle('visible', hasActiveFilters);
+
+  updateUrlFromState();
 }
 
 // Update store list
