@@ -2,6 +2,174 @@
 const SKYLARK_DATA_FILE = 'skylark-stores.json'; // Local JSON file with store data
 const USE_REAL_DATA = true; // Set to false to use dummy data only
 
+// UI language (R068 - inbound tourist support). Store names/addresses are
+// real Japanese data and are intentionally NOT translated here (no reliable
+// canonical English name exists for every one of the ~34 brands); only the
+// app's own UI chrome and map labels switch language.
+const TRANSLATIONS = {
+  ja: {
+    searchPlaceholder: 'ブランド・地名・駅名で探す',
+    clearFilters: '条件をクリアする',
+    selectBrand: 'ブランドを選ぶ',
+    refineSearch: '絞り込み検索',
+    keyboardGuide: 'キーボード操作ガイド',
+    storeListLink: '全店舗一覧を見る',
+    modeAnd: 'すべて満たす',
+    modeOr: 'いずれか満たす',
+    tabList: 'リスト',
+    tabMap: '地図',
+    kbdTab: 'Tab / Shift+Tab — 次/前の項目へ移動',
+    kbdEnter: 'Enter / Space — 選択・実行',
+    kbdArrow: '↑ / ↓ — 検索候補の選択',
+    kbdEsc: 'Esc — 検索候補・ポップアップを閉じる',
+    langToggle: 'English',
+    noResultsInView: '表示範囲に店舗が見つかりません',
+    tooManyResults: () => '100件以上見つかりました',
+    resultsCount: (n) => `${n}件見つかりました`,
+    loadingMore: (n) => `${n}件表示中 - スクロールして続きを読み込む`,
+    noStoresHere: 'この範囲には店舗がありません',
+    nearestStoreLink: (name, dist) => `最寄りの店舗「${name}」へ移動（${dist}km）`,
+    popupAddress: '住所',
+    popupHours: '営業時間',
+    popupPhone: '電話番号',
+    popupParking: '駐車場',
+    popupAmenities: '設備・サービス',
+    popupWeekdayPrefix: '（平日）：',
+    popupWeekendPrefix: '（土日祝日）：',
+    popupOpen: '営業中',
+    popupClosed: '営業時間外',
+    popupParkingYes: 'あり',
+    popupParkingDisabled: '（身障者用あり）',
+    popupDetails: '詳細',
+    popupMenu: 'メニュー表示',
+    popupReserve: '予約する',
+    popupMoreLink: 'もっと見る',
+    popupLessLink: '閉じる',
+    popupWalkRoute: '徒歩ルート',
+    popupDriveRoute: '車ルート',
+    popupOpenGoogleMaps: 'Google Mapsで開く',
+    routeWalk: '徒歩',
+    routeDrive: '車',
+    routeInfo: (label, km, min) => `${label}ルート: ${km}km・約${min}分`,
+    routeGeoUnsupported: 'この端末では現在地を取得できません',
+    routeNotFound: 'ルートが見つかりませんでした',
+    routeFetchError: 'ルート取得中にエラーが発生しました',
+    routeGeoError: '現在地を取得できませんでした。位置情報の利用を許可してください。',
+    webglFallback1: 'お使いの端末・ブラウザは地図の表示に対応していません。',
+    webglFallback2: '別の端末・ブラウザでアクセスするか、最新版のブラウザに更新してからお試しください。',
+    noneLabel: 'なし'
+  },
+  en: {
+    searchPlaceholder: 'Search by brand, place, or station',
+    clearFilters: 'Clear filters',
+    selectBrand: 'Select brand',
+    refineSearch: 'Refine search',
+    keyboardGuide: 'Keyboard guide',
+    storeListLink: 'View all stores',
+    modeAnd: 'Match all',
+    modeOr: 'Match any',
+    tabList: 'List',
+    tabMap: 'Map',
+    kbdTab: 'Tab / Shift+Tab — move to next/previous item',
+    kbdEnter: 'Enter / Space — select or activate',
+    kbdArrow: '↑ / ↓ — navigate search suggestions',
+    kbdEsc: 'Esc — close suggestions or popup',
+    langToggle: '日本語',
+    noResultsInView: 'No stores found in this area',
+    tooManyResults: () => '100+ stores found',
+    resultsCount: (n) => `${n} store${n === 1 ? '' : 's'} found`,
+    loadingMore: (n) => `Showing ${n} - scroll for more`,
+    noStoresHere: 'No stores in this area',
+    nearestStoreLink: (name, dist) => `Go to nearest store "${name}" (${dist}km)`,
+    popupAddress: 'Address',
+    popupHours: 'Hours',
+    popupPhone: 'Phone',
+    popupParking: 'Parking',
+    popupAmenities: 'Amenities',
+    popupWeekdayPrefix: 'Weekdays: ',
+    popupWeekendPrefix: 'Weekends/Holidays: ',
+    popupOpen: 'Open',
+    popupClosed: 'Closed',
+    popupParkingYes: 'Available',
+    popupParkingDisabled: ' (accessible parking available)',
+    popupDetails: 'Details',
+    popupMenu: 'View Menu',
+    popupReserve: 'Reserve',
+    popupMoreLink: 'Show more',
+    popupLessLink: 'Show less',
+    popupWalkRoute: 'Walking route',
+    popupDriveRoute: 'Driving route',
+    popupOpenGoogleMaps: 'Open in Google Maps',
+    routeWalk: 'Walking',
+    routeDrive: 'Driving',
+    routeInfo: (label, km, min) => `${label} route: ${km}km, ~${min} min`,
+    routeGeoUnsupported: 'This device cannot get your current location',
+    routeNotFound: 'No route found',
+    routeFetchError: 'An error occurred while fetching the route',
+    routeGeoError: 'Could not get your current location. Please allow location access.',
+    webglFallback1: 'Your device or browser does not support map display.',
+    webglFallback2: 'Please try a different device/browser, or update to the latest version.',
+    noneLabel: 'None'
+  }
+};
+
+let currentLang = 'ja';
+function t(key, ...args) {
+  const entry = TRANSLATIONS[currentLang][key];
+  return typeof entry === 'function' ? entry(...args) : entry;
+}
+
+// Switch UI language + map labels together (R068). Store names/addresses
+// stay in Japanese (real data, not UI chrome) - see the TRANSLATIONS comment.
+function toggleUiLanguage() {
+  currentLang = currentLang === 'ja' ? 'en' : 'ja';
+
+  // Use GL JS v3's native setLanguage rather than the mapbox-gl-language
+  // plugin's own setLanguage: the plugin throws inside this specific custom
+  // Studio style (found while testing - its internal findStreetsSource
+  // crashes even though a "composite" source is present), which would abort
+  // the rest of this function before any UI text got translated. The native
+  // method works correctly against this style.
+  if (map && typeof map.setLanguage === 'function') {
+    try {
+      map.setLanguage(currentLang);
+    } catch (error) {
+      console.error('Map language switch failed:', error);
+    }
+  }
+
+  // Static UI chrome
+  document.getElementById('search-box').placeholder = t('searchPlaceholder');
+  document.getElementById('clear-filters').textContent = t('clearFilters');
+  document.getElementById('store-list-link').textContent = t('storeListLink');
+  document.getElementById('lang-toggle').textContent = t('langToggle');
+  document.querySelector('#brand-filter-toggle .btn-label').textContent = t('selectBrand');
+  document.querySelector('#amenity-filter-toggle .btn-label').textContent = t('refineSearch');
+  document.querySelector('#keyboard-guide-toggle .btn-label').textContent = t('keyboardGuide');
+  document.getElementById('amenity-mode-and').textContent = t('modeAnd');
+  document.getElementById('amenity-mode-or').textContent = t('modeOr');
+  document.getElementById('tab-list').textContent = t('tabList');
+  document.getElementById('tab-map').textContent = t('tabMap');
+  document.getElementById('kbd-guide-tab').innerHTML = `<kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> — ${t('kbdTab').split('— ')[1]}`;
+  document.getElementById('kbd-guide-enter').innerHTML = `<kbd>Enter</kbd> / <kbd>Space</kbd> — ${t('kbdEnter').split('— ')[1]}`;
+  document.getElementById('kbd-guide-arrow').innerHTML = `<kbd>↑</kbd> / <kbd>↓</kbd> — ${t('kbdArrow').split('— ')[1]}`;
+  document.getElementById('kbd-guide-esc').innerHTML = `<kbd>Esc</kbd> — ${t('kbdEsc').split('— ')[1]}`;
+
+  // Dynamic content that bakes in translated strings at render time
+  if (typeof initAmenityFilters === 'function' && document.getElementById('amenity-filters').children.length) {
+    initAmenityFilters();
+  }
+  if (typeof updateStoreCount === 'function' && map) {
+    updateStoreCount();
+  }
+  if (typeof updateStoreListImmediate === 'function' && map) {
+    updateStoreListImmediate();
+  }
+  if (currentPopup && currentPopupFeature) {
+    currentPopup.setHTML(createPopupContent(currentPopupFeature));
+  }
+}
+
 // Map configuration - initial view, zoom limits, and pan bounds
 const MAP_CONFIG = {
   INITIAL_CENTER: [138.2529, 36.2048], // Japan-wide overview centroid
@@ -427,31 +595,31 @@ async function loadStoresFromAPI(mapBounds) {
 // 絞り込み検索 (amenity filter) definitions: single source of truth for
 // data extraction (loadStoresFromAPI) and sidebar UI generation (initAmenityFilters)
 const AMENITY_FILTERS = [
-  { id: 'delivery', label: '宅配あり', key: '宅配フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/439ff93d-ead7-47e1-8482-63e1e65638d2.png' },
-  { id: 'takeout', label: 'テイクアウト可', key: '持ち帰りフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/64872114-7eee-4ca6-bb88-cd8079e61c88.png' },
-  { id: 'ubereats', label: 'Uber Eatsあり', key: 'ubereatsフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-stg-static-local/images/skylark/17f825fc-0795-4b68-b602-5c278e6a34f0.png' },
-  { id: 'demaecan', label: '出前館', key: 'demaecanフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-stg-static-local/images/skylark/c5b0c90c-f4fe-481d-9fd7-325b46f58b97.png' },
-  { id: 'qrPayment', label: 'QR決済対応', key: 'QR決済（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/16a23b90-0055-4cdd-bf65-b5cdb0edaf58.png' },
-  { id: 'open24h', label: '全日24時間', key: '全日２４時間フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/c91b1e5e-d25f-4b21-b2f1-70cc8bdbdce1.png' },
-  { id: 'reservation', label: '予約可', key: '予約フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/b17ab33c-c32f-4111-82cf-b0abb179cfc3.png' },
-  { id: 'credit', label: 'クレジット可', key: 'クレジット（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/e464aa68-7fde-4a89-96b7-f35583731790.png' },
-  { id: 'emoney', label: '電子マネー可', key: '電子マネー（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/ed7a28c3-89db-4b71-b327-48eebac3b990.png' },
-  { id: 'wifi', label: 'Wi-Fiあり', key: 'ｗｉ－ｆｉ（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/76e25fa3-70bc-4b39-9532-bc26d1299e8e.png' },
-  { id: 'parking', label: '駐車場あり', key: '駐車場（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/e623fc3c-ff59-45f5-847b-12bad0257c31.png' },
-  { id: 'disabledParking', label: '身障者用駐車場あり', key: '身障者用駐車場フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/f2c1fb52-bd24-45fd-bb58-c6fdd1703b16.png' },
-  { id: 'wheelchair', label: '車椅子入店可', key: '車椅子対応フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/cb06972e-8bdf-4600-93c2-e9ee6564a89a.png' },
-  { id: 'elevator', label: 'エレベーターあり', key: 'エレベーターフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/eb9c9a01-179d-4b52-a362-bbeda06c8468.png' },
-  { id: 'petTerrace', label: 'テラス席に限りペット同伴可', key: 'ペット同伴可', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/fa865921-a681-47d8-aec2-0eaed140d4f7.png' },
-  { id: 'diaper', label: 'おむつ替え台あり', key: 'おむつ替え台フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/743b216e-a674-401f-8a9d-ca44e76aff0a.png' },
-  { id: 'multiToilet', label: '多目的トイレあり', key: '多目的トイレフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/d3c0afc9-46ac-4767-a705-d4caa991dfb4.png' },
-  { id: 'partyRoom', label: 'パーティールームあり', key: 'パーティーフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/12537778-a007-4c3f-8d4d-f7e1ba6811c7.png' },
-  { id: 'tatami', label: '座敷(大・小) あり', key: '座敷フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/65d6701a-cb6e-4449-aa21-1d4c1a4e2ff3.png' },
-  { id: 'sunken', label: '小上がり(畳席) あり', key: '小上がりフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/a17a137d-7351-40fe-a4b9-770ddb70904a.png' },
-  { id: 'privateRoom', label: '個室・個室風席あり', key: '個室フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/b728a741-b1fd-4320-83a8-71fde462af02.png' },
-  { id: 'counter', label: 'カウンター席あり', key: 'カウンター席フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/2ec594ce-5e1f-425f-9c61-ca21c6b2f4ed.png' },
-  { id: 'digitalMenu', label: 'デジタルメニューブック', key: 'デジタルメニューブック（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/996d345e-c9df-402d-a239-b31a5fe60644.png' },
-  { id: 'serviceRobot', label: 'サービスロボットあり', key: 'サービスロボット（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/fa6b95c8-3fd1-4252-9650-00d1b13c2ed4.png' },
-  { id: 'noSmoking', label: '禁煙', key: '完全禁煙フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/bbb828bc-dd36-4d7b-ba71-4b678da474b9.png' }
+  { id: 'delivery', label: '宅配あり', labelEn: 'Delivery available', key: '宅配フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/439ff93d-ead7-47e1-8482-63e1e65638d2.png' },
+  { id: 'takeout', label: 'テイクアウト可', labelEn: 'Takeout available', key: '持ち帰りフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/64872114-7eee-4ca6-bb88-cd8079e61c88.png' },
+  { id: 'ubereats', label: 'Uber Eatsあり', labelEn: 'Uber Eats available', key: 'ubereatsフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-stg-static-local/images/skylark/17f825fc-0795-4b68-b602-5c278e6a34f0.png' },
+  { id: 'demaecan', label: '出前館', labelEn: 'Demae-can delivery', key: 'demaecanフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-stg-static-local/images/skylark/c5b0c90c-f4fe-481d-9fd7-325b46f58b97.png' },
+  { id: 'qrPayment', label: 'QR決済対応', labelEn: 'QR payment accepted', key: 'QR決済（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/16a23b90-0055-4cdd-bf65-b5cdb0edaf58.png' },
+  { id: 'open24h', label: '全日24時間', labelEn: 'Open 24 hours', key: '全日２４時間フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/c91b1e5e-d25f-4b21-b2f1-70cc8bdbdce1.png' },
+  { id: 'reservation', label: '予約可', labelEn: 'Reservations accepted', key: '予約フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/b17ab33c-c32f-4111-82cf-b0abb179cfc3.png' },
+  { id: 'credit', label: 'クレジット可', labelEn: 'Credit cards accepted', key: 'クレジット（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/e464aa68-7fde-4a89-96b7-f35583731790.png' },
+  { id: 'emoney', label: '電子マネー可', labelEn: 'E-money accepted', key: '電子マネー（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/ed7a28c3-89db-4b71-b327-48eebac3b990.png' },
+  { id: 'wifi', label: 'Wi-Fiあり', labelEn: 'Wi-Fi available', key: 'ｗｉ－ｆｉ（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/76e25fa3-70bc-4b39-9532-bc26d1299e8e.png' },
+  { id: 'parking', label: '駐車場あり', labelEn: 'Parking available', key: '駐車場（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/e623fc3c-ff59-45f5-847b-12bad0257c31.png' },
+  { id: 'disabledParking', label: '身障者用駐車場あり', labelEn: 'Accessible parking available', key: '身障者用駐車場フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/f2c1fb52-bd24-45fd-bb58-c6fdd1703b16.png' },
+  { id: 'wheelchair', label: '車椅子入店可', labelEn: 'Wheelchair accessible', key: '車椅子対応フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/cb06972e-8bdf-4600-93c2-e9ee6564a89a.png' },
+  { id: 'elevator', label: 'エレベーターあり', labelEn: 'Elevator available', key: 'エレベーターフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/eb9c9a01-179d-4b52-a362-bbeda06c8468.png' },
+  { id: 'petTerrace', label: 'テラス席に限りペット同伴可', labelEn: 'Pets allowed (terrace seating only)', key: 'ペット同伴可', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/fa865921-a681-47d8-aec2-0eaed140d4f7.png' },
+  { id: 'diaper', label: 'おむつ替え台あり', labelEn: 'Diaper changing table', key: 'おむつ替え台フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/743b216e-a674-401f-8a9d-ca44e76aff0a.png' },
+  { id: 'multiToilet', label: '多目的トイレあり', labelEn: 'Accessible restroom', key: '多目的トイレフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/d3c0afc9-46ac-4767-a705-d4caa991dfb4.png' },
+  { id: 'partyRoom', label: 'パーティールームあり', labelEn: 'Party room available', key: 'パーティーフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/12537778-a007-4c3f-8d4d-f7e1ba6811c7.png' },
+  { id: 'tatami', label: '座敷(大・小) あり', labelEn: 'Tatami seating available', key: '座敷フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/65d6701a-cb6e-4449-aa21-1d4c1a4e2ff3.png' },
+  { id: 'sunken', label: '小上がり(畳席) あり', labelEn: 'Sunken tatami seating', key: '小上がりフラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/a17a137d-7351-40fe-a4b9-770ddb70904a.png' },
+  { id: 'privateRoom', label: '個室・個室風席あり', labelEn: 'Private room seating', key: '個室フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/b728a741-b1fd-4320-83a8-71fde462af02.png' },
+  { id: 'counter', label: 'カウンター席あり', labelEn: 'Counter seating', key: 'カウンター席フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/2ec594ce-5e1f-425f-9c61-ca21c6b2f4ed.png' },
+  { id: 'digitalMenu', label: 'デジタルメニューブック', labelEn: 'Digital menu', key: 'デジタルメニューブック（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/996d345e-c9df-402d-a239-b31a5fe60644.png' },
+  { id: 'serviceRobot', label: 'サービスロボットあり', labelEn: 'Service robot', key: 'サービスロボット（有無）フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/fa6b95c8-3fd1-4252-9650-00d1b13c2ed4.png' },
+  { id: 'noSmoking', label: '禁煙', labelEn: 'Non-smoking', key: '完全禁煙フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/bbb828bc-dd36-4d7b-ba71-4b678da474b9.png' }
 ];
 
 // Brand colors for map markers
@@ -472,6 +640,7 @@ const brandText = {
 
 // State management
 let map;
+let languageControl = null; // MapboxLanguage control instance, set in initMap()
 let selectedStoreId = null;
 let currentPopup = null;
 let currentZoom = 11;
@@ -684,11 +853,11 @@ function initMap() {
     initBrandFilters(); // Re-initialize brand filters with actual data
     restoreFiltersFromUrl(); // Apply brands/amenities from a shared URL, if any
 
-    // Add Japanese language support
+    // Add Japanese language support (kept as a module-level reference so
+    // toggleUiLanguage (R068) can switch map labels along with the UI chrome)
     if (typeof MapboxLanguage !== 'undefined') {
-      map.addControl(new MapboxLanguage({
-        defaultLanguage: 'ja'
-      }));
+      languageControl = new MapboxLanguage({ defaultLanguage: 'ja' });
+      map.addControl(languageControl);
     }
 
     // Add navigation controls
@@ -1066,21 +1235,21 @@ function createPopupContent(feature) {
     ? JSON.parse(props.hours)
     : props.hours;
 
-  const amenitiesText = amenities.length ? amenities.join('／') : 'なし';
+  const amenitiesText = amenities.length ? amenities.join('／') : t('noneLabel');
   const showAmenitiesToggle = amenities.length > 2;
 
   const menuButton = props.menuUrl
-    ? `<a class="popup-menu-btn" href="${props.menuUrl}" target="_blank" rel="noopener">メニュー表示</a>`
+    ? `<a class="popup-menu-btn" href="${props.menuUrl}" target="_blank" rel="noopener">${t('popupMenu')}</a>`
     : '';
 
   const reserveButton = props.reservationUrl
-    ? `<a class="popup-reserve-btn" href="${props.reservationUrl}" target="_blank" rel="noopener">予約する</a>`
+    ? `<a class="popup-reserve-btn" href="${props.reservationUrl}" target="_blank" rel="noopener">${t('popupReserve')}</a>`
     : '';
 
   const openStatus = getOpenStatus(hours.weekday, hours.weekend);
   const openStatusBadge = openStatus === null
     ? ''
-    : `<span class="popup-open-status ${openStatus ? 'is-open' : 'is-closed'}">${openStatus ? '営業中' : '営業時間外'}</span>`;
+    : `<span class="popup-open-status ${openStatus ? 'is-open' : 'is-closed'}">${openStatus ? t('popupOpen') : t('popupClosed')}</span>`;
 
   const noticeBanner = props.notice
     ? `<div class="popup-notice">${props.notice}</div>`
@@ -1100,49 +1269,49 @@ function createPopupContent(feature) {
     <div class="popup-body">
       ${noticeBanner}
       <div class="popup-section">
-        <div class="popup-label">住所</div>
+        <div class="popup-label">${t('popupAddress')}</div>
         <div class="popup-value">
           ${props.address}
           <div class="popup-route-actions">
-            <button type="button" onclick="showRouteToStore([${feature.geometry.coordinates[0]}, ${feature.geometry.coordinates[1]}], 'walking')">徒歩ルート</button>
-            <button type="button" onclick="showRouteToStore([${feature.geometry.coordinates[0]}, ${feature.geometry.coordinates[1]}], 'driving-traffic')">車ルート</button>
-            <a href="https://www.google.com/maps/dir/?api=1&destination=${feature.geometry.coordinates[1]},${feature.geometry.coordinates[0]}" target="_blank" rel="noopener">Google Mapsで開く</a>
+            <button type="button" onclick="showRouteToStore([${feature.geometry.coordinates[0]}, ${feature.geometry.coordinates[1]}], 'walking')">${t('popupWalkRoute')}</button>
+            <button type="button" onclick="showRouteToStore([${feature.geometry.coordinates[0]}, ${feature.geometry.coordinates[1]}], 'driving-traffic')">${t('popupDriveRoute')}</button>
+            <a href="https://www.google.com/maps/dir/?api=1&destination=${feature.geometry.coordinates[1]},${feature.geometry.coordinates[0]}" target="_blank" rel="noopener">${t('popupOpenGoogleMaps')}</a>
           </div>
         </div>
       </div>
       <div class="popup-section">
-        <div class="popup-label">営業時間</div>
+        <div class="popup-label">${t('popupHours')}</div>
         <div class="popup-value popup-value-bold">
-          （平日）：${hours.weekday}<br>
-          （土日祝日）：${hours.weekend} ${openStatusBadge}
+          ${t('popupWeekdayPrefix')}${hours.weekday}<br>
+          ${t('popupWeekendPrefix')}${hours.weekend} ${openStatusBadge}
         </div>
       </div>
       <div class="popup-section">
-        <div class="popup-label">電話番号</div>
+        <div class="popup-label">${t('popupPhone')}</div>
         <div class="popup-value popup-value-bold">${props.phone}</div>
       </div>
       ${props.hasParking ? `
       <div class="popup-section">
-        <div class="popup-label">駐車場</div>
+        <div class="popup-label">${t('popupParking')}</div>
         <div class="popup-value popup-value-bold">
-          あり${props.hasDisabledParking ? '（身障者用あり）' : ''}
+          ${t('popupParkingYes')}${props.hasDisabledParking ? t('popupParkingDisabled') : ''}
         </div>
       </div>
       ` : ''}
       <div class="popup-section">
-        <div class="popup-label">設備・サービス</div>
+        <div class="popup-label">${t('popupAmenities')}</div>
         <div class="popup-value">
           <div class="popup-value-amenities">${amenitiesText}</div>
           ${showAmenitiesToggle ? `<button class="popup-amenities-toggle" onclick="
             const el = this.previousElementSibling;
             const expanded = el.classList.toggle('expanded');
-            this.textContent = expanded ? '閉じる' : 'もっと見る';
-          ">もっと見る</button>` : ''}
+            this.textContent = expanded ? t('popupLessLink') : t('popupMoreLink');
+          ">${t('popupMoreLink')}</button>` : ''}
         </div>
       </div>
     </div>
     <div class="popup-footer">
-      <button class="popup-details-btn">詳細</button>
+      <button class="popup-details-btn">${t('popupDetails')}</button>
       ${menuButton}
       ${reserveButton}
     </div>
@@ -1168,11 +1337,14 @@ function scheduleShowPopupOnMoveEnd(feature) {
 }
 
 // Show popup
+let currentPopupFeature = null; // tracked so toggleUiLanguage() can re-render an open popup
+
 function showPopup(feature) {
   if (currentPopup) {
     currentPopup.remove();
     currentPopup = null;
   }
+  currentPopupFeature = feature;
 
   currentPopup = new mapboxgl.Popup({
     offset: 90,
@@ -1206,6 +1378,7 @@ function closePopup() {
     currentPopup.remove();
     currentPopup = null;
   }
+  currentPopupFeature = null;
   selectedStoreId = null;
   updateSymbolState();
   document.querySelectorAll('.store-item.active').forEach(item => item.classList.remove('active'));
@@ -1228,10 +1401,10 @@ window.clearRoute = clearRoute;
 // Show the info banner over the map with a route's distance/duration
 function showRouteInfo(profile, distanceKm, durationMin) {
   const banner = document.getElementById('route-info-banner');
-  const label = profile === 'walking' ? '徒歩' : '車';
+  const label = profile === 'walking' ? t('routeWalk') : t('routeDrive');
   banner.innerHTML = `
-    <span>${label}ルート: ${distanceKm}km・約${durationMin}分</span>
-    <button onclick="clearRoute()" aria-label="ルートを閉じる" type="button">×</button>
+    <span>${t('routeInfo', label, distanceKm, durationMin)}</span>
+    <button onclick="clearRoute()" aria-label="${currentLang === 'en' ? 'Close route' : 'ルートを閉じる'}" type="button">×</button>
   `;
   banner.classList.add('active');
 }
@@ -1240,7 +1413,7 @@ function showRouteInfo(profile, distanceKm, durationMin) {
 // the Mapbox Directions API (R046 walking / R047 driving).
 function showRouteToStore(destination, profile) {
   if (!navigator.geolocation) {
-    alert('この端末では現在地を取得できません');
+    alert(t('routeGeoUnsupported'));
     return;
   }
 
@@ -1261,7 +1434,7 @@ function showRouteToStore(destination, profile) {
       const data = await response.json();
       const route = data.routes && data.routes[0];
       if (!route) {
-        alert('ルートが見つかりませんでした');
+        alert(t('routeNotFound'));
         return;
       }
 
@@ -1280,11 +1453,11 @@ function showRouteToStore(destination, profile) {
       map.fitBounds(bounds, { padding: 60, duration: 1000 });
     } catch (error) {
       console.error('Directions error:', error);
-      alert('ルート取得中にエラーが発生しました');
+      alert(t('routeFetchError'));
     }
   }, (error) => {
     console.error('Geolocation error:', error);
-    alert('現在地を取得できませんでした。位置情報の利用を許可してください。');
+    alert(t('routeGeoError'));
   });
 }
 window.showRouteToStore = showRouteToStore;
@@ -1371,7 +1544,7 @@ function initAmenityFilters() {
     button.dataset.amenityId = filterDef.id;
     button.innerHTML = `
       <img src="${filterDef.icon}" class="amenity-filter-icon" alt="">
-      <span class="amenity-filter-name">${filterDef.label}</span>
+      <span class="amenity-filter-name">${currentLang === 'en' ? filterDef.labelEn : filterDef.label}</span>
     `;
 
     button.addEventListener('click', () => {
@@ -1494,9 +1667,9 @@ function showNearestStoreLink(centerCoords) {
   const emptyState = document.createElement('div');
   emptyState.className = 'empty-state-nearest';
   emptyState.innerHTML = `
-    <p>この範囲には店舗がありません</p>
+    <p>${t('noStoresHere')}</p>
     <button class="nearest-store-link" type="button">
-      最寄りの店舗「${nearest.properties.name}」へ移動（${nearestDist.toFixed(1)}km）
+      ${t('nearestStoreLink', nearest.properties.name, nearestDist.toFixed(1))}
     </button>
   `;
   emptyState.querySelector('.nearest-store-link').addEventListener('click', () => {
@@ -1651,7 +1824,7 @@ function appendStoreListBatch() {
     const loadingDiv = document.createElement('div');
     loadingDiv.className = 'loading-indicator';
     loadingDiv.style.cssText = 'padding: 16px 20px; background-color: #f0f0f0; text-align: center; font-size: 13px; color: #666;';
-    loadingDiv.textContent = `${displayedCount}件表示中 - スクロールして続きを読み込む`;
+    loadingDiv.textContent = t('loadingMore', displayedCount);
     storeList.appendChild(loadingDiv);
   }
 }
@@ -1687,11 +1860,11 @@ function updateStoreCount() {
   const count = visibleStores.length;
   let text;
   if (count === 0) {
-    text = '表示範囲に店舗が見つかりません';
+    text = t('noResultsInView');
   } else if (count >= 100) {
-    text = '100件以上見つかりました';
+    text = t('tooManyResults');
   } else {
-    text = `${count}件見つかりました`;
+    text = t('resultsCount', count);
   }
   document.getElementById('store-count').textContent = text;
 }
@@ -1963,6 +2136,9 @@ function initUIEvents() {
   // Initialize search
   initSearch();
 
+  // Language toggle (R068)
+  document.getElementById('lang-toggle').addEventListener('click', toggleUiLanguage);
+
   // Clear filters button
   document.getElementById('clear-filters').addEventListener('click', clearFilters);
 
@@ -2096,8 +2272,8 @@ function showWebglFallback() {
   mapEl.removeAttribute('aria-hidden'); // this message is real content, not decorative
   mapEl.innerHTML = `
     <div class="webgl-fallback">
-      <p>お使いの端末・ブラウザは地図の表示に対応していません。</p>
-      <p>別の端末・ブラウザでアクセスするか、最新版のブラウザに更新してからお試しください。</p>
+      <p>${t('webglFallback1')}</p>
+      <p>${t('webglFallback2')}</p>
     </div>
   `;
 }

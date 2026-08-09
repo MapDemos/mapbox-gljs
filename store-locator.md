@@ -151,6 +151,24 @@ js: store-locator.js
       text-decoration: underline;
     }
 
+    #lang-toggle {
+      display: block;
+      width: 100%;
+      padding: 0 15px 10px;
+      background: none;
+      border: none;
+      color: white;
+      font-size: 12px;
+      text-align: right;
+      opacity: 0.85;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    #lang-toggle:hover {
+      opacity: 1;
+    }
+
     .filter-section {
       background-color: white;
       margin: 0;
@@ -965,10 +983,11 @@ js: store-locator.js
         </div>
         <button id="clear-filters">条件をクリアする</button>
         <a id="store-list-link" href="store-list.html">全店舗一覧を見る</a>
+        <button id="lang-toggle" type="button">English</button>
 
         <div class="filter-section">
           <button class="filter-header" id="brand-filter-toggle">
-            ブランドを選ぶ
+            <span class="btn-label">ブランドを選ぶ</span>
             <span class="toggle-icon">
               <svg width="12" height="12" viewBox="0 0 12 12">
                 <polyline fill="none" stroke="#000" stroke-width="1.1" points="1 3.5 6 8.5 11 3.5"></polyline>
@@ -982,7 +1001,7 @@ js: store-locator.js
 
         <div class="filter-section">
           <button class="filter-header" id="amenity-filter-toggle">
-            絞り込み検索
+            <span class="btn-label">絞り込み検索</span>
             <span class="toggle-icon">
               <svg width="12" height="12" viewBox="0 0 12 12">
                 <polyline fill="none" stroke="#000" stroke-width="1.1" points="1 3.5 6 8.5 11 3.5"></polyline>
@@ -1002,7 +1021,7 @@ js: store-locator.js
 
         <div class="filter-section">
           <button class="filter-header" id="keyboard-guide-toggle">
-            キーボード操作ガイド
+            <span class="btn-label">キーボード操作ガイド</span>
             <span class="toggle-icon">
               <svg width="12" height="12" viewBox="0 0 12 12">
                 <polyline fill="none" stroke="#000" stroke-width="1.1" points="1 3.5 6 8.5 11 3.5"></polyline>
@@ -1011,10 +1030,10 @@ js: store-locator.js
           </button>
           <div class="filter-content" id="keyboard-guide-content">
             <ul class="keyboard-guide-list">
-              <li><kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> — 次/前の項目へ移動</li>
-              <li><kbd>Enter</kbd> / <kbd>Space</kbd> — 選択・実行</li>
-              <li><kbd>↑</kbd> / <kbd>↓</kbd> — 検索候補の選択</li>
-              <li><kbd>Esc</kbd> — 検索候補・ポップアップを閉じる</li>
+              <li id="kbd-guide-tab"><kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> — 次/前の項目へ移動</li>
+              <li id="kbd-guide-enter"><kbd>Enter</kbd> / <kbd>Space</kbd> — 選択・実行</li>
+              <li id="kbd-guide-arrow"><kbd>↑</kbd> / <kbd>↓</kbd> — 検索候補の選択</li>
+              <li id="kbd-guide-esc"><kbd>Esc</kbd> — 検索候補・ポップアップを閉じる</li>
             </ul>
           </div>
         </div>
