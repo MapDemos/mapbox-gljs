@@ -182,6 +182,36 @@ const MAP_CONFIG = {
   GEOLOCATE_ZOOM: 15 // zoom level flown to once the user's location is found
 };
 
+// R073 (地図画面の出し分け), brand piece only: a ?brand= param simulates this
+// map being embedded on one of Skylark's real per-brand pages (e.g.
+// store-info.skylark.co.jp/gusto/) - locking the map to that brand's stores
+// - instead of building actual separate URL routing across their real
+// multi-site/multi-domain hosting, which this single demo instance can't
+// exercise. The common (all-brands) and 優待 (loyalty page) pieces are
+// intentionally left unimplemented. Slugs are the real ones used in
+// Skylark's own site (confirmed from store-info.skylark.co.jp's footer
+// brand links) - only covering brands that actually have one; buffet-style
+// brands linked via generic co_XX paths don't get a slug here.
+const BRAND_SLUGS = {
+  gusto: 'ガスト',
+  bamiyan: 'バーミヤン',
+  syabuyo: 'しゃぶ葉',
+  yumean: '夢庵',
+  jonathan: 'ジョナサン',
+  steak_gusto: 'ステーキガスト',
+  mmcoffee: 'むさしの森珈琲',
+  karayoshi: 'から好し（ガスト内店含む）',
+  aiya: '藍屋',
+  tonkara_tei: 'とんから亭',
+  chawan: 'chawan',
+  la_ohana: 'ラ・オハナ',
+  totoyamichi: '魚屋路',
+  grazie_gardens: 'グラッチェガーデンズ',
+  hachiro_soba: '八郎そば',
+  ym_shokudo: 'ゆめあん食堂',
+  miwami: '三〇三'
+};
+
 // Read shared filter/view state (brands, amenities, map position) out of the URL
 // query string, so a shared link can reproduce the same search results (R035).
 function parseUrlState() {
@@ -193,13 +223,15 @@ function parseUrlState() {
   const lng = parseFloat(params.get('lng'));
   const zoom = parseFloat(params.get('zoom'));
   const hasPosition = Number.isFinite(lat) && Number.isFinite(lng) && Number.isFinite(zoom);
+  const lockedBrand = BRAND_SLUGS[params.get('brand')] || null; // R073 brand piece
   return {
     brands,
     amenities,
     amenityMode,
     center: hasPosition ? [lng, lat] : null,
     zoom: hasPosition ? zoom : null,
-    hasState: brands.length > 0 || amenities.length > 0 || hasPosition
+    lockedBrand,
+    hasState: brands.length > 0 || amenities.length > 0 || hasPosition || !!lockedBrand
   };
 }
 
@@ -235,7 +267,20 @@ function updateUrlFromState() {
 // Apply the brands/amenities from the URL (if any) to the filter buttons, once
 // they exist with real data, then run the normal filter pipeline once.
 function restoreFiltersFromUrl() {
-  if (!urlState.brands.length && !urlState.amenities.length) return;
+  // R073 brand piece: a locked brand page only has one brand to show, so
+  // the other brand-filter buttons are removed rather than left toggleable.
+  if (urlState.lockedBrand) {
+    document.querySelectorAll('#brand-filters .brand-filter').forEach(btn => {
+      if (btn.dataset.brand === urlState.lockedBrand) {
+        btn.classList.add('active');
+        btn.disabled = true;
+      } else {
+        btn.remove();
+      }
+    });
+  }
+
+  if (!urlState.brands.length && !urlState.amenities.length && !urlState.lockedBrand) return;
 
   document.querySelectorAll('#brand-filters .brand-filter').forEach(btn => {
     if (urlState.brands.includes(btn.dataset.brand)) btn.classList.add('active');
@@ -2213,9 +2258,10 @@ function clearFilters() {
   document.getElementById('search-box').value = '';
   searchFilterQuery = '';
 
-  // Deselect all brand filters (no selection = show all brands)
+  // Deselect all brand filters (no selection = show all brands) - except a
+  // locked brand-page brand (R073), which stays active even through "clear".
   document.querySelectorAll('#brand-filters .brand-filter').forEach(btn => {
-    btn.classList.remove('active');
+    if (btn.dataset.brand !== urlState.lockedBrand) btn.classList.remove('active');
   });
 
   // Uncheck all amenity filters and reset AND/OR mode back to the default
