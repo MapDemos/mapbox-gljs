@@ -137,18 +137,31 @@ js: store-locator.js
       opacity: 0.8;
     }
 
+    /* Pinned to the map's top-right corner, matching the reference site's
+       own "新店舗一覧" button exactly (position/colors/shape confirmed by
+       inspecting store-info.skylark.co.jp live). right:56px (not the
+       reference's own 10px) clears Mapbox's own top-right control stack
+       (zoom/compass/geolocate, ~39px wide) which the reference's map
+       doesn't have in the same spot. */
     #store-list-link {
-      display: block;
-      padding: 0 15px 8px;
+      position: absolute;
+      top: 22px;
+      right: 56px;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      height: 40px;
+      padding: 0 8px 0 16px;
+      background-color: #ED1C24;
       color: white;
-      font-size: 12px;
-      text-align: right;
-      opacity: 0.85;
+      font-size: 14px;
+      text-decoration: none;
+      box-shadow: 0 0 3px rgba(0, 0, 0, 0.31);
     }
 
-    #store-list-link:hover {
-      opacity: 1;
-      text-decoration: underline;
+    #store-list-link svg {
+      flex-shrink: 0;
     }
 
     #lang-toggle {
@@ -288,6 +301,66 @@ js: store-locator.js
       background-color: #f8f8f8;
       font-family: inherit;
       font-size: 12px;
+    }
+
+    /* Keyboard shortcuts dialog, opened by the link inside the attribution
+       control (customAttribution in initMap()). */
+    #keyboard-guide-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 99;
+    }
+
+    #keyboard-guide-backdrop.active {
+      display: block;
+    }
+
+    #keyboard-guide-modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      border-radius: 4px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      padding: 20px 24px;
+      z-index: 100;
+      min-width: 280px;
+      max-width: 90vw;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    #keyboard-guide-modal.active {
+      display: block;
+    }
+
+    .kbd-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 14px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    #keyboard-guide-close {
+      background: none;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
     }
 
     .amenity-filter-mode {
@@ -447,23 +520,67 @@ js: store-locator.js
     }
 
     .empty-state-nearest p {
-      margin: 0 0 12px;
+      margin: 0;
       font-size: 14px;
     }
 
-    .nearest-store-link {
-      background-color: #ED1C24;
-      color: white;
-      border: none;
-      padding: 10px 16px;
-      border-radius: 4px;
-      font-size: 13px;
-      font-weight: 600;
+    /* Nearest-store pointer: a marker pinned to the map's current center
+       (not a sidebar button) with a label and an arrow rotated to the
+       compass bearing of the nearest store, matching the reference site's
+       own empty-viewport treatment. */
+    .to-nearest {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+      font-family: inherit;
     }
 
-    .nearest-store-link:hover {
-      background-color: #d11920;
+    .to-nearest .label {
+      background-color: white;
+      color: #444;
+      padding: 6px 12px;
+      border-radius: 14px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      margin-bottom: 6px;
+      transition: 0.2s;
+    }
+
+    .to-nearest .direction {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background-color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      transition: 0.2s;
+    }
+
+    .to-nearest .direction svg {
+      fill: #ED1C24;
+      transition: 0.2s;
+    }
+
+    /* Hover inverts the pointer to solid red, same as the reference site */
+    .to-nearest:hover .label,
+    .to-nearest:hover .direction {
+      background-color: #ED1C24;
+    }
+
+    .to-nearest:hover .label {
+      color: white;
+    }
+
+    .to-nearest:hover .direction svg {
+      fill: white;
     }
 
     .store-item {
@@ -527,6 +644,16 @@ js: store-locator.js
       height: 100vh;
     }
 
+    /* This account/style's sources report mapbox_logo:false (an
+       account-level flag, not a third-party licensing restriction - even
+       the plain Mapbox-hosted composite source has it), so GL JS's own
+       LogoControl hides itself. It re-applies that inline display:none on
+       every 'sourcedata' event, so this needs !important to actually stick
+       rather than a one-time override. */
+    .mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(.mapboxgl-ctrl-logo) {
+      display: block !important;
+    }
+
     .webgl-fallback {
       display: flex;
       flex-direction: column;
@@ -547,10 +674,10 @@ js: store-locator.js
 
     /* Popup styles */
     .mapboxgl-popup {
-      /* Above the mobile bottom sheet (z-index 10) - the sheet is an overlay
-         Mapbox's own container-based collision detection doesn't know about,
-         so an anchor choice that places the popup low can still end up
-         visually behind the sheet without this. */
+      /* Above the mobile side-panel drawer/backdrop (z-index 20/15) - those
+         are overlays Mapbox's own container-based collision detection
+         doesn't know about, so an anchor choice that places the popup low
+         can still end up visually behind them without this. */
       z-index: 50;
     }
 
@@ -573,15 +700,6 @@ js: store-locator.js
       justify-content: space-between;
       align-items: center;
       gap: 10px;
-    }
-
-    .popup-brand-logo {
-      width: 28px;
-      height: 28px;
-      border-radius: 4px;
-      object-fit: contain;
-      background: white;
-      flex-shrink: 0;
     }
 
     .popup-header h3 {
@@ -660,8 +778,7 @@ js: store-locator.js
       margin-top: 6px;
     }
 
-    .popup-route-actions button,
-    .popup-route-actions a {
+    .popup-route-actions button {
       background: none;
       border: none;
       padding: 0;
@@ -673,8 +790,7 @@ js: store-locator.js
       font-family: inherit;
     }
 
-    .popup-route-actions button:hover,
-    .popup-route-actions a:hover {
+    .popup-route-actions button:hover {
       text-decoration: underline;
     }
 
@@ -808,107 +924,114 @@ js: store-locator.js
       box-shadow: 0 3px 10px rgba(0,0,0,0.4);
     }
 
-    /* Bottom-sheet drag handle + list/map tabs - mobile only, hidden on desktop */
-    #sheet-handle-bar {
+    /* Side-panel open/close tabs + backdrop - mobile only, hidden on desktop */
+    #open-side-panel,
+    #close-side-panel,
+    #sidebar-backdrop {
       display: none;
     }
 
-    #mobile-view-tabs {
-      display: none;
-    }
-
-    /* Mobile responsive - map fills the screen, sidebar becomes a draggable
-       bottom sheet over it with 3 snap states (collapsed/default/expanded) */
+    /* Mobile responsive - map fills the whole screen; the sidebar (search/
+       filters/list - identical content to the desktop side panel) becomes a
+       fixed-position drawer that slides in from the left over the map,
+       toggled by a red tab, matching the reference site's own pattern. */
     @media (max-width: 768px) {
       #container {
         position: relative;
-        flex-direction: column;
-      }
-
-      #map {
-        height: 100%;
       }
 
       /* Keep the whole popup (header+body+footer) comfortably short on
-         phones, so it fits above the bottom sheet regardless of which side
-         Mapbox chooses to anchor it toward. */
+         phones, so it never dominates the smaller viewport. */
       .popup-body {
         max-height: 32vh;
       }
 
       #sidebar {
-        position: absolute;
-        left: 0;
-        bottom: 0;
-        width: 100%;
-        height: 45vh; /* default state */
-        max-height: 90vh;
-        min-height: 76px;
-        border-radius: 16px 16px 0 0;
-        box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.3);
-        z-index: 10;
-        transition: height 0.25s ease;
-      }
-
-      #sidebar.sheet-dragging {
-        transition: none;
-      }
-
-      #sidebar.sheet-collapsed {
-        height: 76px;
-      }
-
-      #sidebar.sheet-expanded {
-        height: 90vh;
-      }
-
-      #sheet-handle-bar {
-        display: flex;
-        justify-content: center;
-        padding: 8px 0 6px;
-        background-color: white;
-        border-radius: 16px 16px 0 0;
-        touch-action: none;
-        cursor: grab;
-        position: sticky;
+        position: fixed;
         top: 0;
-        z-index: 2;
-        flex-shrink: 0;
+        left: 0;
+        height: 100%;
+        width: 340px;
+        max-width: 85vw;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+        z-index: 20;
+        box-shadow: 2px 0 16px rgba(0, 0, 0, 0.3);
       }
 
-      #sheet-handle {
-        width: 36px;
-        height: 4px;
-        border-radius: 2px;
-        background-color: #ccc;
+      #container.panel-open #sidebar {
+        transform: translateX(0);
       }
 
-      #mobile-view-tabs {
-        display: flex;
-        gap: 8px;
-        padding: 0 16px 10px;
-        background-color: white;
-        position: sticky;
-        top: 20px;
-        z-index: 2;
-        flex-shrink: 0;
+      #sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 15;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
       }
 
-      .mobile-tab {
-        flex: 1;
-        padding: 9px;
+      #container.panel-open #sidebar-backdrop {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      #open-side-panel,
+      #close-side-panel {
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        top: 16px;
+        min-height: 48px;
+        padding: 8px 12px 8px 16px;
+        background-color: #ED1C24;
+        color: white;
         border: none;
-        border-radius: 6px;
-        background-color: #eee;
-        color: #333;
-        font-size: 14px;
-        font-weight: 600;
+        border-radius: 0 24px 24px 0;
+        font-size: 16px;
+        text-align: center;
+        box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
         cursor: pointer;
       }
 
-      .mobile-tab.active {
-        background-color: #ED1C24;
-        color: white;
+      /* Default (panel closed): show the "探す" tab pinned to the screen's
+         left edge, hide the "閉じる" tab. #container.panel-open flips both.
+         Both are fixed to the viewport (siblings of #sidebar, not children -
+         nesting #close-side-panel inside #sidebar would put it at the mercy
+         of #sidebar's own transform/overflow-y clipping it). */
+      #open-side-panel,
+      #close-side-panel {
+        position: fixed;
+        z-index: 21;
+      }
+
+      #open-side-panel {
+        display: flex;
+        left: 0;
+        white-space: nowrap; /* "探す" always fits on one line */
+      }
+
+      #close-side-panel {
+        display: none;
+        /* left+right (not a fixed width) so the button is only ever as wide
+           as the remaining space next to the panel - "閉じる" wraps to a
+           second line instead of overflowing/getting clipped when that
+           space is narrow (e.g. panel at its 85vw max-width on a small
+           phone). */
+        left: min(340px, 85vw); /* matches #sidebar's own width formula */
+        right: 4px;
+        padding-right: 16px;
+      }
+
+      #container.panel-open #open-side-panel {
+        display: none;
+      }
+
+      #container.panel-open #close-side-panel {
+        display: flex;
       }
     }
 
@@ -964,12 +1087,18 @@ js: store-locator.js
 
 <body>
   <div id="container">
+    <button id="open-side-panel" class="side-panel-tab" type="button">
+      <span>探す</span>
+      <svg width="20" height="20" viewBox="0 0 20 20">
+        <circle fill="none" stroke="white" stroke-width="1.1" cx="9" cy="9" r="7"></circle>
+        <path fill="none" stroke="white" stroke-width="1.1" d="M14,14 L18,18 L14,14 Z"></path>
+      </svg>
+    </button>
+    <div id="sidebar-backdrop"></div>
+    <button id="close-side-panel" class="side-panel-tab" type="button">
+      <span>閉じる</span>
+    </button>
     <div id="sidebar">
-      <div id="sheet-handle-bar" aria-hidden="true"><span id="sheet-handle"></span></div>
-      <div id="mobile-view-tabs">
-        <button id="tab-list" class="mobile-tab active" type="button">リスト</button>
-        <button id="tab-map" class="mobile-tab" type="button">地図</button>
-      </div>
       <div id="sidebar-header">
         <div class="search-container">
           <input type="text" id="search-box" name="search" placeholder="ブランド・地名・駅名で探す" autocomplete="off">
@@ -982,7 +1111,6 @@ js: store-locator.js
           <div id="search-suggestions"></div>
         </div>
         <button id="clear-filters">条件をクリアする</button>
-        <a id="store-list-link" href="store-list.html">全店舗一覧を見る</a>
         <button id="lang-toggle" type="button">English</button>
 
         <div class="filter-section">
@@ -1019,24 +1147,6 @@ js: store-locator.js
           </div>
         </div>
 
-        <div class="filter-section">
-          <button class="filter-header" id="keyboard-guide-toggle">
-            <span class="btn-label">キーボード操作ガイド</span>
-            <span class="toggle-icon">
-              <svg width="12" height="12" viewBox="0 0 12 12">
-                <polyline fill="none" stroke="#000" stroke-width="1.1" points="1 3.5 6 8.5 11 3.5"></polyline>
-              </svg>
-            </span>
-          </button>
-          <div class="filter-content" id="keyboard-guide-content">
-            <ul class="keyboard-guide-list">
-              <li id="kbd-guide-tab"><kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> — 次/前の項目へ移動</li>
-              <li id="kbd-guide-enter"><kbd>Enter</kbd> / <kbd>Space</kbd> — 選択・実行</li>
-              <li id="kbd-guide-arrow"><kbd>↑</kbd> / <kbd>↓</kbd> — 検索候補の選択</li>
-              <li id="kbd-guide-esc"><kbd>Esc</kbd> — 検索候補・ポップアップを閉じる</li>
-            </ul>
-          </div>
-        </div>
       </div>
 
       <div id="store-count">0件見つかりました</div>
@@ -1046,6 +1156,36 @@ js: store-locator.js
     </div>
 
     <div id="map" aria-hidden="true"></div>
+
+    <a id="store-list-link" href="store-list.html">
+      <span>新店舗一覧</span>
+      <svg width="24" height="24" viewBox="0 0 24 24">
+        <path fill="white" d="M9.4 18L8 16.6l4.6-4.6L8 7.4 9.4 6l6 6z"></path>
+      </svg>
+    </a>
+
+    <!-- Keyboard shortcuts (R061): the clickable link itself lives inside
+         the map's attribution control (added via customAttribution in
+         initMap()), alongside the data/terms/report-error links. Clicking
+         it opens this centered dialog. -->
+    <div id="keyboard-guide-backdrop"></div>
+    <div id="keyboard-guide-modal" role="dialog" aria-modal="true" aria-labelledby="keyboard-guide-title">
+      <div class="kbd-modal-header">
+        <span id="keyboard-guide-title">キーボードショートカット</span>
+        <button id="keyboard-guide-close" type="button" aria-label="閉じる">
+          <svg width="14" height="14" viewBox="0 0 14 14">
+            <line x1="1" y1="1" x2="13" y2="13" stroke="#565656" stroke-width="1.3"></line>
+            <line x1="13" y1="1" x2="1" y2="13" stroke="#565656" stroke-width="1.3"></line>
+          </svg>
+        </button>
+      </div>
+      <ul class="keyboard-guide-list">
+        <li id="kbd-guide-tab"><kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> — 次/前の項目へ移動</li>
+        <li id="kbd-guide-enter"><kbd>Enter</kbd> / <kbd>Space</kbd> — 選択・実行</li>
+        <li id="kbd-guide-arrow"><kbd>↑</kbd> / <kbd>↓</kbd> — 検索候補の選択</li>
+        <li id="kbd-guide-esc"><kbd>Esc</kbd> — 検索候補・ポップアップを閉じる</li>
+      </ul>
+    </div>
     <div id="route-info-banner"></div>
     <button id="floating-clear-filters" class="floating-clear-btn">
       <svg width="10" height="10" viewBox="0 0 20 20">

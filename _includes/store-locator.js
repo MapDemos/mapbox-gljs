@@ -12,12 +12,12 @@ const TRANSLATIONS = {
     clearFilters: '条件をクリアする',
     selectBrand: 'ブランドを選ぶ',
     refineSearch: '絞り込み検索',
-    keyboardGuide: 'キーボード操作ガイド',
-    storeListLink: '全店舗一覧を見る',
+    keyboardGuide: 'キーボードショートカット',
+    storeListLink: '新店舗一覧',
     modeAnd: 'すべて満たす',
     modeOr: 'いずれか満たす',
-    tabList: 'リスト',
-    tabMap: '地図',
+    openSidePanel: '探す',
+    closeSidePanel: '閉じる',
     kbdTab: 'Tab / Shift+Tab — 次/前の項目へ移動',
     kbdEnter: 'Enter / Space — 選択・実行',
     kbdArrow: '↑ / ↓ — 検索候補の選択',
@@ -47,7 +47,6 @@ const TRANSLATIONS = {
     popupLessLink: '閉じる',
     popupWalkRoute: '徒歩ルート',
     popupDriveRoute: '車ルート',
-    popupOpenGoogleMaps: 'Google Mapsで開く',
     routeWalk: '徒歩',
     routeDrive: '車',
     routeInfo: (label, km, min) => `${label}ルート: ${km}km・約${min}分`,
@@ -64,12 +63,12 @@ const TRANSLATIONS = {
     clearFilters: 'Clear filters',
     selectBrand: 'Select brand',
     refineSearch: 'Refine search',
-    keyboardGuide: 'Keyboard guide',
-    storeListLink: 'View all stores',
+    keyboardGuide: 'Keyboard shortcuts',
+    storeListLink: 'New stores',
     modeAnd: 'Match all',
     modeOr: 'Match any',
-    tabList: 'List',
-    tabMap: 'Map',
+    openSidePanel: 'Search',
+    closeSidePanel: 'Close',
     kbdTab: 'Tab / Shift+Tab — move to next/previous item',
     kbdEnter: 'Enter / Space — select or activate',
     kbdArrow: '↑ / ↓ — navigate search suggestions',
@@ -99,7 +98,6 @@ const TRANSLATIONS = {
     popupLessLink: 'Show less',
     popupWalkRoute: 'Walking route',
     popupDriveRoute: 'Driving route',
-    popupOpenGoogleMaps: 'Open in Google Maps',
     routeWalk: 'Walking',
     routeDrive: 'Driving',
     routeInfo: (label, km, min) => `${label} route: ${km}km, ~${min} min`,
@@ -141,15 +139,16 @@ function toggleUiLanguage() {
   // Static UI chrome
   document.getElementById('search-box').placeholder = t('searchPlaceholder');
   document.getElementById('clear-filters').textContent = t('clearFilters');
-  document.getElementById('store-list-link').textContent = t('storeListLink');
+  document.querySelector('#store-list-link span').textContent = t('storeListLink');
   document.getElementById('lang-toggle').textContent = t('langToggle');
   document.querySelector('#brand-filter-toggle .btn-label').textContent = t('selectBrand');
   document.querySelector('#amenity-filter-toggle .btn-label').textContent = t('refineSearch');
-  document.querySelector('#keyboard-guide-toggle .btn-label').textContent = t('keyboardGuide');
+  document.querySelector('.keyboard-guide-link').textContent = t('keyboardGuide');
+  document.getElementById('keyboard-guide-title').textContent = t('keyboardGuide');
   document.getElementById('amenity-mode-and').textContent = t('modeAnd');
   document.getElementById('amenity-mode-or').textContent = t('modeOr');
-  document.getElementById('tab-list').textContent = t('tabList');
-  document.getElementById('tab-map').textContent = t('tabMap');
+  document.querySelector('#open-side-panel span').textContent = t('openSidePanel');
+  document.querySelector('#close-side-panel span').textContent = t('closeSidePanel');
   document.getElementById('kbd-guide-tab').innerHTML = `<kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> — ${t('kbdTab').split('— ')[1]}`;
   document.getElementById('kbd-guide-enter').innerHTML = `<kbd>Enter</kbd> / <kbd>Space</kbd> — ${t('kbdEnter').split('— ')[1]}`;
   document.getElementById('kbd-guide-arrow').innerHTML = `<kbd>↑</kbd> / <kbd>↓</kbd> — ${t('kbdArrow').split('— ')[1]}`;
@@ -164,6 +163,9 @@ function toggleUiLanguage() {
   }
   if (typeof updateStoreListImmediate === 'function' && map) {
     updateStoreListImmediate();
+  }
+  if (typeof updateMapLayers === 'function' && map) {
+    updateMapLayers(); // Refreshes area-group pill labels (getAreaLabel) immediately, not just on next pan/zoom
   }
   if (currentPopup && currentPopupFeature) {
     currentPopup.setHTML(createPopupContent(currentPopupFeature));
@@ -622,6 +624,20 @@ const AMENITY_FILTERS = [
   { id: 'noSmoking', label: '禁煙', labelEn: 'Non-smoking', key: '完全禁煙フラグ', icon: 'https://storage.googleapis.com/storelocator-v3-static/images/skylark/bbb828bc-dd36-4d7b-ba71-4b678da474b9.png' }
 ];
 
+// Canonical brand display order, matching the production site's own brand
+// filter list (store-info.skylark.co.jp) - R036. Brands in our data that
+// aren't in this list (e.g. one-off/unlisted names) sort after it.
+const BRAND_ORDER = [
+  'ガスト', 'バーミヤン', 'しゃぶ葉', '夢庵', 'ジョナサン', 'ステーキガスト',
+  'むさしの森珈琲', 'から好し（ガスト内店含む）', 'から好し（単独店）', '藍屋',
+  'とんから亭', 'chawan', 'ラ・オハナ', '魚屋路', 'グラッチェガーデンズ',
+  '八郎そば', 'ゆめあん食堂', '三〇三', 'グランブッフェ', 'ニューマーケット',
+  'フェスタガーデン', 'フォレスト', '包包點心', '點心甜心', '点心甜心', 'ダイナー',
+  'ザ ブッフェ', '八献', 'くし葉', 'すうぷ', 'その他ブッフェレストラン',
+  'ペルティカ', 'フロプレステージュ', 'トマト＆オニオン', 'じゅうじゅうカルビ',
+  '資さんうどん'
+];
+
 // Brand colors for map markers
 const brandColors = {
   'ガスト': '#E31837',
@@ -650,8 +666,8 @@ let currentZoom = 11;
 // (e.g. a full address) for display, which must not be treated as a filter query.
 let searchFilterQuery = '';
 
-// Set by initMobileSheet() once wired up; collapses the mobile bottom sheet so
-// the map (and any popup) is visible after a store is selected.
+// Set by initSidePanelToggle() once wired up; closes the mobile side-panel
+// drawer so the map (and any popup) is visible after a store is selected.
 let collapseMobileSheet = null;
 
 // How multiple selected amenity filters combine: 'AND' (must have all of
@@ -669,6 +685,273 @@ let filteredStores = [];
 const PREFECTURE_REGEX = /^(東京都|北海道|大阪府|京都府|[^\s]+県)/;
 const WARD_CITY_REGEX = /^([^\s]+?(市|区|町|村))/;
 const FULL_ADDRESS_REGEX = /^(東京都|北海道|大阪府|京都府|[^\s]+県)([^\s]+?(市|区|町|村))?/;
+
+// English names for the area-group map pill labels (R068 - the UI-language
+// toggle already switches every other UI string and the map's own street
+// labels via map.setLanguage(), but these DOM-rendered pills were still
+// stuck in Japanese). Built from the exact set of prefecture/wardCity
+// strings ADDRESS_PARSER actually produces for the real dataset - not a
+// general-purpose gazetteer, so a lookup miss falls back to the raw
+// Japanese name rather than guessing (see getAreaLabel below).
+//
+// A few entries are stuck with a truncated/malformed key because of a
+// pre-existing bug in FULL_ADDRESS_REGEX below: its ward/city half stops
+// at the FIRST occurrence of 市/区/町/村, so real names that happen to
+// contain one of those characters before their true suffix get cut short
+// - e.g. "四日市" here is really 四日市市 (Yokkaichi City), "大村" is really
+// 大村市 (Omura City), etc. Likewise the prefecture half is greedy, so
+// "広島県山県" (from 広島県山県郡...) swallowed a district name that itself
+// ends in 県. Not fixed here - a regex change belongs to whoever owns that
+// parsing decision - but every affected key still gets a correct label for
+// the place it actually represents.
+
+const PREFECTURE_EN = {
+  '三重県': 'Mie', '京都府': 'Kyoto', '佐賀県': 'Saga', '兵庫県': 'Hyogo',
+  '北海道': 'Hokkaido', '千葉県': 'Chiba', '和歌山県': 'Wakayama', '埼玉県': 'Saitama',
+  '大分県': 'Oita', '大阪府': 'Osaka', '奈良県': 'Nara', '宮城県': 'Miyagi',
+  '宮崎県': 'Miyazaki', '富山県': 'Toyama', '山口県': 'Yamaguchi', '山形県': 'Yamagata',
+  '山梨県': 'Yamanashi', '岐阜県': 'Gifu', '岡山県': 'Okayama', '岩手県': 'Iwate',
+  '島根県': 'Shimane', '広島県': 'Hiroshima', '広島県山県': 'Yamagata District, Hiroshima', '徳島県': 'Tokushima',
+  '愛媛県': 'Ehime', '愛知県': 'Aichi', '新潟県': 'Niigata', '東京都': 'Tokyo',
+  '栃木県': 'Tochigi', '沖縄県': 'Okinawa', '滋賀県': 'Shiga', '熊本県': 'Kumamoto',
+  '石川県': 'Ishikawa', '神奈川県': 'Kanagawa', '福井県': 'Fukui', '福岡県': 'Fukuoka',
+  '福島県': 'Fukushima', '秋田県': 'Akita', '群馬県': 'Gunma', '茨城県': 'Ibaraki',
+  '長崎県': 'Nagasaki', '長野県': 'Nagano', '青森県': 'Aomori', '静岡県': 'Shizuoka',
+  '香川県': 'Kagawa', '高知県': 'Kochi', '鳥取県': 'Tottori', '鹿児島県': 'Kagoshima',
+};
+
+const WARD_CITY_EN = {
+  'あきる野市': 'Akiruno City', 'いすみ市': 'Isumi City', 'いわき市': 'Iwaki City',
+  'うるま市': 'Uruma City', 'さいたま市': 'Saitama City', 'さくら市': 'Sakura City',
+  'さぬき市': 'Sanuki City', 'たつの市': 'Tatsuno City', 'つくばみらい市': 'Tsukubamirai City',
+  'つくば市': 'Tsukuba City', 'にかほ市': 'Nikaho City', 'ひたちなか市': 'Hitachinaka City',
+  'ふじみ野市': 'Fujimino City', 'みよし市': 'Miyoshi City', 'むつ市': 'Mutsu City',
+  '一宮市': 'Ichinomiya City', '一関市': 'Ichinoseki City', '三原市': 'Mihara City',
+  '三島市': 'Mishima City', '三木市': 'Miki City', '三条市': 'Sanjo City',
+  '三浦市': 'Miura City', '三浦郡葉山町': 'Hayama Town, Miura District', '三田市': 'Sanda City',
+  '三笠市': 'Mikasa City', '三郷市': 'Misato City', '三重郡朝日町': 'Asahi Town, Mie District',
+  '三鷹市': 'Mitaka City', '上尾市': 'Ageo City', '上田市': 'Ueda City',
+  '上益城郡嘉島町': 'Kashima Town, Kamimashiki District', '上越市': 'Joetsu City', '下妻市': 'Shimotsuma City',
+  '下松市': 'Kudamatsu City', '下田市': 'Shimoda City', '下都賀郡壬生町': 'Mibu Town, Shimotsuga District',
+  '下野市': 'Shimotsuke City', '下関市': 'Shimonoseki City', '世田谷区': 'Setagaya Ward',
+  '中央区': 'Chuo Ward', '中央市': 'Chuo City', '中巨摩郡昭和町': 'Showa Town, Nakakoma District',
+  '中津川市': 'Nakatsugawa City', '中津市': 'Nakatsu City', '中郡二宮町': 'Ninomiya Town, Naka District',
+  '中郡大磯町': 'Oiso Town, Naka District', '中野区': 'Nakano Ward', '中野市': 'Nakano City',
+  '中間市': 'Nakama City', '丸亀市': 'Marugame City', '丹波市': 'Tanba City',
+  '丹羽郡扶桑町': 'Fuso Town, Niwa District', '久喜市': 'Kuki City', '久慈市': 'Kuji City',
+  '久留米市': 'Kurume City', '亀山市': 'Kameyama City', '亀岡市': 'Kameoka City',
+  '五所川原市': 'Goshogawara City', '五條市': 'Gojo City', '交野市': 'Katano City',
+  '京丹後市': 'Kyotango City', '京田辺市': 'Kyotanabe City', '京都市': 'Kyoto City',
+  '京都郡苅田町': 'Kanda Town, Kyoto District', '人吉市': 'Hitoyoshi City', '今治市': 'Imabari City',
+  '仙北市': 'Semboku City', '仙台市': 'Sendai City', '仲多度郡多度津町': 'Tadotsu Town, Nakatado District',
+  '伊万里市': 'Imari City', '伊丹市': 'Itami City', '伊予郡松前町': 'Masaki Town, Iyo District',
+  '伊勢原市': 'Isehara City', '伊勢崎市': 'Isesaki City', '伊勢市': 'Ise City',
+  '伊東市': 'Ito City', '伊豆の国市': 'Izunokuni City', '伊豆市': 'Izu City',
+  '伊那市': 'Ina City', '会津若松市': 'Aizuwakamatsu City', '佐世保市': 'Sasebo City',
+  '佐久市': 'Saku City', '佐伯市': 'Saiki City', '佐倉市': 'Sakura City',
+  '佐渡市': 'Sado City', '佐賀市': 'Saga City', '佐野市': 'Sano City',
+  '倉吉市': 'Kurayoshi City', '倉敷市': 'Kurashiki City', '備前市': 'Bizen City',
+  '児玉郡上里町': 'Kamisato Town, Kodama District', '入間市': 'Iruma City', '入間郡三芳町': 'Miyoshi Town, Iruma District',
+  '入間郡毛呂山町': 'Moroyama Town, Iruma District', '八代市': 'Yatsushiro City', '八千代市': 'Yachiyo City',
+  '八尾市': 'Yao City', '八幡市': 'Yawata City', '八戸市': 'Hachinohe City',
+  '八潮市': 'Yashio City', '八王子市': 'Hachioji City', '八街市': 'Yachimata City',
+  '出雲市': 'Izumo City', '函館市': 'Hakodate City', '刈谷市': 'Kariya City',
+  '別府市': 'Beppu City', '前橋市': 'Maebashi City', '加古川市': 'Kakogawa City',
+  '加東市': 'Kato City', '加茂市': 'Kamo City', '加西市': 'Kasai City',
+  '加須市': 'Kazo City', '勝浦市': 'Katsuura City', '北上市': 'Kitakami City',
+  '北九州市': 'Kitakyushu City', '北区': 'Kita Ward', '北名古屋市': 'Kitanagoya City',
+  '北安曇郡白馬村': 'Hakuba Village, Kitaazumi District', '北本市': 'Kitamoto City', '北杜市': 'Hokuto City',
+  '北葛飾郡杉戸町': 'Sugito Town, Kitakatsushika District', '北足立郡伊奈町': 'Ina Town, Kitaadachi District', '十和田市': 'Towada City',
+  '千代田区': 'Chiyoda Ward', '千曲市': 'Chikuma City', '千歳市': 'Chitose City',
+  '千葉市': 'Chiba City', '半田市': 'Handa City', '南アルプス市': 'Minami-Alps City',
+  '南佐久郡佐久穂町': 'Sakuho Town, Minamisaku District', '南城市': 'Nanjo City', '南巨摩郡富士川町': 'Fujikawa Town, Minamikoma District',
+  '南相馬市': 'Minamisoma City', '南秋田郡五城目町': 'Gojome Town, Minamiakita District', '南足柄市': 'Minamiashigara City',
+  '南都留郡富士河口湖町': 'Fujikawaguchiko Town, Minamitsuru District', '南都留郡山中湖村': 'Yamanakako Village, Minamitsuru District', '南陽市': 'Nanyo City',
+  '印旛郡栄町': 'Sakae Town, Imba District', '印旛郡酒々井町': 'Shisui Town, Imba District', '印西市': 'Inzai City',
+  '厚木市': 'Atsugi City', '取手市': 'Toride City', '古河市': 'Koga City',
+  '古賀市': 'Koga City', '可児市': 'Kani City', '台東区': 'Taito Ward',
+  '各務原市': 'Kakamigahara City', '合志市': 'Koshi City', '吉川市': 'Yoshikawa City',
+  '吉野川市': 'Yoshinogawa City', '名取市': 'Natori City', '名古屋市': 'Nagoya City',
+  '名張市': 'Nabari City', '名護市': 'Nago City', '君津市': 'Kimitsu City',
+  '吹田市': 'Suita City', '呉市': 'Kure City', '周南市': 'Shunan City',
+  '和光市': 'Wako City', '和歌山市': 'Wakayama City', '和泉市': 'Izumi City',
+  '品川区': 'Shinagawa Ward', '唐津市': 'Karatsu City', '善通寺市': 'Zentsuji City',
+  '喜多方市': 'Kitakata City', '四国中央市': 'Shikokuchuo City', '四日市': 'Yokkaichi City',
+  '四街道市': 'Yotsukaido City', '国分寺市': 'Kokubunji City', '国立市': 'Kunitachi City',
+  '土浦市': 'Tsuchiura City', '坂井市': 'Sakai City', '坂出市': 'Sakaide City',
+  '坂戸市': 'Sakado City', '坂東市': 'Sakato City', '城陽市': 'Joyo City',
+  '堺市': 'Sakai City', '塩尻市': 'Shiojiri City', '塩谷郡高根沢町': 'Takanezawa Town, Shioya District',
+  '墨田区': 'Sumida Ward', '多摩市': 'Tama City', '多治見市': 'Tajimi City',
+  '多賀城市': 'Tagajo City', '大仙市': 'Daisen City', '大分市': 'Oita City',
+  '大和市': 'Yamato City', '大和高田市': 'Yamatotakada City', '大垣市': 'Ogaki City',
+  '大崎市': 'Osaki City', '大府市': 'Obu City', '大月市': 'Otsuki City',
+  '大村': 'Omura City', '大東市': 'Daito City', '大津市': 'Otsu City',
+  '大洲市': 'Ozu City', '大牟田市': 'Omuta City', '大田区': 'Ota Ward',
+  '大田原市': 'Otawara City', '大田市': 'Oda City', '大町': 'Omachi City',
+  '大網白里市': 'Oamishirasato City', '大里郡寄居町': 'Yorii Town, Osato District', '大野城市': 'Onojo City',
+  '大阪市': 'Osaka City', '大館市': 'Odate City', '天理市': 'Tenri City',
+  '天童市': 'Tendo City', '太宰府市': 'Dazaifu City', '太田市': 'Ota City',
+  '夷隅郡大多喜町': 'Otaki Town, Isumi District', '奈良市': 'Nara City', '奥州市': 'Oshu City',
+  '妙高市': 'Myoko City', '姫路市': 'Himeji City', '姶良市': 'Aira City',
+  '宇佐市': 'Usa City', '宇和島市': 'Uwajima City', '宇土市': 'Uto City',
+  '宇治市': 'Uji City', '宇部市': 'Ube City', '宇都宮市': 'Utsunomiya City',
+  '宇陀市': 'Uda City', '守山市': 'Moriyama City', '守谷市': 'Moriya City',
+  '安中市': 'Annaka City', '安城市': 'Anjo City', '安曇野市': 'Azumino City',
+  '安芸郡府中町': 'Fuchu Town, Aki District', '安芸郡海田町': 'Kaita Town, Aki District', '宍粟市': 'Shiso City',
+  '宗像市': 'Munakata City', '宜野湾市': 'Ginowan City', '宝塚市': 'Takarazuka City',
+  '宮古市': 'Miyako City', '宮城郡利府町': 'Rifu Town, Miyagi District', '宮崎市': 'Miyazaki City',
+  '富士吉田市': 'Fujiyoshida City', '富士宮市': 'Fujimiya City', '富士市': 'Fuji City',
+  '富士見市': 'Fujimi City', '富山市': 'Toyama City', '富岡市': 'Tomioka City',
+  '富津市': 'Futtsu City', '富田林市': 'Tondabayashi City', '富谷市': 'Tomiya City',
+  '富里市': 'Tomisato City', '寒河江市': 'Sagae City', '寝屋川市': 'Neyagawa City',
+  '射水市': 'Imizu City', '小千谷市': 'Ojiya City', '小山市': 'Oyama City',
+  '小平市': 'Kodaira City', '小松島市': 'Komatsushima City', '小松市': 'Komatsu City',
+  '小浜市': 'Obama City', '小牧市': 'Komaki City', '小田原市': 'Odawara City',
+  '小矢部市': 'Oyabe City', '小諸市': 'Komoro City', '小金井市': 'Koganei City',
+  '尼崎市': 'Amagasaki City', '尾張旭市': 'Owariasahi City', '尾道市': 'Onomichi City',
+  '山口市': 'Yamaguchi City', '山形市': 'Yamagata City', '山梨市': 'Yamanashi City',
+  '山武市': 'Sammu City', '山武郡横芝光町': 'Yokoshibahikari Town, Sammu District', '岐阜市': 'Gifu City',
+  '岡山市': 'Okayama City', '岡崎市': 'Okazaki City', '岡谷市': 'Okaya City',
+  '岩倉市': 'Iwakura City', '岩出市': 'Iwade City', '岩国市': 'Iwakuni City',
+  '岸和田市': 'Kishiwada City', '島原市': 'Shimabara City', '島尻郡南風原町': 'Haebaru Town, Shimajiri District',
+  '川口市': 'Kawaguchi City', '川崎市': 'Kawasaki City', '川西市': 'Kawanishi City',
+  '川越市': 'Kawagoe City', '市原市': 'Ichihara City', '市川市': 'Ichikawa City',
+  '帯広市': 'Obihiro City', '常総市': 'Joso City', '常陸大宮市': 'Hitachiomiya City',
+  '常陸太田市': 'Hitachiota City', '平塚市': 'Hiratsuka City', '幸手市': 'Satte City',
+  '広島市': 'Hiroshima City', '府中市': 'Fuchu City', '座間市': 'Zama City',
+  '延岡市': 'Nobeoka City', '廿日市': 'Hatsukaichi City', '弘前市': 'Hirosaki City',
+  '弥富市': 'Yatomi City', '彦根市': 'Hikone City', '御坊市': 'Gobo City',
+  '御殿場市': 'Gotemba City', '徳島市': 'Tokushima City', '志摩市': 'Shima City',
+  '志木市': 'Shiki City', '恵庭市': 'Eniwa City', '愛甲郡愛川町': 'Aikawa Town, Aiko District',
+  '愛知郡東郷町': 'Togo Town, Aichi District', '成田市': 'Narita City', '我孫子市': 'Abiko City',
+  '戸田市': 'Toda City', '所沢市': 'Tokorozawa City', '指宿市': 'Ibusuki City',
+  '掛川市': 'Kakegawa City', '揖保郡太子町': 'Taishi Town, Ibo District', '摂津市': 'Settsu City',
+  '敦賀市': 'Tsuruga City', '文京区': 'Bunkyo Ward', '新宮市': 'Shingu City',
+  '新宿区': 'Shinjuku Ward', '新居浜市': 'Niihama City', '新庄市': 'Shinjo City',
+  '新座市': 'Niiza City', '新潟市': 'Niigata City', '新発田市': 'Shibata City',
+  '日光市': 'Nikko City', '日向市': 'Hyuga City', '日田市': 'Hita City',
+  '日立市': 'Hitachi City', '日進市': 'Nisshin City', '日野市': 'Hino City',
+  '日高市': 'Hidaka City', '旭川市': 'Asahikawa City', '旭市': 'Asahi City',
+  '明石市': 'Akashi City', '春日井市': 'Kasugai City', '春日市': 'Kasuga City',
+  '春日部市': 'Kasukabe City', '昭島市': 'Akishima City', '有田市': 'Arida City',
+  '朝倉市': 'Asakura City', '朝霞市': 'Asaka City', '木更津市': 'Kisarazu City',
+  '木津川市': 'Kizugawa City', '木田郡三木町': 'Miki Town, Kita District', '本宮市': 'Motomiya City',
+  '本巣市': 'Motosu City', '本巣郡北方町': 'Kitagata Town, Motosu District', '本庄市': 'Honjo City',
+  '札幌市': 'Sapporo City', '杉並区': 'Suginami Ward', '村上市': 'Murakami City',
+  '東久留米市': 'Higashikurume City', '東大和市': 'Higashiyamato City', '東大阪市': 'Higashiosaka City',
+  '東広島市': 'Higashihiroshima City', '東村': 'Higashimurayama City', '東松山市': 'Higashimatsuyama City',
+  '東根市': 'Higashine City', '東海市': 'Tokai City', '東茨城郡茨城町': 'Ibaraki Town, Higashiibaraki District',
+  '東近江市': 'Higashiomi City', '東金市': 'Togane City', '松原市': 'Matsubara City',
+  '松山市': 'Matsuyama City', '松戸市': 'Matsudo City', '松本市': 'Matsumoto City',
+  '松江市': 'Matsue City', '松阪市': 'Matsusaka City', '板橋区': 'Itabashi Ward',
+  '板野郡北島町': 'Kitajima Town, Itano District', '枚方市': 'Hirakata City', '柏原市': 'Kashihara City',
+  '柏崎市': 'Kashiwazaki City', '柏市': 'Kashiwa City', '柳井市': 'Yanai City',
+  '柴田郡大河原町': 'Ogawara Town, Shibata District', '栃木市': 'Tochigi City', '栗東市': 'Ritto City',
+  '桐生市': 'Kiryu City', '桑名市': 'Kuwana City', '桜井市': 'Sakurai City',
+  '桶川市': 'Okegawa City', '榛原郡吉田町': 'Yoshida Town, Haibara District', '横手市': 'Yokote City',
+  '横浜市': 'Yokohama City', '横須賀市': 'Yokosuka City', '橋本市': 'Hashimoto City',
+  '橿原市': 'Kashihara City', '武蔵村': 'Musashimurayama City', '武蔵野市': 'Musashino City',
+  '武雄市': 'Takeo City', '比企郡小川町': 'Ogawa Town, Hiki District', '比企郡嵐山町': 'Ranzan Town, Hiki District',
+  '水俣市': 'Minamata City', '水戸市': 'Mito City', '氷見市': 'Himi City',
+  '江別市': 'Ebetsu City', '江南市': 'Konan City', '江戸川区': 'Edogawa Ward',
+  '江東区': 'Koto Ward', '池田市': 'Ikeda City', '沖縄市': 'Okinawa City',
+  '河内郡上三川町': 'Kaminokawa Town, Kawachi District', '河内長野市': 'Kawachinagano City', '沼津市': 'Numazu City',
+  '沼田市': 'Numata City', '泉佐野市': 'Izumisano City', '津山市': 'Tsuyama City',
+  '津島市': 'Tsushima City', '津市': 'Tsu City', '洲本市': 'Sumoto City',
+  '流山市': 'Nagareyama City', '浜松市': 'Hamamatsu City', '浦安市': 'Urayasu City',
+  '浦添市': 'Urasoe City', '海南市': 'Kainan City', '海老名市': 'Ebina City',
+  '海部郡大治町': 'Oharu Town, Kaifu District', '海部郡蟹江町': 'Kanie Town, Kaifu District', '深谷市': 'Fukaya City',
+  '清瀬市': 'Kiyose City', '渋川市': 'Shibukawa City', '渋谷区': 'Shibuya Ward',
+  '港区': 'Minato Ward', '湖西市': 'Kosai City', '湯沢市': 'Yuzawa City',
+  '滑川市': 'Namerikawa City', '滝川市': 'Takikawa City', '瀬戸市': 'Seto City',
+  '焼津市': 'Yaizu City', '熊本市': 'Kumamoto City', '熊谷市': 'Kumagaya City',
+  '熊野市': 'Kumano City', '熱海市': 'Atami City', '牛久市': 'Ushiku City',
+  '犬山市': 'Inuyama City', '狛江市': 'Komae City', '狭山市': 'Sayama City',
+  '猿島郡境町': 'Sakai Town, Sashima District', '玉名市': 'Tamana City', '瑞浪市': 'Mizunami City',
+  '瑞穂市': 'Mizuho City', '生駒市': 'Ikoma City', '生駒郡平群町': 'Heguri Town, Ikoma District',
+  '田原市': 'Tahara City', '田川市': 'Tagawa City', '田方郡函南町': 'Kannami Town, Tagata District',
+  '田村': 'Tamura City', '田辺市': 'Tanabe City', '由利本荘市': 'Yurihonjo City',
+  '甲州市': 'Koshu City', '甲府市': 'Kofu City', '甲斐市': 'Kai City',
+  '甲賀市': 'Koka City', '男鹿市': 'Oga City', '町田市': 'Machida City',
+  '登別市': 'Noboribetsu City', '白井市': 'Shiroi City', '白山市': 'Hakusan City',
+  '白岡市': 'Shiraoka City', '白河市': 'Shirakawa City', '白石市': 'Shiroishi City',
+  '益田市': 'Masuda City', '盛岡市': 'Morioka City', '目黒区': 'Meguro Ward',
+  '直方市': 'Nogata City', '相模原市': 'Sagamihara City', '真岡市': 'Moka City',
+  '矢板市': 'Yaita City', '知多市': 'Chita City', '知多郡東浦町': 'Higashiura Town, Chita District',
+  '知多郡阿久比町': 'Agui Town, Chita District', '知立市': 'Chiryu City', '石岡市': 'Ishioka City',
+  '石巻市': 'Ishinomaki City', '石狩市': 'Ishikari City', '砺波市': 'Tonami City',
+  '碧南市': 'Hekinan City', '磐田市': 'Iwata City', '神埼郡吉野ヶ里町': 'Yoshinogari Town, Kanzaki District',
+  '神崎郡福崎町': 'Fukusaki Town, Kanzaki District', '神戸市': 'Kobe City', '神栖市': 'Kamisu City',
+  '福井市': 'Fukui City', '福山市': 'Fukuyama City', '福岡市': 'Fukuoka City',
+  '福島市': 'Fukushima City', '福生市': 'Fussa City', '福知山市': 'Fukuchiyama City',
+  '秋田市': 'Akita City', '秦野市': 'Hadano City', '秩父市': 'Chichibu City',
+  '秩父郡皆野町': 'Minano Town, Chichibu District', '稲城市': 'Inagi City', '稲敷市': 'Inashiki City',
+  '稲沢市': 'Inazawa City', '立川市': 'Tachikawa City', '竹原市': 'Takehara City',
+  '笛吹市': 'Fuefuki City', '笠岡市': 'Kasaoka City', '笠間市': 'Kasama City',
+  '筑紫野市': 'Chikushino City', '筑西市': 'Chikusei City', '箕面市': 'Minoh City',
+  '米子市': 'Yonago City', '米沢市': 'Yonezawa City', '糟屋郡志免町': 'Shime Town, Kasuya District',
+  '糟屋郡新宮町': 'Shingu Town, Kasuya District', '糟屋郡篠栗町': 'Sasaguri Town, Kasuya District', '糟屋郡粕屋町': 'Kasuya Town, Kasuya District',
+  '糸島市': 'Itoshima City', '糸魚川市': 'Itoigawa City', '紀の川市': 'Kinokawa City',
+  '綾瀬市': 'Ayase City', '総社市': 'Soja City', '練馬区': 'Nerima Ward',
+  '美濃加茂市': 'Minokamo City', '美馬市': 'Mima City', '羽島市': 'Hashima City',
+  '羽曳野市': 'Habikino City', '羽村': 'Hamura City', '羽生市': 'Hanyu City',
+  '習志野市': 'Narashino City', '胆沢郡金ケ崎町': 'Kanegasaki Town, Isawa District', '能代市': 'Noshiro City',
+  '舞鶴市': 'Maizuru City', '船橋市': 'Funabashi City', '芦屋市': 'Ashiya City',
+  '花巻市': 'Hanamaki City', '苫小牧市': 'Tomakomai City', '茂原市': 'Mobara City',
+  '茅ヶ崎市': 'Chigasaki City', '茅野市': 'Chino City', '茨木市': 'Ibaraki City',
+  '草加市': 'Soka City', '草津市': 'Kusatsu City', '荒川区': 'Arakawa Ward',
+  '菊川市': 'Kikugawa City', '菊池郡菊陽町': 'Kikuyo Town, Kikuchi District', '萩市': 'Hagi City',
+  '葛城市': 'Katsuragi City', '葛飾区': 'Katsushika Ward', '蒲郡市': 'Gamagori City',
+  '蓮田市': 'Hasuda City', '蕨市': 'Warabi City', '薩摩川内市': 'Satsumasendai City',
+  '藤井寺市': 'Fujiidera City', '藤岡市': 'Fujioka City', '藤枝市': 'Fujieda City',
+  '藤沢市': 'Fujisawa City', '行田市': 'Gyoda City', '袋井市': 'Fukuroi City',
+  '袖ケ浦市': 'Sodegaura City', '裾野市': 'Susono City', '西多摩郡日の出町': 'Hinode Town, Nishitama District',
+  '西多摩郡瑞穂町': 'Mizuho Town, Nishitama District', '西宮市': 'Nishinomiya City', '西尾市': 'Nishio City',
+  '西条市': 'Saijo City', '西東京市': 'Nishitokyo City', '西白河郡矢吹町': 'Yabuki Town, Nishishirakawa District',
+  '見附市': 'Mitsuke City', '観音寺市': 'Kanonji City', '調布市': 'Chofu City',
+  '諏訪市': 'Suwa City', '諏訪郡下諏訪町': 'Shimosuwa Town, Suwa District', '諫早市': 'Isahaya City',
+  '豊中市': 'Toyonaka City', '豊岡市': 'Toyooka City', '豊島区': 'Toshima Ward',
+  '豊川市': 'Toyokawa City', '豊橋市': 'Toyohashi City', '豊田市': 'Toyota City',
+  '賀茂郡河津町': 'Kawazu Town, Kamo District', '赤穂市': 'Ako City', '越前市': 'Echizen City',
+  '越谷市': 'Koshigaya City', '足利市': 'Ashikaga City', '足柄上郡大井町': 'Oi Town, Ashigarakami District',
+  '足柄上郡開成町': 'Kaisei Town, Ashigarakami District', '足柄下郡湯河原町': 'Yugawara Town, Ashigarashimo District', '足立区': 'Adachi Ward',
+  '近江八幡市': 'Omihachiman City', '逗子市': 'Zushi City', '遠賀郡岡垣町': 'Okagaki Town, Onga District',
+  '邑楽郡大泉町': 'Oizumi Town, Ora District', '那珂川市': 'Nakagawa City', '那珂市': 'Naka City',
+  '那珂郡東海村': 'Tokai Village, Naka District', '那覇市': 'Naha City', '那須塩原市': 'Nasushiobara City',
+  '郡北広島町': 'Kitahiroshima Town', '郡山市': 'Koriyama City', '都城市': 'Miyakonojo City',
+  '都留市': 'Tsuru City', '酒田市': 'Sakata City', '野々市': 'Nonoichi City',
+  '野洲市': 'Yasu City', '野田市': 'Noda City', '金沢市': 'Kanazawa City',
+  '鈴鹿市': 'Suzuka City', '鎌ケ谷市': 'Kamagaya City', '鎌倉市': 'Kamakura City',
+  '長久手市': 'Nagakute City', '長岡京市': 'Nagaokakyo City', '長岡市': 'Nagaoka City',
+  '長崎市': 'Nagasaki City', '長浜市': 'Nagahama City', '長生郡一宮町': 'Ichinomiya Town, Chosei District',
+  '長野市': 'Nagano City', '門真市': 'Kadoma City', '関市': 'Seki City',
+  '阪南市': 'Hannan City', '防府市': 'Hofu City', '霧島市': 'Kirishima City',
+  '青梅市': 'Ome City', '青森市': 'Aomori City', '静岡市': 'Shizuoka City',
+  '韮崎市': 'Nirasaki City', '須坂市': 'Suzaka City', '須崎市': 'Susaki City',
+  '須賀川市': 'Sukagawa City', '額田郡幸田町': 'Kota Town, Nukata District', '飯塚市': 'Iizuka City',
+  '飯山市': 'Iiyama City', '飯田市': 'Iida City', '飯能市': 'Hanno City',
+  '館山市': 'Tateyama City', '館林市': 'Tatebayashi City', '香南市': 'Konan City',
+  '香取市': 'Katori City', '香取郡多古町': 'Tako Town, Katori District', '駒ヶ根市': 'Komagane City',
+  '駿東郡清水町': 'Shimizu Town, Sunto District', '駿東郡長泉町': 'Nagaizumi Town, Sunto District', '高山市': 'Takayama City',
+  '高岡市': 'Takaoka City', '高崎市': 'Takasaki City', '高座郡寒川町': 'Samukawa Town, Koza District',
+  '高松市': 'Takamatsu City', '高梁市': 'Takahashi City', '高槻市': 'Takatsuki City',
+  '高浜市': 'Takahama City', '高知市': 'Kochi City', '高砂市': 'Takasago City',
+  '高萩市': 'Takahagi City', '鯖江市': 'Sabae City', '鳥取市': 'Tottori City',
+  '鳥栖市': 'Tosu City', '鳴門市': 'Naruto City', '鴨川市': 'Kamogawa City',
+  '鴻巣市': 'Konosu City', '鶴ヶ島市': 'Tsurugashima City', '鶴岡市': 'Tsuruoka City',
+  '鹿児島市': 'Kagoshima City', '鹿屋市': 'Kanoya City', '鹿嶋市': 'Kashima City',
+  '鹿沼市': 'Kanuma City', '鹿角市': 'Kazuno City', '黒部市': 'Kurobe City',
+  '龍ケ崎市': 'Ryugasaki City',
+};
+
+// Only used when currentLang is 'en' (see renderAreaGroupMarkers); falls
+// back to the raw Japanese name if a prefecture/wardCity string somehow
+// isn't in either table (shouldn't happen for the current dataset, but the
+// tables aren't a general gazetteer so new data could introduce one).
+function getAreaLabel(name) {
+  if (currentLang !== 'en') return name;
+  return PREFECTURE_EN[name] || WARD_CITY_EN[name] || name;
+}
 
 const ADDRESS_PARSER = {
   // Option 2: Single-pass parser - parse both prefecture and ward/city in one pass
@@ -775,7 +1058,7 @@ function renderAreaGroupMarkers(groups, tier) {
 
     const el = document.createElement('div');
     el.className = 'area-group-marker';
-    el.innerHTML = `<span class="area-label">${areaName}</span><span class="area-count">${count}</span>`;
+    el.innerHTML = `<span class="area-label">${getAreaLabel(areaName)}</span><span class="area-count">${count}</span>`;
     el.addEventListener('click', () => {
       map.easeTo({
         center: centroid,
@@ -826,8 +1109,25 @@ function initMap() {
     minZoom: MAP_CONFIG.MIN_ZOOM,
     maxZoom: MAP_CONFIG.MAX_ZOOM,
     maxBounds: MAP_CONFIG.MAX_BOUNDS,
-    language: 'ja'
+    language: 'ja',
+    // Default AttributionControl is replaced just below with a customized
+    // one (see R061 comment there) - disable it here to avoid a duplicate.
+    attributionControl: false
   });
+
+  // Keyboard-shortcuts link (R061) lives inside the attribution control,
+  // alongside the map's own data/terms/report-error links, rather than as
+  // a separate floating element. Two AttributionControl quirks to work
+  // around: it strips any <a> whose href isn't http(s)/mailto (so "#"
+  // doesn't survive - using a real Mapbox URL instead, which is moot since
+  // our click handler below calls preventDefault()); and it only keeps
+  // class (not id) when rebuilding the tag, and can re-render this whole
+  // control's innerHTML later (e.g. on a subsequent 'sourcedata' event) -
+  // so the click handler is delegated from a stable ancestor in
+  // initUIEvents() rather than attached directly to this element.
+  map.addControl(new mapboxgl.AttributionControl({
+    customAttribution: '<a href="https://www.mapbox.com/" class="keyboard-guide-link">キーボードショートカット</a>'
+  }));
 
   map.on('load', async () => {
     // Load stores from API using expanded region (not just viewport)
@@ -1257,7 +1557,6 @@ function createPopupContent(feature) {
 
   return `
     <div class="popup-header">
-      <img class="popup-brand-logo" src="${props.brandIcon}" alt="${props.brand}">
       <h3>${props.name}</h3>
       <button class="popup-close" onclick="closePopup()">
         <svg width="14" height="14" viewBox="0 0 14 14">
@@ -1275,7 +1574,6 @@ function createPopupContent(feature) {
           <div class="popup-route-actions">
             <button type="button" onclick="showRouteToStore([${feature.geometry.coordinates[0]}, ${feature.geometry.coordinates[1]}], 'walking')">${t('popupWalkRoute')}</button>
             <button type="button" onclick="showRouteToStore([${feature.geometry.coordinates[0]}, ${feature.geometry.coordinates[1]}], 'driving-traffic')">${t('popupDriveRoute')}</button>
-            <a href="https://www.google.com/maps/dir/?api=1&destination=${feature.geometry.coordinates[1]},${feature.geometry.coordinates[0]}" target="_blank" rel="noopener">${t('popupOpenGoogleMaps')}</a>
           </div>
         </div>
       </div>
@@ -1350,13 +1648,18 @@ function showPopup(feature) {
     offset: 90,
     closeButton: false,
     closeOnClick: false,
+    // Match the CSS width (.mapboxgl-popup-content) - Mapbox's own default
+    // (240px) would otherwise clamp the wrapper via max-width:100% on the
+    // content, since that resolves against Mapbox's inline max-width here.
+    // Capped with a vw term too so it doesn't get clipped on phones narrower
+    // than 380px.
+    maxWidth: 'min(380px, 92vw)',
     // Always show the popup above the marker, not auto-detected: the
     // selected store is deliberately positioned south-of-center via
     // getCenterOffset() to leave room above it for exactly this. Without
     // forcing it, Mapbox can pick 'top' (box below the marker) based on a
     // stale height measurement taken before the popup's image/content
-    // finishes loading, which then overflows into (or behind) the mobile
-    // bottom sheet.
+    // finishes loading, which then overflows off the bottom of the screen.
     anchor: 'bottom'
   })
     .setLngLat(feature.geometry.coordinates)
@@ -1422,7 +1725,7 @@ function showRouteToStore(destination, profile) {
 
     try {
       const response = await fetch(
-        `https://api.mapbox.com/directions/v5/mapbox/${profile}/` +
+        `https://api.mapbox.com/directions/v5/mapbox.tmp.valhalla-zenrin/${profile}/` +
         `${origin[0]},${origin[1]};${destination[0]},${destination[1]}` +
         `?geometries=geojson&overview=full&access_token=${mapboxgl.accessToken}`
       );
@@ -1498,7 +1801,7 @@ function selectStore(storeId) {
   // marker is highlighted, not reset to a fixed value).
 
   // On mobile, reveal the map (and the popup about to show on it) instead of
-  // leaving the bottom sheet expanded over it. No-op/inert on desktop.
+  // leaving the side-panel drawer open over it. No-op/inert on desktop.
   if (collapseMobileSheet) collapseMobileSheet();
 }
 
@@ -1515,7 +1818,15 @@ function initBrandFilters() {
   // Clear existing filters
   brandFiltersContainer.innerHTML = '';
 
-  Object.entries(brandIconsByName).forEach(([brand, iconPath]) => {
+  // Sort by the production site's brand order (R036); anything not listed
+  // there keeps its original (first-appearance) relative order at the end.
+  const sortedBrands = Object.entries(brandIconsByName).sort((a, b) => {
+    const ai = BRAND_ORDER.indexOf(a[0]);
+    const bi = BRAND_ORDER.indexOf(b[0]);
+    return (ai === -1 ? BRAND_ORDER.length : ai) - (bi === -1 ? BRAND_ORDER.length : bi);
+  });
+
+  sortedBrands.forEach(([brand, iconPath]) => {
     const button = document.createElement('button');
     button.className = 'brand-filter';
     button.dataset.brand = brand;
@@ -1646,11 +1957,31 @@ let currentVisibleStores = [];
 let displayedCount = 0;
 const batchSize = 20;
 
+// Marker pointing at the nearest store when the viewport has none visible.
+// Pinned to the map's current center (like the reference site), not a
+// sidebar element - removed again as soon as any store re-enters view.
+let nearestStoreMarker = null;
+
+function removeNearestStoreMarker() {
+  if (nearestStoreMarker) {
+    nearestStoreMarker.remove();
+    nearestStoreMarker = null;
+  }
+}
+
 // Immediate list update (called by debouncer or when immediate update needed)
-// When no stores are visible in the current viewport, show a link to the
-// nearest one (by distance from the map center) instead of a blank list.
+// When no stores are visible in the current viewport, show the plain empty
+// message in the list and point to the nearest store (by distance from the
+// map center) with a marker on the map instead.
 function showNearestStoreLink(centerCoords) {
-  if (filteredStores.length === 0) return; // nothing to link to (e.g. filters exclude everything)
+  const storeList = document.getElementById('store-list');
+  const emptyState = document.createElement('div');
+  emptyState.className = 'empty-state-nearest';
+  emptyState.innerHTML = `<p>${t('noStoresHere')}</p>`;
+  storeList.appendChild(emptyState);
+
+  removeNearestStoreMarker();
+  if (filteredStores.length === 0) return; // nothing to point to (e.g. filters exclude everything)
 
   let nearest = null;
   let nearestDist = Infinity;
@@ -1663,23 +1994,28 @@ function showNearestStoreLink(centerCoords) {
   });
   if (!nearest) return;
 
-  const storeList = document.getElementById('store-list');
-  const emptyState = document.createElement('div');
-  emptyState.className = 'empty-state-nearest';
-  emptyState.innerHTML = `
-    <p>${t('noStoresHere')}</p>
-    <button class="nearest-store-link" type="button">
-      ${t('nearestStoreLink', nearest.properties.name, nearestDist.toFixed(1))}
-    </button>
+  const bearing = turf.bearing(turf.point(centerCoords), turf.point(nearest.geometry.coordinates));
+
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'to-nearest';
+  el.innerHTML = `
+    <span class="label">${t('nearestStoreLink', nearest.properties.name, nearestDist.toFixed(1))}</span>
+    <div class="direction" style="transform: rotate(${bearing}deg)">
+      <svg width="18" height="18" viewBox="0 -960 960 960"><path d="M440-80v-647L256-544l-56-56 280-280 280 280-56 57-184-184v647h-80Z"/></svg>
+    </div>
   `;
-  emptyState.querySelector('.nearest-store-link').addEventListener('click', () => {
+  el.addEventListener('click', () => {
     selectStore(nearest.properties.id);
     const targetZoom = 15;
     const offsetCenter = getCenterOffset(nearest.geometry.coordinates, targetZoom);
     map.flyTo({ center: offsetCenter, zoom: targetZoom, duration: 1000 });
     scheduleShowPopupOnMoveEnd(nearest);
   });
-  storeList.appendChild(emptyState);
+
+  nearestStoreMarker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+    .setLngLat(centerCoords)
+    .addTo(map);
 }
 
 function updateStoreListImmediate() {
@@ -1711,6 +2047,8 @@ function updateStoreListImmediate() {
   // leaving the list area blank (R016)
   if (currentVisibleStores.length === 0) {
     showNearestStoreLink(centerCoords);
+  } else {
+    removeNearestStoreMarker();
   }
 
   // Add scroll listener for progressive loading (the sidebar itself scrolls,
@@ -2160,13 +2498,31 @@ function initUIEvents() {
     amenityFilterToggle.querySelector('.toggle-icon').classList.toggle('expanded', amenityFilterWrapper.classList.contains('active'));
   });
 
-  // Keyboard operation guide (R061) - same collapsible pattern
-  const keyboardGuideToggle = document.getElementById('keyboard-guide-toggle');
-  const keyboardGuideContent = document.getElementById('keyboard-guide-content');
+  // Keyboard operation guide (R061) - a link inside the attribution control
+  // (added via customAttribution in initMap()) opening a centered dialog.
+  // Delegated from document rather than attached to the link directly:
+  // AttributionControl can rebuild that control's innerHTML later (e.g. on
+  // a subsequent 'sourcedata' event), which would silently detach a
+  // directly-attached listener.
+  const keyboardGuideModal = document.getElementById('keyboard-guide-modal');
+  const keyboardGuideBackdrop = document.getElementById('keyboard-guide-backdrop');
+  const keyboardGuideClose = document.getElementById('keyboard-guide-close');
 
-  keyboardGuideToggle.addEventListener('click', () => {
-    keyboardGuideContent.classList.toggle('active');
-    keyboardGuideToggle.querySelector('.toggle-icon').classList.toggle('expanded', keyboardGuideContent.classList.contains('active'));
+  function setKeyboardGuideOpen(open) {
+    keyboardGuideModal.classList.toggle('active', open);
+    keyboardGuideBackdrop.classList.toggle('active', open);
+  }
+
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.keyboard-guide-link')) {
+      e.preventDefault(); // real https: href (for AttributionControl's sanitizer), never actually navigated to
+      setKeyboardGuideOpen(true);
+    }
+  });
+  keyboardGuideClose.addEventListener('click', () => setKeyboardGuideOpen(false));
+  keyboardGuideBackdrop.addEventListener('click', () => setKeyboardGuideOpen(false));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && keyboardGuideModal.classList.contains('active')) setKeyboardGuideOpen(false);
   });
 
   // AND/OR mode for combining multiple selected amenity filters (R034)
@@ -2190,77 +2546,33 @@ function initUIEvents() {
   // Floating clear-filters button (shown over the map when a filter is active)
   document.getElementById('floating-clear-filters').addEventListener('click', clearFilters);
 
-  initMobileSheet();
+  initSidePanelToggle();
 }
 
-// Mobile bottom-sheet: drag-to-resize (R055) + explicit リスト/地図 tabs (R053)
-// with 3 snap states. CSS-inert on desktop (the media query gives these
-// elements/classes their positioning), so this is safe to always wire up.
-function initMobileSheet() {
-  const sidebar = document.getElementById('sidebar');
-  const handleBar = document.getElementById('sheet-handle-bar');
-  const tabList = document.getElementById('tab-list');
-  const tabMap = document.getElementById('tab-map');
+// Mobile side-panel drawer (R053/R055 - was a draggable bottom sheet with
+// リスト/地図 tabs, replaced at user request to match the reference site's
+// own mobile pattern): a red "探す" tab pinned to the screen edge opens the
+// same search/filter/list panel used on desktop as a full-height overlay;
+// a "閉じる" tab (and the backdrop) closes it. CSS-inert on desktop (the
+// media query gives these elements their positioning), so this is safe to
+// always wire up.
+function initSidePanelToggle() {
+  const container = document.getElementById('container');
+  const openTab = document.getElementById('open-side-panel');
+  const closeTab = document.getElementById('close-side-panel');
+  const backdrop = document.getElementById('sidebar-backdrop');
 
-  const COLLAPSED_PX = 76;
-  const getDefaultPx = () => window.innerHeight * 0.45;
-  const getExpandedPx = () => window.innerHeight * 0.9;
-
-  function setSheetState(state) {
-    sidebar.classList.remove('sheet-collapsed', 'sheet-expanded');
-    sidebar.style.height = ''; // let CSS drive height for the target state
-    if (state === 'collapsed') sidebar.classList.add('sheet-collapsed');
-    if (state === 'expanded') sidebar.classList.add('sheet-expanded');
-    tabList.classList.toggle('active', state === 'expanded');
-    tabMap.classList.toggle('active', state === 'collapsed');
+  function setPanelOpen(open) {
+    container.classList.toggle('panel-open', open);
   }
 
-  tabList.addEventListener('click', () => setSheetState('expanded'));
-  tabMap.addEventListener('click', () => setSheetState('collapsed'));
+  openTab.addEventListener('click', () => setPanelOpen(true));
+  closeTab.addEventListener('click', () => setPanelOpen(false));
+  backdrop.addEventListener('click', () => setPanelOpen(false));
 
-  // Collapse the sheet when a store is selected, so the map (and its popup)
-  // is actually visible - mirrors the "地図" tab, but automatic.
-  collapseMobileSheet = () => setSheetState('collapsed');
-
-  let dragStartY = null;
-  let dragStartHeight = null;
-
-  handleBar.addEventListener('pointerdown', (e) => {
-    dragStartY = e.clientY;
-    dragStartHeight = sidebar.getBoundingClientRect().height;
-    sidebar.classList.add('sheet-dragging');
-    handleBar.setPointerCapture(e.pointerId);
-  });
-
-  handleBar.addEventListener('pointermove', (e) => {
-    if (dragStartY === null) return;
-    const delta = dragStartY - e.clientY; // dragging up = taller sheet
-    const newHeight = Math.min(getExpandedPx(), Math.max(COLLAPSED_PX, dragStartHeight + delta));
-    sidebar.style.height = `${newHeight}px`;
-  });
-
-  function endDrag() {
-    if (dragStartY === null) return;
-    const currentHeight = sidebar.getBoundingClientRect().height;
-    dragStartY = null;
-    sidebar.classList.remove('sheet-dragging');
-
-    // Snap to whichever of the 3 states is closest to where the drag ended
-    const targets = { collapsed: COLLAPSED_PX, default: getDefaultPx(), expanded: getExpandedPx() };
-    let closest = 'default';
-    let closestDist = Infinity;
-    Object.entries(targets).forEach(([state, px]) => {
-      const dist = Math.abs(currentHeight - px);
-      if (dist < closestDist) {
-        closestDist = dist;
-        closest = state;
-      }
-    });
-    setSheetState(closest);
-  }
-
-  handleBar.addEventListener('pointerup', endDrag);
-  handleBar.addEventListener('pointercancel', endDrag);
+  // Close the panel when a store is selected, so the map (and its popup)
+  // is actually visible - mirrors the "閉じる" tab, but automatic.
+  collapseMobileSheet = () => setPanelOpen(false);
 }
 
 // Initialize everything

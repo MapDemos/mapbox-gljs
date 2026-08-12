@@ -1,6 +1,6 @@
 ---
 layout: null
-title: 店舗一覧
+title: 新店舗一覧
 ---
 
 <html lang="ja">
@@ -38,96 +38,175 @@ title: 店舗一覧
       color: #666;
     }
 
+    /* Flat divided list (no cards/shadows), matching the reference site's
+       own new-store list (store-info.skylark.co.jp/list/) - confirmed by
+       inspecting its .list-unit/.open-date/.title-with-icon/.actions
+       markup and computed styles live. */
     main {
-      max-width: 900px;
+      max-width: 960px;
       margin: 0 auto;
-      padding: 16px 20px 60px;
+      padding: 0 20px 40px;
     }
 
-    .prefecture-group {
-      background-color: white;
-      border-radius: 6px;
-      margin-bottom: 10px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      overflow: hidden;
-    }
-
-    .prefecture-group summary {
-      padding: 14px 16px;
-      cursor: pointer;
-      font-weight: 700;
-      font-size: 15px;
-      list-style: none;
-    }
-
-    .prefecture-group summary::-webkit-details-marker {
-      display: none;
-    }
-
-    .prefecture-group summary::before {
-      content: "▶";
-      display: inline-block;
-      margin-right: 8px;
-      font-size: 11px;
-      transition: transform 0.15s;
-    }
-
-    .prefecture-group[open] summary::before {
-      transform: rotate(90deg);
-    }
-
-    .prefecture-group ul {
-      margin: 0;
-      padding: 0;
-      list-style: none;
-      border-top: 1px solid #eee;
-    }
-
-    .prefecture-group li {
-      padding: 12px 16px;
-      border-bottom: 1px solid #f0f0f0;
-    }
-
-    .prefecture-group li:last-child {
-      border-bottom: none;
-    }
-
-    .prefecture-group a {
-      color: #ED1C24;
-      font-weight: 600;
-      font-size: 14px;
-      text-decoration: none;
-    }
-
-    .prefecture-group a:hover {
-      text-decoration: underline;
-    }
-
-    .store-list-address {
+    .new-store-item {
       display: block;
-      color: #666;
-      font-size: 13px;
-      margin-top: 2px;
+      padding: 16px 0;
+      border-bottom: 1px solid #eee;
+      text-decoration: none;
+      color: #333;
+    }
+
+    .new-store-date {
+      font-size: 16px;
+      font-weight: 700;
+      margin: 0 0 8px;
+    }
+
+    .new-store-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .new-store-name {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .new-store-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background-color: white;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    .new-store-name span {
+      font-weight: 700;
+      font-size: 20px;
+    }
+
+    .new-store-details-btn {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      height: 30px;
+      padding: 0 15px;
+      background-color: #ED1C24;
+      color: white;
+      font-size: 14px;
+    }
+
+    .new-store-address {
+      display: block;
+      font-size: 16px;
+      margin-top: 8px;
+    }
+
+    #pagination {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 20px;
+    }
+
+    #pagination button {
+      border: 1px solid #ddd;
+      background-color: white;
+      color: #333;
+      border-radius: 4px;
+      padding: 6px 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    #pagination button.active {
+      background-color: #ED1C24;
+      color: white;
+      border-color: #ED1C24;
     }
   </style>
 </head>
 
 <body>
   <header>
-    <h1>店舗一覧</h1>
+    <h1>新店舗一覧</h1>
     <a href="store-locator.html">← 地図で探す</a>
   </header>
   <div id="total-count">読み込み中...</div>
   <main id="store-list-container"></main>
+  <div id="pagination"></div>
 
   <script>
     const SKYLARK_DATA_FILE = 'skylark-stores.json';
-    // Same pattern as _includes/store-locator.js's FULL_ADDRESS_REGEX, kept
-    // in sync with it for consistent prefecture grouping across both pages.
-    const FULL_ADDRESS_REGEX = /^(東京都|北海道|大阪府|京都府|[^\s]+県)([^\s]+?(市|区|町|村))?/;
+    const PAGE_SIZE = 10;
+    let newStores = [];
+    let currentPage = 1;
+
+    function renderPage(page) {
+      currentPage = page;
+      const container = document.getElementById('store-list-container');
+      container.innerHTML = '';
+
+      const start = (page - 1) * PAGE_SIZE;
+      const pageStores = newStores.slice(start, start + PAGE_SIZE);
+
+      pageStores.forEach(store => {
+        const extra = store.extra_fields || {};
+        const brandCode = extra['カテゴリ'] || '0101';
+        const openDate = new Date(extra['オープン日']);
+
+        const a = document.createElement('a');
+        a.className = 'new-store-item';
+        a.href = `store-locator.html?lat=${store.latitude}&lng=${store.longitude}&zoom=15.00`;
+
+        const dateEl = document.createElement('p');
+        dateEl.className = 'new-store-date';
+        dateEl.textContent = `${openDate.getFullYear()}年${openDate.getMonth() + 1}月${openDate.getDate()}日 オープン`;
+
+        const row = document.createElement('div');
+        row.className = 'new-store-row';
+        row.innerHTML = `
+          <div class="new-store-name">
+            <img class="new-store-icon" src="assets/brand-icons/${brandCode}.png" alt="">
+            <span>${store.name}</span>
+          </div>
+          <span class="new-store-details-btn">店舗詳細</span>
+        `;
+
+        const addr = document.createElement('p');
+        addr.className = 'new-store-address';
+        addr.textContent = store.address;
+
+        a.appendChild(dateEl);
+        a.appendChild(row);
+        a.appendChild(addr);
+        container.appendChild(a);
+      });
+
+      renderPagination();
+    }
+
+    function renderPagination() {
+      const pagination = document.getElementById('pagination');
+      pagination.innerHTML = '';
+      const pageCount = Math.ceil(newStores.length / PAGE_SIZE);
+      if (pageCount <= 1) return;
+
+      for (let i = 1; i <= pageCount; i++) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = i;
+        btn.className = i === currentPage ? 'active' : '';
+        btn.addEventListener('click', () => renderPage(i));
+        pagination.appendChild(btn);
+      }
+    }
 
     async function init() {
-      const container = document.getElementById('store-list-container');
       let stores;
       try {
         const response = await fetch(SKYLARK_DATA_FILE);
@@ -138,46 +217,16 @@ title: 店舗一覧
         return;
       }
 
-      document.getElementById('total-count').textContent = `${stores.length}件の店舗`;
+      // R072: mirrors the reference site's own new-store list - only stores
+      // flagged 新店フラグ (real data, not a fabricated subset), newest
+      // opening date first, not the full store directory grouped by
+      // prefecture.
+      newStores = stores
+        .filter(store => (store.extra_fields || {})['新店フラグ'] === '1')
+        .sort((a, b) => new Date(b.extra_fields['オープン日']) - new Date(a.extra_fields['オープン日']));
 
-      const groups = {};
-      stores.forEach(store => {
-        const match = (store.address || '').match(FULL_ADDRESS_REGEX);
-        const prefecture = match ? match[1] : 'その他';
-        if (!groups[prefecture]) groups[prefecture] = [];
-        groups[prefecture].push(store);
-      });
-
-      Object.keys(groups).sort().forEach(prefecture => {
-        const storesInPref = groups[prefecture].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-
-        const details = document.createElement('details');
-        details.className = 'prefecture-group';
-
-        const summary = document.createElement('summary');
-        summary.textContent = `${prefecture}（${storesInPref.length}）`;
-        details.appendChild(summary);
-
-        const ul = document.createElement('ul');
-        storesInPref.forEach(store => {
-          const li = document.createElement('li');
-
-          const a = document.createElement('a');
-          a.href = `store-locator.html?lat=${store.latitude}&lng=${store.longitude}&zoom=15.00`;
-          a.textContent = store.name;
-
-          const addr = document.createElement('span');
-          addr.className = 'store-list-address';
-          addr.textContent = store.address;
-
-          li.appendChild(a);
-          li.appendChild(addr);
-          ul.appendChild(li);
-        });
-        details.appendChild(ul);
-
-        container.appendChild(details);
-      });
+      document.getElementById('total-count').textContent = `${newStores.length}件の店舗をご紹介します。`;
+      renderPage(1);
     }
 
     init();
