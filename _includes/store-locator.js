@@ -2426,8 +2426,12 @@ function initSearch() {
       const [lng, lat] = feature.geometry.coordinates;
 
       // Update input with selected place name (a navigation label, not a filter
-      // query - clear the tracked query so it doesn't get treated as one)
-      searchBox.value = suggestion.full_address || suggestion.place_formatted || suggestion.name;
+      // query - clear the tracked query so it doesn't get treated as one).
+      // Uses address, not full_address: Mapbox's Search Box /suggest response
+      // duplicates the address text inside full_address for some POI types
+      // (e.g. "東京都港区東新橋1-1-11, 東京都港区東新橋1-1-11" for 新橋駅) -
+      // address is the same text without that duplication.
+      searchBox.value = suggestion.address || suggestion.place_formatted || suggestion.name;
       searchFilterQuery = '';
 
       // Hide suggestions
@@ -2456,7 +2460,7 @@ function initSearch() {
       // Fallback: try to use coordinates from suggestion if available
       if (suggestion.geometry && suggestion.geometry.coordinates) {
         const [lng, lat] = suggestion.geometry.coordinates;
-        searchBox.value = suggestion.full_address || suggestion.name;
+        searchBox.value = suggestion.address || suggestion.name;
         searchFilterQuery = '';
         suggestionsContainer.classList.remove('active');
         suggestionsContainer.innerHTML = '';
@@ -2489,6 +2493,14 @@ function initSearch() {
 
   // Handle keyboard navigation
   searchBox.addEventListener('keydown', (e) => {
+    // Ignore keys fired while an IME composition is in progress (e.g. Enter
+    // to commit a kana->kanji conversion, しんばし->新橋) - keyCode 229 is
+    // the legacy fallback for browsers that don't set isComposing. Without
+    // this, that commit-Enter was misread as "select the highlighted
+    // suggestion", closing the dropdown and overwriting the input before
+    // the user had even finished typing their query.
+    if (e.isComposing || e.keyCode === 229) return;
+
     if (e.key === 'Escape') {
       suggestionsContainer.classList.remove('active');
       suggestionsContainer.innerHTML = '';
