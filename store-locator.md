@@ -1232,7 +1232,15 @@ js: store-locator.js
       </div>
     </div>
 
-    <div id="map" aria-hidden="true"></div>
+    <!-- R062: not aria-hidden - confirmed by inspecting Google Maps JS API's
+         own source (maps.googleapis.com/.../common.js) that the reference
+         site's map div is never hidden from assistive tech; it's a single
+         focusable role="region" (Mapbox GL JS gives its own canvas the same
+         role="region"/tabindex="0" by default), with a description pointing
+         at the keyboard-shortcuts content - see initMap()/toggleUiLanguage()
+         where the canvas's aria-label/aria-roledescription/aria-describedby
+         get set up to mirror that exactly. -->
+    <div id="map"></div>
 
     <a id="store-list-link" href="store-list.html">
       <span>新店舗一覧</span>

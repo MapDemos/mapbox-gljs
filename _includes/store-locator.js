@@ -28,6 +28,8 @@ const TRANSLATIONS = {
     kbdEnd: 'ビューを 75% 右へ移動',
     kbdPageUp: 'ビューを 75% 上へ移動',
     kbdPageDown: 'ビューを 75% 下へ移動',
+    mapAriaLabel: 'マップ',
+    mapAriaRoledescription: '地図',
     langToggle: 'English',
     noResultsInView: '表示範囲に店舗が見つかりません',
     tooManyResults: () => '100件以上見つかりました',
@@ -85,6 +87,8 @@ const TRANSLATIONS = {
     kbdEnd: 'Move view 75% right',
     kbdPageUp: 'Move view 75% up',
     kbdPageDown: 'Move view 75% down',
+    mapAriaLabel: 'Map',
+    mapAriaRoledescription: 'map',
     langToggle: '日本語',
     noResultsInView: 'No stores found in this area',
     tooManyResults: () => '100+ stores found',
@@ -157,6 +161,11 @@ function toggleUiLanguage() {
   document.querySelector('#amenity-filter-toggle .btn-label').textContent = t('refineSearch');
   document.querySelector('.keyboard-guide-link').textContent = t('keyboardGuide');
   document.getElementById('keyboard-guide-title').textContent = t('keyboardGuide');
+  if (map) {
+    const mapCanvas = map.getCanvas();
+    mapCanvas.setAttribute('aria-label', t('mapAriaLabel'));
+    mapCanvas.setAttribute('aria-roledescription', t('mapAriaRoledescription'));
+  }
   document.getElementById('amenity-mode-and').textContent = t('modeAnd');
   document.getElementById('amenity-mode-or').textContent = t('modeOr');
   document.querySelector('#open-side-panel span').textContent = t('openSidePanel');
@@ -1229,6 +1238,21 @@ function initMap() {
     attributionControl: false
   });
 
+  // R062: mirrors Google Maps JS API's own accessibility construction on
+  // the reference site (confirmed by reading its actual source served from
+  // maps.googleapis.com/.../common.js - not guessed): the map's interactive
+  // element is never aria-hidden, just a single focusable role="region"
+  // with a label/roledescription and an aria-describedby pointing at a
+  // hidden element containing the full keyboard-shortcuts list (Google
+  // reuses its keyboard-shortcuts dialog content for this; same idea here,
+  // pointing at our own #keyboard-guide-modal). Mapbox GL JS already gives
+  // its canvas role="region"/tabindex="0" by default - this only localizes
+  // the label/roledescription and adds the describedby link.
+  const mapCanvas = map.getCanvas();
+  mapCanvas.setAttribute('aria-label', t('mapAriaLabel'));
+  mapCanvas.setAttribute('aria-roledescription', t('mapAriaRoledescription'));
+  mapCanvas.setAttribute('aria-describedby', 'keyboard-guide-modal');
+
   // Keyboard-shortcuts link (R061) lives inside the attribution control,
   // alongside the map's own data/terms/report-error links, rather than as
   // a separate floating element. Two AttributionControl quirks to work
@@ -1910,14 +1934,6 @@ function showPopup(feature) {
     .setLngLat(feature.geometry.coordinates)
     .setHTML(createPopupContent(feature))
     .addTo(map);
-
-  // The popup (with a real, useful, focusable close button and route
-  // actions) is rendered as a child of #map, which is aria-hidden by
-  // default (R062 - map is decorative, list is the primary UI). Hiding an
-  // ancestor of focusable content is an accessibility anti-pattern the
-  // browser itself blocks (and warns about) - so lift aria-hidden while a
-  // popup with real content is actually open.
-  document.getElementById('map').removeAttribute('aria-hidden');
 }
 
 // Close popup
@@ -1931,9 +1947,6 @@ function closePopup() {
   updateSymbolState();
   document.querySelectorAll('.store-item.active').forEach(item => item.classList.remove('active'));
   clearRoute();
-  // Restore the map's decorative aria-hidden state now that its only
-  // focusable content (the popup) is gone.
-  document.getElementById('map').setAttribute('aria-hidden', 'true');
 }
 
 // Remove any drawn route and hide the route info banner (R046/R047)
@@ -2852,7 +2865,6 @@ function initSidePanelToggle() {
 // instead of a blank map or a cryptic GL error (R066).
 function showWebglFallback() {
   const mapEl = document.getElementById('map');
-  mapEl.removeAttribute('aria-hidden'); // this message is real content, not decorative
   mapEl.innerHTML = `
     <div class="webgl-fallback">
       <p>${t('webglFallback1')}</p>
