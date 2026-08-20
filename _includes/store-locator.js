@@ -18,10 +18,16 @@ const TRANSLATIONS = {
     modeOr: 'いずれか満たす',
     openSidePanel: '探す',
     closeSidePanel: '閉じる',
-    kbdTab: 'Tab / Shift+Tab — 次/前の項目へ移動',
-    kbdEnter: 'Enter / Space — 選択・実行',
-    kbdArrow: '↑ / ↓ — 検索候補の選択',
-    kbdEsc: 'Esc — 検索候補・ポップアップを閉じる',
+    kbdLeft: '左へ移動',
+    kbdRight: '右へ移動',
+    kbdUp: '上へ移動',
+    kbdDown: '下へ移動',
+    kbdZoomIn: 'ズームイン',
+    kbdZoomOut: 'ズームアウト',
+    kbdHome: 'ビューを 75% 左へ移動',
+    kbdEnd: 'ビューを 75% 右へ移動',
+    kbdPageUp: 'ビューを 75% 上へ移動',
+    kbdPageDown: 'ビューを 75% 下へ移動',
     langToggle: 'English',
     noResultsInView: '表示範囲に店舗が見つかりません',
     tooManyResults: () => '100件以上見つかりました',
@@ -69,10 +75,16 @@ const TRANSLATIONS = {
     modeOr: 'Match any',
     openSidePanel: 'Search',
     closeSidePanel: 'Close',
-    kbdTab: 'Tab / Shift+Tab — move to next/previous item',
-    kbdEnter: 'Enter / Space — select or activate',
-    kbdArrow: '↑ / ↓ — navigate search suggestions',
-    kbdEsc: 'Esc — close suggestions or popup',
+    kbdLeft: 'Move left',
+    kbdRight: 'Move right',
+    kbdUp: 'Move up',
+    kbdDown: 'Move down',
+    kbdZoomIn: 'Zoom in',
+    kbdZoomOut: 'Zoom out',
+    kbdHome: 'Move view 75% left',
+    kbdEnd: 'Move view 75% right',
+    kbdPageUp: 'Move view 75% up',
+    kbdPageDown: 'Move view 75% down',
     langToggle: '日本語',
     noResultsInView: 'No stores found in this area',
     tooManyResults: () => '100+ stores found',
@@ -149,10 +161,13 @@ function toggleUiLanguage() {
   document.getElementById('amenity-mode-or').textContent = t('modeOr');
   document.querySelector('#open-side-panel span').textContent = t('openSidePanel');
   document.querySelector('#close-side-panel span').textContent = t('closeSidePanel');
-  document.getElementById('kbd-guide-tab').innerHTML = `<kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> — ${t('kbdTab').split('— ')[1]}`;
-  document.getElementById('kbd-guide-enter').innerHTML = `<kbd>Enter</kbd> / <kbd>Space</kbd> — ${t('kbdEnter').split('— ')[1]}`;
-  document.getElementById('kbd-guide-arrow').innerHTML = `<kbd>↑</kbd> / <kbd>↓</kbd> — ${t('kbdArrow').split('— ')[1]}`;
-  document.getElementById('kbd-guide-esc').innerHTML = `<kbd>Esc</kbd> — ${t('kbdEsc').split('— ')[1]}`;
+  [['kbd-guide-left', 'kbdLeft'], ['kbd-guide-right', 'kbdRight'], ['kbd-guide-up', 'kbdUp'],
+   ['kbd-guide-down', 'kbdDown'], ['kbd-guide-zoomin', 'kbdZoomIn'], ['kbd-guide-zoomout', 'kbdZoomOut'],
+   ['kbd-guide-home', 'kbdHome'], ['kbd-guide-end', 'kbdEnd'], ['kbd-guide-pageup', 'kbdPageUp'],
+   ['kbd-guide-pagedown', 'kbdPageDown']
+  ].forEach(([rowId, key]) => {
+    document.querySelector(`#${rowId} td:last-child`).textContent = t(key);
+  });
 
   // Dynamic content that bakes in translated strings at render time
   if (typeof initAmenityFilters === 'function' && document.getElementById('amenity-filters').children.length) {
@@ -723,6 +738,37 @@ let amenityFilterMode = 'AND';
 // Will be initialized after data loads
 let filteredStores = [];
 
+// Fixed per-area (prefecture/wardCity) centroid+count, precomputed from the
+// *entire* currently-filtered dataset whenever filteredStores changes - not
+// from whatever happens to be in the current padded viewport. Matches the
+// reference site's own behavior (confirmed by inspecting its bundle: it
+// fetches pre-aggregated cluster data from a backend keyed by geohash cell,
+// so a group's displayed count/position never depends on which part of it
+// happens to be on-screen). We have no backend, but we do have the whole
+// dataset loaded client-side already, so this reproduces the same
+// "computed once, independent of viewport" behavior locally.
+let areaStats = { prefecture: {}, wardCity: {} };
+
+function computeAreaStats() {
+  const buckets = { prefecture: {}, wardCity: {} };
+  filteredStores.forEach(feature => {
+    ['prefecture', 'wardCity'].forEach(key => {
+      const name = feature.properties[key];
+      if (!name) return;
+      if (!buckets[key][name]) buckets[key][name] = [];
+      buckets[key][name].push(feature.geometry.coordinates);
+    });
+  });
+
+  const stats = { prefecture: {}, wardCity: {} };
+  ['prefecture', 'wardCity'].forEach(key => {
+    Object.entries(buckets[key]).forEach(([name, coords]) => {
+      stats[key][name] = { centroid: calculateCentroid(coords), count: coords.length };
+    });
+  });
+  return stats;
+}
+
 // No longer needed - using native symbol layers instead of canvas images
 
 // Address parsing utilities
@@ -1023,7 +1069,7 @@ const ADDRESS_PARSER = {
 
   // Get administrative area based on zoom level
   getAdminArea(address, zoom) {
-    if (zoom >= 13) {
+    if (zoom >= 12) {
       return null; // Show individual stores
     } else if (zoom >= 11) {
       return this.parseWardCity(address); // Group by ward/city
@@ -1033,8 +1079,12 @@ const ADDRESS_PARSER = {
   }
 };
 
-// Group stores by administrative area
-function groupStoresByArea(stores, zoom) {
+// Group stores by administrative area. `stores` is the padded (pre-loaded,
+// includes a buffer just outside the viewport for smooth panning) set;
+// `strictVisibleIds` identifies which of those are actually on-screen right
+// now, so each group's pill can be centered on its visible members instead
+// of drifting off-screen toward off-screen ones (see calculateCentroid).
+function groupStoresByArea(stores, zoom, strictVisibleIds) {
   const groups = {};
   const individualStores = [];
 
@@ -1042,7 +1092,7 @@ function groupStoresByArea(stores, zoom) {
     // Option 1: Use pre-parsed address properties instead of parsing on every call
     // This is MUCH faster than parsing strings with regex
     let adminArea;
-    if (zoom >= 13) {
+    if (zoom >= 12) {
       adminArea = null; // Show individual stores
     } else if (zoom >= 11) {
       adminArea = feature.properties.wardCity; // Use pre-parsed ward/city
@@ -1059,11 +1109,15 @@ function groupStoresByArea(stores, zoom) {
         groups[adminArea] = {
           name: adminArea,
           stores: [],
-          coordinates: []
+          coordinates: [],
+          strictCoordinates: []
         };
       }
       groups[adminArea].stores.push(feature);
       groups[adminArea].coordinates.push(feature.geometry.coordinates);
+      if (strictVisibleIds.has(feature.properties.id)) {
+        groups[adminArea].strictCoordinates.push(feature.geometry.coordinates);
+      }
     }
   });
 
@@ -1096,10 +1150,25 @@ function renderAreaGroupMarkers(groups, tier) {
   // pill can go straight to individual stores since that's the natural next
   // step down.
   const targetZoom = tier === 'prefecture' ? 12 : 14;
+  const statsKey = tier === 'prefecture' ? 'prefecture' : 'wardCity';
+  const bounds = map.getBounds();
 
   Object.entries(groups).forEach(([areaName, group]) => {
-    const centroid = calculateCentroid(group.coordinates);
-    const count = group.stores.length;
+    const fixedStat = areaStats[statsKey][areaName];
+
+    // Primary: the fixed, precomputed-from-the-whole-dataset centroid (see
+    // areaStats) - stable across pan/zoom, matching the reference site's own
+    // behavior. Fallback only if that fixed point isn't actually on-screen
+    // right now: use the strictly-visible members' centroid instead, so a
+    // large area that's only partially in view never ends up with an
+    // invisible pill despite having visible member stores. Last-resort
+    // fallback (no fixed stat at all, shouldn't normally happen) uses the
+    // full padded group.
+    let centroid = fixedStat ? fixedStat.centroid : calculateCentroid(group.coordinates);
+    if (!bounds.contains(centroid) && group.strictCoordinates.length) {
+      centroid = calculateCentroid(group.strictCoordinates);
+    }
+    const count = fixedStat ? fixedStat.count : group.stores.length;
 
     const el = document.createElement('div');
     el.className = 'area-group-marker';
@@ -1174,6 +1243,33 @@ function initMap() {
     customAttribution: '<a href="https://www.mapbox.com/" class="keyboard-guide-link">キーボードショートカット</a>'
   }));
 
+  // Customer feedback: flick-panning coasted too far after release compared
+  // to Google Maps. Mapbox's default deceleration (2500) let a flick glide
+  // roughly 3x the distance of the drag itself; 9000 and 7000 both felt too
+  // stiff/abrupt in live testing. maxSpeed/linearity left at Mapbox's
+  // defaults - deceleration was the only knob that mattered for "moves too
+  // much" specifically.
+  map.dragPan.enable({ deceleration: 6500, maxSpeed: 1400, linearity: 0.3 });
+
+  // Home/End/Page Up/Page Down aren't handled by Mapbox's built-in keyboard
+  // handler (only arrows + +/- are) but the reference site's native Google
+  // Maps keyboard shortcuts support them (move the view 75% of the viewport
+  // in each direction) - added here so the keyboard-shortcuts guide's
+  // content is accurate, not just visually copied.
+  map.getCanvas().addEventListener('keydown', (e) => {
+    const size = map.getContainer().getBoundingClientRect();
+    let dx = 0, dy = 0;
+    switch (e.key) {
+      case 'Home': dx = -size.width * 0.75; break;
+      case 'End': dx = size.width * 0.75; break;
+      case 'PageUp': dy = -size.height * 0.75; break;
+      case 'PageDown': dy = size.height * 0.75; break;
+      default: return;
+    }
+    e.preventDefault();
+    map.panBy([dx, dy]);
+  });
+
   map.on('load', async () => {
     // Load stores from API using expanded region (not just viewport)
     // This loads more stores upfront but eliminates API calls on pan
@@ -1191,6 +1287,7 @@ function initMap() {
 
     // Initialize filtered stores
     filteredStores = storeData.features;
+    areaStats = computeAreaStats();
 
     // Update the UI with loaded stores
     updateStoreListImmediate(); // Immediate update on initial load
@@ -1291,7 +1388,7 @@ function initMap() {
         source: 'stores',
         layout: {
           'icon-image': ['concat', 'brand-', ['get', 'brand']],
-          'icon-size': 0.6,
+          'icon-size': STORE_ICON_BASE_SIZE,
           'icon-anchor': 'bottom',
           'icon-allow-overlap': true,
           'icon-ignore-placement': true
@@ -1306,7 +1403,7 @@ function initMap() {
         filter: ['==', ['get', 'hasParking'], true],
         layout: {
           'text-field': 'P',
-          'text-size': 16,
+          'text-size': PARKING_TEXT_BASE_SIZE,
           'text-offset': PARKING_BASE_OFFSET,
           'text-allow-overlap': true,
           'text-ignore-placement': true,
@@ -1326,8 +1423,11 @@ function initMap() {
           const feature = e.features[0];
           selectStore(feature.properties.id);
 
-          // Center on the clicked store and show popup
-          const targetZoom = Math.max(map.getZoom(), 15);
+          // Center on the clicked store WITHOUT changing zoom - the marker
+          // is already visible on-screen, so there's nothing to zoom in
+          // for. Confirmed against the reference site: clicking a marker
+          // there never changes zoom, only pans to center it.
+          const targetZoom = map.getZoom();
           const offsetCenter = getCenterOffset(feature.geometry.coordinates, targetZoom);
 
           map.flyTo({
@@ -1387,7 +1487,7 @@ function initMap() {
 
 // Get zoom level category
 function getZoomLevel(zoom) {
-  if (zoom >= 13) return 'individual';
+  if (zoom >= 12) return 'individual';
   if (zoom >= 11) return 'ward';
   return 'prefecture';
 }
@@ -1418,6 +1518,15 @@ function updateMapLayers() {
   // This reduces processing from ~255 stores to ~30-80 stores
   const visibleStores = getVisibleStores(filteredStores, bounds);
 
+  // Strictly on-screen subset (no padding) - a group pill should be centered
+  // on whichever of its members are actually visible, not pulled off-screen
+  // by padding-only members averaged in from just outside the viewport
+  // (e.g. a large city only partially in view, whose other stores sit south
+  // of the visible area - see calculateCentroid).
+  const strictVisibleIds = new Set(
+    getVisibleStores(filteredStores, bounds, 0).map(f => f.properties.id)
+  );
+
   // R009: once the viewport has narrowed to a single prefecture, switch to
   // ward/city-level grouping even if the raw zoom hasn't crossed that
   // threshold yet - a single giant "prefecture: N" pill isn't useful once
@@ -1432,7 +1541,7 @@ function updateMapLayers() {
     }
   }
 
-  const { groups, individualStores } = groupStoresByArea(visibleStores, effectiveZoom);
+  const { groups, individualStores } = groupStoresByArea(visibleStores, effectiveZoom, strictVisibleIds);
 
   // Render area-group markers as DOM pills (label + count)
   renderAreaGroupMarkers(groups, getZoomLevel(effectiveZoom));
@@ -1519,8 +1628,9 @@ function updateSymbolState() {
 }
 
 // Heartbeat pulse animation for the selected store's icon only
-const STORE_ICON_BASE_SIZE = 0.6;
-const PARKING_BASE_OFFSET = [1.5, -4.0];
+const STORE_ICON_BASE_SIZE = 0.48; // 80% of the previous 0.6
+const PARKING_BASE_OFFSET = [1.2, -3.2]; // scaled with STORE_ICON_BASE_SIZE to stay aligned to the icon
+const PARKING_TEXT_BASE_SIZE = 16 * 0.8; // scaled with STORE_ICON_BASE_SIZE to stay proportional to the icon
 let pulseAnimationId = null;
 
 function startSelectedStorePulse() {
@@ -1531,7 +1641,7 @@ function startSelectedStorePulse() {
       pulseAnimationId = null;
       return;
     }
-    const scale = STORE_ICON_BASE_SIZE + Math.abs(Math.sin(timestamp / 500)) * 0.25;
+    const scale = STORE_ICON_BASE_SIZE + Math.abs(Math.sin(timestamp / 600)) * 0.2;
     const scaleRatio = scale / STORE_ICON_BASE_SIZE;
     map.setLayoutProperty('store-icons', 'icon-size', [
       'case',
@@ -1545,6 +1655,12 @@ function startSelectedStorePulse() {
         ['==', ['get', 'id'], selectedStoreId],
         ['literal', [PARKING_BASE_OFFSET[0] * scaleRatio, PARKING_BASE_OFFSET[1] * scaleRatio]],
         ['literal', PARKING_BASE_OFFSET]
+      ]);
+      map.setLayoutProperty('parking-text', 'text-size', [
+        'case',
+        ['==', ['get', 'id'], selectedStoreId],
+        PARKING_TEXT_BASE_SIZE * scaleRatio,
+        PARKING_TEXT_BASE_SIZE
       ]);
     }
     pulseAnimationId = requestAnimationFrame(animate);
@@ -1563,6 +1679,7 @@ function stopSelectedStorePulse() {
   }
   if (map.getLayer('parking-text')) {
     map.setLayoutProperty('parking-text', 'text-offset', PARKING_BASE_OFFSET);
+    map.setLayoutProperty('parking-text', 'text-size', PARKING_TEXT_BASE_SIZE);
   }
 }
 
@@ -1840,10 +1957,10 @@ function selectStore(storeId) {
     }
   });
 
-  // Camera movement is the caller's responsibility (both call sites already
-  // fly to the store while preserving/raising the current zoom rather than
-  // resetting it - R013 wants the current zoom level maintained when a
-  // marker is highlighted, not reset to a fixed value).
+  // Camera movement is the caller's responsibility. Callers preserve the
+  // current zoom (R013) except when selecting a store from the list while
+  // it's still aggregated into a group pill, where zooming in is the whole
+  // point - see activateStoreItem().
 
   // On mobile, reveal the map (and the popup about to show on it) instead of
   // leaving the side-panel drawer open over it. No-op/inert on desktop.
@@ -1965,6 +2082,8 @@ function applyFilters() {
     };
   });
 
+  areaStats = computeAreaStats();
+
   updateStoreListImmediate(); // Direct call for immediate response to filter clicks
   updateMapLayers(); // Direct call - no debouncing needed for discrete filter actions
   updateStoreCount();
@@ -2052,7 +2171,8 @@ function showNearestStoreLink(centerCoords) {
   `;
   el.addEventListener('click', () => {
     selectStore(nearest.properties.id);
-    const targetZoom = 15;
+    // 12 matches our own individual-marker threshold (getZoomLevel()).
+    const targetZoom = 12;
     const offsetCenter = getCenterOffset(nearest.geometry.coordinates, targetZoom);
     map.flyTo({ center: offsetCenter, zoom: targetZoom, duration: 1000 });
     scheduleShowPopupOnMoveEnd(nearest);
@@ -2144,28 +2264,32 @@ function appendStoreListBatch() {
     function activateStoreItem() {
       selectStore(props.id);
 
-      // Check if map is zoomed in enough to show individual stores
+      // Zoom in only if the store isn't already shown as an individual
+      // marker (aggregated into a group pill below this threshold - see
+      // getZoomLevel()). Confirmed against the reference site: selecting an
+      // already-visible store from the list only centers on it, no zoom
+      // change; selecting an aggregated one zooms in to reveal it.
       const currentZoom = map.getZoom();
       if (currentZoom < 12) {
-        // Zoom in to show individual stores, then show popup
-        const offsetCenter = getCenterOffset(feature.geometry.coordinates, 15);
+        // Zoom in to show individual stores, then show popup. 12 matches
+        // our own individual-marker threshold (getZoomLevel()).
+        const offsetCenter = getCenterOffset(feature.geometry.coordinates, 12);
 
         map.flyTo({
           center: offsetCenter,
-          zoom: 15,
+          zoom: 12,
           duration: 1000
         });
 
         // Show popup after zoom animation completes
         scheduleShowPopupOnMoveEnd(feature);
       } else {
-        // Already zoomed in, just center and show popup
-        const targetZoom = Math.max(currentZoom, 15);
-        const offsetCenter = getCenterOffset(feature.geometry.coordinates, targetZoom);
+        // Already zoomed in - just center, don't change zoom
+        const offsetCenter = getCenterOffset(feature.geometry.coordinates, currentZoom);
 
         map.flyTo({
           center: offsetCenter,
-          zoom: targetZoom,
+          zoom: currentZoom,
           duration: 800
         });
 

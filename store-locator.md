@@ -284,32 +284,59 @@ js: store-locator.js
       flex-wrap: nowrap;
     }
 
-    .keyboard-guide-list {
-      margin: 0;
-      padding: 0;
-      list-style: none;
+    .keyboard-guide-table {
+      border-collapse: separate;
       font-size: 13px;
-      color: #333;
-      line-height: 1.8;
+      font-family: "Google Sans Text", Roboto, Arial, sans-serif;
+      color: #000;
     }
 
-    .keyboard-guide-list kbd {
+    .keyboard-guide-table tr {
+      height: 32px;
+      vertical-align: middle;
+    }
+
+    .keyboard-guide-table td {
+      padding: 6px;
+      vertical-align: middle;
+    }
+
+    .keyboard-guide-table td:first-child {
+      text-align: end;
+      white-space: nowrap;
+    }
+
+    .keyboard-guide-table td:last-child {
+      text-align: start;
+      white-space: nowrap;
+    }
+
+    .keyboard-guide-table kbd {
       display: inline-block;
-      padding: 1px 6px;
-      border: 1px solid #ccc;
-      border-radius: 3px;
-      background-color: #f8f8f8;
-      font-family: inherit;
-      font-size: 12px;
+      background-color: #e8eaed;
+      border: none;
+      border-radius: 2px;
+      padding: 2px 4px;
+      margin: 0 2px;
+      font-family: "Google Sans Text", Roboto, Arial, sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 16px;
+      color: #000;
+      min-width: 20px;
+      text-align: center;
     }
 
     /* Keyboard shortcuts dialog, opened by the link inside the attribution
-       control (customAttribution in initMap()). */
+       control (customAttribution in initMap()). Styled to match the
+       reference site's native Google Maps keyboard-shortcuts <dialog>
+       (inspected live: rgb(32,33,36)/0.7 backdrop, 28px radius, no
+       box-shadow, 22px/400 title in #3c4043, table-based shortcut rows). */
     #keyboard-guide-backdrop {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.4);
+      background: rgba(32, 33, 36, 0.7);
       z-index: 99;
     }
 
@@ -324,14 +351,14 @@ js: store-locator.js
       left: 50%;
       transform: translate(-50%, -50%);
       background: white;
-      border-radius: 4px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-      padding: 20px 24px;
+      border-radius: 28px;
+      box-shadow: none;
+      padding: 20px 8px 8px;
       z-index: 100;
       min-width: 280px;
-      max-width: 90vw;
-      max-height: 80vh;
-      overflow-y: auto;
+      max-width: calc(100% - 38px);
+      max-height: calc(100% - 38px);
+      overflow: auto;
     }
 
     #keyboard-guide-modal.active {
@@ -342,17 +369,20 @@ js: store-locator.js
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 20px;
-      margin-bottom: 14px;
-      font-size: 16px;
-      font-weight: 600;
-      color: #333;
+      padding: 0 16px;
+      margin: 0 0 20px;
+    }
+
+    #keyboard-guide-title {
+      font-size: 22px;
+      font-weight: 400;
+      color: #3c4043;
     }
 
     #keyboard-guide-close {
       background: none;
-      border: 1px solid #ccc;
-      border-radius: 3px;
+      border: none;
+      border-radius: 0;
       width: 24px;
       height: 24px;
       display: flex;
@@ -361,6 +391,17 @@ js: store-locator.js
       cursor: pointer;
       padding: 0;
       flex-shrink: 0;
+      transition: all 0.2s;
+    }
+
+    #keyboard-guide-close:hover {
+      background-color: rgba(60, 64, 67, 0.08);
+      border-radius: 50%;
+    }
+
+    .keyboard-guide-content {
+      display: flex;
+      padding: 0 16px 16px;
     }
 
     .amenity-filter-mode {
@@ -1173,18 +1214,27 @@ js: store-locator.js
       <div class="kbd-modal-header">
         <span id="keyboard-guide-title">キーボードショートカット</span>
         <button id="keyboard-guide-close" type="button" aria-label="閉じる">
-          <svg width="14" height="14" viewBox="0 0 14 14">
-            <line x1="1" y1="1" x2="13" y2="13" stroke="#565656" stroke-width="1.3"></line>
-            <line x1="13" y1="1" x2="1" y2="13" stroke="#565656" stroke-width="1.3"></line>
+          <svg width="16" height="16" viewBox="0 0 24 24">
+            <path fill="#000" d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path>
           </svg>
         </button>
       </div>
-      <ul class="keyboard-guide-list">
-        <li id="kbd-guide-tab"><kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> — 次/前の項目へ移動</li>
-        <li id="kbd-guide-enter"><kbd>Enter</kbd> / <kbd>Space</kbd> — 選択・実行</li>
-        <li id="kbd-guide-arrow"><kbd>↑</kbd> / <kbd>↓</kbd> — 検索候補の選択</li>
-        <li id="kbd-guide-esc"><kbd>Esc</kbd> — 検索候補・ポップアップを閉じる</li>
-      </ul>
+      <div class="keyboard-guide-content">
+        <table class="keyboard-guide-table">
+          <tbody>
+            <tr id="kbd-guide-left"><td><kbd>←</kbd></td><td>左へ移動</td></tr>
+            <tr id="kbd-guide-right"><td><kbd>→</kbd></td><td>右へ移動</td></tr>
+            <tr id="kbd-guide-up"><td><kbd>↑</kbd></td><td>上へ移動</td></tr>
+            <tr id="kbd-guide-down"><td><kbd>↓</kbd></td><td>下へ移動</td></tr>
+            <tr id="kbd-guide-zoomin"><td><kbd>+</kbd></td><td>ズームイン</td></tr>
+            <tr id="kbd-guide-zoomout"><td><kbd>-</kbd></td><td>ズームアウト</td></tr>
+            <tr id="kbd-guide-home"><td><kbd>Home</kbd></td><td>ビューを 75% 左へ移動</td></tr>
+            <tr id="kbd-guide-end"><td><kbd>End</kbd></td><td>ビューを 75% 右へ移動</td></tr>
+            <tr id="kbd-guide-pageup"><td><kbd>Page Up</kbd></td><td>ビューを 75% 上へ移動</td></tr>
+            <tr id="kbd-guide-pagedown"><td><kbd>Page Down</kbd></td><td>ビューを 75% 下へ移動</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
     <div id="route-info-banner"></div>
     <button id="floating-clear-filters" class="floating-clear-btn">
