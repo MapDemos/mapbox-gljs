@@ -139,14 +139,14 @@ js: store-locator.js
 
     /* Pinned to the map's top-right corner, matching the reference site's
        own "新店舗一覧" button exactly (position/colors/shape confirmed by
-       inspecting store-info.skylark.co.jp live). right:56px (not the
-       reference's own 10px) clears Mapbox's own top-right control stack
-       (zoom/compass/geolocate, ~39px wide) which the reference's map
-       doesn't have in the same spot. */
+       inspecting store-info.skylark.co.jp live), including its 10px right
+       offset - top-right no longer holds Mapbox's own control stack (zoom
+       moved to center-right, geolocate to bottom-right; see initMap()), so
+       nothing else needs clearing here anymore. */
     #store-list-link {
       position: absolute;
       top: 22px;
-      right: 56px;
+      right: 10px;
       z-index: 5;
       display: flex;
       align-items: center;
@@ -693,6 +693,42 @@ js: store-locator.js
        rather than a one-time override. */
     .mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(.mapboxgl-ctrl-logo) {
       display: block !important;
+    }
+
+    /* Zoom controls moved from the map's top-right corner to center-right.
+       Mapbox only supports the 4 corners as addControl positions, so this
+       re-anchors the control after the fact (see the .zoom-controls-
+       center-right class added in initMap()). The top-right corner
+       container itself is shrink-wrapped to its content by default (not
+       full map height), so top:50% inside it wouldn't center against the
+       whole map - stretching it with bottom:0 first fixes that; its other
+       child (the geolocate button) stays in normal flow and is unaffected
+       by the container simply being taller. */
+    .mapboxgl-ctrl-top-right {
+      bottom: 0;
+    }
+
+    .zoom-controls-center-right {
+      position: absolute;
+      top: 50%;
+      right: 10px;
+      margin: 0 !important;
+      transform: translateY(-50%) scale(1.2);
+    }
+
+    /* Zoom +/- and the recenter (geolocate) button, both sized up 20% -
+       transform:scale keeps the icon crisp (vs. resizing the fixed-size
+       background-image) at the cost of the layout box staying its
+       original 29px size, so each gets its own transform-origin to grow
+       away from the map edge/corner it's anchored to rather than over it. */
+    .zoom-controls-center-right.map-ctrl-large {
+      transform: translateY(-50%) scale(1.2);
+      transform-origin: right center;
+    }
+
+    .mapboxgl-ctrl-bottom-right .map-ctrl-large {
+      transform: scale(1.2);
+      transform-origin: bottom right;
     }
 
     .webgl-fallback {

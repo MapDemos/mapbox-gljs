@@ -1302,8 +1302,15 @@ function initMap() {
       map.addControl(languageControl);
     }
 
-    // Add navigation controls
-    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    // Add navigation controls. Mapbox only offers the 4 corners as control
+    // positions, so to get "center-right" the control is added to top-right
+    // as usual and then re-anchored with CSS (.zoom-controls-center-right in
+    // store-locator.md) - marking it with a stable class here rather than
+    // relying on child order/nth-child, which would silently break if
+    // another control gets added to this corner later.
+    const navigationControl = new mapboxgl.NavigationControl({ showCompass: false });
+    map.addControl(navigationControl, 'top-right');
+    navigationControl._container.classList.add('zoom-controls-center-right');
 
     // Add current-location control, matching the reference site's locate-me
     // button: shows a marker at the user's position and zooms in to it.
@@ -1313,7 +1320,9 @@ function initMap() {
       showUserLocation: true,
       fitBoundsOptions: { maxZoom: MAP_CONFIG.GEOLOCATE_ZOOM }
     });
-    map.addControl(geolocateControl, 'top-right');
+    map.addControl(geolocateControl, 'bottom-right');
+    geolocateControl._container.classList.add('map-ctrl-large');
+    navigationControl._container.classList.add('map-ctrl-large');
 
     // Fallback when location permission is denied or unavailable: stay on the
     // Japan-wide overview (MAP_CONFIG.INITIAL_CENTER/INITIAL_ZOOM) rather than
@@ -1391,7 +1400,8 @@ function initMap() {
           'icon-size': STORE_ICON_BASE_SIZE,
           'icon-anchor': 'bottom',
           'icon-allow-overlap': true,
-          'icon-ignore-placement': true
+          'icon-ignore-placement': true,
+          'symbol-sort-key': 0
         }
       });
 
@@ -1401,6 +1411,50 @@ function initMap() {
         type: 'symbol',
         source: 'stores',
         filter: ['==', ['get', 'hasParking'], true],
+        layout: {
+          'text-field': 'P',
+          'text-size': PARKING_TEXT_BASE_SIZE,
+          'text-offset': PARKING_BASE_OFFSET,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold']
+        },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': '#9C27B0',
+          'text-halo-width': 8,
+          'text-halo-blur': 0
+        }
+      });
+
+      // Layer order alone puts every parking-text "P" badge above every
+      // store icon, so when the selected store's icon grows during its
+      // pulse it can grow underneath a neighboring store's "P" badge
+      // (symbol-sort-key only reorders features within the same layer, not
+      // across layers). These two duplicate the selected feature's icon and
+      // (if it has one) its own "P" badge onto layers stacked above
+      // parking-text, so the selected store is always drawn on top of every
+      // other store's badge. Hidden via an impossible filter until a store
+      // is selected (see updateSymbolState).
+      map.addLayer({
+        id: 'selected-store-icon',
+        type: 'symbol',
+        source: 'stores',
+        filter: ['==', ['get', 'id'], ''],
+        layout: {
+          'icon-image': ['concat', 'brand-', ['get', 'brand']],
+          'icon-size': STORE_ICON_BASE_SIZE,
+          'icon-anchor': 'bottom',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true
+        }
+      });
+
+      map.addLayer({
+        id: 'selected-parking-text',
+        type: 'symbol',
+        source: 'stores',
+        filter: ['all', ['==', ['get', 'hasParking'], true], ['==', ['get', 'id'], '']],
         layout: {
           'text-field': 'P',
           'text-size': PARKING_TEXT_BASE_SIZE,
@@ -1620,9 +1674,22 @@ function updateSymbolState() {
       1,
       0.7
     ]);
+    // Higher symbol-sort-key draws on top - keep the selected store's icon
+    // above any overlapping neighbors instead of it being hidden underneath.
+    map.setLayoutProperty('store-icons', 'symbol-sort-key', [
+      'case',
+      ['==', ['get', 'id'], selectedStoreId],
+      1,
+      0
+    ]);
+    map.setFilter('selected-store-icon', ['==', ['get', 'id'], selectedStoreId]);
+    map.setFilter('selected-parking-text', ['all', ['==', ['get', 'hasParking'], true], ['==', ['get', 'id'], selectedStoreId]]);
     startSelectedStorePulse();
   } else {
     map.setPaintProperty('store-icons', 'icon-opacity', 1);
+    map.setLayoutProperty('store-icons', 'symbol-sort-key', 0);
+    map.setFilter('selected-store-icon', ['==', ['get', 'id'], '']);
+    map.setFilter('selected-parking-text', ['all', ['==', ['get', 'hasParking'], true], ['==', ['get', 'id'], '']]);
     stopSelectedStorePulse();
   }
 }
@@ -1663,6 +1730,15 @@ function startSelectedStorePulse() {
         PARKING_TEXT_BASE_SIZE
       ]);
     }
+    if (map.getLayer('selected-store-icon')) {
+      map.setLayoutProperty('selected-store-icon', 'icon-size', scale);
+    }
+    if (map.getLayer('selected-parking-text')) {
+      map.setLayoutProperty('selected-parking-text', 'text-offset', [
+        'literal', [PARKING_BASE_OFFSET[0] * scaleRatio, PARKING_BASE_OFFSET[1] * scaleRatio]
+      ]);
+      map.setLayoutProperty('selected-parking-text', 'text-size', PARKING_TEXT_BASE_SIZE * scaleRatio);
+    }
     pulseAnimationId = requestAnimationFrame(animate);
   }
 
@@ -1680,6 +1756,13 @@ function stopSelectedStorePulse() {
   if (map.getLayer('parking-text')) {
     map.setLayoutProperty('parking-text', 'text-offset', PARKING_BASE_OFFSET);
     map.setLayoutProperty('parking-text', 'text-size', PARKING_TEXT_BASE_SIZE);
+  }
+  if (map.getLayer('selected-store-icon')) {
+    map.setLayoutProperty('selected-store-icon', 'icon-size', STORE_ICON_BASE_SIZE);
+  }
+  if (map.getLayer('selected-parking-text')) {
+    map.setLayoutProperty('selected-parking-text', 'text-offset', PARKING_BASE_OFFSET);
+    map.setLayoutProperty('selected-parking-text', 'text-size', PARKING_TEXT_BASE_SIZE);
   }
 }
 
@@ -2566,6 +2649,11 @@ function initSearch() {
       // Generate new session token for next search
       sessionToken = generateSessionToken();
 
+      // On mobile, reveal the map (and the place it's about to fly to)
+      // instead of leaving the side-panel drawer open over it - same
+      // reasoning as selectStore()'s collapseMobileSheet() call.
+      if (collapseMobileSheet) collapseMobileSheet();
+
       // Large results (prefectures, cities) come back with a bbox - fit to
       // that instead of always flying to a fixed street-level zoom, which
       // would show only a tiny corner of a whole prefecture.
@@ -2589,6 +2677,7 @@ function initSearch() {
         suggestionsContainer.classList.remove('active');
         suggestionsContainer.innerHTML = '';
         sessionToken = generateSessionToken();
+        if (collapseMobileSheet) collapseMobileSheet();
 
         map.flyTo({
           center: [lng, lat],
