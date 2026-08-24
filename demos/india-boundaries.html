@@ -1,0 +1,362 @@
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-language/v1.0.0/mapbox-gl-language.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/d3@7.8.5/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.min.js"></script>
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.css" type="text/css" />
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<script src="https://kenji-shima.github.io/resource-files/polyline.js" type="module"></script>
+<script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      height: 100vh; display: flex; flex-direction: column;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+    }
+
+    #header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 16px; background: #1a1a2e; color: #fff;
+      flex-shrink: 0;
+    }
+    #header .title { font-size: 14px; font-weight: 700; }
+    #header .subtitle {
+      font-size: 11px; font-weight: 400; color: #aaa;
+      border-left: 1px solid #444; padding-left: 12px;
+    }
+
+    #body { flex: 1; display: flex; overflow: hidden; min-height: 0; }
+
+    #sidebar {
+      width: 240px; flex-shrink: 0;
+      display: flex; flex-direction: column;
+      background: #fff; border-right: 1px solid #ddd; z-index: 1;
+    }
+
+    #coverage-summary {
+      padding: 9px 14px; font-size: 12px; font-weight: 600;
+      background: #f8f8f8; border-bottom: 2px solid #e0e0e0; color: #444;
+      flex-shrink: 0;
+    }
+    #coverage-summary .poly-count { color: #27ae60; }
+    #coverage-summary .total-count { color: #888; font-weight: 400; }
+
+    #place-list {
+      list-style: none; flex: 1; overflow-y: auto;
+    }
+    #place-list li.place-item {
+      padding: 8px 14px 8px 28px; cursor: pointer; font-size: 13px;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex; align-items: center; gap: 8px; color: #333;
+      position: relative;
+    }
+    #place-list li.place-item::before {
+      content: ''; display: inline-block;
+      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+      position: absolute; left: 14px;
+    }
+    #place-list li.place-item.boundaries::before { background: #27ae60; }
+    #place-list li.place-item.searchbox::before  { background: #e67e22; }
+    #place-list li.place-item:hover  { background: #f5f5f5; }
+    #place-list li.place-item.active.boundaries { background: #eafaf1; font-weight: 600; }
+    #place-list li.place-item.active.searchbox  { background: #fef5e7; font-weight: 600; }
+
+    #place-list li.section-header {
+      padding: 6px 14px; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.7px;
+      background: #f0f0f0; color: #777; border-bottom: 1px solid #e0e0e0;
+      cursor: default;
+    }
+    #place-list li.section-header.polygon { color: #27ae60; background: #f0faf4; }
+    #place-list li.section-header.point   { color: #e67e22; background: #fef9f0; }
+
+    #legend {
+      padding: 10px 14px; border-top: 1px solid #eee;
+      font-size: 11px; color: #888;
+      display: flex; flex-direction: column; gap: 5px;
+      flex-shrink: 0;
+    }
+    #legend div { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+    #map-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    #map-header {
+      padding: 8px 14px; font-size: 12px; font-weight: 600;
+      background: #fafafa; border-bottom: 1px solid #ddd;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    #map-header .result-info {
+      font-size: 11px; font-weight: 400; color: #666;
+      max-width: 460px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    #map-wrap { flex: 1; position: relative; min-height: 0; }
+    #mapbox-map { width: 100%; height: 100%; }
+
+    #map-badge {
+      display: none;
+      position: absolute; top: 12px; left: 12px; z-index: 1;
+      padding: 6px 14px; border-radius: 20px;
+      font-size: 12px; font-weight: 700; color: #fff;
+      pointer-events: none;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    #map-badge.polygon { display: block; background: #27ae60; }
+    #map-badge.point   { display: block; background: #e67e22; }
+
+    .badge {
+      display: inline-block; padding: 2px 8px;
+      border-radius: 10px; font-size: 11px; font-weight: 600; color: #fff;
+    }
+    .badge.boundaries { background: #27ae60; }
+    .badge.searchbox  { background: #e67e22; }
+
+    .info-detail { font-size: 11px; color: #666; }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <span class="title">India Boundaries Coverage</span>
+</div>
+
+<div id="body">
+  <div id="sidebar">
+    <div id="coverage-summary">Loading…</div>
+    <ul id="place-list"></ul>
+    <div id="legend">
+      <div><span class="dot" style="background:#27ae60"></span>Polygon available in Boundaries</div>
+      <div><span class="dot" style="background:#e67e22"></span>No polygon — point result only</div>
+    </div>
+  </div>
+
+  <div id="map-area">
+    <div id="map-header">
+      Mapbox
+      <span class="result-info" id="mapbox-info">Select a place</span>
+    </div>
+    <div id="map-wrap">
+      <div id="mapbox-map"></div>
+      <div id="map-badge"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  mapboxgl.accessToken = 'pk.eyJ1IjoibWJ4c29sdXRpb25zIiwiYSI6ImNqeWtiM250dzBjcGMzbnQ1NXpkZml6YjUifQ.EiJnPlDOMMlG5wr93SxVYQ';
+
+// csvName: name as it appears in the lookup CSV (when different from display name)
+// centroid: used to disambiguate when multiple entries share the same csvName
+const PLACES = [
+    { name: 'Jawali',                   source: 'boundaries', lookup: 'pos4' },
+    { name: 'Sissu',                    source: 'searchbox' },
+    { name: 'Chopta',                   source: 'searchbox' },
+    { name: 'Tamhini Ghat',             source: 'searchbox' },
+    { name: 'Poombarai',                source: 'searchbox' },
+    { name: 'Chandoli National Park',   source: 'searchbox' },
+    { name: 'Gulma',                    source: 'searchbox' },
+    { name: 'Surathkal',                source: 'boundaries', lookup: 'pos4' },
+    { name: 'Attappadi',                source: 'boundaries', lookup: 'adm3' },
+    { name: 'Najafgarh',                source: 'boundaries', lookup: 'pos4' },
+    { name: 'Alipiri',                  source: 'searchbox' },
+    { name: 'Manas National Park',      source: 'searchbox' },
+    { name: 'Shivrajpur',               source: 'searchbox', proximity: [68.97, 22.47] },
+    { name: 'Hanle',                    source: 'searchbox' },
+    { name: 'Gandhi Nagar (Delhi)',      source: 'boundaries', lookup: 'pos4', csvName: 'Gandhi Nagar', centroid: [77.268,  28.6564] },
+    { name: 'Gandhi Nagar (Jaipur)',     source: 'boundaries', lookup: 'pos4', csvName: 'Gandhi Nagar', centroid: [75.7913, 26.8778] },
+    { name: 'Gandhi Nagar (Nashik)',     source: 'boundaries', lookup: 'pos4' },
+    { name: 'Gandhi Nagar (Bhopal)',     source: 'boundaries', lookup: 'pos4' },
+    { name: 'Gandhi Nagar (Tamil Nadu)', source: 'boundaries', lookup: 'pos4', csvName: 'Gandhi Nagar', centroid: [79.5598, 11.5994] },
+    { name: 'Gandhi Nagar MA',           source: 'boundaries', lookup: 'pos4' },
+    { name: 'Gandhi Nagar (Kerala)',     source: 'boundaries', lookup: 'pos4', csvName: 'Gandhi Nagar', centroid: [76.4964,  9.6448] },
+    { name: 'Mehandipur Balaji',         source: 'searchbox' },
+    { name: 'Lohagad',                  source: 'searchbox', proximity: [73.47, 18.73] },
+    { name: 'Vindhya Range',            source: 'searchbox' },
+    { name: 'Maredumilli',              source: 'boundaries', lookup: 'pos4' },
+];
+
+const map = new mapboxgl.Map({
+    container: 'mapbox-map',
+    center: [78.9629, 22.5],
+    zoom: 4
+});
+
+let sessionToken = crypto.randomUUID();
+let currentMarker = null;
+let activeLayerId = null;
+let activeSourceId = null;
+const lookupCache = {};
+
+const fetchLookup = async (type) => {
+    if (lookupCache[type]) return lookupCache[type];
+    const res = await fetch(`data/india-${type}.json`);
+    lookupCache[type] = await res.json();
+    return lookupCache[type];
+};
+
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+const setMapBadge = (type) => {
+    const badge = document.getElementById('map-badge');
+    badge.className = type;
+    badge.textContent = type === 'polygon' ? '✓ Polygon available' : '✗ No polygon — point only';
+};
+
+const populateList = () => {
+    const list = document.getElementById('place-list');
+    const summary = document.getElementById('coverage-summary');
+
+    const polyPlaces  = PLACES.map((p, i) => ({ ...p, i })).filter(p => p.source === 'boundaries');
+    const pointPlaces = PLACES.map((p, i) => ({ ...p, i })).filter(p => p.source === 'searchbox');
+
+    summary.innerHTML = `<span class="poly-count">${polyPlaces.length} of ${PLACES.length}</span> <span class="total-count">places have boundary polygons</span>`;
+
+    const addSection = (label, cls) => {
+        const hdr = document.createElement('li');
+        hdr.className = `section-header ${cls}`;
+        hdr.textContent = label;
+        list.appendChild(hdr);
+    };
+
+    const addItem = ({ name, source, i }) => {
+        const li = document.createElement('li');
+        li.textContent = name;
+        li.className = `place-item ${source}`;
+        li.addEventListener('click', () => selectPlace(i, li));
+        list.appendChild(li);
+    };
+
+    addSection(`Polygon Available (${polyPlaces.length})`, 'polygon');
+    polyPlaces.forEach(addItem);
+
+    addSection(`No Polygon — Point Only (${pointPlaces.length})`, 'point');
+    pointPlaces.forEach(addItem);
+};
+
+const clearMapbox = () => {
+    if (currentMarker) { currentMarker.remove(); currentMarker = null; }
+    if (activeLayerId && map.getLayer(activeLayerId)) map.removeLayer(activeLayerId);
+    if (activeSourceId && map.getSource(activeSourceId)) map.removeSource(activeSourceId);
+    activeLayerId = null;
+    activeSourceId = null;
+    const badge = document.getElementById('map-badge');
+    badge.className = '';
+    badge.textContent = '';
+};
+
+const selectPlace = async (index, el) => {
+    document.querySelectorAll('#place-list li').forEach(li => li.classList.remove('active'));
+    el.classList.add('active');
+    clearMapbox();
+
+    const place = PLACES[index];
+    const info = document.getElementById('mapbox-info');
+    info.innerHTML = '';
+
+    if (place.source === 'boundaries') {
+        info.innerHTML = `<span class="badge boundaries">Polygon available</span> <span class="info-detail">Loading...</span>`;
+        await showBoundary(place, info);
+    } else {
+        info.innerHTML = `<span class="badge searchbox">No polygon</span> <span class="info-detail">Searching...</span>`;
+        await showSearchBox(place, info);
+    }
+};
+
+const showBoundary = async (place, info) => {
+    const data = await fetchLookup(place.lookup);
+    const searchName = place.csvName || place.name;
+    const matches = data.filter(e => e.name === searchName);
+
+    let entry;
+    if (matches.length === 1) {
+        entry = matches[0];
+    } else if (matches.length > 1 && place.centroid) {
+        entry = matches.reduce((best, e) =>
+            dist(e.centroid, place.centroid) < dist(best.centroid, place.centroid) ? e : best
+        );
+    } else {
+        info.querySelector('.info-detail').textContent = 'Not found in lookup';
+        return;
+    }
+
+    activeSourceId = `src-${entry.tileset}`;
+    activeLayerId = 'layer-boundary';
+
+    if (!map.getSource(activeSourceId)) {
+        map.addSource(activeSourceId, { type: 'vector', url: `mapbox://${entry.tileset}` });
+    }
+    map.addLayer({
+        id: activeLayerId,
+        type: 'fill',
+        source: activeSourceId,
+        'source-layer': entry.layer,
+        paint: { 'fill-color': '#27ae60', 'fill-opacity': 0.45 },
+        filter: ['==', ['get', 'mapbox_id'], entry.id]
+    });
+
+    map.fitBounds([[entry.bbox[0], entry.bbox[1]], [entry.bbox[2], entry.bbox[3]]], { padding: 80, duration: 1000 });
+    info.querySelector('.info-detail').textContent = entry.tileset;
+    setMapBadge('polygon');
+};
+
+const showSearchBox = async (place, info) => {
+    const proximityParam = place.proximity ? `&proximity=${place.proximity[0]},${place.proximity[1]}` : '';
+    const suggestUrl = `https://api.mapbox.com/search/searchbox/v1/suggest?q=${encodeURIComponent(place.name)}&country=IN&language=en&limit=5${proximityParam}&session_token=${sessionToken}&access_token=${mapboxgl.accessToken}`;
+
+    try {
+        const suggestRes = await fetch(suggestUrl);
+        const suggestData = await suggestRes.json();
+
+        if (!suggestData.suggestions?.length) {
+            info.querySelector('.info-detail').textContent = 'No results found';
+            setMapBadge('point');
+            return;
+        }
+
+        const suggestion = suggestData.suggestions[0];
+        const retrieveUrl = `https://api.mapbox.com/search/searchbox/v1/retrieve/${suggestion.mapbox_id}?session_token=${sessionToken}&access_token=${mapboxgl.accessToken}`;
+        const retrieveRes = await fetch(retrieveUrl);
+        const retrieveData = await retrieveRes.json();
+
+        if (!retrieveData.features?.length) {
+            info.querySelector('.info-detail').textContent = 'No results found';
+            setMapBadge('point');
+            return;
+        }
+
+        const feature = retrieveData.features[0];
+        const coords = feature.geometry.coordinates;
+        const address = feature.properties.full_address || feature.properties.place_formatted || feature.properties.name || '';
+
+        currentMarker = new mapboxgl.Marker({ color: '#e67e22' })
+            .setLngLat(coords)
+            .setPopup(new mapboxgl.Popup({ closeOnClick: false }).setHTML(`<strong>${place.name}</strong><br>${address}`))
+            .addTo(map);
+        currentMarker.togglePopup();
+
+        info.querySelector('.info-detail').textContent = address;
+        map.flyTo({ center: coords, zoom: 12, duration: 1000 });
+        sessionToken = crypto.randomUUID();
+        setMapBadge('point');
+
+    } catch (err) {
+        console.error(err);
+        info.querySelector('.info-detail').textContent = 'Search failed';
+    }
+};
+
+map.on('load', () => populateList());
+
+</script>
+</body>
+</html>

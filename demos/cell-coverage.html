@@ -1,0 +1,815 @@
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-language/v1.0.0/mapbox-gl-language.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/d3@7.8.5/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.min.js"></script>
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.css" type="text/css" />
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<script src="https://kenji-shima.github.io/resource-files/polyline.js" type="module"></script>
+<script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
+  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css" type="text/css" />
+  <style>
+    * {
+  box-sizing: border-box;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+td,
+th {
+  border: 1px solid black;
+  text-align: left;
+  padding: 8px;
+}
+
+th {
+  background-color: #f2f2f2;
+}
+
+h1 {
+  font-size: 22px;
+  margin: 0;
+  font-weight: 400;
+  line-height: 20px;
+  padding: 20px 2px;
+}
+
+a {
+  color: red;
+  text-decoration: underline;
+  cursor: pointer;
+  font: 400 14px 'Source Sans Pro', 'Helvetica Neue', sans-serif;
+}
+
+.map {
+  position: absolute;
+  /*left: 20%;*/
+  width: 100%;
+  top: 0;
+  bottom: 0;
+}
+
+::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+  border-left: 0;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+::-webkit-scrollbar-track {
+  background: none;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #fff;
+  border-radius: 0;
+}
+
+.map-overlay-right {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  opacity: 0.8;
+  background-color: black;
+  color: white;
+  opacity: 0.8;
+  text-align: left;
+  overflow: auto;
+  border-radius: 3px;
+  padding: 10px;
+  font: 400 12px/22px 'Source Sans Pro', 'Helvetica Neue', sans-serif;
+  animation: slide-up 1s;
+}
+
+.title {
+  font-weight: bold;
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0%);
+  }
+}
+
+@keyframes slide-right {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(0%);
+  }
+}
+
+a.boxclose {
+  float: right;
+  cursor: pointer;
+  display: block;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border-width: 3px;
+  border-style: solid;
+  border-color: #605F61;
+  border-radius: 100%;
+  background: -webkit-linear-gradient(-45deg, transparent 0%, transparent 46%, white 46%, white 56%, transparent 56%, transparent 100%), -webkit-linear-gradient(45deg, transparent 0%, transparent 46%, white 46%, white 56%, transparent 56%, transparent 100%);
+  background-color: #605F61;
+  box-shadow: 0px 0px 5px 2px rgba(0, 0, 0, 0.5);
+  transition: all 0.3s ease;
+}
+
+h3 {
+  /*background: #0076D1;
+  color: #fff;*/
+  margin: 0;
+  padding: 10px;
+  border-radius: 3px 3px 0 0;
+  font-weight: 700;
+  /*margin-top: -15px;*/
+}
+
+body,
+html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  font-family: 'Open Sans', sans-serif;
+  color: red;
+}
+
+h1 {
+  margin: 0;
+  position: relative;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  text-align: center;
+  font-size: 40px;
+}
+
+.map-overlay-legend {
+  position: absolute;
+  opacity: 0.8;
+  top: 30;
+  right: 0;
+  background: #fff;
+  margin-right: 20px;
+  overflow: auto;
+  border-radius: 3px;
+  width: 300px;
+  padding: 10px;
+  font: 400 12px/22px 'Source Sans Pro', 'Helvetica Neue', sans-serif;
+  transition: transform .5s ease-in-out;
+}
+
+.mapboxgl-popup {
+  padding-bottom: 10px;
+  opacity: 0.8;
+  width: 500px;
+}
+
+.mapboxgl-popup-content {
+  padding-bottom: 10px;
+  opacity: 0.8;
+  width: fit-content;
+}
+
+.marker {
+  border: none;
+  cursor: pointer;
+  height: 56px;
+  width: 56px;
+  background-image: url(../images/alert.png);
+}
+
+.blinking {
+  -webkit-animation: blink .5s ease-in-out infinite alternate;
+  -moz-animation: blink .5s ease-in-out infinite alternate;
+  animation: blink .5s ease-in-out infinite alternate;
+}
+
+@-webkit-keyframes blink {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@-moz-keyframes blink {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes blink {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+a.replay {
+  color: blue;
+  text-decoration: underline;
+  cursor: pointer;
+  font: 400 18px 'Source Sans Pro', 'Helvetica Neue', sans-serif;
+}
+
+
+.legend {
+  position: absolute;
+  bottom: 120px;
+  right: 40px;
+  background: black;
+  padding: 10px;
+  border-radius: 5px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+  width: 50%;
+  opacity: 0.8;
+}
+
+.legend-title {
+  font-size: 14px;
+  text-align: center;
+  margin-bottom: 5px;
+  color: #000000;
+}
+
+.legend-scale {
+  text-align: center;
+}
+
+.legend-bar {
+  position: relative;
+  height: 30px;
+  background: linear-gradient(to right,
+      rgba(80, 74, 154, 1),
+      rgba(84, 172, 162, 1),
+      rgba(193, 228, 148, 1),
+      rgba(252, 244, 162, 1),
+      rgba(251, 166, 91, 1),
+      rgba(216, 66, 65, 1),
+      rgba(143, 3, 58, 1));
+  border: 1px solid #999;
+  border-radius: 3px;
+  margin-bottom: 5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 5px;
+}
+
+.label {
+  font-size: 12px;
+  color: #fff;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.hidden {
+  display: none;
+}
+
+.map-overlay-bottom {
+  position: absolute;
+  bottom: 30px;
+  right: 20px;
+  left: 20px;
+  background-color: black;
+  color: white;
+  opacity: 0.8;
+  margin-right: 20px;
+  font-family: Arial, sans-serif;
+  overflow: auto;
+  border-radius: 3px;
+  padding: 10px;
+  height: 80px;
+}
+.slider {
+  position: relative;
+  top: 20px;
+  width: 100%;
+}
+.time {
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+  width: 100%;
+  top: 10px;
+}
+.time span {
+  font-size: 11px;
+  text-align: center;
+}
+
+#active-datetime {
+  font-size: 14px;
+  width: 100%;
+  position: relative;
+}
+
+button {
+  height: 14px;
+  padding: 0 10px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      display: none;
+      background-color: #ffffff;
+      padding: 5px;
+    }
+    .stats {
+      position: absolute;
+      top: 25px;
+      left: 25px;
+    }
+
+    .location {
+      font-weight: bolder;
+      font-size: 16px;
+      margin-top: 16px;
+      display: block;
+    }
+    .coverage {
+      color: rgb(74, 74, 74);
+      font-size: 14px;
+      margin-top: 8px;
+      margin-bottom: 8px;
+      display: block;
+    }
+    #colorbar-container {
+      z-index: 3;
+      position: absolute;
+      left: 50%;
+      top: 13px;
+      transform: translate(-50%, 0);
+      display: none;
+      transition: opacity 0.5s;
+      opacity: 0;
+    }
+    .mapboxgl-marker {
+      cursor: pointer !important;
+    }
+    .mapboxgl-popup {
+      z-index: 10 !important;
+    }
+    .loading {
+      position: absolute;
+      z-index: 999;
+      background-color: rgba(0, 0, 0, 0.5);
+      top: 0;
+      bottom: 0;
+      right: 0;
+      left: 0;
+      display: none;
+    }
+    .bars {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 62px;
+      height: 30px;
+      transform: translate(-50%, -50%);
+    }
+
+    .bar {
+      position: absolute;
+      bottom: 0;
+      width: 10px;
+    }
+
+    .bar:nth-child(1) {
+      background: white;
+      height: 10px;
+      left: 0px;
+    }
+
+    .bar:nth-child(2) {
+      background: white;
+      height: 15px;
+      left: 13px;
+    }
+
+    .bar:nth-child(3) {
+      background: white;
+      height: 20px;
+      left: 26px;
+    }
+
+    .bar:nth-child(4) {
+      background: white;
+      height: 25px;
+      left: 39px;
+    }
+
+    .bar:nth-child(5) {
+      background: white;
+      height: 30px;
+      left: 52px;
+    }
+  </style>
+</head>
+<body>
+  <div id="map" class="map"></div>
+  <div id="info"></div>
+  <div id="colorbar-container">
+    <canvas id="colorbar" class="colorbar"></canvas>
+  </div>
+  <div class="loading">
+    <div id="bars" class="bars">
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+    </div>
+  </div>
+</body>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
+<script>
+  // Override token for this demo to access mbxsolutions tileset
+mapboxgl.accessToken = 'pk.eyJ1IjoibWJ4c29sdXRpb25zIiwiYSI6ImNqeWtiM250dzBjcGMzbnQ1NXpkZml6YjUifQ.EiJnPlDOMMlG5wr93SxVYQ';
+
+// FPS Meter implementation
+window.requestAnimationFrame ||
+  (window.requestAnimationFrame = (() =>
+    window.requestAnimationFrame ||
+    window.webkitRequestAnimationFrame ||
+    window.mozRequestAnimationFrame ||
+    function (e) {
+      window.setTimeout(e, 1e3 / 60);
+    })());
+
+const getTime = () =>
+  window.performance && window.performance.now
+    ? window.performance.now()
+    : +new Date();
+
+class FPSMeter {
+  constructor(e) {
+    (this.ui = e.ui || !1),
+      (this.fps = 0),
+      (this.isRunning = !1),
+      (this.defaultStyles =
+        'z-index:999;position:fixed;bottom:30px;left:5px;padding:10px;font-weight:600;font-style:normal;font-size:12px;font-family:Consolas,Menlo,Monaco,"Lucida Console","Liberation Mono","DejaVu Sans Mono","Bitstream Vera Sans Mono","Courier New",Courier,monospace,sans-serif');
+  }
+  measure() {
+    const e = getTime();
+    window.requestAnimationFrame(() => {
+      const t = Math.round((1 / (getTime() - e)) * 1e3);
+      if (((this.fps = t), this.ui && this.element)) {
+        let e = 4 - `${t}`.length,
+          i = "";
+        for (; e > 0; ) (i += " "), e--;
+        switch (((this.text.nodeValue = `${t}${i}fps`), !1)) {
+          case !(t < 7):
+            (this.element.style.color = "#FFF"),
+              (this.element.style.backgroundColor = "#FF4500");
+            break;
+          case !(t < 25):
+            (this.element.style.color = "#FF4500"),
+              (this.element.style.backgroundColor = "#000");
+            break;
+          case !(t < 40):
+            (this.element.style.color = "orange"),
+              (this.element.style.backgroundColor = "#000");
+            break;
+          case !(t > 70):
+            (this.element.style.color = "#0f0"),
+              (this.element.style.backgroundColor = "#000");
+            break;
+          default:
+            (this.element.style.color = "#018801"),
+              (this.element.style.backgroundColor = "#000");
+        }
+      }
+      this.isRunning && this.measure();
+    });
+  }
+  start() {
+    this.isRunning ||
+      ((this.isRunning = !0),
+      !0 === this.ui &&
+        ((this.text = document.createTextNode("")),
+        (this.element = document.createElement("div")),
+        (this.element.style = this.defaultStyles),
+        this.element.appendChild(this.text),
+        document.body.appendChild(this.element)),
+      this.measure());
+  }
+  pause() {
+    this.isRunning = !1;
+  }
+  resume() {
+    this.isRunning || ((this.isRunning = !0), this.measure());
+  }
+  toggle() {
+    this.isRunning ? this.pause() : this.resume();
+  }
+  stop() {
+    this.isRunning &&
+      ((this.isRunning = !1),
+      !0 === this.ui && this.element && this.element.remove());
+  }
+}
+
+// Configuration
+const tileset = "mbxsolutions.ntt-hex";
+let state = "IDLENOT";
+const loader = document.getElementsByClassName("loading")[0];
+
+// Initialize geocoder
+// const geocoder = new MapboxGeocoder({
+//   accessToken: mapboxgl.accessToken,
+//   mapboxgl: mapboxgl,
+//   countries: "JP",
+//   marker: {
+//     color: "#ebebeb",
+//   },
+//   flyTo: false,
+// });
+
+// Initialize map
+const map = new mapboxgl.Map({
+  container: "map",
+  style: "mapbox://styles/mbxsolutions/cmnmsy5kw001v01rhaeol71pc",
+  center: [134.366235, 35.010239],
+  zoom: 4.28,
+  minZoom: 4,
+  maxZoom: 18,
+});
+
+// Compute time to load map
+let mapboxstarttime = performance.now();
+map.once("idle", function () {
+  let mapboxendtime = performance.now();
+  var mapboxtime = mapboxendtime - mapboxstarttime;
+  info.style.display = "block";
+  info.innerHTML = "描画時間： " + Math.floor(mapboxtime) + " ms";
+});
+
+// FPS counter
+setTimeout(() => {
+  const fps = new FPSMeter({ ui: true });
+  fps.start();
+  fps.element.addEventListener("click", fps.toggle.bind(fps), {
+    passive: true,
+    capture: false,
+  });
+}, 1000);
+
+const marker = new mapboxgl.Marker({
+  color: "#ebebeb",
+});
+
+function startLoading() {
+  loader.style.display = "block";
+}
+
+function stopLoading() {
+  loader.style.display = "none";
+}
+
+function openMarker(marker, d, place_name, markerCoords, jump) {
+  if (d.features.length > 0) {
+    const count = d.features[0].properties.count;
+    let coverage = "";
+
+    if (count < 10) {
+      coverage = "標準的";
+    } else if (count >= 10 && count < 100) {
+      coverage = "良好";
+    } else if (count >= 100) {
+      coverage = "上品質";
+    }
+
+    marker.setPopup(
+      new mapboxgl.Popup()
+        .setHTML(
+          `
+          <span class="location">${place_name}</span>
+          <span class="coverage">${coverage}</span>
+          `
+        )
+        .addTo(map)
+    );
+  } else {
+    marker.setPopup(
+      new mapboxgl.Popup()
+        .setHTML(
+          `
+          <span class="location">${place_name}</span>
+          <span class="coverage">カバレッジなし</span>
+          `
+        )
+        .addTo(map)
+    );
+  }
+
+  if (jump) {
+    map.jumpTo({
+      center: markerCoords,
+      zoom: 9,
+    });
+  }
+
+  stopLoading();
+}
+
+// geocoder.on("result", async function (e) {
+//   if (marker) marker.remove();
+
+//   startLoading();
+
+//   const lat = e.result.center[1];
+//   const lon = e.result.center[0];
+
+//   await fetch(
+//     `https://api.mapbox.com/v4/${tileset}/tilequery/${lon},${lat}.json?access_token=${mapboxgl.accessToken}`
+//   )
+//     .then((d) => d.json())
+//     .then((d) => {
+//       openMarker(
+//         geocoder.mapMarker,
+//         d,
+//         e.result.place_name,
+//         e.result.center,
+//         true
+//       );
+//     });
+// });
+
+// function updateLabelsToJapanese() {
+//   const styleLayers = map.getStyle().layers;
+
+//   // Iterate through style layers
+//   styleLayers.forEach((layer) => {
+//     if (layer.layout && layer.layout["text-field"]) {
+//       map.setLayoutProperty(layer.id, "text-field", ["get", "name_ja"]);
+//     }
+//   });
+// }
+
+// map.on("load", function () {
+//   // map.addControl(geocoder);
+//   updateLabelsToJapanese();
+// });
+
+// Show legend at all zoom levels - moved to after createLegend
+
+// map.on("zoom", function (e) {
+//   const zoom = map.getZoom();
+
+//   if (zoom >= 8 && state === "IDLENOT") {
+//     document.getElementById("colorbar-container").style.display = "block";
+//     setTimeout(() => {
+//       document.getElementById("colorbar-container").style.opacity = 1;
+//       state = "IDLESHOWING";
+//     }, 0);
+//     state = "TRANSITIONING";
+//   } else if (zoom < 8 && state === "IDLESHOWING") {
+//     document.getElementById("colorbar-container").style.opacity = 0;
+//     setTimeout(() => {
+//       document.getElementById("colorbar-container").style.display =
+//         "none";
+//       state = "IDLENOT";
+//     }, 500);
+//     state = "TRANSITIONING";
+//   }
+// });
+
+// map.getCanvas().style.cursor = "pointer";
+
+// map.on("click", async (e) => {
+//   if (geocoder.mapMarker) geocoder.mapMarker.remove();
+
+//   startLoading();
+
+//   const lat = e.lngLat.lat;
+//   const lon = e.lngLat.lng;
+
+//   let placeName;
+//   let tileQueryResponse;
+
+//   const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lon},${lat}.json?access_token=${mapboxgl.accessToken}&language=ja`;
+
+//   const geocode = fetch(url)
+//     .then((d) => d.json())
+//     .then((d) => {
+//       placeName = d.features[0].place_name;
+//     });
+
+//   const tileQuery = fetch(
+//     `https://api.mapbox.com/v4/${tileset}/tilequery/${lon},${lat}.json?access_token=${mapboxgl.accessToken}`
+//   )
+//     .then((d) => d.json())
+//     .then((d) => {
+//       tileQueryResponse = d;
+//     });
+
+//   await Promise.all([geocode, tileQuery]);
+
+//   //set marker coordinates
+//   if (marker) marker.remove();
+
+//   marker.setLngLat([lon, lat]).addTo(map);
+
+//   openMarker(marker, tileQueryResponse, placeName, [lon, lat], false);
+// });
+
+//create legend
+function createLegend(id, values, colors, label) {
+  const ratio = window.devicePixelRatio || 1;
+  const canvas = document.getElementById(id);
+
+  const ctx = canvas.getContext("2d");
+
+  const width = 350;
+  const margin = 25;
+
+  const height = 55;
+  canvas.width = width * ratio;
+  canvas.height = height * ratio;
+  canvas.style.width = width + "px";
+  canvas.style.height = height + "px";
+  ctx.scale(ratio, ratio);
+
+  const cmin = values[0];
+  const cmax = values[values.length - 1];
+  const domain = cmax - cmin;
+
+  const grad = ctx.createLinearGradient(margin, 0, width - 2 * margin, 0);
+
+  for (let i = 0; i < values.length; i++) {
+    grad.addColorStop((values[i] - cmin) / domain, colors[i]);
+  }
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(margin, 0, width - 2 * margin, 30);
+  ctx.textAlign = "center";
+
+  ctx.strokeStyle = "black";
+  ctx.lineJoin = "round";
+
+  ctx.font = "14px Sans-serif";
+  ctx.lineWidth = 2.0;
+  ctx.strokeText("弱い", 42, 45);
+  ctx.strokeText("強い", 310, 45);
+  ctx.fillStyle = "white";
+  ctx.fillText("弱い", 42, 45);
+  ctx.fillText("強い", 310, 45);
+
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 2.0;
+  ctx.strokeRect(margin, 1, width - 2 * margin, 29);
+}
+
+const legendColors = ["#1a1a1a", "#ff007f"];
+
+createLegend("colorbar", [1, 2], legendColors, "Coverage");
+
+// Show legend at all zoom levels
+document.getElementById("colorbar-container").style.display = "block";
+document.getElementById("colorbar-container").style.opacity = 1;
+
+</script>
+</html>

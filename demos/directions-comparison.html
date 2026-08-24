@@ -1,0 +1,1793 @@
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-language/v1.0.0/mapbox-gl-language.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/d3@7.8.5/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.min.js"></script>
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.css" type="text/css" />
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<script src="https://kenji-shima.github.io/resource-files/polyline.js" type="module"></script>
+<script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      height: 100vh; display: flex; flex-direction: column;
+      background: #f5f5f5; color: #333;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+    }
+
+    #header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 20px; background: #fff;
+      border-bottom: 2px solid #e0e0e0; flex-shrink: 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .title {
+      font-size: 16px; font-weight: 700; color: #333;
+      white-space: nowrap; display: flex; align-items: center; gap: 8px;
+    }
+    .spacer { flex: 1; }
+
+    /* Mode buttons */
+    #mode-btns { display: flex; gap: 8px; }
+    .mode-btn {
+      padding: 7px 14px; border: 1px solid #ddd; border-radius: 6px;
+      font-size: 13px; cursor: pointer; background: white; color: #555;
+      transition: all 0.2s;
+    }
+    .mode-btn.active { color: white; font-weight: 600; }
+    #btn-origin.active { background: #34a853; border-color: #34a853; }
+    #btn-destination.active { background: #ea4335; border-color: #ea4335; }
+
+    /* Select and buttons */
+    select, .btn {
+      padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;
+      font-size: 13px; outline: none; cursor: pointer;
+      background: white; color: #333;
+    }
+    select:focus, .btn:hover { border-color: #4285f4; }
+    .btn-clear:hover { background: #f5f5f5; border-color: #999; }
+
+    #layout { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+
+    #map-row {
+      display: grid; grid-template-columns: 1fr 1fr;
+      flex: 1; min-height: 0; overflow: hidden; border-bottom: 2px solid #e0e0e0;
+    }
+
+    .map-pane {
+      display: flex; flex-direction: column; overflow: hidden;
+      background: white; position: relative;
+    }
+    .map-pane:first-child { border-right: 1px solid #e0e0e0; }
+
+    .map-header {
+      padding: 10px 16px; font-size: 13px; font-weight: 600;
+      background: #fafafa; border-bottom: 1px solid #e0e0e0;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .param-group { display: flex; align-items: center; gap: 6px; }
+    .param-label { font-size: 12px; color: #666; font-weight: 500; }
+    .param-group .btn { padding: 5px 10px; font-size: 12px; }
+    #google-key-group { display: flex; align-items: center; gap: 6px; }
+    #google-key-group label { font-size: 12px; color: #666; white-space: nowrap; }
+    #google-key-input {
+      padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px;
+      font-size: 12px; width: 220px; outline: none;
+    }
+    #google-key-input:focus { border-color: #4285f4; }
+    #google-key-btn { padding: 6px 10px; font-size: 12px; }
+    .api-badge {
+      font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 12px;
+    }
+    .mapbox-badge { background: #e8f0fe; color: #1a73e8; }
+    .google-badge { background: #fce8e6; color: #d93025; }
+
+    .map-container { flex: 1; min-height: 0; }
+    .map-container canvas { cursor: crosshair !important; }
+
+    /* Results row */
+    #results-row {
+      display: grid; grid-template-columns: 1fr 1fr;
+      flex: 0 1 280px; overflow: hidden; background: white;
+    }
+    .result-pane { display: flex; flex-direction: column; overflow: hidden; }
+    .result-pane:first-child { border-right: 1px solid #e0e0e0; }
+    .result-header {
+      padding: 10px 16px; font-size: 13px; font-weight: 600;
+      background: #fafafa; border-bottom: 1px solid #e0e0e0;
+    }
+    .result-content { flex: 1; overflow-y: auto; padding: 16px; }
+    .result-placeholder {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; height: 100%; color: #aaa;
+      font-size: 13px; gap: 8px;
+    }
+    .result-placeholder .icon { font-size: 32px; }
+
+    /* Metric cards in results */
+    .result-summary {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;
+    }
+    .metric-card {
+      background: #f8f9fa; border-radius: 8px; padding: 12px;
+      border: 1px solid #e0e0e0;
+    }
+    .metric-label {
+      font-size: 11px; color: #666; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;
+    }
+    .metric-value { font-size: 22px; font-weight: 700; color: #333; }
+    .metric-unit { font-size: 12px; color: #666; margin-left: 2px; }
+    .route-info {
+      font-size: 13px; color: #555; margin-bottom: 12px;
+      padding: 8px 12px; background: #f0f4ff; border-radius: 6px;
+      border-left: 3px solid #4285f4;
+    }
+    .steps-title {
+      font-size: 12px; font-weight: 600; color: #666;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      margin-bottom: 8px; margin-top: 12px;
+    }
+    .step-item {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 6px 0; border-bottom: 1px solid #f0f0f0;
+      font-size: 12px; color: #444;
+    }
+    .step-item:last-child { border-bottom: none; }
+    .step-number {
+      flex-shrink: 0; width: 22px; height: 22px;
+      background: #e8f0fe; color: #1a73e8;
+      border-radius: 50%; font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .step-text { flex: 1; line-height: 1.4; }
+
+    /* Click hint overlay */
+    .click-hint {
+      position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.7); color: white; padding: 6px 14px;
+      border-radius: 20px; font-size: 12px; pointer-events: none;
+      white-space: nowrap; z-index: 10;
+    }
+
+    /* Loading spinner */
+    .loading-indicator {
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px; padding: 20px; color: #666; font-size: 13px;
+    }
+    .spinner {
+      width: 20px; height: 20px; border: 2px solid #e0e0e0;
+      border-top-color: #4285f4; border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Avoid dropdowns */
+    .avoid-dropdown { position: relative; }
+    .avoid-btn {
+      padding: 5px 10px; border: 1px solid #ddd; border-radius: 6px;
+      font-size: 12px; cursor: pointer; background: white; color: #555;
+      display: flex; align-items: center; gap: 5px; white-space: nowrap;
+      transition: border-color 0.2s;
+    }
+    .avoid-btn:hover, .avoid-dropdown.open .avoid-btn { border-color: #4285f4; }
+    .avoid-panel {
+      display: none; position: absolute; top: calc(100% + 4px); left: 0;
+      background: white; border: 1px solid #ddd; border-radius: 8px;
+      padding: 6px; z-index: 200; min-width: 175px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+    .avoid-dropdown.open .avoid-panel { display: block; }
+    .avoid-option {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 6px; font-size: 12px; cursor: pointer; border-radius: 4px;
+      color: #333; user-select: none;
+    }
+    .avoid-option:hover { background: #f5f5f5; }
+    .avoid-option input[type="checkbox"] { cursor: pointer; }
+
+    /* Batch modal */
+    #batch-modal {
+      display: none; position: fixed; inset: 0; z-index: 500;
+      background: rgba(0,0,0,0.45); overflow-y: auto; padding: 40px 20px;
+    }
+    #batch-modal.open { display: block; }
+    #batch-panel {
+      background: white; border-radius: 12px;
+      max-width: 1100px; margin: 0 auto;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2); overflow: hidden;
+    }
+    #batch-panel-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 20px; border-bottom: 1px solid #e0e0e0; background: #fafafa;
+    }
+    #batch-panel-title { font-size: 15px; font-weight: 700; flex: 1; margin: 0; }
+    #batch-progress { font-size: 13px; color: #666; white-space: nowrap; }
+    .batch-table-wrap { overflow-x: auto; max-height: calc(100vh - 180px); overflow-y: auto; }
+    #batch-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    #batch-table thead th {
+      position: sticky; top: 0; z-index: 1;
+      background: #f8f9fa; padding: 8px 12px;
+      font-weight: 600; border-bottom: 1px solid #e0e0e0;
+      white-space: nowrap; text-align: right;
+    }
+    #batch-table thead th:first-child { text-align: left; }
+    #batch-table .col-group-mapbox { background: #e8f0fe; color: #1a73e8; text-align: center; }
+    #batch-table .col-group-google { background: #fce8e6; color: #d93025; text-align: center; }
+    #batch-table .col-group-delta  { background: #f0f0f0; color: #555;    text-align: center; }
+    #batch-table tbody td {
+      padding: 7px 12px; border-bottom: 1px solid #f0f0f0;
+      text-align: right; white-space: nowrap;
+    }
+    #batch-table tbody td:first-child { text-align: left; font-weight: 500; }
+    #batch-table tbody tr:hover td { background: #f5f7ff; }
+    .batch-cell-loading { color: #aaa; font-size: 12px; text-align: center !important; }
+    .batch-cell-error { color: #ea4335; font-size: 12px; text-align: center !important; }
+    .batch-cell-skip { color: #aaa; text-align: center !important; }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <span class="title">
+    <span>🗺️</span>
+    Directions API 比較
+  </span>
+  <div id="mode-btns">
+    <button class="mode-btn active" id="btn-origin">A&nbsp; 出発地を設定</button>
+    <button class="mode-btn" id="btn-destination">B&nbsp; 目的地を設定</button>
+  </div>
+  <select id="route-source">
+    <option value="cbcloud-routes.geojson">CBcloud 配送ルート</option>
+    <option value="japan-ferry-routes.geojson">日本のフェリー航路</option>
+    <option value="japan-nav-routes.geojson">日本ナビ検証ルート (1000件)</option>
+  </select>
+  <select id="route-preset">
+    <option value="">-- ルートを選択 --</option>
+  </select>
+  <select id="travel-mode">
+    <option value="driving">車</option>
+    <option value="driving-traffic">車 (交通情報)</option>
+  </select>
+  <button class="btn" id="batch-btn" disabled="">バッチ実行</button>
+  <div class="spacer"></div>
+  <div id="google-key-group">
+    <label for="google-key-input">Google API Key</label>
+    <input type="password" id="google-key-input" placeholder="APIキーを入力" />
+    <button class="btn" id="google-key-btn">設定</button>
+  </div>
+  <button class="btn btn-clear" id="clear-btn">クリア</button>
+</div>
+
+<div id="layout">
+  <div id="map-row">
+    <div class="map-pane">
+      <div class="map-header">
+        <span>Mapbox Directions API</span>
+        <div class="param-group">
+          <span class="param-label">パラメータ</span>
+          <div class="avoid-dropdown" id="mapbox-avoid-dropdown">
+            <button class="avoid-btn" id="mapbox-avoid-btn">Avoid ▾</button>
+            <div class="avoid-panel">
+              <label class="avoid-option"><input type="checkbox" value="toll" /> Tolls</label>
+              <label class="avoid-option"><input type="checkbox" value="motorway" /> Motorways</label>
+              <label class="avoid-option"><input type="checkbox" value="ferry" /> Ferries</label>
+              <label class="avoid-option"><input type="checkbox" value="unpaved" /> Unpaved Roads</label>
+              <label class="avoid-option"><input type="checkbox" value="cash_only_tolls" /> Cash-Only Tolls</label>
+            </div>
+          </div>
+          <button class="btn" id="mapbox-execute-btn">実行</button>
+        </div>
+        <span class="api-badge mapbox-badge">mapbox/directions/v5</span>
+      </div>
+      <div id="mapbox-map" class="map-container"></div>
+      <div class="click-hint" id="mapbox-hint">クリックして出発地 (A) を設定</div>
+    </div>
+    <div class="map-pane">
+      <div class="map-header">
+        <span>Google Routes API</span>
+        <div class="param-group">
+          <span class="param-label">パラメータ</span>
+          <div class="avoid-dropdown" id="google-avoid-dropdown">
+            <button class="avoid-btn" id="google-avoid-btn">Avoid ▾</button>
+            <div class="avoid-panel">
+              <label class="avoid-option"><input type="checkbox" value="tolls" /> Tolls</label>
+              <label class="avoid-option"><input type="checkbox" value="highways" /> Highways</label>
+              <label class="avoid-option"><input type="checkbox" value="ferries" /> Ferries</label>
+            </div>
+          </div>
+          <button class="btn" id="google-execute-btn">実行</button>
+        </div>
+        <span class="api-badge google-badge">routes/v2</span>
+      </div>
+      <div id="google-map" class="map-container"></div>
+      <div class="click-hint" id="google-hint">クリックして出発地 (A) を設定</div>
+    </div>
+  </div>
+
+  <div id="results-row">
+    <div class="result-pane">
+      <div class="result-header">Mapbox 結果</div>
+      <div class="result-content" id="mapbox-result-content">
+        <div class="result-placeholder">
+          <span class="icon">🗺️</span>
+          <span>出発地と目的地を設定するとルートが表示されます</span>
+        </div>
+      </div>
+    </div>
+    <div class="result-pane">
+      <div class="result-header">Google 結果</div>
+      <div class="result-content" id="google-result-content">
+        <div class="result-placeholder">
+          <span class="icon">🗺️</span>
+          <span>出発地と目的地を設定するとルートが表示されます</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="batch-modal">
+  <div id="batch-panel">
+    <div id="batch-panel-header">
+      <h2 id="batch-panel-title">バッチ実行結果</h2>
+      <span id="batch-progress"></span>
+      <button class="btn" id="batch-csv-btn" disabled="">CSVダウンロード</button>
+      <button class="btn btn-clear" id="batch-close-btn">閉じる</button>
+    </div>
+    <div class="batch-table-wrap">
+      <table id="batch-table">
+        <thead>
+          <tr>
+            <th rowspan="2">ルート</th>
+            <th colspan="3" class="col-group-mapbox">Mapbox</th>
+            <th colspan="3" class="col-group-google">Google</th>
+            <th colspan="3" class="col-group-delta">Δ (Mapbox − Google)</th>
+          </tr>
+          <tr>
+            <th>所要時間</th><th>距離</th><th>ステップ数</th>
+            <th>所要時間</th><th>距離</th><th>ステップ数</th>
+            <th>所要時間</th><th>距離</th><th>ステップ数</th>
+          </tr>
+        </thead>
+        <tbody id="batch-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+// CONSTANTS
+// ============================================================
+const GOOGLE_KEY_STORAGE = 'directions_google_api_key';
+
+const MAPBOX_TURN_ANGLE_THRESHOLD = 20; // degrees — below this is considered straight
+
+function bearingDelta(before, after) {
+  return Math.abs(((after - before) + 540) % 360 - 180);
+}
+
+// A step is a turn if the heading changes by at least the threshold,
+// excluding depart/arrive/notification which have no meaningful bearing.
+const MAPBOX_NO_TURN_TYPES = new Set(['depart', 'arrive', 'notification']);
+
+function isMapboxTurn(step) {
+  if (MAPBOX_NO_TURN_TYPES.has(step.maneuver?.type)) return false;
+  const delta = bearingDelta(step.maneuver.bearing_before, step.maneuver.bearing_after);
+  return delta >= MAPBOX_TURN_ANGLE_THRESHOLD;
+}
+
+const GOOGLE_TURN_MANEUVERS = new Set([
+  'TURN_SLIGHT_LEFT', 'TURN_SHARP_LEFT', 'UTURN_LEFT', 'TURN_LEFT',
+  'TURN_SLIGHT_RIGHT', 'TURN_SHARP_RIGHT', 'UTURN_RIGHT', 'TURN_RIGHT',
+  'ROUNDABOUT_LEFT', 'ROUNDABOUT_RIGHT',
+]);
+
+const CONGESTION_COLORS = {
+  moderate:    '#ff9800',
+  heavy:       '#f44336',
+  severe:      '#f44336',
+  SLOW:        '#ff9800',
+  TRAFFIC_JAM: '#f44336',
+};
+const DEFAULT_ROUTE_COLOR = '#4285f4';
+let googleApiKey = localStorage.getItem(GOOGLE_KEY_STORAGE) || '';
+const INITIAL_CENTER = [139.7671, 35.6812]; // Tokyo
+const INITIAL_ZOOM = 12;
+
+// ============================================================
+// STATE
+// ============================================================
+let state = {
+  clickMode: 'origin',    // 'origin' | 'destination'
+  travelMode: 'driving',
+  origin: null,           // { lat, lng } or null
+  destination: null,      // { lat, lng } or null
+  mapboxExclude: [],      // e.g. ['toll', 'ferry']
+  googleAvoid: [],        // e.g. ['tolls', 'highways']
+};
+
+// ============================================================
+// MAPS & MARKERS
+// ============================================================
+let mapboxMap = null;
+let googleMap = null;
+let googleRoutePolylines = [];
+let isSyncing = false;
+
+let mapboxOriginMarker = null;
+let mapboxDestMarker = null;
+let googleOriginMarker = null;
+let googleDestMarker = null;
+
+let mapboxTurnMarkers = [];
+let googleTurnMarkers = [];
+
+let currentFetchId = 0;
+let mapboxStyleLoaded = false;
+let pendingGeometry = null;
+let pendingCongestionData = null;
+
+// ============================================================
+// GOOGLE MAPS
+// ============================================================
+function loadGoogleMaps() {
+  if (window.google?.maps) return Promise.resolve();
+  if (window._googleMapsPromise) return window._googleMapsPromise;
+  window._googleMapsPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${googleApiKey}`;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+  return window._googleMapsPromise;
+}
+
+async function initGoogleMap() {
+  await loadGoogleMaps();
+
+  googleMap = new google.maps.Map(document.getElementById('google-map'), {
+    center: { lat: INITIAL_CENTER[1], lng: INITIAL_CENTER[0] },
+    zoom: INITIAL_ZOOM + 1, // Google zoom offset (+1 for tile size parity)
+    mapId: 'DEMO_MAP_ID',
+  });
+
+  googleMap.addListener('click', (e) => {
+    handleMapClick(e.latLng.lat(), e.latLng.lng());
+  });
+
+  ['center_changed', 'zoom_changed'].forEach((event) => {
+    googleMap.addListener(event, syncFromGoogle);
+  });
+}
+
+function decodePolyline(encoded) {
+  const points = [];
+  let index = 0, lat = 0, lng = 0;
+  while (index < encoded.length) {
+    let b, shift = 0, result = 0;
+    do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lat += result & 1 ? ~(result >> 1) : result >> 1;
+    shift = 0; result = 0;
+    do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lng += result & 1 ? ~(result >> 1) : result >> 1;
+    points.push({ lat: lat / 1e5, lng: lng / 1e5 });
+  }
+  return points;
+}
+
+// ============================================================
+// MAPBOX
+// ============================================================
+function initMapboxMap() {
+  mapboxMap = new mapboxgl.Map({
+    container: 'mapbox-map',
+    style: 'mapbox://styles/kenji-shima/cmmtz45at001501sm99f0eima',
+    center: INITIAL_CENTER,
+    zoom: INITIAL_ZOOM,
+  });
+
+  mapboxMap.on('load', () => {
+    mapboxStyleLoaded = true;
+
+    const firstSymbol = mapboxMap.getStyle().layers.find(
+      l => l.type === 'symbol' && !l.id.startsWith('tunnel')
+    );
+    const beforeId = firstSymbol ? firstSymbol.id : undefined;
+
+    // Route source (full geometry — used for casing)
+    mapboxMap.addSource('route', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+    });
+
+    // Congestion source (per-segment features with congestion property)
+    mapboxMap.addSource('route-congestion', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+    });
+
+    // Casing layer (wider, on full geometry)
+    mapboxMap.addLayer({
+      id: 'route-line-casing',
+      type: 'line',
+      source: 'route',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#1a56c4',
+        'line-width': 8,
+        'line-opacity': 0.8,
+      },
+    }, beforeId);
+
+    // Main route line colored by congestion segment
+    mapboxMap.addLayer({
+      id: 'route-line',
+      type: 'line',
+      source: 'route-congestion',
+      layout: { 'line-join': 'round', 'line-cap': 'butt' },
+      paint: {
+        'line-color': ['match', ['get', 'congestion'],
+          'moderate', '#ff9800',
+          'heavy',    '#f44336',
+          'severe',   '#f44336',
+          'rgba(0,0,0,0)',
+        ],
+        'line-width': 5,
+        'line-opacity': 0.9,
+      },
+    }, beforeId);
+
+    if (pendingGeometry) {
+      mapboxMap.getSource('route').setData({ type: 'Feature', geometry: pendingGeometry, properties: {} });
+      pendingGeometry = null;
+    }
+    if (pendingCongestionData) {
+      mapboxMap.getSource('route-congestion').setData(pendingCongestionData);
+      pendingCongestionData = null;
+    }
+  });
+
+  mapboxMap.on('click', (e) => {
+    handleMapClick(e.lngLat.lat, e.lngLat.lng);
+  });
+
+  mapboxMap.on('move', syncFromMapbox);
+}
+
+// ============================================================
+// MAP SYNC
+// ============================================================
+const SYNC_EPSILON = 1e-6;
+
+function syncFromGoogle() {
+  if (isSyncing || !mapboxMap) return;
+
+  const center = googleMap.getCenter();
+  const newLat = center.lat();
+  const newLng = center.lng();
+  const newZoom = googleMap.getZoom() - 1;
+  const cur = mapboxMap.getCenter();
+
+  if (
+    Math.abs(newLat - cur.lat) < SYNC_EPSILON &&
+    Math.abs(newLng - cur.lng) < SYNC_EPSILON &&
+    Math.abs(newZoom - mapboxMap.getZoom()) < SYNC_EPSILON
+  ) return;
+
+  isSyncing = true;
+  mapboxMap.jumpTo({ center: [newLng, newLat], zoom: newZoom });
+  requestAnimationFrame(() => { isSyncing = false; });
+}
+
+function syncFromMapbox() {
+  if (isSyncing || !googleMap) return;
+
+  const center = mapboxMap.getCenter();
+  const newLat = center.lat;
+  const newLng = center.lng;
+  const newZoom = mapboxMap.getZoom() + 1;
+  const cur = googleMap.getCenter();
+
+  if (
+    Math.abs(newLat - cur.lat()) < SYNC_EPSILON &&
+    Math.abs(newLng - cur.lng()) < SYNC_EPSILON &&
+    Math.abs(newZoom - googleMap.getZoom()) < SYNC_EPSILON
+  ) return;
+
+  isSyncing = true;
+  googleMap.setOptions({ center: { lat: newLat, lng: newLng }, zoom: newZoom });
+  requestAnimationFrame(() => { isSyncing = false; });
+}
+
+// ============================================================
+// MARKERS
+// ============================================================
+
+/**
+ * Creates the custom HTML element for a numbered turn marker.
+ * @param {number} index - 0-based turn index
+ * @returns {HTMLElement}
+ */
+function createTurnMarkerElement(index) {
+  const el = document.createElement('div');
+  Object.assign(el.style, {
+    width: '20px',
+    height: '20px',
+    background: '#f5a623',
+    borderRadius: '50%',
+    color: 'white',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '10px',
+    fontWeight: 'bold',
+    border: '2px solid white',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
+    cursor: 'default',
+  });
+  el.textContent = index + 1;
+  return el;
+}
+
+/**
+ * Removes all turn markers from both maps.
+ */
+function clearTurnMarkers() {
+  mapboxTurnMarkers.forEach(m => m.remove());
+  mapboxTurnMarkers = [];
+  googleTurnMarkers.forEach(m => m.setMap(null));
+  googleTurnMarkers = [];
+}
+
+/**
+ * Creates the custom HTML element for a Mapbox origin marker (circle with "A").
+ * @returns {HTMLElement}
+ */
+function createOriginElement() {
+  const el = document.createElement('div');
+  Object.assign(el.style, {
+    width: '32px',
+    height: '32px',
+    background: '#34a853',
+    borderRadius: '50%',
+    color: 'white',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    border: '2px solid white',
+    boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+    cursor: 'default',
+  });
+  el.textContent = 'A';
+  return el;
+}
+
+/**
+ * Creates the custom HTML element for a Mapbox destination marker (rotated square with "B").
+ * @returns {HTMLElement}
+ */
+function createDestinationElement() {
+  const el = document.createElement('div');
+  Object.assign(el.style, {
+    width: '32px',
+    height: '32px',
+    background: '#ea4335',
+    borderRadius: '50%',
+    color: 'white',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    border: '2px solid white',
+    boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+    cursor: 'default',
+  });
+  el.textContent = 'B';
+  return el;
+}
+
+/**
+ * Places markers for origin or destination on both maps.
+ * @param {'origin'|'destination'} type
+ * @param {number} lat
+ * @param {number} lng
+ */
+function placeMarkers(type, lat, lng) {
+  if (type === 'origin') {
+    // Mapbox origin
+    if (mapboxOriginMarker) mapboxOriginMarker.remove();
+    mapboxOriginMarker = new mapboxgl.Marker({ element: createOriginElement() })
+      .setLngLat([lng, lat])
+      .addTo(mapboxMap);
+
+    // Google origin
+    if (googleOriginMarker) googleOriginMarker.setMap(null);
+    googleOriginMarker = new google.maps.Marker({
+      position: { lat, lng },
+      map: googleMap,
+      label: { text: 'A', color: 'white', fontWeight: 'bold' },
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 14,
+        fillColor: '#34a853',
+        fillOpacity: 1,
+        strokeColor: '#ffffff',
+        strokeWeight: 2,
+      },
+      zIndex: 1000,
+    });
+  } else {
+    // Mapbox destination
+    if (mapboxDestMarker) mapboxDestMarker.remove();
+    mapboxDestMarker = new mapboxgl.Marker({ element: createDestinationElement() })
+      .setLngLat([lng, lat])
+      .addTo(mapboxMap);
+
+    // Google destination
+    if (googleDestMarker) googleDestMarker.setMap(null);
+    googleDestMarker = new google.maps.Marker({
+      position: { lat, lng },
+      map: googleMap,
+      label: { text: 'B', color: 'white', fontWeight: 'bold' },
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 14,
+        fillColor: '#ea4335',
+        fillOpacity: 1,
+        strokeColor: '#ffffff',
+        strokeWeight: 2,
+      },
+      zIndex: 1000,
+    });
+  }
+}
+
+// ============================================================
+// CLICK HANDLER
+// ============================================================
+
+/**
+ * Handles a map click on either the Mapbox or Google map.
+ * @param {number} lat
+ * @param {number} lng
+ */
+function handleMapClick(lat, lng) {
+  const type = state.clickMode;
+
+  if (type === 'origin') {
+    state.origin = { lat, lng };
+    // Auto-advance to destination mode after placing origin
+    if (!state.destination) {
+      state.clickMode = 'destination';
+      document.getElementById('btn-destination').classList.add('active');
+      document.getElementById('btn-origin').classList.remove('active');
+    }
+  } else {
+    state.destination = { lat, lng };
+  }
+
+  placeMarkers(type, lat, lng);
+  updateHints();
+
+  if (state.origin && state.destination) {
+    fetchBothRoutes();
+  }
+}
+
+// ============================================================
+// DIRECTIONS - FETCH
+// ============================================================
+
+/**
+ * Fetches routes from both APIs in parallel and updates result panels.
+ */
+async function fetchBothRoutes() {
+  clearTurnMarkers();
+  const fetchId = ++currentFetchId;
+  const loadingHTML = `
+    <div class="loading-indicator">
+      <div class="spinner"></div>
+      <span>ルートを取得中...</span>
+    </div>`;
+
+  document.getElementById('mapbox-result-content').innerHTML = loadingHTML;
+  document.getElementById('google-result-content').innerHTML = loadingHTML;
+
+  const controls = ['btn-origin', 'btn-destination', 'travel-mode', 'clear-btn', 'mapbox-avoid-btn', 'google-avoid-btn', 'mapbox-execute-btn', 'google-execute-btn'];
+  controls.forEach(id => document.getElementById(id).disabled = true);
+  try {
+    const tasks = [fetchMapboxRoute(fetchId)];
+    if (state.travelMode !== 'cycling') tasks.push(fetchGoogleRoute(fetchId));
+    await Promise.all(tasks);
+  } finally {
+    controls.forEach(id => document.getElementById(id).disabled = false);
+  }
+}
+
+/**
+ * Fetches a route from the Mapbox Directions API and renders the result.
+ */
+async function fetchMapboxRoute(fetchId) {
+  const { origin, destination, travelMode } = state;
+
+  const profileMap = { driving: 'mapbox.tmp.valhalla-zenrin/driving', 'driving-traffic': 'mapbox.tmp.valhalla-zenrin-premium/driving-traffic', walking: 'mapbox.tmp.valhalla-zenrin/walking', cycling: 'mapbox.tmp.valhalla-zenrin/cycling' };
+  const profile = profileMap[travelMode] || 'driving';
+
+  const excludeParam = state.mapboxExclude.length > 0
+    ? `&exclude=${state.mapboxExclude.join(',')}`
+    : '';
+  const annotationParam = travelMode === 'driving-traffic' ? '&annotations=congestion' : '';
+
+  const url =
+    `https://api.mapbox.com/directions/v5/${profile}/` +
+    `${origin.lng},${origin.lat};${destination.lng},${destination.lat}` +
+    `?steps=true&geometries=geojson&overview=full&language=ja` +
+    `${excludeParam}${annotationParam}` +
+    `&access_token=${mapboxgl.accessToken}`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${data.message || res.statusText}`);
+    }
+
+    if (fetchId !== currentFetchId) return;
+
+    if (!data.routes || data.routes.length === 0) {
+      showErrorPlaceholder('mapbox-result-content', 'ルートが見つかりませんでした。');
+      return;
+    }
+
+    const route = data.routes[0];
+    const coords = route.geometry.coordinates;
+    const congestionArr = route.legs[0]?.annotation?.congestion || [];
+
+    // Full geometry → casing source
+    const fullGeom = { type: 'Feature', geometry: route.geometry, properties: {} };
+    if (mapboxStyleLoaded && mapboxMap.getSource('route')) {
+      mapboxMap.getSource('route').setData(fullGeom);
+    } else {
+      pendingGeometry = route.geometry;
+    }
+
+    // Group consecutive same-congestion segments into one LineString each
+    const segFeatures = [];
+    if (coords.length > 1) {
+      let cur = { congestion: congestionArr[0] || null, coordinates: [coords[0]] };
+      for (let i = 1; i < coords.length; i++) {
+        cur.coordinates.push(coords[i]);
+        const next = congestionArr[i] || null;
+        if (next !== cur.congestion || i === coords.length - 1) {
+          segFeatures.push({
+            type: 'Feature',
+            properties: { congestion: cur.congestion },
+            geometry: { type: 'LineString', coordinates: cur.coordinates },
+          });
+          cur = { congestion: next, coordinates: [coords[i]] };
+        }
+      }
+    } else {
+      segFeatures.push({ type: 'Feature', properties: {}, geometry: route.geometry });
+    }
+    const congData = { type: 'FeatureCollection', features: segFeatures };
+    if (mapboxStyleLoaded && mapboxMap.getSource('route-congestion')) {
+      mapboxMap.getSource('route-congestion').setData(congData);
+    } else {
+      pendingCongestionData = congData;
+    }
+
+    renderMapboxResult(route);
+  } catch (err) {
+    console.error('Mapbox Directions error:', err);
+    showErrorPlaceholder('mapbox-result-content', 'ルートの取得に失敗しました。');
+  }
+}
+
+/**
+ * Fetches a route from the Google Routes API v2 and renders the result.
+ */
+async function fetchGoogleRoute(fetchId) {
+  const { origin, destination, travelMode } = state;
+
+  const travelModeMap = {
+    driving: 'DRIVE',
+    'driving-traffic': 'DRIVE',
+    walking: 'WALK',
+    cycling: 'BICYCLE',
+  };
+  const isDrive = travelMode === 'driving' || travelMode === 'driving-traffic';
+  const routingPreference = travelMode === 'driving-traffic'
+    ? 'TRAFFIC_AWARE_OPTIMAL' : 'TRAFFIC_AWARE';
+
+  const body = {
+    origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
+    destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
+    travelMode: travelModeMap[travelMode] || 'DRIVE',
+    ...(isDrive && { routingPreference }),
+    ...(travelMode === 'driving-traffic' && { extraComputations: ['TRAFFIC_ON_POLYLINE'] }),
+    languageCode: 'ja',
+    routeModifiers: {
+      avoidTolls: state.googleAvoid.includes('tolls'),
+      avoidHighways: state.googleAvoid.includes('highways'),
+      avoidFerries: state.googleAvoid.includes('ferries'),
+    },
+  };
+
+  try {
+    const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': googleApiKey,
+        'X-Goog-FieldMask': 'routes.legs,routes.polyline,routes.description,routes.travelAdvisory.speedReadingIntervals',
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+
+    if (fetchId !== currentFetchId) return;
+
+    if (!res.ok || !data.routes?.length) {
+      const msg = data.error?.message || res.statusText;
+      console.error('Google Routes error:', msg);
+      showErrorPlaceholder('google-result-content', `ルートが見つかりませんでした (${msg})。`);
+      return;
+    }
+
+    const route = data.routes[0];
+
+    // Draw congestion-colored polyline segments on Google map
+    googleRoutePolylines.forEach(p => p.setMap(null));
+    googleRoutePolylines = [];
+    const points = decodePolyline(route.polyline.encodedPolyline);
+    const intervals = route.travelAdvisory?.speedReadingIntervals || [];
+    if (intervals.length > 0) {
+      intervals.forEach(iv => {
+        const seg = points.slice(iv.startPolylinePointIndex, iv.endPolylinePointIndex + 1);
+        if (seg.length < 2) return;
+        googleRoutePolylines.push(new google.maps.Polyline({
+          path: seg,
+          map: googleMap,
+          strokeColor: CONGESTION_COLORS[iv.speed] || DEFAULT_ROUTE_COLOR,
+          strokeWeight: 5,
+          strokeOpacity: 0.9,
+        }));
+      });
+    } else {
+      googleRoutePolylines.push(new google.maps.Polyline({
+        path: points,
+        map: googleMap,
+        strokeColor: DEFAULT_ROUTE_COLOR,
+        strokeWeight: 5,
+        strokeOpacity: 0.9,
+      }));
+    }
+
+    renderGoogleResult(route.legs[0], route.description || '');
+  } catch (err) {
+    console.error('Google Routes error:', err);
+    showErrorPlaceholder('google-result-content', 'ルートの取得に失敗しました。');
+  }
+}
+
+// ============================================================
+// DIRECTIONS - RESULT RENDERING
+// ============================================================
+
+/**
+ * Formats seconds into a human-readable duration value string.
+ * @param {number} seconds
+ * @returns {string}
+ */
+function formatDuration(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
+  if (h > 0) return m > 0 ? `${h}h ${m}` : `${h}`;
+  return m > 0 ? `${m}` : '<1';
+}
+
+/**
+ * Returns the unit label for a formatted duration.
+ * @param {number} seconds
+ * @returns {string}
+ */
+function formatDurationUnit(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
+  if (h > 0) return m > 0 ? 'm' : 'h';
+  return 'min';
+}
+
+/**
+ * Formats meters into a human-readable distance value string.
+ * @param {number} m
+ * @returns {string}
+ */
+function formatDistance(m) {
+  return m >= 1000 ? (m / 1000).toFixed(1) : Math.round(m).toString();
+}
+
+/**
+ * Returns the unit label for a distance in meters.
+ * @param {number} m
+ * @returns {string}
+ */
+function formatDistanceUnit(m) {
+  return m >= 1000 ? 'km' : 'm';
+}
+
+/**
+ * Builds the shared result panel HTML.
+ * @param {object} opts
+ * @param {number}   opts.durationSec
+ * @param {number}   opts.distanceM
+ * @param {number}   opts.turnCount
+ * @param {string}   [opts.summary]
+ * @param {string[]} opts.stepTexts  - plain-text step instructions
+ * @returns {string}
+ */
+function buildResultHTML({ durationSec, distanceM, turnCount, summary, stepTexts }) {
+  const totalSteps = stepTexts.length;
+
+  const summaryHTML = summary
+    ? `<div class="route-info">経由: ${summary}</div>`
+    : '';
+
+  const stepsHTML = stepTexts
+    .map(
+      (text, i) => `
+        <div class="step-item">
+          <span class="step-number">${i + 1}</span>
+          <span class="step-text">${text}</span>
+        </div>`
+    )
+    .join('');
+
+  const moreHTML = '';
+
+  return `
+    <div class="result-summary" style="grid-template-columns: 1fr 1fr;">
+      <div class="metric-card">
+        <div class="metric-label">所要時間</div>
+        <div class="metric-value">${formatDuration(durationSec)}<span class="metric-unit">${formatDurationUnit(durationSec)}</span></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">距離</div>
+        <div class="metric-value">${formatDistance(distanceM)}<span class="metric-unit">${formatDistanceUnit(distanceM)}</span></div>
+      </div>
+      <!--
+      <div class="metric-card">
+        <div class="metric-label">右左折</div>
+        <div class="metric-value">${turnCount}<span class="metric-unit">回</span></div>
+      </div>
+      -->
+    </div>
+    ${summaryHTML}
+    <div class="steps-title">ステップ (全${totalSteps}件)</div>
+    ${stepsHTML}
+    ${moreHTML}
+  `;
+}
+
+/**
+ * Renders a Mapbox Directions route into the left result panel.
+ * @param {object} route - routes[0] from the Mapbox Directions API response
+ */
+function renderMapboxResult(route) {
+  const durationSec = route.duration;
+  const distanceM = route.distance;
+  const summary = route.legs[0]?.summary || '';
+  const steps = route.legs[0]?.steps || [];
+  const stepTexts = steps.map((s) => s.maneuver?.instruction || '');
+  const turnSteps = steps.filter(isMapboxTurn);
+
+  // Debug: log every maneuver with its type and whether it was counted
+  let turnIdx = 0;
+  console.group(`[Mapbox] maneuvers (${steps.length} steps, ${turnSteps.length} turns)`);
+  steps.forEach((s) => {
+    const counted = isMapboxTurn(s);
+    const delta = MAPBOX_NO_TURN_TYPES.has(s.maneuver?.type)
+      ? '  n/a'
+      : String(Math.round(bearingDelta(s.maneuver.bearing_before, s.maneuver.bearing_after))).padStart(4) + '°';
+    const label = counted ? `✅ #${++turnIdx}` : '  —  ';
+    console.log(`${label}  ${delta}  [${s.maneuver?.type}]  ${s.maneuver?.instruction || ''}`);
+  });
+  console.groupEnd();
+
+  // Place numbered markers at each turn point
+  /* turnSteps.forEach((step, i) => {
+    const [lng, lat] = step.maneuver.location;
+    const marker = new mapboxgl.Marker({ element: createTurnMarkerElement(i) })
+      .setLngLat([lng, lat])
+      .addTo(mapboxMap);
+    mapboxTurnMarkers.push(marker);
+  }); */
+
+  document.getElementById('mapbox-result-content').innerHTML = buildResultHTML({
+    durationSec,
+    distanceM,
+    turnCount: turnSteps.length,
+    summary,
+    stepTexts,
+  });
+}
+
+/**
+ * Renders a Google Routes API leg into the right result panel.
+ * @param {object} leg - routes[0].legs[0] from the Google Routes API response
+ * @param {string} summary - routes[0].description
+ */
+function renderGoogleResult(leg, summary) {
+  const durationSec = parseInt(leg.duration);
+  const distanceM = leg.distanceMeters;
+  const steps = leg.steps || [];
+
+  const stepTexts = steps.map((s) => s.navigationInstruction?.instructions || '');
+  const turnSteps = steps.filter((s) => GOOGLE_TURN_MANEUVERS.has(s.navigationInstruction?.maneuver));
+
+  // Debug: log every maneuver with its type and whether it was counted
+  let turnIdx = 0;
+  console.group(`[Google] maneuvers (${steps.length} steps, ${turnSteps.length} turns)`);
+  steps.forEach((s) => {
+    const maneuver = s.navigationInstruction?.maneuver || '(none)';
+    const counted = GOOGLE_TURN_MANEUVERS.has(maneuver);
+    const label = counted ? `✅ #${++turnIdx}` : '  —  ';
+    console.log(`${label}  [${maneuver}]  ${s.navigationInstruction?.instructions || ''}`);
+  });
+  console.groupEnd();
+
+  document.getElementById('google-result-content').innerHTML = buildResultHTML({
+    durationSec,
+    distanceM,
+    turnCount: turnSteps.length,
+    summary,
+    stepTexts,
+  });
+}
+
+/**
+ * Displays an error message in a result panel.
+ * @param {string} panelId
+ * @param {string} message
+ */
+function showErrorPlaceholder(panelId, message) {
+  document.getElementById(panelId).innerHTML = `
+    <div class="error-placeholder" style="padding: 24px; color: #ea4335; font-size: 14px;">
+      ${message}
+    </div>`;
+}
+
+// ============================================================
+// BATCH RUN
+// ============================================================
+
+let batchResults = [];
+let batchCompleted = 0;
+
+/**
+ * Fetches a Mapbox route and returns metrics only — no map or UI update.
+ */
+async function fetchMapboxRouteData(origin, destination) {
+  const profileMap = { driving: 'driving', 'driving-traffic': 'driving-traffic', walking: 'walking', cycling: 'cycling' };
+  const profile = profileMap[state.travelMode] || 'driving';
+  const excludeParam = state.mapboxExclude.length > 0 ? `&exclude=${state.mapboxExclude.join(',')}` : '';
+
+  const url =
+    `https://api.mapbox.com/directions/v5/mapbox.tmp.valhalla-zenrin-premium/${profile}/` +
+    `${origin.lng},${origin.lat};${destination.lng},${destination.lat}` +
+    `?steps=true&geometries=polyline&overview=false&language=ja` +
+    `${excludeParam}` +
+    `&access_token=${mapboxgl.accessToken}`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${data.message || res.statusText}`);
+  if (!data.routes?.length) throw new Error('ルートなし');
+
+  const route = data.routes[0];
+  const steps = route.legs[0]?.steps || [];
+  return {
+    durationSec: route.duration,
+    distanceM: route.distance,
+    turnCount: steps.filter(isMapboxTurn).length,
+    stepCount: steps.length,
+  };
+}
+
+/**
+ * Fetches a Google route via Routes API v2 and returns metrics only — no map or UI update.
+ */
+async function fetchGoogleRouteData(origin, destination) {
+  const travelModeMap = {
+    driving: 'DRIVE',
+    'driving-traffic': 'DRIVE',
+    walking: 'WALK',
+    cycling: 'BICYCLE',
+  };
+  const routingPreference = state.travelMode === 'driving-traffic'
+    ? 'TRAFFIC_AWARE_OPTIMAL' : 'TRAFFIC_AWARE';
+
+  const body = {
+    origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
+    destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
+    travelMode: travelModeMap[state.travelMode] || 'DRIVE',
+    routingPreference,
+    languageCode: 'ja',
+    routeModifiers: {
+      avoidTolls: state.googleAvoid.includes('tolls'),
+      avoidHighways: state.googleAvoid.includes('highways'),
+      avoidFerries: state.googleAvoid.includes('ferries'),
+    },
+  };
+
+  const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': googleApiKey,
+      'X-Goog-FieldMask': 'routes.legs.duration,routes.legs.distanceMeters,routes.legs.steps',
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.routes?.length) {
+    throw new Error(data.error?.message || res.statusText);
+  }
+
+  const leg = data.routes[0].legs[0];
+  const steps = leg.steps || [];
+  return {
+    durationSec: parseInt(leg.duration),
+    distanceM: leg.distanceMeters,
+    turnCount: steps.filter(s => GOOGLE_TURN_MANEUVERS.has(s.navigationInstruction?.maneuver)).length,
+    stepCount: steps.length,
+  };
+}
+
+/**
+ * Renders one batch table row once its route data is available.
+ */
+function renderBatchCells(data, error, skipped) {
+  if (skipped) {
+    return '<td colspan="3" class="batch-cell-skip">—</td>';
+  }
+  if (error) {
+    return `<td colspan="3" class="batch-cell-error">${error}</td>`;
+  }
+  return `
+    <td>${formatDuration(data.durationSec)}<span class="metric-unit">${formatDurationUnit(data.durationSec)}</span></td>
+    <td>${formatDistance(data.distanceM)}<span class="metric-unit">${formatDistanceUnit(data.distanceM)}</span></td>
+    <!-- <td>${data.turnCount}</td> -->
+    <td>${data.stepCount}</td>
+  `;
+}
+
+/**
+ * Renders 4 Δ cells (Mapbox − Google), calculated after rounding each side.
+ * Time Δ in minutes, distance Δ in km (1 decimal).
+ */
+function renderDeltaCells(m, g, googleSkipped) {
+  if (googleSkipped || !m || !g) {
+    return '<td colspan="3" class="batch-cell-skip">—</td>';
+  }
+
+  const timeΔ = Math.round(m.durationSec / 60) - Math.round(g.durationSec / 60);
+  const distΔ = parseFloat((m.distanceM / 1000).toFixed(1)) - parseFloat((g.distanceM / 1000).toFixed(1));
+  // const turnΔ = m.turnCount - g.turnCount;
+  const stepΔ = m.stepCount - g.stepCount;
+
+  const cell = (v, unit) => {
+    const sign = v > 0 ? '+' : '';
+    return `<td>${sign}${v}<span class="metric-unit">${unit}</span></td>`;
+  };
+  const cellKm = (v) => {
+    const sign = v > 0 ? '+' : '';
+    return `<td>${sign}${v.toFixed(1)}<span class="metric-unit">km</span></td>`;
+  };
+
+  return `${cell(timeΔ, 'min')}${cellKm(distΔ)}${cell(stepΔ, '')}`;
+}
+
+function routeNameCell(group) {
+  const o = group.origin.properties.address || '';
+  const d = group.destination.properties.address || '';
+  const sub = (o || d) ? `<div style="font-size:11px;color:#999;margin-top:2px">${o} → ${d}</div>` : '';
+  return `<td>${group.name}${sub}</td>`;
+}
+
+function updateBatchRow(i, mapboxData, mapboxError, googleData, googleError, googleSkipped) {
+  const row = document.getElementById(`batch-row-${i}`);
+  if (!row) return;
+  row.innerHTML = `
+    ${routeNameCell(presetGroups[i])}
+    ${renderBatchCells(mapboxData, mapboxError, false)}
+    ${renderBatchCells(googleData, googleError, googleSkipped)}
+    ${renderDeltaCells(mapboxData, googleData, googleSkipped)}
+  `;
+}
+
+/**
+ * Fetches both APIs for one preset route and updates its table row when done.
+ * Results stream in as they complete; table order is preserved by row index.
+ */
+async function runRouteForBatch(group, i) {
+  const googleSkipped = !googleApiKey;
+
+  try {
+    const [origin, destination] = await Promise.all([
+      resolveLocation(group.origin),
+      resolveLocation(group.destination),
+    ]);
+
+    const tasks = [fetchMapboxRouteData(origin, destination)];
+    if (!googleSkipped) tasks.push(fetchGoogleRouteData(origin, destination));
+
+    const [mapboxSettled, googleSettled] = await Promise.allSettled(
+      googleSkipped ? [tasks[0], Promise.reject()] : tasks
+    );
+
+    const mapboxData  = mapboxSettled.status  === 'fulfilled' ? mapboxSettled.value  : null;
+    const mapboxError = mapboxSettled.status  === 'rejected'  ? mapboxSettled.reason?.message || 'エラー' : null;
+    const googleData  = googleSettled?.status === 'fulfilled' ? googleSettled.value  : null;
+    const googleError = (!googleSkipped && googleSettled?.status === 'rejected')
+      ? googleSettled.reason?.message || 'エラー' : null;
+
+    batchResults[i] = { name: group.name, group, mapbox: mapboxData, google: googleData };
+    updateBatchRow(i, mapboxData, mapboxError, googleData, googleError, googleSkipped);
+  } catch (err) {
+    batchResults[i] = { name: group.name, group, error: err.message };
+    const row = document.getElementById(`batch-row-${i}`);
+    if (row) row.innerHTML = `${routeNameCell(group)}<td colspan="9" class="batch-cell-error">エラー: ${err.message}</td>`;
+  }
+
+  batchCompleted++;
+  document.getElementById('batch-progress').textContent = `${batchCompleted} / ${presetGroups.length}`;
+  if (batchCompleted === presetGroups.length) {
+    document.getElementById('batch-csv-btn').disabled = false;
+  }
+}
+
+async function runBatch() {
+  batchCompleted = 0;
+  batchResults = new Array(presetGroups.length).fill(null);
+
+  // Pre-populate rows in dropdown order, each showing a loading state
+  const tbody = document.getElementById('batch-tbody');
+  tbody.innerHTML = presetGroups.map((g, i) => `
+    <tr id="batch-row-${i}">
+      ${routeNameCell(g)}
+      <td colspan="8" class="batch-cell-loading">処理中...</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('batch-progress').textContent = `0 / ${presetGroups.length}`;
+  document.getElementById('batch-csv-btn').disabled = true;
+  document.getElementById('batch-modal').classList.add('open');
+
+  // Concurrency semaphore: max 400 routes in-flight (~800 req/s), no artificial delay
+  const MAX_CONCURRENT = 400;
+  let active = 0;
+  let idx = 0;
+
+  await new Promise(resolve => {
+    function next() {
+      while (active < MAX_CONCURRENT && idx < presetGroups.length) {
+        const i = idx++;
+        active++;
+        runRouteForBatch(presetGroups[i], i).finally(() => {
+          active--;
+          if (idx < presetGroups.length) next();
+          else if (active === 0) resolve();
+        });
+      }
+      if (idx >= presetGroups.length && active === 0) resolve();
+    }
+    next();
+  });
+}
+
+function downloadBatchCSV() {
+  const skipGoogle = !googleApiKey;
+  const headers = [
+    'ルート', '出発地', '目的地',
+    'Mapbox 所要時間(min)', 'Mapbox 距離(km)', 'Mapbox ステップ数',
+    'Google 所要時間(min)', 'Google 距離(km)', 'Google ステップ数',
+    'Δ 所要時間(min)', 'Δ 距離(km)', 'Δ ステップ数',
+  ];
+
+  const toMin = (sec) => Math.round(sec / 60);
+  const toKm  = (m)   => (m / 1000).toFixed(2);
+
+  const rows = batchResults.map((r) => {
+    if (!r) return ['-', '', '', '', '', '', '', '', '', ''];
+    const m = r.mapbox;
+    const g = r.google;
+    const na = skipGoogle ? 'スキップ' : 'エラー';
+    const originAddr = r.group?.origin.properties.address || '';
+    const destAddr   = r.group?.destination.properties.address || '';
+
+    const timeΔ = (m && g) ? toMin(m.durationSec) - toMin(g.durationSec) : '';
+    const distΔ = (m && g) ? (parseFloat(toKm(m.distanceM)) - parseFloat(toKm(g.distanceM))).toFixed(2) : '';
+    const stepΔ = (m && g) ? m.stepCount - g.stepCount : '';
+
+    return [
+      r.name, originAddr, destAddr,
+      m ? toMin(m.durationSec) : 'エラー',
+      m ? toKm(m.distanceM)   : 'エラー',
+      m ? m.stepCount         : 'エラー',
+      g ? toMin(g.durationSec) : na,
+      g ? toKm(g.distanceM)   : na,
+      g ? g.stepCount         : na,
+      timeΔ, distΔ, stepΔ,
+    ];
+  });
+
+  const csv = [headers, ...rows]
+    .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `directions-batch-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ============================================================
+// CLEAR
+// ============================================================
+
+/**
+ * Resets all markers, routes, and state to the initial empty state.
+ */
+function clearAll() {
+  state.origin = null;
+  state.destination = null;
+  state.clickMode = 'origin';
+  document.getElementById('btn-origin').classList.add('active');
+  document.getElementById('btn-destination').classList.remove('active');
+
+  // Remove Mapbox markers
+  if (mapboxOriginMarker) { mapboxOriginMarker.remove(); mapboxOriginMarker = null; }
+  if (mapboxDestMarker) { mapboxDestMarker.remove(); mapboxDestMarker = null; }
+
+  // Remove Google markers
+  if (googleOriginMarker) { googleOriginMarker.setMap(null); googleOriginMarker = null; }
+  if (googleDestMarker) { googleDestMarker.setMap(null); googleDestMarker = null; }
+
+  clearTurnMarkers();
+
+  // Clear Mapbox route
+  const source = mapboxMap.getSource('route');
+  if (source) source.setData({ type: 'FeatureCollection', features: [] });
+  const congSource = mapboxMap.getSource('route-congestion');
+  if (congSource) congSource.setData({ type: 'FeatureCollection', features: [] });
+
+  // Clear Google route
+  googleRoutePolylines.forEach(p => p.setMap(null));
+  googleRoutePolylines = [];
+
+  // Reset result panels to placeholder
+  const placeholder = `<div class="result-placeholder" style="padding: 24px; color: #999; font-size: 14px; text-align: center;">出発地と目的地を設定するとルートが表示されます</div>`;
+  document.getElementById('mapbox-result-content').innerHTML = placeholder;
+  document.getElementById('google-result-content').innerHTML = placeholder;
+
+  updateHints();
+}
+
+// ============================================================
+// HINTS
+// ============================================================
+
+/**
+ * Updates the hint overlay text on both maps based on current state.
+ */
+function updateHints() {
+  let text;
+  if (!state.origin) {
+    text = 'クリックして出発地 (A) を設定';
+  } else if (!state.destination) {
+    text = 'クリックして目的地 (B) を設定';
+  } else {
+    const label = state.clickMode === 'origin' ? '出発地 (A)' : '目的地 (B)';
+    text = `クリックして${label}を移動`;
+  }
+
+  document.getElementById('mapbox-hint').textContent = text;
+  document.getElementById('google-hint').textContent = text;
+}
+
+// ============================================================
+// PRESET ROUTES
+// ============================================================
+
+// Groups: [{ name, origin: feature, destination: feature }, ...]
+let presetGroups = [];
+
+async function loadPresetRoutes(url = 'cbcloud-routes.geojson') {
+  const presetSelect = document.getElementById('route-preset');
+  const batchBtn = document.getElementById('batch-btn');
+
+  // Reset preset dropdown to its placeholder before loading
+  presetSelect.innerHTML = '<option value="">-- ルートを選択 --</option>';
+  presetSelect.disabled = true;
+  batchBtn.disabled = true;
+  presetGroups = [];
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const data = await res.json();
+    const features = data.features || [];
+
+    // Group paired features by route name, preserving order
+    const map = new Map();
+    features.forEach(f => {
+      const name = f.properties.route;
+      if (!map.has(name)) map.set(name, { name, origin: null, destination: null });
+      map.get(name)[f.properties.role] = f;
+    });
+    presetGroups = [...map.values()].filter(g => g.origin && g.destination);
+
+    presetGroups.forEach((group, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      const originAddr = group.origin.properties.address;
+      const destAddr   = group.destination.properties.address;
+      const addrLabel  = (originAddr && destAddr) ? ` (${originAddr} → ${destAddr})` : '';
+      opt.textContent  = group.name + addrLabel;
+      presetSelect.appendChild(opt);
+    });
+
+    if (presetGroups.length > 0) {
+      batchBtn.disabled = false;
+    }
+  } catch (err) {
+    console.error(`Failed to load preset routes from ${url}:`, err);
+  } finally {
+    presetSelect.disabled = false;
+  }
+}
+
+function resolveLocation(feature) {
+  if (feature.geometry?.coordinates) {
+    const [lng, lat] = feature.geometry.coordinates;
+    return Promise.resolve({ lat, lng });
+  }
+  return geocodeV6(feature.properties.address);
+}
+
+async function geocodeV6(address) {
+  const url =
+    `https://api.mapbox.com/search/geocode/v6/forward` +
+    `?q=${encodeURIComponent(address)}&country=JP&language=ja` +
+    `&access_token=${mapboxgl.accessToken}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  const feature = data.features?.[0];
+  if (!feature) throw new Error(`No geocode result for: ${address}`);
+  const [lng, lat] = feature.geometry.coordinates;
+  return { lat, lng };
+}
+
+async function applyPresetRoute(group) {
+  const select = document.getElementById('route-preset');
+  select.disabled = true;
+  try {
+    const [origin, destination] = await Promise.all([
+      resolveLocation(group.origin),
+      resolveLocation(group.destination),
+    ]);
+
+    state.origin      = origin;
+    state.destination = destination;
+    state.clickMode   = 'origin';
+
+    document.getElementById('btn-origin').classList.add('active');
+    document.getElementById('btn-destination').classList.remove('active');
+
+    placeMarkers('origin',      origin.lat,      origin.lng);
+    placeMarkers('destination', destination.lat, destination.lng);
+    updateHints();
+
+    // Fit Mapbox — sync carries Google along
+    mapboxMap.fitBounds(
+      [[origin.lng, origin.lat], [destination.lng, destination.lat]],
+      { padding: 80, duration: 600 }
+    );
+
+    fetchBothRoutes();
+  } catch (err) {
+    console.error('Preset route error:', err);
+  } finally {
+    select.disabled = false;
+  }
+}
+
+// ============================================================
+// AVOID DROPDOWNS
+// ============================================================
+
+function closeAllDropdowns() {
+  document.querySelectorAll('.avoid-dropdown.open').forEach(d => d.classList.remove('open'));
+}
+
+function updateAvoidBtnLabel(btn, values) {
+  btn.textContent = values.length === 0
+    ? 'Avoid \u25be'
+    : `Avoid: ${values.join(', ')} \u25be`;
+}
+
+function setupAvoidDropdowns() {
+  // Mapbox
+  const mapboxDropdown = document.getElementById('mapbox-avoid-dropdown');
+  const mapboxBtn = document.getElementById('mapbox-avoid-btn');
+  const mapboxCheckboxes = mapboxDropdown.querySelectorAll('input[type="checkbox"]');
+
+  mapboxBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = mapboxDropdown.classList.contains('open');
+    closeAllDropdowns();
+    if (!isOpen) mapboxDropdown.classList.add('open');
+  });
+
+  mapboxDropdown.querySelector('.avoid-panel').addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+
+  mapboxCheckboxes.forEach(cb => {
+    cb.addEventListener('change', () => {
+      state.mapboxExclude = [...mapboxCheckboxes].filter(c => c.checked).map(c => c.value);
+      updateAvoidBtnLabel(mapboxBtn, state.mapboxExclude);
+    });
+  });
+
+  // Google
+  const googleDropdown = document.getElementById('google-avoid-dropdown');
+  const googleBtn = document.getElementById('google-avoid-btn');
+  const googleCheckboxes = googleDropdown.querySelectorAll('input[type="checkbox"]');
+
+  googleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = googleDropdown.classList.contains('open');
+    closeAllDropdowns();
+    if (!isOpen) googleDropdown.classList.add('open');
+  });
+
+  googleDropdown.querySelector('.avoid-panel').addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+
+  googleCheckboxes.forEach(cb => {
+    cb.addEventListener('change', () => {
+      state.googleAvoid = [...googleCheckboxes].filter(c => c.checked).map(c => c.value);
+      updateAvoidBtnLabel(googleBtn, state.googleAvoid);
+    });
+  });
+
+  // Execute buttons
+  document.getElementById('mapbox-execute-btn').addEventListener('click', () => {
+    if (state.origin && state.destination) fetchBothRoutes();
+  });
+  document.getElementById('google-execute-btn').addEventListener('click', () => {
+    if (state.origin && state.destination) fetchBothRoutes();
+  });
+
+  // Close when clicking outside any dropdown
+  document.addEventListener('click', closeAllDropdowns);
+}
+
+// ============================================================
+// EVENT HANDLERS
+// ============================================================
+
+function setupEventListeners() {
+  // Origin / Destination mode toggle
+  document.getElementById('btn-origin').addEventListener('click', () => {
+    state.clickMode = 'origin';
+    document.getElementById('btn-origin').classList.add('active');
+    document.getElementById('btn-destination').classList.remove('active');
+    updateHints();
+  });
+
+  document.getElementById('btn-destination').addEventListener('click', () => {
+    state.clickMode = 'destination';
+    document.getElementById('btn-destination').classList.add('active');
+    document.getElementById('btn-origin').classList.remove('active');
+    updateHints();
+  });
+
+  // Travel mode
+  document.getElementById('travel-mode').addEventListener('change', (e) => {
+    state.travelMode = e.target.value;
+    if (state.origin && state.destination) {
+      fetchBothRoutes();
+    }
+  });
+
+  // Clear
+  document.getElementById('clear-btn').addEventListener('click', clearAll);
+
+  // Batch
+  document.getElementById('batch-btn').addEventListener('click', runBatch);
+  document.getElementById('batch-close-btn').addEventListener('click', () => {
+    document.getElementById('batch-modal').classList.remove('open');
+  });
+  document.getElementById('batch-csv-btn').addEventListener('click', downloadBatchCSV);
+
+  setupAvoidDropdowns();
+
+  // Preset route dropdown
+  document.getElementById('route-preset').addEventListener('change', (e) => {
+    const idx = e.target.value;
+    if (idx === '') return;
+    applyPresetRoute(presetGroups[Number(idx)]);
+  });
+
+  // Route-source dropdown — swap the underlying preset GeoJSON
+  document.getElementById('route-source').addEventListener('change', (e) => {
+    clearAll();
+    loadPresetRoutes(e.target.value);
+  });
+}
+
+// ============================================================
+// INITIALIZATION
+// ============================================================
+
+function setupGoogleKeyInput() {
+  const input = document.getElementById('google-key-input');
+  const btn   = document.getElementById('google-key-btn');
+
+  if (googleApiKey) input.value = googleApiKey;
+
+  function saveKey() {
+    const val = input.value.trim();
+    if (!val) return;
+    localStorage.setItem(GOOGLE_KEY_STORAGE, val);
+    location.reload();
+  }
+
+  btn.addEventListener('click', saveKey);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveKey(); });
+}
+
+async function init() {
+  setupEventListeners();
+  setupGoogleKeyInput();
+  updateHints();
+  initMapboxMap();
+  loadPresetRoutes(document.getElementById('route-source').value);
+
+  if (googleApiKey) {
+    await initGoogleMap();
+  } else {
+    document.getElementById('google-map').innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999;font-size:13px;">Google API Keyを入力してください</div>';
+  }
+}
+
+init();
+
+</script>
+</body>
+</html>

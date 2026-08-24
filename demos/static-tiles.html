@@ -1,0 +1,729 @@
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-language/v1.0.0/mapbox-gl-language.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/d3@7.8.5/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.min.js"></script>
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.css" type="text/css" />
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<script src="https://kenji-shima.github.io/resource-files/polyline.js" type="module"></script>
+<script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
+  <style>
+    * {
+  box-sizing: border-box;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+td,
+th {
+  border: 1px solid black;
+  text-align: left;
+  padding: 8px;
+}
+
+th {
+  background-color: #f2f2f2;
+}
+
+h1 {
+  font-size: 22px;
+  margin: 0;
+  font-weight: 400;
+  line-height: 20px;
+  padding: 20px 2px;
+}
+
+a {
+  color: red;
+  text-decoration: underline;
+  cursor: pointer;
+  font: 400 14px 'Source Sans Pro', 'Helvetica Neue', sans-serif;
+}
+
+.map {
+  position: absolute;
+  /*left: 20%;*/
+  width: 100%;
+  top: 0;
+  bottom: 0;
+}
+
+::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+  border-left: 0;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+::-webkit-scrollbar-track {
+  background: none;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #fff;
+  border-radius: 0;
+}
+
+.map-overlay-right {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  opacity: 0.8;
+  background-color: black;
+  color: white;
+  opacity: 0.8;
+  text-align: left;
+  overflow: auto;
+  border-radius: 3px;
+  padding: 10px;
+  font: 400 12px/22px 'Source Sans Pro', 'Helvetica Neue', sans-serif;
+  animation: slide-up 1s;
+}
+
+.title {
+  font-weight: bold;
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0%);
+  }
+}
+
+@keyframes slide-right {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(0%);
+  }
+}
+
+a.boxclose {
+  float: right;
+  cursor: pointer;
+  display: block;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border-width: 3px;
+  border-style: solid;
+  border-color: #605F61;
+  border-radius: 100%;
+  background: -webkit-linear-gradient(-45deg, transparent 0%, transparent 46%, white 46%, white 56%, transparent 56%, transparent 100%), -webkit-linear-gradient(45deg, transparent 0%, transparent 46%, white 46%, white 56%, transparent 56%, transparent 100%);
+  background-color: #605F61;
+  box-shadow: 0px 0px 5px 2px rgba(0, 0, 0, 0.5);
+  transition: all 0.3s ease;
+}
+
+h3 {
+  /*background: #0076D1;
+  color: #fff;*/
+  margin: 0;
+  padding: 10px;
+  border-radius: 3px 3px 0 0;
+  font-weight: 700;
+  /*margin-top: -15px;*/
+}
+
+body,
+html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  font-family: 'Open Sans', sans-serif;
+  color: red;
+}
+
+h1 {
+  margin: 0;
+  position: relative;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  text-align: center;
+  font-size: 40px;
+}
+
+.map-overlay-legend {
+  position: absolute;
+  opacity: 0.8;
+  top: 30;
+  right: 0;
+  background: #fff;
+  margin-right: 20px;
+  overflow: auto;
+  border-radius: 3px;
+  width: 300px;
+  padding: 10px;
+  font: 400 12px/22px 'Source Sans Pro', 'Helvetica Neue', sans-serif;
+  transition: transform .5s ease-in-out;
+}
+
+.mapboxgl-popup {
+  padding-bottom: 10px;
+  opacity: 0.8;
+  width: 500px;
+}
+
+.mapboxgl-popup-content {
+  padding-bottom: 10px;
+  opacity: 0.8;
+  width: fit-content;
+}
+
+.marker {
+  border: none;
+  cursor: pointer;
+  height: 56px;
+  width: 56px;
+  background-image: url(../images/alert.png);
+}
+
+.blinking {
+  -webkit-animation: blink .5s ease-in-out infinite alternate;
+  -moz-animation: blink .5s ease-in-out infinite alternate;
+  animation: blink .5s ease-in-out infinite alternate;
+}
+
+@-webkit-keyframes blink {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@-moz-keyframes blink {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes blink {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+a.replay {
+  color: blue;
+  text-decoration: underline;
+  cursor: pointer;
+  font: 400 18px 'Source Sans Pro', 'Helvetica Neue', sans-serif;
+}
+
+
+.legend {
+  position: absolute;
+  bottom: 120px;
+  right: 40px;
+  background: black;
+  padding: 10px;
+  border-radius: 5px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+  width: 50%;
+  opacity: 0.8;
+}
+
+.legend-title {
+  font-size: 14px;
+  text-align: center;
+  margin-bottom: 5px;
+  color: #000000;
+}
+
+.legend-scale {
+  text-align: center;
+}
+
+.legend-bar {
+  position: relative;
+  height: 30px;
+  background: linear-gradient(to right,
+      rgba(80, 74, 154, 1),
+      rgba(84, 172, 162, 1),
+      rgba(193, 228, 148, 1),
+      rgba(252, 244, 162, 1),
+      rgba(251, 166, 91, 1),
+      rgba(216, 66, 65, 1),
+      rgba(143, 3, 58, 1));
+  border: 1px solid #999;
+  border-radius: 3px;
+  margin-bottom: 5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 5px;
+}
+
+.label {
+  font-size: 12px;
+  color: #fff;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.hidden {
+  display: none;
+}
+
+.map-overlay-bottom {
+  position: absolute;
+  bottom: 30px;
+  right: 20px;
+  left: 20px;
+  background-color: black;
+  color: white;
+  opacity: 0.8;
+  margin-right: 20px;
+  font-family: Arial, sans-serif;
+  overflow: auto;
+  border-radius: 3px;
+  padding: 10px;
+  height: 80px;
+}
+.slider {
+  position: relative;
+  top: 20px;
+  width: 100%;
+}
+.time {
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+  width: 100%;
+  top: 10px;
+}
+.time span {
+  font-size: 11px;
+  text-align: center;
+}
+
+#active-datetime {
+  font-size: 14px;
+  width: 100%;
+  position: relative;
+}
+
+button {
+  height: 14px;
+  padding: 0 10px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+
+    .layer-toggle {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.06);
+      z-index: 1;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Source Sans Pro', sans-serif;
+      min-width: 260px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(0, 0, 0, 0.04);
+    }
+
+    .layer-toggle h3 {
+      margin: 0 0 16px 0;
+      font-size: 15px;
+      font-weight: 600;
+      background: none;
+      color: #1a1a1a;
+      padding: 0;
+      letter-spacing: -0.01em;
+      text-transform: uppercase;
+      font-size: 11px;
+      color: #6b7280;
+      font-weight: 700;
+    }
+
+    /* Hide default radio buttons */
+    .layer-toggle input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Custom toggle button style */
+    .layer-toggle label {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      margin: 0 0 8px 0;
+      cursor: pointer;
+      color: #9ca3af;
+      background: #f9fafb;
+      border-radius: 8px;
+      border: 2px solid #e5e7eb;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      font-size: 14px;
+      font-weight: 500;
+      opacity: 0.6;
+    }
+
+    .layer-toggle label:last-of-type {
+      margin-bottom: 0;
+    }
+
+    /* Icon styling */
+    .layer-toggle label::before {
+      content: '';
+      width: 20px;
+      height: 20px;
+      margin-right: 12px;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      opacity: 0.6;
+      transition: opacity 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    /* Satellite icon */
+    #satellite-layer-radio + label::before {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234b5563' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z'/%3E%3C/svg%3E");
+    }
+
+    /* Map icon */
+    #static-layer-radio + label::before {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234b5563' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7'/%3E%3C/svg%3E");
+    }
+
+    /* Hover state */
+    .layer-toggle label:hover {
+      background: #f3f4f6;
+      border-color: #e5e7eb;
+      transform: translateY(-1px);
+    }
+
+    .layer-toggle label:hover::before {
+      opacity: 0.8;
+    }
+
+    /* Active/checked state */
+    .layer-toggle label:has(input[type="radio"]:checked) {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #ffffff;
+      border-color: #0f172a;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.6), 0 4px 8px rgba(15, 23, 42, 0.5);
+      transform: translateY(-2px);
+      opacity: 1;
+      font-weight: 600;
+    }
+
+    .layer-toggle label:has(input[type="radio"]:checked)::before {
+      opacity: 1;
+      filter: brightness(0) invert(1);
+    }
+
+    /* Active state animation */
+    .layer-toggle input[type="radio"]:checked + label::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      right: 14px;
+      width: 6px;
+      height: 6px;
+      background: #ffffff;
+      border-radius: 50%;
+      transform: translateY(-50%);
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    /* Focus state for accessibility */
+    .layer-toggle label:has(input[type="radio"]:focus) {
+      outline: 2px solid #4f46e5;
+      outline-offset: 2px;
+    }
+
+    /* Pressed state */
+    .layer-toggle label:active {
+      transform: translateY(0);
+    }
+
+    /* Dropdown styling */
+    .projection-dropdown {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 2px solid #e5e7eb;
+    }
+
+    .projection-dropdown h3 {
+      margin: 0 0 16px 0;
+      font-size: 15px;
+      font-weight: 600;
+      background: none;
+      color: #1a1a1a;
+      padding: 0;
+      letter-spacing: -0.01em;
+      text-transform: uppercase;
+      font-size: 11px;
+      color: #6b7280;
+      font-weight: 700;
+    }
+
+    .projection-dropdown select {
+      width: 100%;
+      padding: 10px 12px;
+      background: #f9fafb;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #1a1a1a;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234b5563' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 20px;
+      padding-right: 40px;
+    }
+
+    .projection-dropdown select:hover {
+      background-color: #f3f4f6;
+      border-color: #d1d5db;
+    }
+
+    .projection-dropdown select:focus {
+      outline: 2px solid #4f46e5;
+      outline-offset: 2px;
+      border-color: #4f46e5;
+      background-color: #ffffff;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .layer-toggle {
+        min-width: 240px;
+        padding: 16px;
+      }
+
+      .layer-toggle label {
+        padding: 10px 14px;
+        font-size: 13px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map" class="map"></div>
+
+  <div class="layer-toggle">
+    <h3>Style Controls</h3>
+
+    <label>
+      <input type="radio" name="layer-select" id="satellite-layer-radio" value="satellite" />
+      <span>Satellite Imagery</span>
+    </label>
+
+    <label>
+      <input type="radio" name="layer-select" id="static-layer-radio" value="static" checked="" />
+      <span>Streets</span>
+    </label>
+
+    <div class="projection-dropdown">
+      <h3>Map Projection</h3>
+      <select id="projection-select">
+        <option value="mercator" selected="">Mercator</option>
+        <option value="globe">Globe</option>
+        <option value="equalEarth">Equal Earth</option>
+        <option value="naturalEarth">Natural Earth</option>
+        <option value="winkelTripel">Winkel Tripel</option>
+        <option value="albers">Albers</option>
+        <option value="lambertConformalConic">Lambert Conformal Conic</option>
+        <option value="equirectangular">Equirectangular</option>
+      </select>
+    </div>
+  </div>
+</body>
+<script>
+  // Static Tiles Demo
+// Displays a base style with satellite imagery and a raster static tiles layer overlay
+
+// Default center on Taipei
+const defaultCoordinates = [121.5654, 25.0330];
+
+let map;
+
+const loadMap = () => {
+    map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/kenji-shima/cmmswfkcf001601sw9h7w5quj', // Base style
+        center: defaultCoordinates,
+        zoom: 6,
+        minZoom: 0,
+        maxZoom: 20,
+        scrollZoom: true
+    });
+
+    // Add navigation controls
+    map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+
+    // Add fullscreen control
+    map.addControl(new mapboxgl.FullscreenControl(), 'bottom-right');
+
+    map.on('load', () => {
+        // Find the first label layer to insert satellite and static tiles below labels
+        const layers = map.getStyle().layers;
+        let firstLabelLayerId;
+        for (const layer of layers) {
+            if (layer.type === 'symbol' && layer.layout['text-field']) {
+                firstLabelLayerId = layer.id;
+                break;
+            }
+        }
+
+        // Add Mapbox Satellite tileset
+        // This provides high-resolution satellite imagery
+        map.addSource('satellite-source', {
+            type: 'raster',
+            url: 'mapbox://mapbox.satellite',
+            tileSize: 512
+        });
+
+        map.addLayer({
+            id: 'satellite-layer',
+            type: 'raster',
+            source: 'satellite-source',
+            layout: {
+                'visibility': 'none' // Start hidden
+            },
+            paint: {
+                'raster-opacity': 1,
+                'raster-fade-duration': 300
+            }
+        }, firstLabelLayerId); // Insert below labels
+
+        // Add the static tiles style as a raster layer
+        // This uses the Mapbox Raster Tiles API to render the style as raster tiles
+        map.addSource('static-tiles-source', {
+            type: 'raster',
+            tiles: [
+                `https://api.mapbox.com/styles/v1/kenji-shima/cmn7fa71j003i01sv3qln4tye/tiles/512/{z}/{x}/{y}@2x?access_token=${mapboxgl.accessToken}`
+            ],
+            tileSize: 512
+        });
+
+        map.addLayer({
+            id: 'static-tiles-layer',
+            type: 'raster',
+            source: 'static-tiles-source',
+            paint: {
+                'raster-opacity': 1,
+                'raster-fade-duration': 300
+            }
+        }, firstLabelLayerId); // Insert below labels, above satellite
+
+        // Set up layer selection with radio buttons
+        const satelliteRadio = document.getElementById('satellite-layer-radio');
+        const staticRadio = document.getElementById('static-layer-radio');
+
+        // Function to switch layers
+        function switchLayer(layerType) {
+            if (layerType === 'satellite') {
+                map.setLayoutProperty('satellite-layer', 'visibility', 'visible');
+                map.setLayoutProperty('static-tiles-layer', 'visibility', 'none');
+            } else if (layerType === 'static') {
+                map.setLayoutProperty('satellite-layer', 'visibility', 'none');
+                map.setLayoutProperty('static-tiles-layer', 'visibility', 'visible');
+            }
+        }
+
+        // Radio button event listeners
+        satelliteRadio.addEventListener('change', () => {
+            if (satelliteRadio.checked) {
+                switchLayer('satellite');
+            }
+        });
+
+        staticRadio.addEventListener('change', () => {
+            if (staticRadio.checked) {
+                switchLayer('static');
+            }
+        });
+
+        // Set up projection dropdown
+        const projectionSelect = document.getElementById('projection-select');
+
+        projectionSelect.addEventListener('change', (e) => {
+            const projection = e.target.value;
+            map.setProjection(projection);
+        });
+
+        // Optional: Add click handler to show layer information
+        map.on('click', (e) => {
+            const features = map.queryRenderedFeatures(e.point);
+            if (features.length > 0) {
+                console.log('Clicked features:', features);
+            }
+        });
+    });
+
+    // Error handling
+    map.on('error', (e) => {
+        console.error('Map error:', e);
+    });
+};
+
+// Initialize map when page loads
+loadMap();
+
+</script>
+
+</html>

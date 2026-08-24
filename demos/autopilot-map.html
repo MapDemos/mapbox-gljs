@@ -1,0 +1,1283 @@
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-language/v1.0.0/mapbox-gl-language.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/d3@7.8.5/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.min.js"></script>
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.css" type="text/css" />
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<script src="https://kenji-shima.github.io/resource-files/polyline.js" type="module"></script>
+<script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
+  <style>
+    * {
+  box-sizing: border-box;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+td,
+th {
+  border: 1px solid black;
+  text-align: left;
+  padding: 8px;
+}
+
+th {
+  background-color: #f2f2f2;
+}
+
+h1 {
+  font-size: 22px;
+  margin: 0;
+  font-weight: 400;
+  line-height: 20px;
+  padding: 20px 2px;
+}
+
+a {
+  color: red;
+  text-decoration: underline;
+  cursor: pointer;
+  font: 400 14px 'Source Sans Pro', 'Helvetica Neue', sans-serif;
+}
+
+.map {
+  position: absolute;
+  /*left: 20%;*/
+  width: 100%;
+  top: 0;
+  bottom: 0;
+}
+
+::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+  border-left: 0;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+::-webkit-scrollbar-track {
+  background: none;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #fff;
+  border-radius: 0;
+}
+
+.map-overlay-right {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  opacity: 0.8;
+  background-color: black;
+  color: white;
+  opacity: 0.8;
+  text-align: left;
+  overflow: auto;
+  border-radius: 3px;
+  padding: 10px;
+  font: 400 12px/22px 'Source Sans Pro', 'Helvetica Neue', sans-serif;
+  animation: slide-up 1s;
+}
+
+.title {
+  font-weight: bold;
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0%);
+  }
+}
+
+@keyframes slide-right {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(0%);
+  }
+}
+
+a.boxclose {
+  float: right;
+  cursor: pointer;
+  display: block;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border-width: 3px;
+  border-style: solid;
+  border-color: #605F61;
+  border-radius: 100%;
+  background: -webkit-linear-gradient(-45deg, transparent 0%, transparent 46%, white 46%, white 56%, transparent 56%, transparent 100%), -webkit-linear-gradient(45deg, transparent 0%, transparent 46%, white 46%, white 56%, transparent 56%, transparent 100%);
+  background-color: #605F61;
+  box-shadow: 0px 0px 5px 2px rgba(0, 0, 0, 0.5);
+  transition: all 0.3s ease;
+}
+
+h3 {
+  /*background: #0076D1;
+  color: #fff;*/
+  margin: 0;
+  padding: 10px;
+  border-radius: 3px 3px 0 0;
+  font-weight: 700;
+  /*margin-top: -15px;*/
+}
+
+body,
+html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  font-family: 'Open Sans', sans-serif;
+  color: red;
+}
+
+h1 {
+  margin: 0;
+  position: relative;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  text-align: center;
+  font-size: 40px;
+}
+
+.map-overlay-legend {
+  position: absolute;
+  opacity: 0.8;
+  top: 30;
+  right: 0;
+  background: #fff;
+  margin-right: 20px;
+  overflow: auto;
+  border-radius: 3px;
+  width: 300px;
+  padding: 10px;
+  font: 400 12px/22px 'Source Sans Pro', 'Helvetica Neue', sans-serif;
+  transition: transform .5s ease-in-out;
+}
+
+.mapboxgl-popup {
+  padding-bottom: 10px;
+  opacity: 0.8;
+  width: 500px;
+}
+
+.mapboxgl-popup-content {
+  padding-bottom: 10px;
+  opacity: 0.8;
+  width: fit-content;
+}
+
+.marker {
+  border: none;
+  cursor: pointer;
+  height: 56px;
+  width: 56px;
+  background-image: url(../images/alert.png);
+}
+
+.blinking {
+  -webkit-animation: blink .5s ease-in-out infinite alternate;
+  -moz-animation: blink .5s ease-in-out infinite alternate;
+  animation: blink .5s ease-in-out infinite alternate;
+}
+
+@-webkit-keyframes blink {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@-moz-keyframes blink {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes blink {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+a.replay {
+  color: blue;
+  text-decoration: underline;
+  cursor: pointer;
+  font: 400 18px 'Source Sans Pro', 'Helvetica Neue', sans-serif;
+}
+
+
+.legend {
+  position: absolute;
+  bottom: 120px;
+  right: 40px;
+  background: black;
+  padding: 10px;
+  border-radius: 5px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+  width: 50%;
+  opacity: 0.8;
+}
+
+.legend-title {
+  font-size: 14px;
+  text-align: center;
+  margin-bottom: 5px;
+  color: #000000;
+}
+
+.legend-scale {
+  text-align: center;
+}
+
+.legend-bar {
+  position: relative;
+  height: 30px;
+  background: linear-gradient(to right,
+      rgba(80, 74, 154, 1),
+      rgba(84, 172, 162, 1),
+      rgba(193, 228, 148, 1),
+      rgba(252, 244, 162, 1),
+      rgba(251, 166, 91, 1),
+      rgba(216, 66, 65, 1),
+      rgba(143, 3, 58, 1));
+  border: 1px solid #999;
+  border-radius: 3px;
+  margin-bottom: 5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 5px;
+}
+
+.label {
+  font-size: 12px;
+  color: #fff;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.hidden {
+  display: none;
+}
+
+.map-overlay-bottom {
+  position: absolute;
+  bottom: 30px;
+  right: 20px;
+  left: 20px;
+  background-color: black;
+  color: white;
+  opacity: 0.8;
+  margin-right: 20px;
+  font-family: Arial, sans-serif;
+  overflow: auto;
+  border-radius: 3px;
+  padding: 10px;
+  height: 80px;
+}
+.slider {
+  position: relative;
+  top: 20px;
+  width: 100%;
+}
+.time {
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+  width: 100%;
+  top: 10px;
+}
+.time span {
+  font-size: 11px;
+  text-align: center;
+}
+
+#active-datetime {
+  font-size: 14px;
+  width: 100%;
+  position: relative;
+}
+
+button {
+  height: 14px;
+  padding: 0 10px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+
+    .layer-controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 1;
+      max-width: 250px;
+    }
+
+    .layer-controls h3 {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .layer-toggle {
+      display: flex;
+      align-items: center;
+      margin: 8px 0;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .layer-toggle input[type="checkbox"] {
+      margin-right: 8px;
+      cursor: pointer;
+    }
+
+    .layer-toggle label {
+      cursor: pointer;
+      font-size: 13px;
+      color: #444;
+      flex: 1;
+    }
+
+    .layer-color {
+      width: 20px;
+      height: 3px;
+      margin-left: 8px;
+      border-radius: 2px;
+    }
+
+    .layer-color.circle {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .info-box {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: white;
+      padding: 12px 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 1;
+      max-width: 300px;
+    }
+
+    .info-box h2 {
+      margin: 0 0 5px 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .info-box p {
+      margin: 0;
+      font-size: 12px;
+      color: #666;
+      line-height: 1.4;
+    }
+
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+      z-index: 1000;
+      font-size: 14px;
+      color: #333;
+    }
+
+    .zoom-indicator {
+      position: absolute;
+      bottom: 30px;
+      right: 50px;
+      background: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 1;
+      font-size: 12px;
+      color: #666;
+      font-weight: 600;
+    }
+
+    .zoom-warning {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 107, 107, 0.95);
+      color: white;
+      padding: 15px 25px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 1000;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: center;
+      display: none;
+      max-width: 300px;
+    }
+
+    .zoom-warning.visible {
+      display: block;
+    }
+
+    .load-controls {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: white;
+      padding: 12px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 1;
+      width: 180px;
+    }
+
+    .load-controls h3 {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .load-controls button {
+      width: 100%;
+      padding: 12px 10px;
+      margin: 5px 0;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: white;
+      line-height: 1.4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+    }
+
+    .load-controls button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+
+    .load-controls button:active {
+      transform: translateY(0);
+    }
+
+    .load-controls button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    #load-center {
+      background: #4A90E2;
+    }
+
+    #load-center:hover:not(:disabled) {
+      background: #357ABD;
+    }
+
+    #load-visible {
+      background: #50C878;
+    }
+
+    #load-visible:hover:not(:disabled) {
+      background: #3DA965;
+    }
+
+    #clear-all {
+      background: #FF6B6B;
+    }
+
+    #clear-all:hover:not(:disabled) {
+      background: #E05555;
+    }
+
+    #toggle-auto-load {
+      background: #7B68EE;
+    }
+
+    #toggle-auto-load:hover:not(:disabled) {
+      background: #6A54D9;
+    }
+
+    #toggle-auto-load.active {
+      background: #28a745;
+    }
+
+    #toggle-auto-load.active:hover:not(:disabled) {
+      background: #218838;
+    }
+
+    .status-text {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #e0e0e0;
+      font-size: 12px;
+      color: #666;
+      text-align: center;
+    }
+
+    .status-text.loading {
+      color: #4A90E2;
+      font-weight: 600;
+    }
+
+    .status-text.error {
+      color: #FF6B6B;
+      font-weight: 600;
+    }
+
+    .status-text.success {
+      color: #50C878;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div id="map" class="map"></div>
+
+  <div class="info-box">
+    <h2>Autopilot Map API</h2>
+    <p>Premium lane-level navigation data for autonomous driving applications</p>
+  </div>
+
+  <div class="load-controls">
+    <h3>Load Controls</h3>
+    <button id="load-center">Load Center Tile</button>
+    <button id="load-visible">Load Visible Tiles</button>
+    <button id="clear-all">Clear All Data</button>
+    <button id="toggle-auto-load" class="active">Auto-Load: ON</button>
+    <div id="status-text" class="status-text">Ready</div>
+  </div>
+
+  <div class="layer-controls">
+    <h3>Layer Controls</h3>
+    <div class="layer-toggle">
+      <input type="checkbox" id="toggle-lanes" checked="" />
+      <label for="toggle-lanes">Lanes</label>
+      <div class="layer-color" style="background: linear-gradient(to right, #FFFFFF 50%, #FFD700 50%); border: 1px solid #ccc;"></div>
+    </div>
+    <div class="layer-toggle">
+      <input type="checkbox" id="toggle-groups" checked="" />
+      <label for="toggle-groups">Lane Groups</label>
+      <div class="layer-color" style="background: #7B68EE;"></div>
+    </div>
+    <div class="layer-toggle">
+      <input type="checkbox" id="toggle-coverage" checked="" />
+      <label for="toggle-coverage">Coverage</label>
+      <div class="layer-color" style="background: rgba(74, 144, 226, 0.4); border: 1px solid #4A90E2;"></div>
+    </div>
+    <div class="layer-toggle">
+      <input type="checkbox" id="toggle-markup-lines" checked="" />
+      <label for="toggle-markup-lines">Markup Lines</label>
+      <div class="layer-color" style="background: #FF6B6B;"></div>
+    </div>
+    <div class="layer-toggle">
+      <input type="checkbox" id="toggle-markup-points" checked="" />
+      <label for="toggle-markup-points">Markup Points</label>
+      <div class="layer-color circle" style="background: #FF8C00;"></div>
+    </div>
+    <div class="layer-toggle">
+      <input type="checkbox" id="toggle-markup-polygons" checked="" />
+      <label for="toggle-markup-polygons">Markup Polygons</label>
+      <div class="layer-color" style="background: rgba(255, 107, 107, 0.5); border: 1px solid #FF6B6B;"></div>
+    </div>
+    <div class="layer-toggle">
+      <input type="checkbox" id="toggle-road-islands" checked="" />
+      <label for="toggle-road-islands">Road Islands</label>
+      <div class="layer-color" style="background: rgba(80, 200, 120, 0.5); border: 1px solid #50C878;"></div>
+    </div>
+  </div>
+
+  <div class="zoom-indicator" id="zoom-indicator">Zoom: 16</div>
+  <div class="zoom-warning" id="zoom-warning">
+    Zoom in to level 14 or higher to load lane-level data
+  </div>
+
+</body>
+<script>
+  // Autopilot Map API Demo with Dynamic Tile Loading
+// Display lane-level navigation data with multiple layers
+
+// Use secret token with tilesets:read scope for Autopilot API
+const AUTOPILOT_TOKEN = 'sk.REDACTED-autopilot-secret-TOKEN';
+
+// Initialize map centered on Tokyo
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/dark-v11',
+  center: [139.7670, 35.6812],
+  zoom: 16,
+  pitch: 0,
+  bearing: 0
+});
+
+// Add navigation controls
+map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+
+// Tile cache to avoid re-fetching (with success/error status)
+const tileCache = {
+  lanes: new Map(),
+  groups: new Map(),
+  coverage: new Map(),
+  'markup-lines': new Map(),
+  'markup-points': new Map(),
+  'markup-polygons': new Map(),
+  'road-islands': new Map()
+};
+
+// Track which tiles have been loaded to the map (to avoid duplicate rendering)
+const loadedTiles = {
+  lanes: new Set(),
+  groups: new Set(),
+  coverage: new Set(),
+  'markup-lines': new Set(),
+  'markup-points': new Set(),
+  'markup-polygons': new Set(),
+  'road-islands': new Set()
+};
+
+// Track failed tiles (with retry capability)
+const failedTiles = {
+  lanes: new Map(),
+  groups: new Map(),
+  coverage: new Map(),
+  'markup-lines': new Map(),
+  'markup-points': new Map(),
+  'markup-polygons': new Map(),
+  'road-islands': new Map()
+};
+
+// Auto-load state
+let autoLoadEnabled = true;
+
+// Loading state
+let isLoading = false;
+
+// Get tile coordinates for a given point and zoom
+function pointToTile(lng, lat, zoom) {
+  const z = Math.floor(zoom);
+  const x = Math.floor((lng + 180) / 360 * Math.pow(2, z));
+  const y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z));
+  return { z, x, y };
+}
+
+// Get all tiles in current viewport
+function getVisibleTiles(bounds, zoom) {
+  const z = Math.floor(zoom);
+  const nw = pointToTile(bounds.getWest(), bounds.getNorth(), z);
+  const se = pointToTile(bounds.getEast(), bounds.getSouth(), z);
+
+  const tiles = [];
+  for (let x = Math.max(0, nw.x); x <= se.x; x++) {
+    for (let y = Math.max(0, nw.y); y <= se.y; y++) {
+      tiles.push({ z, x, y });
+    }
+  }
+  return tiles;
+}
+
+// Fetch Autopilot data for a tile with retry support
+async function fetchTileData(layer, tile, forceRetry = false) {
+  const tileKey = `${tile.z}/${tile.x}/${tile.y}`;
+
+  // Check cache (unless force retry)
+  if (!forceRetry && tileCache[layer].has(tileKey)) {
+    return tileCache[layer].get(tileKey);
+  }
+
+  // Check if this tile has failed before (unless force retry)
+  if (!forceRetry && failedTiles[layer].has(tileKey)) {
+    const failInfo = failedTiles[layer].get(tileKey);
+    // Don't retry failed tiles immediately (wait at least 30 seconds)
+    if (Date.now() - failInfo.timestamp < 30000) {
+      return { type: 'FeatureCollection', features: [] };
+    }
+  }
+
+  // Convert hyphenated layer names to underscored for API endpoint
+  const apiLayer = layer.replace(/-/g, '_');
+  const url = `https://api.mapbox.com/dataservices-tiles/v1/autopilot/${apiLayer}/${tile.z}/${tile.x}/${tile.y}.geojson?access_token=${AUTOPILOT_TOKEN}`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      if (response.status === 404) {
+        // 404s are expected - not all tiles have data for all layers
+        // Silently cache as empty and return
+        const empty = { type: 'FeatureCollection', features: [] };
+        tileCache[layer].set(tileKey, empty);
+        // Remove from failed tiles if it was there
+        failedTiles[layer].delete(tileKey);
+        return empty;
+      }
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    tileCache[layer].set(tileKey, data);
+    // Remove from failed tiles on success
+    failedTiles[layer].delete(tileKey);
+    return data;
+  } catch (error) {
+    // Log non-404 errors
+    console.error(`Error fetching ${layer} tile ${tileKey}:`, error);
+
+    // Track failed tile
+    failedTiles[layer].set(tileKey, {
+      error: error.message,
+      timestamp: Date.now()
+    });
+
+    const empty = { type: 'FeatureCollection', features: [] };
+    return empty;
+  }
+}
+
+// Update status display
+function updateStatus(message, type = 'normal') {
+  const statusEl = document.getElementById('status-text');
+  if (statusEl) {
+    statusEl.textContent = message;
+    statusEl.className = 'status-text';
+    if (type === 'loading') statusEl.classList.add('loading');
+    if (type === 'error') statusEl.classList.add('error');
+    if (type === 'success') statusEl.classList.add('success');
+  }
+}
+
+// Load tiles for all layers
+async function loadVisibleTiles(forceRetry = false) {
+  if (isLoading) {
+    updateStatus('Already loading...', 'loading');
+    return;
+  }
+
+  const bounds = map.getBounds();
+  const zoom = map.getZoom();
+
+  // Only load at zoom 14+
+  if (zoom < 14) {
+    updateStatus('Zoom in to level 14+', 'normal');
+    return;
+  }
+
+  isLoading = true;
+  updateStatus('Loading tiles...', 'loading');
+
+  // Always fetch tiles at zoom 14 (where Autopilot data is available)
+  const tileZoom = 14;
+  const tiles = getVisibleTiles(bounds, tileZoom);
+  const layers = ['lanes', 'groups', 'coverage', 'markup-lines', 'markup-points', 'markup-polygons', 'road-islands'];
+
+  let totalLoaded = 0;
+  let totalFailed = 0;
+
+  try {
+    for (const layer of layers) {
+      const source = map.getSource(`${layer}-source`);
+      if (!source) continue;
+
+      // Get current features from source
+      const currentData = source._data || { type: 'FeatureCollection', features: [] };
+      const newFeatures = [...currentData.features];
+
+      // Only fetch tiles that haven't been loaded yet (or force retry)
+      for (const tile of tiles) {
+        const tileKey = `${tile.z}/${tile.x}/${tile.y}`;
+
+        // Skip if already loaded to map (unless force retry)
+        if (!forceRetry && loadedTiles[layer].has(tileKey)) continue;
+
+        const data = await fetchTileData(layer, tile, forceRetry);
+        if (data.features && data.features.length > 0) {
+          // Remove old features from this tile if retrying
+          if (forceRetry && loadedTiles[layer].has(tileKey)) {
+            // Filter out features from this tile (can't easily identify, so keep all)
+          }
+          newFeatures.push(...data.features);
+          loadedTiles[layer].add(tileKey);
+          totalLoaded++;
+        } else {
+          // Mark empty tiles as loaded too to avoid re-checking
+          loadedTiles[layer].add(tileKey);
+          if (failedTiles[layer].has(tileKey)) {
+            totalFailed++;
+          }
+        }
+      }
+
+      // Update source with accumulated features
+      source.setData({
+        type: 'FeatureCollection',
+        features: newFeatures
+      });
+    }
+
+    // Count total loaded tiles across all layers
+    const totalTileCount = Object.values(loadedTiles).reduce((sum, set) => sum + set.size, 0);
+
+    if (totalFailed > 0) {
+      updateStatus(`Loaded ${totalTileCount} tiles (${totalFailed} errors)`, 'error');
+    } else {
+      updateStatus(`Loaded ${totalTileCount} tiles`, 'success');
+    }
+  } catch (error) {
+    console.error('Error loading tiles:', error);
+    updateStatus('Error loading tiles', 'error');
+  } finally {
+    isLoading = false;
+  }
+}
+
+// Load just the center tile
+async function loadCenterTile() {
+  if (isLoading) {
+    updateStatus('Already loading...', 'loading');
+    return;
+  }
+
+  const zoom = map.getZoom();
+
+  // Only load at zoom 14+
+  if (zoom < 14) {
+    updateStatus('Zoom in to level 14+', 'normal');
+    return;
+  }
+
+  isLoading = true;
+  updateStatus('Loading center tile...', 'loading');
+
+  const center = map.getCenter();
+  const tileZoom = 14;
+  const tile = pointToTile(center.lng, center.lat, tileZoom);
+  const layers = ['lanes', 'groups', 'coverage', 'markup-lines', 'markup-points', 'markup-polygons', 'road-islands'];
+
+  let totalLoaded = 0;
+  let totalFailed = 0;
+
+  try {
+    for (const layer of layers) {
+      const source = map.getSource(`${layer}-source`);
+      if (!source) continue;
+
+      const currentData = source._data || { type: 'FeatureCollection', features: [] };
+      const newFeatures = [...currentData.features];
+
+      const tileKey = `${tile.z}/${tile.x}/${tile.y}`;
+
+      // Always load center tile (force retry)
+      const data = await fetchTileData(layer, tile, true);
+      if (data.features && data.features.length > 0) {
+        newFeatures.push(...data.features);
+        loadedTiles[layer].add(tileKey);
+        totalLoaded++;
+      } else {
+        loadedTiles[layer].add(tileKey);
+        if (failedTiles[layer].has(tileKey)) {
+          totalFailed++;
+        }
+      }
+
+      source.setData({
+        type: 'FeatureCollection',
+        features: newFeatures
+      });
+    }
+
+    const totalTileCount = Object.values(loadedTiles).reduce((sum, set) => sum + set.size, 0);
+
+    if (totalFailed > 0) {
+      updateStatus(`Loaded ${totalTileCount} tiles (${totalFailed} errors)`, 'error');
+    } else {
+      updateStatus(`Loaded ${totalTileCount} tiles`, 'success');
+    }
+  } catch (error) {
+    console.error('Error loading center tile:', error);
+    updateStatus('Error loading tile', 'error');
+  } finally {
+    isLoading = false;
+  }
+}
+
+// Clear all loaded data and caches
+function clearAllData() {
+  if (isLoading) {
+    updateStatus('Cannot clear while loading', 'error');
+    return;
+  }
+
+  const layers = ['lanes', 'groups', 'coverage', 'markup-lines', 'markup-points', 'markup-polygons', 'road-islands'];
+
+  // Clear all caches
+  layers.forEach(layer => {
+    tileCache[layer].clear();
+    loadedTiles[layer].clear();
+    failedTiles[layer].clear();
+
+    // Clear map source
+    const source = map.getSource(`${layer}-source`);
+    if (source) {
+      source.setData({ type: 'FeatureCollection', features: [] });
+    }
+  });
+
+  updateStatus('Cleared all data', 'success');
+  console.log('All data cleared. You can now reload tiles.');
+}
+
+// Add layers to map
+map.on('load', async () => {
+  // Initialize empty sources for all layers
+  const layers = ['lanes', 'groups', 'coverage', 'markup-lines', 'markup-points', 'markup-polygons', 'road-islands'];
+  layers.forEach(layer => {
+    map.addSource(`${layer}-source`, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] }
+    });
+  });
+
+  // Add lanes layer with markup color
+  map.addLayer({
+    id: 'lanes',
+    type: 'line',
+    source: 'lanes-source',
+    layout: {
+      'line-join': 'round',
+      'line-cap': 'round'
+    },
+    paint: {
+      // Color by markup color (white/yellow lane markings)
+      'line-color': [
+        'match',
+        ['get', 'markupColor'],
+        'white', '#FFFFFF',
+        'yellow', '#FFD700',
+        '#888888'
+      ],
+      'line-width': 2,
+      'line-opacity': 0.9
+    }
+  });
+
+  // Add lane groups layer
+  map.addLayer({
+    id: 'groups',
+    type: 'line',
+    source: 'groups-source',
+    layout: {
+      'line-join': 'round',
+      'line-cap': 'round'
+    },
+    paint: {
+      'line-color': '#7B68EE',
+      'line-width': 3,
+      'line-opacity': 0.7
+    }
+  });
+
+  // Add coverage layer (polygon)
+  map.addLayer({
+    id: 'coverage',
+    type: 'fill',
+    source: 'coverage-source',
+    paint: {
+      'fill-color': '#4A90E2',
+      'fill-opacity': 0.2,
+      'fill-outline-color': '#4A90E2'
+    }
+  });
+
+  // Add markup lines layer (stoplines, crossings)
+  map.addLayer({
+    id: 'markup-lines',
+    type: 'line',
+    source: 'markup-lines-source',
+    layout: {
+      'line-join': 'round',
+      'line-cap': 'butt'
+    },
+    paint: {
+      'line-color': '#FF6B6B',
+      'line-width': 3,
+      'line-opacity': 0.9
+    }
+  });
+
+  // Add markup points layer
+  map.addLayer({
+    id: 'markup-points',
+    type: 'circle',
+    source: 'markup-points-source',
+    paint: {
+      'circle-radius': 6,
+      'circle-color': '#FF8C00',
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#FFFFFF',
+      'circle-opacity': 0.9
+    }
+  });
+
+  // Add markup polygons layer
+  map.addLayer({
+    id: 'markup-polygons',
+    type: 'fill',
+    source: 'markup-polygons-source',
+    paint: {
+      'fill-color': '#FF6B6B',
+      'fill-opacity': 0.4,
+      'fill-outline-color': '#FF6B6B'
+    }
+  });
+
+  // Add road islands layer (plural - polygon)
+  map.addLayer({
+    id: 'road-islands',
+    type: 'fill',
+    source: 'road-islands-source',
+    paint: {
+      'fill-color': '#50C878',
+      'fill-opacity': 0.4,
+      'fill-outline-color': '#50C878'
+    }
+  });
+
+  // Add click handlers for feature inspection
+  const clickableLayers = ['lanes', 'groups', 'coverage', 'markup-lines', 'markup-points', 'markup-polygons', 'road-islands'];
+
+  clickableLayers.forEach(layerId => {
+    map.on('click', layerId, (e) => {
+      const features = e.features;
+      if (features.length > 0) {
+        const feature = features[0];
+        const properties = feature.properties;
+
+        let html = `<strong>Layer:</strong> ${layerId}<br>`;
+
+        // Display relevant properties
+        Object.keys(properties).forEach(key => {
+          if (key !== 'layer' && properties[key] !== null && properties[key] !== undefined) {
+            html += `<strong>${key}:</strong> ${properties[key]}<br>`;
+          }
+        });
+
+        new mapboxgl.Popup()
+          .setLngLat(e.lngLat)
+          .setHTML(html)
+          .addTo(map);
+      }
+    });
+
+    // Change cursor on hover
+    map.on('mouseenter', layerId, () => {
+      map.getCanvas().style.cursor = 'pointer';
+    });
+
+    map.on('mouseleave', layerId, () => {
+      map.getCanvas().style.cursor = '';
+    });
+  });
+
+  // Setup layer toggle controls
+  setupLayerToggles();
+
+  // Setup load controls
+  setupLoadControls();
+
+  // Load initial tiles
+  loadVisibleTiles();
+});
+
+// Reload tiles when map moves or zooms (only if auto-load is enabled)
+map.on('moveend', () => {
+  if (autoLoadEnabled) {
+    loadVisibleTiles();
+  }
+});
+
+map.on('zoomend', () => {
+  if (autoLoadEnabled) {
+    loadVisibleTiles();
+  }
+});
+
+// Update zoom indicator and warning
+function updateZoomIndicator() {
+  const zoom = map.getZoom();
+  const zoomIndicator = document.getElementById('zoom-indicator');
+  const zoomWarning = document.getElementById('zoom-warning');
+
+  if (zoomIndicator) {
+    zoomIndicator.textContent = `Zoom: ${zoom.toFixed(1)}`;
+  }
+
+  if (zoomWarning) {
+    if (zoom < 14) {
+      zoomWarning.classList.add('visible');
+    } else {
+      zoomWarning.classList.remove('visible');
+    }
+  }
+}
+
+// Update on zoom changes
+map.on('zoom', updateZoomIndicator);
+
+// Initialize zoom indicator
+map.on('load', () => {
+  updateZoomIndicator();
+});
+
+// Function to setup layer toggle controls
+function setupLayerToggles() {
+  const toggles = {
+    'toggle-lanes': 'lanes',
+    'toggle-groups': 'groups',
+    'toggle-coverage': 'coverage',
+    'toggle-markup-lines': 'markup-lines',
+    'toggle-markup-points': 'markup-points',
+    'toggle-markup-polygons': 'markup-polygons',
+    'toggle-road-islands': 'road-islands'
+  };
+
+  Object.keys(toggles).forEach(toggleId => {
+    const checkbox = document.getElementById(toggleId);
+    const layerId = toggles[toggleId];
+
+    checkbox.addEventListener('change', function() {
+      const visibility = this.checked ? 'visible' : 'none';
+      map.setLayoutProperty(layerId, 'visibility', visibility);
+    });
+  });
+}
+
+// Function to setup load controls
+function setupLoadControls() {
+  const loadCenterBtn = document.getElementById('load-center');
+  const loadVisibleBtn = document.getElementById('load-visible');
+  const clearAllBtn = document.getElementById('clear-all');
+  const toggleAutoLoadBtn = document.getElementById('toggle-auto-load');
+
+  // Load center tile button
+  if (loadCenterBtn) {
+    loadCenterBtn.addEventListener('click', () => {
+      loadCenterTile();
+    });
+  }
+
+  // Load visible tiles button
+  if (loadVisibleBtn) {
+    loadVisibleBtn.addEventListener('click', () => {
+      loadVisibleTiles(true); // Force retry
+    });
+  }
+
+  // Clear all data button
+  if (clearAllBtn) {
+    clearAllBtn.addEventListener('click', () => {
+      if (confirm('Clear all loaded data? This will remove all features from the map.')) {
+        clearAllData();
+      }
+    });
+  }
+
+  // Toggle auto-load button
+  if (toggleAutoLoadBtn) {
+    toggleAutoLoadBtn.addEventListener('click', function() {
+      autoLoadEnabled = !autoLoadEnabled;
+      this.textContent = autoLoadEnabled ? 'Auto-Load: ON' : 'Auto-Load: OFF';
+      this.classList.toggle('active', autoLoadEnabled);
+
+      if (autoLoadEnabled) {
+        updateStatus('Auto-load enabled', 'success');
+        // Immediately load visible tiles
+        loadVisibleTiles();
+      } else {
+        updateStatus('Auto-load disabled', 'normal');
+      }
+    });
+  }
+
+  // Disable buttons while loading
+  const updateButtonStates = () => {
+    if (loadCenterBtn) loadCenterBtn.disabled = isLoading;
+    if (loadVisibleBtn) loadVisibleBtn.disabled = isLoading;
+    if (clearAllBtn) clearAllBtn.disabled = isLoading;
+  };
+
+  // Update button states periodically
+  setInterval(updateButtonStates, 100);
+}
+
+// Add map error handling (only log critical errors)
+map.on('error', (e) => {
+  // Ignore style validation errors which are common during layer initialization
+  if (e.error && e.error.message && !e.error.message.includes('layer')) {
+    console.error('Map error:', e);
+  }
+});
+
+</script>
+</html>

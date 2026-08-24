@@ -1,0 +1,751 @@
+<p>&lt;!DOCTYPE html&gt;</p>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-language/v1.0.0/mapbox-gl-language.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/d3@7.8.5/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.min.js"></script>
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.css" type="text/css" />
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<script src="https://kenji-shima.github.io/resource-files/polyline.js" type="module"></script>
+<script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
+  <title>NOTAM Proximity Demo</title>
+  <meta name="description" content="Concept demo: plotting NOTAMs and flight routes, and flagging routes that pass within a configurable distance of a NOTAM." />
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: rgba(19, 26, 36, 0.94);
+      --panel-border: rgba(255, 255, 255, 0.08);
+      --text: #e6edf3;
+      --muted: #8b96a5;
+      --accent: #4fa3ff;
+      --ok: #3ecf8e;
+      --warn: #f0b429;
+      --bad: #f0553f;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      --mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      background: var(--bg);
+      font-family: var(--font);
+      color: var(--text);
+    }
+
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    .panel {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      bottom: 40px;
+      z-index: 2;
+      width: 340px;
+      overflow-y: auto;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(6px);
+    }
+
+    .panel-section {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--panel-border);
+    }
+
+    .panel-section:last-child {
+      border-bottom: none;
+    }
+
+    /* Header + alert threshold stay pinned to the top of the panel while
+       the rest (routes, NOTAMs, disclaimer) scrolls underneath them. */
+    .panel-sticky-top {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: var(--panel);
+    }
+
+    /* The routes list gets its own bounded, independently-scrollable box
+       (there can be many more routes than fit comfortably) instead of
+       forcing the whole panel to grow with the network size. */
+    .scroll-list {
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .panel h1 {
+      font-size: 15px;
+      margin: 0 0 4px 0;
+    }
+
+    .panel .subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+      margin: 0;
+    }
+
+    .panel h2 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin: 0 0 10px 0;
+    }
+
+    .threshold-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .threshold-row input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent);
+      touch-action: none;
+    }
+
+    .threshold-value {
+      font-family: var(--mono);
+      font-size: 12px;
+      min-width: 52px;
+      text-align: right;
+      color: var(--accent);
+    }
+
+    .list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 7px 0;
+      font-size: 12.5px;
+      cursor: pointer;
+    }
+
+    .list-item + .list-item {
+      border-top: 1px dashed var(--panel-border);
+    }
+
+    .list-item .label {
+      color: var(--text);
+    }
+
+    .list-item .detail {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .badge {
+      flex-shrink: 0;
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      white-space: nowrap;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .badge.clear { background: rgba(62, 207, 142, 0.15); color: var(--ok); }
+    .badge.alert { background: rgba(240, 180, 41, 0.18); color: var(--warn); }
+    .badge.inside { background: rgba(240, 85, 63, 0.2); color: var(--bad); }
+
+    .disclaimer {
+      font-size: 10.5px;
+      color: var(--muted);
+      line-height: 1.5;
+      font-style: italic;
+    }
+
+    .legend {
+      position: absolute;
+      bottom: 40px;
+      right: 16px;
+      z-index: 2;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 11px;
+      color: var(--muted);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .legend div {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 4px 0;
+    }
+
+    .swatch {
+      width: 14px;
+      height: 3px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .mapboxgl-popup-content {
+      background: var(--panel);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 12.5px;
+      border-radius: 6px;
+      padding: 12px 14px;
+    }
+
+    .mapboxgl-popup-content h3 {
+      margin: 0 0 6px 0;
+      font-size: 13px;
+    }
+
+    .mapboxgl-popup-content .popup-detail {
+      color: var(--muted);
+      font-size: 11.5px;
+      margin: 2px 0;
+    }
+
+    .mapboxgl-popup-tip {
+      border-top-color: var(--panel) !important;
+      border-bottom-color: var(--panel) !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <div class="panel">
+    <div class="panel-sticky-top">
+      <div class="panel-section">
+        <h1>NOTAM Proximity Demo</h1>
+        <p class="subtitle">Plot NOTAMs, plot routes, and flag any route within a configurable distance of a NOTAM.</p>
+      </div>
+
+      <div class="panel-section">
+        <h2>Alert threshold</h2>
+        <div class="threshold-row">
+          <input type="range" id="threshold-slider" min="0" max="100" step="5" value="40" />
+          <span class="threshold-value" id="threshold-value">40 nm</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h2>Routes</h2>
+      <div id="route-list" class="scroll-list"></div>
+    </div>
+
+    <div class="panel-section">
+      <h2>NOTAMs</h2>
+      <div id="notam-list" class="scroll-list"></div>
+    </div>
+
+    <div class="panel-section">
+      <p class="disclaimer">Sample data for illustration only &mdash; not a live NOTAM feed. A production build would ingest live NOTAMs (e.g. an ICAO/FAA feed) and real flight-plan waypoints in place of the routes and NOTAMs below.</p>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div><span class="swatch" style="background:#3ecf8e"></span> Route clear</div>
+    <div><span class="swatch" style="background:#f0b429"></span> Within alert threshold</div>
+    <div><span class="swatch" style="background:#f0553f"></span> Route crosses NOTAM area</div>
+    <div><span class="dot" style="background:rgba(79,163,255,0.5); border:1px solid #4fa3ff"></span> NOTAM threshold ring</div>
+  </div>
+
+  <script>
+    // mapboxgl.accessToken is set by utils.js (loaded in common_head.html).
+    // turf is loaded globally in common_head.html.
+
+    const COLOR_CLEAR = '#3ecf8e';
+    const COLOR_ALERT = '#f0b429';
+    const COLOR_INSIDE = '#f0553f';
+
+    // --- Sample data -----------------------------------------------------
+    // Illustrative only: fictional NOTAMs placed near a handful of
+    // Singapore-hub routes, not sourced from any live NOTAM feed.
+
+    const SIN = [103.9915, 1.3644];
+
+    const ROUTES = [
+      { id: 'SIN-BKK', name: 'Singapore → Bangkok', from: SIN, to: [100.7501, 13.6900] },
+      { id: 'SIN-MNL', name: 'Singapore → Manila', from: SIN, to: [121.0198, 14.5086] },
+      { id: 'SIN-DPS', name: 'Singapore → Denpasar (Bali)', from: SIN, to: [115.1667, -8.7482] },
+      { id: 'SIN-HAN', name: 'Singapore → Hanoi', from: SIN, to: [105.8019, 21.2212] },
+      { id: 'SIN-NRT', name: 'Singapore → Tokyo (Narita)', from: SIN, to: [140.3929, 35.7647] },
+      { id: 'SIN-CGK', name: 'Singapore → Jakarta', from: SIN, to: [106.6559, -6.1256] },
+      { id: 'SIN-KUL', name: 'Singapore → Kuala Lumpur', from: SIN, to: [101.7099, 2.7456] },
+      { id: 'SIN-SGN', name: 'Singapore → Ho Chi Minh City', from: SIN, to: [106.6520, 10.8188] },
+      { id: 'SIN-TPE', name: 'Singapore → Taipei', from: SIN, to: [121.2325, 25.0777] },
+      { id: 'SIN-CAN', name: 'Singapore → Guangzhou', from: SIN, to: [113.2988, 23.3924] },
+      { id: 'SIN-ICN', name: 'Singapore → Seoul (Incheon)', from: SIN, to: [126.4407, 37.4602] },
+      { id: 'SIN-MAA', name: 'Singapore → Chennai', from: SIN, to: [80.1709, 12.9941] },
+      { id: 'SIN-PER', name: 'Singapore → Perth', from: SIN, to: [115.9672, -31.9403] },
+      { id: 'SIN-ATH', name: 'Singapore → Athens', from: SIN, to: [23.9445, 37.9364] },
+      { id: 'SIN-JED', name: 'Singapore → Jeddah', from: SIN, to: [39.1565, 21.6796] }
+    ];
+
+    const NOTAMS = [
+      {
+        id: 'A101',
+        type: 'UAS (Drone) Activity',
+        desc: 'Unmanned aircraft operations reported below 3,000ft AGL.',
+        center: [102.0, 10.5],
+        radiusNm: 25,
+        altitude: 'SFC–3,000FT AGL',
+        valid: '2026-08-04 0000Z – 2026-08-11 2359Z'
+      },
+      {
+        id: 'A114',
+        type: 'Military Exercise',
+        desc: 'Airspace reserved for naval exercise; expect vectoring.',
+        center: [108.6, 15.0],
+        radiusNm: 45,
+        altitude: 'SFC–FL450',
+        valid: '2026-08-03 0600Z – 2026-08-06 1800Z'
+      },
+      {
+        id: 'B227',
+        type: 'Volcanic Ash Advisory',
+        desc: 'Ash plume reported near Mount Agung; monitor for updates.',
+        center: [115.5, -8.3],
+        radiusNm: 60,
+        altitude: 'FL000–FL350',
+        valid: '2026-08-05 0000Z – UFN'
+      },
+      {
+        id: 'C305',
+        type: 'Runway/Taxiway Closure',
+        desc: 'Taxiway Bravo closed for resurfacing; expect ground delays.',
+        center: [121.02, 14.51],
+        radiusNm: 8,
+        altitude: 'Surface',
+        valid: '2026-08-01 – 2026-09-01'
+      },
+      {
+        id: 'D410',
+        type: 'Temporary Flight Restriction',
+        desc: 'VIP movement TFR; not near any current routing.',
+        center: [133.0, -25.0],
+        radiusNm: 30,
+        altitude: 'SFC–FL200',
+        valid: '2026-08-06 0300Z – 2026-08-06 0900Z'
+      },
+      {
+        id: 'E512',
+        type: 'Military Exercise',
+        desc: 'Live-fire naval exercise in the Taiwan Strait; expect reroutes.',
+        center: [119.9, 24.4],
+        radiusNm: 35,
+        altitude: 'SFC–FL410',
+        valid: '2026-08-07 0000Z – 2026-08-09 1200Z'
+      },
+      {
+        id: 'F618',
+        type: 'Temporary Restricted Area',
+        desc: 'Maritime exercise in the Red Sea restricting overflight.',
+        center: [39.0, 20.8],
+        radiusNm: 20,
+        altitude: 'SFC–FL250',
+        valid: '2026-08-08 0000Z – 2026-08-10 2359Z'
+      }
+    ];
+
+    // --- Precompute static route geometry ---------------------------------
+
+    const routeLines = ROUTES.map((route) => {
+      const line = turf.greatCircle(turf.point(route.from), turf.point(route.to), {
+        properties: {},
+        npoints: 100
+      });
+      // greatCircle can return a MultiLineString if the path crosses the
+      // antimeridian; none of these routes do, so this is always a single
+      // LineString in practice.
+      return { route, line };
+    });
+
+    // --- State -------------------------------------------------------------
+
+    let thresholdNm = 40;
+    let latest = null; // populated by render(): { routeStatus, notamStatus }
+
+    function nm(distanceKm) {
+      return distanceKm; // pointToLineDistance/nearestPointOnLine already return nm when asked
+    }
+
+    function computeState() {
+      const routeStatus = {}; // routeId -> { status, worstNotamId, worstDistance }
+      const notamStatus = {}; // notamId -> { status, nearestRouteId, nearestDistance, nearestPoint }
+
+      ROUTES.forEach((r) => { routeStatus[r.id] = { status: 'clear', worstNotamId: null, worstDistance: Infinity }; });
+      NOTAMS.forEach((n) => { notamStatus[n.id] = { status: 'clear', nearestRouteId: null, nearestDistance: Infinity, nearestPoint: null }; });
+
+      NOTAMS.forEach((notam) => {
+        const notamPoint = turf.point(notam.center);
+
+        routeLines.forEach(({ route, line }) => {
+          const distance = turf.pointToLineDistance(notamPoint, line, { units: 'nauticalmiles' });
+          const nearest = turf.nearestPointOnLine(line, notamPoint, { units: 'nauticalmiles' });
+
+          let status = 'clear';
+          if (distance <= notam.radiusNm) status = 'inside';
+          else if (distance <= thresholdNm) status = 'alert';
+
+          const severity = { clear: 0, alert: 1, inside: 2 };
+
+          if (severity[status] > severity[routeStatus[route.id].status]) {
+            routeStatus[route.id] = { status, worstNotamId: notam.id, worstDistance: distance };
+          }
+
+          if (distance < notamStatus[notam.id].nearestDistance) {
+            notamStatus[notam.id] = {
+              status,
+              nearestRouteId: route.id,
+              nearestDistance: distance,
+              nearestPoint: nearest.geometry.coordinates
+            };
+          } else if (severity[status] > severity[notamStatus[notam.id].status] && notamStatus[notam.id].nearestRouteId === route.id) {
+            notamStatus[notam.id].status = status;
+          }
+        });
+      });
+
+      return { routeStatus, notamStatus };
+    }
+
+    function buildRouteFeatures(routeStatus) {
+      return {
+        type: 'FeatureCollection',
+        features: routeLines.map(({ route, line }) => ({
+          type: 'Feature',
+          geometry: line.geometry,
+          properties: {
+            id: route.id,
+            name: route.name,
+            status: routeStatus[route.id].status
+          }
+        }))
+      };
+    }
+
+    function buildNotamFillFeatures(notamStatus) {
+      return {
+        type: 'FeatureCollection',
+        features: NOTAMS.map((notam) => {
+          const circle = turf.circle(notam.center, notam.radiusNm, { units: 'nauticalmiles', steps: 64 });
+          circle.properties = { id: notam.id, status: notamStatus[notam.id].status };
+          return circle;
+        })
+      };
+    }
+
+    function buildThresholdRingFeatures() {
+      if (thresholdNm <= 0) return { type: 'FeatureCollection', features: [] };
+      return {
+        type: 'FeatureCollection',
+        features: NOTAMS.map((notam) => {
+          const circle = turf.circle(notam.center, thresholdNm, { units: 'nauticalmiles', steps: 64 });
+          circle.properties = { id: notam.id };
+          return circle;
+        })
+      };
+    }
+
+    function buildNotamPointFeatures(notamStatus) {
+      return {
+        type: 'FeatureCollection',
+        features: NOTAMS.map((notam) => ({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: notam.center },
+          properties: { id: notam.id, status: notamStatus[notam.id].status }
+        }))
+      };
+    }
+
+    function buildConnectorFeatures(notamStatus) {
+      const lines = [];
+      const labels = [];
+
+      NOTAMS.forEach((notam) => {
+        const info = notamStatus[notam.id];
+        if (info.status === 'clear' || !info.nearestPoint) return;
+
+        lines.push({
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: [notam.center, info.nearestPoint] },
+          properties: { status: info.status }
+        });
+
+        const midpoint = turf.midpoint(turf.point(notam.center), turf.point(info.nearestPoint));
+        labels.push({
+          type: 'Feature',
+          geometry: midpoint.geometry,
+          properties: { label: `${info.nearestDistance.toFixed(0)} nm`, status: info.status }
+        });
+      });
+
+      return {
+        lines: { type: 'FeatureCollection', features: lines },
+        labels: { type: 'FeatureCollection', features: labels }
+      };
+    }
+
+    function statusLabel(status) {
+      if (status === 'inside') return 'Crosses NOTAM';
+      if (status === 'alert') return 'Within threshold';
+      return 'Clear';
+    }
+
+    function renderLists(routeStatus, notamStatus) {
+      const routeList = document.getElementById('route-list');
+      routeList.innerHTML = '';
+      ROUTES.forEach((route) => {
+        const info = routeStatus[route.id];
+        const item = document.createElement('div');
+        item.className = 'list-item';
+        const detail = info.worstNotamId
+          ? `Nearest: NOTAM ${info.worstNotamId} — ${info.worstDistance.toFixed(0)} nm`
+          : 'No nearby NOTAMs';
+        item.innerHTML = `
+          <span class="label">${route.name}<span class="detail">${detail}</span></span>
+          <span class="badge ${info.status}">${statusLabel(info.status)}</span>
+        `;
+        item.addEventListener('click', () => flyToRoute(route));
+        routeList.appendChild(item);
+      });
+
+      const notamList = document.getElementById('notam-list');
+      notamList.innerHTML = '';
+      NOTAMS.forEach((notam) => {
+        const info = notamStatus[notam.id];
+        const item = document.createElement('div');
+        item.className = 'list-item';
+        const nearestRoute = ROUTES.find((r) => r.id === info.nearestRouteId);
+        const detail = nearestRoute
+          ? `Nearest route: ${nearestRoute.name} — ${info.nearestDistance.toFixed(0)} nm`
+          : '';
+        item.innerHTML = `
+          <span class="label">${notam.id} — ${notam.type}<span class="detail">${detail}</span></span>
+          <span class="badge ${info.status}">${statusLabel(info.status)}</span>
+        `;
+        item.addEventListener('click', () => flyToNotam(notam));
+        notamList.appendChild(item);
+      });
+    }
+
+    function render() {
+      const { routeStatus, notamStatus } = computeState();
+      latest = { routeStatus, notamStatus };
+
+      if (map.getSource('routes')) map.getSource('routes').setData(buildRouteFeatures(routeStatus));
+      if (map.getSource('notam-fills')) map.getSource('notam-fills').setData(buildNotamFillFeatures(notamStatus));
+      if (map.getSource('notam-threshold-rings')) map.getSource('notam-threshold-rings').setData(buildThresholdRingFeatures());
+      if (map.getSource('notam-points')) map.getSource('notam-points').setData(buildNotamPointFeatures(notamStatus));
+
+      const { lines, labels } = buildConnectorFeatures(notamStatus);
+      if (map.getSource('connectors')) map.getSource('connectors').setData(lines);
+      if (map.getSource('connector-labels')) map.getSource('connector-labels').setData(labels);
+
+      renderLists(routeStatus, notamStatus);
+    }
+
+    function flyToRoute(route) {
+      const bounds = new mapboxgl.LngLatBounds(route.from, route.from);
+      bounds.extend(route.to);
+      map.fitBounds(bounds, { padding: 100, duration: 1000 });
+    }
+
+    function flyToNotam(notam) {
+      map.flyTo({ center: notam.center, zoom: 5, duration: 1000 });
+      new mapboxgl.Popup({ offset: 12 })
+        .setLngLat(notam.center)
+        .setHTML(notamPopupHtml(notam))
+        .addTo(map);
+    }
+
+    function notamPopupHtml(notam) {
+      const info = latest ? latest.notamStatus[notam.id] : null;
+      const nearestRoute = info ? ROUTES.find((r) => r.id === info.nearestRouteId) : null;
+      const proximityLine = info && nearestRoute
+        ? `<p class="popup-detail">Nearest route: ${nearestRoute.name} (${info.nearestDistance.toFixed(0)} nm) — ${statusLabel(info.status)}</p>`
+        : '';
+      return `
+        <h3>NOTAM ${notam.id}</h3>
+        <p class="popup-detail">${notam.type}</p>
+        <p class="popup-detail">${notam.desc}</p>
+        <p class="popup-detail">Altitude: ${notam.altitude}</p>
+        <p class="popup-detail">Valid: ${notam.valid}</p>
+        <p class="popup-detail">Radius: ${notam.radiusNm} nm</p>
+        ${proximityLine}
+      `;
+    }
+
+    // --- Map setup -----------------------------------------------------
+
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/standard',
+      center: [110, 8],
+      zoom: 3.2
+    });
+
+    map.on('style.load', () => {
+      map.setConfigProperty('basemap', 'lightPreset', 'night');
+    });
+
+    map.on('load', () => {
+      map.addSource('notam-fills', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({
+        id: 'notam-fill-layer',
+        type: 'fill',
+        source: 'notam-fills',
+        paint: {
+          'fill-color': ['match', ['get', 'status'], 'inside', COLOR_INSIDE, 'alert', COLOR_ALERT, '#5b6572'],
+          'fill-opacity': 0.14,
+          'fill-emissive-strength': 1
+        }
+      });
+      map.addLayer({
+        id: 'notam-fill-outline',
+        type: 'line',
+        source: 'notam-fills',
+        paint: {
+          'line-color': ['match', ['get', 'status'], 'inside', COLOR_INSIDE, 'alert', COLOR_ALERT, '#5b6572'],
+          'line-width': 1.5,
+          'line-opacity': 0.6,
+          'line-emissive-strength': 1
+        }
+      });
+
+      map.addSource('notam-threshold-rings', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({
+        id: 'notam-threshold-layer',
+        type: 'line',
+        source: 'notam-threshold-rings',
+        paint: {
+          'line-color': '#4fa3ff',
+          'line-width': 1.5,
+          'line-dasharray': [2, 2],
+          'line-opacity': 0.7,
+          'line-emissive-strength': 1
+        }
+      });
+
+      map.addSource('connectors', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({
+        id: 'connector-layer',
+        type: 'line',
+        source: 'connectors',
+        paint: {
+          'line-color': ['match', ['get', 'status'], 'inside', COLOR_INSIDE, COLOR_ALERT],
+          'line-width': 1.5,
+          'line-dasharray': [1, 1.5],
+          'line-emissive-strength': 1
+        }
+      });
+
+      map.addSource('connector-labels', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({
+        id: 'connector-label-layer',
+        type: 'symbol',
+        source: 'connector-labels',
+        layout: {
+          'text-field': ['get', 'label'],
+          'text-size': 11,
+          'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular']
+        },
+        paint: {
+          'text-color': ['match', ['get', 'status'], 'inside', COLOR_INSIDE, COLOR_ALERT],
+          'text-halo-color': '#0d1117',
+          'text-halo-width': 1.4,
+          'text-emissive-strength': 1
+        }
+      });
+
+      map.addSource('routes', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({
+        id: 'route-layer',
+        type: 'line',
+        source: 'routes',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': ['match', ['get', 'status'], 'inside', COLOR_INSIDE, 'alert', COLOR_ALERT, COLOR_CLEAR],
+          'line-width': 3,
+          'line-emissive-strength': 1
+        }
+      });
+
+      map.addSource('notam-points', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({
+        id: 'notam-point-layer',
+        type: 'circle',
+        source: 'notam-points',
+        paint: {
+          'circle-radius': 6,
+          'circle-color': ['match', ['get', 'status'], 'inside', COLOR_INSIDE, 'alert', COLOR_ALERT, '#a0aab6'],
+          'circle-stroke-color': '#0d1117',
+          'circle-stroke-width': 2,
+          'circle-emissive-strength': 1
+        }
+      });
+
+      map.on('mouseenter', 'notam-point-layer', () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'notam-point-layer', () => { map.getCanvas().style.cursor = ''; });
+      map.on('click', 'notam-point-layer', (e) => {
+        const id = e.features[0].properties.id;
+        const notam = NOTAMS.find((n) => n.id === id);
+        new mapboxgl.Popup({ offset: 12 })
+          .setLngLat(notam.center)
+          .setHTML(notamPopupHtml(notam))
+          .addTo(map);
+      });
+
+      // Fit to everything: all route endpoints plus all NOTAM centers.
+      const bounds = new mapboxgl.LngLatBounds();
+      ROUTES.forEach((r) => { bounds.extend(r.from); bounds.extend(r.to); });
+      NOTAMS.forEach((n) => bounds.extend(n.center));
+      map.fitBounds(bounds, { padding: 60, duration: 0 });
+
+      render();
+    });
+
+    const slider = document.getElementById('threshold-slider');
+    const sliderValue = document.getElementById('threshold-value');
+    slider.addEventListener('input', () => {
+      thresholdNm = Number(slider.value);
+      sliderValue.textContent = `${thresholdNm} nm`;
+      render();
+    });
+
+    map.on('error', (e) => {
+      console.error('Map error:', e);
+    });
+  </script>
+</body>
+</html>

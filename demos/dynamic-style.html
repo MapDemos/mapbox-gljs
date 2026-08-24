@@ -1,0 +1,572 @@
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-language/v1.0.0/mapbox-gl-language.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/d3@7.8.5/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.min.js"></script>
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.css" type="text/css" />
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<script src="https://kenji-shima.github.io/resource-files/polyline.js" type="module"></script>
+<script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet" />
+  <style>
+    <!--
+    :root {
+        --slate-900: #12181f;
+        --slate-800: #1a222b;
+        --slate-700: #232e39;
+        --cyan: #3ec6d9;
+        --lime: #a3d977;
+        --paper: #e8ecef;
+        --muted: #8b9aa8;
+        --hairline: rgba(232, 236, 239, 0.1);
+    }
+
+    body {
+        margin: 0;
+        overflow: hidden;
+    }
+
+    .map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+    }
+
+    /* Control panel — framed as an inspector reporting on the style, not a
+       generic settings box: a header rule, numeric readouts, then a live log. */
+    #panel {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        z-index: 1;
+        width: 320px;
+        box-sizing: border-box;
+        /* Never taller than the window — the log gives up its space first. */
+        max-height: calc(100vh - 32px);
+        display: flex;
+        flex-direction: column;
+        background: var(--slate-900);
+        border-top: 2px solid var(--cyan);
+        border-radius: 0 0 4px 4px;
+        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
+        color: var(--paper);
+        font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+        overflow: hidden;
+    }
+
+    .panel-head,
+    .switch-row,
+    .stats,
+    #status {
+        flex: 0 0 auto;
+    }
+
+    .panel-head {
+        padding: 12px 14px 10px;
+    }
+
+    .panel-title {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--cyan);
+        margin: 0 0 2px;
+    }
+
+    .panel-sub {
+        margin: 0;
+        font-size: 11px;
+        line-height: 1.45;
+        color: var(--muted);
+    }
+
+    .panel-sub code {
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 10px;
+        color: var(--paper);
+    }
+
+    /* Language switch — a two-ended track, so both states are always readable
+       rather than one being hidden behind the knob. */
+    .switch-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px 12px;
+        border-top: 1px solid var(--hairline);
+        border-bottom: 1px solid var(--hairline);
+        background: var(--slate-800);
+    }
+
+    .switch {
+        position: relative;
+        display: inline-flex;
+        flex: 0 0 auto;
+    }
+
+    .switch input {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        opacity: 0;
+        cursor: pointer;
+    }
+
+    .switch-track {
+        position: relative;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        align-items: center;
+        width: 128px;
+        height: 28px;
+        border-radius: 3px;
+        background: var(--slate-700);
+        box-shadow: inset 0 0 0 1px var(--hairline);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        pointer-events: none;
+    }
+
+    .switch-track span {
+        position: relative;
+        z-index: 1;
+        text-align: center;
+        color: var(--muted);
+        transition: color 140ms ease;
+    }
+
+    /* The moving indicator. */
+    .switch-track::before {
+        content: '';
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: calc(50% - 3px);
+        height: calc(100% - 6px);
+        border-radius: 2px;
+        background: var(--cyan);
+        transition: transform 160ms ease;
+    }
+
+    .switch input:checked ~ .switch-track::before {
+        transform: translateX(100%);
+    }
+
+    .switch-track span:first-child {
+        color: var(--slate-900);
+    }
+
+    .switch input:checked ~ .switch-track span:first-child {
+        color: var(--muted);
+    }
+
+    .switch input:checked ~ .switch-track span:last-child {
+        color: var(--slate-900);
+    }
+
+    .switch input:focus-visible ~ .switch-track {
+        outline: 2px solid var(--lime);
+        outline-offset: 2px;
+    }
+
+    .switch-caption {
+        font-size: 10px;
+        line-height: 1.35;
+        color: var(--muted);
+    }
+
+    /* Triage readout — the loop's own accounting, kept visible because the
+       classification is the interesting part, not just the end result. */
+    .stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        border-bottom: 1px solid var(--hairline);
+    }
+
+    .stat {
+        padding: 9px 4px 10px;
+        text-align: center;
+        border-right: 1px solid var(--hairline);
+    }
+
+    .stat:last-child {
+        border-right: none;
+    }
+
+    .stat-value {
+        display: block;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 16px;
+        font-weight: 500;
+        line-height: 1.1;
+    }
+
+    .stat-label {
+        display: block;
+        margin-top: 3px;
+        font-size: 8.5px;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--muted);
+    }
+
+    .stat--rewritten .stat-value {
+        color: var(--cyan);
+    }
+
+    .stat--skipped .stat-value {
+        color: var(--muted);
+    }
+
+    #status {
+        padding: 9px 14px;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 10px;
+        line-height: 1.4;
+        color: var(--lime);
+        border-bottom: 1px solid var(--hairline);
+    }
+
+    #log {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: 232px;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 10px;
+    }
+
+    .log-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 8px;
+        padding: 4px 14px;
+        border-bottom: 1px solid rgba(232, 236, 239, 0.05);
+    }
+
+    .log-layer {
+        color: var(--paper);
+        /* Required for the ellipsis to engage — a flex item won't shrink below
+           its content width without it, and the detail would spill off the edge. */
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .log-detail {
+        flex: 0 0 auto;
+        color: var(--cyan);
+    }
+
+    .log-row--skipped .log-layer,
+    .log-row--skipped .log-detail {
+        color: var(--muted);
+    }
+
+    /* Stay top-anchored on narrow screens rather than docking to the bottom, so the
+       Mapbox attribution and the zoom controls in the bottom-right remain visible. */
+    @media (max-width: 480px) {
+        #panel {
+            top: 0;
+            left: 0;
+            right: 0;
+            width: auto;
+            max-height: 62vh;
+            border-radius: 0;
+            border-top: none;
+            border-bottom: 2px solid var(--cyan);
+        }
+
+        #log {
+            max-height: none;
+        }
+    }
+    -->
+</style>
+</head>
+
+<body>
+  <div id="map" class="map"></div>
+
+  <section id="panel" aria-label="Label language controls">
+    <div class="panel-head">
+      <p class="panel-title">Label language</p>
+      <p class="panel-sub">Style stays <code>mapbox://styles/mapbox/streets-v12</code>. The toggle loops every
+        layer and rewrites <code>text-field</code> in place — no reload, no new tiles.</p>
+    </div>
+
+    <div class="switch-row">
+      <span class="switch">
+        <input type="checkbox" id="lang-toggle" aria-label="Switch label language to Japanese" />
+        <span class="switch-track" aria-hidden="true">
+          <span>EN</span>
+          <span>日本語</span>
+        </span>
+      </span>
+      <span class="switch-caption">Flip to run<br />the layer loop</span>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-value" id="stat-scanned">—</span>
+        <span class="stat-label">Scanned</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="stat-labelled">—</span>
+        <span class="stat-label">Labels</span>
+      </div>
+      <div class="stat stat--rewritten">
+        <span class="stat-value" id="stat-rewritten">—</span>
+        <span class="stat-label">Rewritten</span>
+      </div>
+      <div class="stat stat--skipped">
+        <span class="stat-value" id="stat-skipped">—</span>
+        <span class="stat-label">Skipped</span>
+      </div>
+    </div>
+
+    <p id="status" role="status">Loading style…</p>
+
+    <div id="log" tabindex="0" aria-label="Layers touched by the last pass"></div>
+  </section>
+</body>
+<script>
+  // mapboxgl.accessToken is already set globally by utils.js (loaded via common_head.html)
+
+// The stock Mapbox Streets style. Nothing about this URL — or the tileset behind it —
+// changes when the language toggles: streets-v12 ships every localized name field
+// (name_en, name_ja, name_ko, name_zh-Hans, ...) in the same vector tiles, and each
+// label layer's `text-field` just picks which one to draw. Switching language is
+// therefore a pure client-side restyle: loop the layers, rewrite the expression.
+const STYLE = 'mapbox://styles/mapbox/streets-v12';
+
+// Tokyo — wide enough that road, settlement, water, transit and POI labels are all
+// on screen together, so a single toggle visibly rewrites all of them at once.
+const CENTER = [139.7671, 35.6812];
+const ZOOM = 11.5;
+
+const map = new mapboxgl.Map({
+    container: 'map',
+    style: STYLE,
+    center: CENTER,
+    zoom: ZOOM
+});
+
+map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+
+// Every `text-field` exactly as the style shipped it, keyed by layer id. Captured once,
+// on first style load, and never overwritten. Rewrites are always derived from this
+// snapshot rather than from the layer's current value, which makes the round trip
+// lossless: "back to English" is simply reapplying the original expression. That
+// matters for layers like `block-number-label`, whose original is a bare
+// ["get", "name"] with no name_en to reverse-engineer a way back from.
+const originalTextFields = new Map();
+
+// Field names we treat as a translatable label. Anything else a symbol layer might
+// draw — `ref` on the road shields, `house_num` on building numbers — is left alone.
+function isNameField(field) {
+    return field === 'name' || field.startsWith('name_');
+}
+
+function isNameLookup(node) {
+    return Array.isArray(node) && node.length === 2 && node[0] === 'get' &&
+        typeof node[1] === 'string' && isNameField(node[1]);
+}
+
+// streets-v12 already writes its labels as coalesce(name_en, name). Recognizing that
+// whole shape — rather than rewriting each ["get", ...] inside it independently — keeps
+// the output the same shape as the input instead of nesting a coalesce in a coalesce.
+// Worth doing because this demo invites people to inspect the resulting expression.
+function isNameCoalesce(node) {
+    return Array.isArray(node) && node[0] === 'coalesce' && node.length > 1 &&
+        node.slice(1).every(isNameLookup);
+}
+
+// Recursively rewrite a `text-field` value so every name lookup inside it reads the
+// requested language, falling back to the local name when that language is missing.
+// A walk is required rather than a flat swap because some layers bury the name lookup
+// several levels deep — `transit-label` nests it inside step/match, `airport-label`
+// inside step/case/concat — and those wrapper expressions must survive untouched.
+// Returns null when the expression contains no name lookup at all; that null is what
+// marks a layer as skipped.
+function localizeTextField(value, lang) {
+    let rewrote = false;
+
+    const walk = (node) => {
+        // Legacy string-token form, e.g. "{name_en}". streets-v12 no longer uses it,
+        // but handling it keeps the loop correct against older or custom styles.
+        if (typeof node === 'string') {
+            const replaced = node.replace(/\{(name(?:_[\w-]+)?)\}/g, () => {
+                rewrote = true;
+                return `{name_${lang}}`;
+            });
+            return replaced;
+        }
+
+        if (!Array.isArray(node)) return node;
+
+        // The thing we're actually hunting for: a name lookup, either bare
+        // (["get", "name"], as on block-number-label) or already wrapped in a
+        // coalesce (every other label layer in streets-v12).
+        if (isNameCoalesce(node) || isNameLookup(node)) {
+            rewrote = true;
+            return ['coalesce', ['get', `name_${lang}`], ['get', 'name']];
+        }
+
+        return node.map(walk);
+    };
+
+    const result = walk(value);
+    return rewrote ? result : null;
+}
+
+// Human-readable summary of what a skipped layer draws instead of a name, so the log
+// explains itself rather than just asserting the layer was skipped.
+function describeNonNameField(value) {
+    const fields = new Set();
+    const collect = (node) => {
+        if (!Array.isArray(node)) return;
+        if (node.length === 2 && node[0] === 'get' && typeof node[1] === 'string') {
+            fields.add(node[1]);
+            return;
+        }
+        node.forEach(collect);
+    };
+    collect(value);
+    return fields.size ? [...fields].join(', ') : 'no name field';
+}
+
+// --- UI ---------------------------------------------------------------------
+
+const toggle = document.getElementById('lang-toggle');
+const statusEl = document.getElementById('status');
+const logEl = document.getElementById('log');
+const statScanned = document.getElementById('stat-scanned');
+const statLabelled = document.getElementById('stat-labelled');
+const statRewritten = document.getElementById('stat-rewritten');
+const statSkipped = document.getElementById('stat-skipped');
+
+function renderLog(entries) {
+    logEl.replaceChildren(
+        ...entries.map(({ id, detail, state }) => {
+            const row = document.createElement('div');
+            row.className = `log-row log-row--${state}`;
+
+            const name = document.createElement('span');
+            name.className = 'log-layer';
+            name.textContent = id;
+
+            const note = document.createElement('span');
+            note.className = 'log-detail';
+            note.textContent = detail;
+
+            row.append(name, note);
+            return row;
+        })
+    );
+    logEl.scrollTop = 0;
+}
+
+// --- The process ------------------------------------------------------------
+
+// Loop every layer in the live style and set its label language. This is the whole
+// demo: no style reload, no new tile request, no second style URL — just
+// setLayoutProperty on the layers that draw a name.
+function applyLanguage(lang) {
+    const layers = map.getStyle().layers;
+    const entries = [];
+    let labelled = 0;
+    let rewritten = 0;
+    let skipped = 0;
+
+    for (const layer of layers) {
+        const original = originalTextFields.get(layer.id);
+        if (original === undefined) continue; // not a label layer
+
+        labelled++;
+
+        // Classify from the transform result regardless of the target language, so a
+        // layer that draws `ref` or `house_num` reports as skipped in every language
+        // rather than only in Japanese.
+        const localized = localizeTextField(original, lang);
+
+        // English is the style's shipped default, so switching back means reapplying the
+        // snapshot verbatim rather than a transform of it. Only that restores
+        // `block-number-label` to its original bare ["get", "name"].
+        const next = localized !== null && lang === 'en' ? original : localized;
+
+        if (next === null) {
+            skipped++;
+            entries.push({
+                id: layer.id,
+                detail: `skipped · draws ${describeNonNameField(original)}`,
+                state: 'skipped'
+            });
+            continue;
+        }
+
+        map.setLayoutProperty(layer.id, 'text-field', next);
+        rewritten++;
+        entries.push({
+            id: layer.id,
+            detail: lang === 'en' ? '→ original' : `→ name_${lang}`,
+            state: 'rewritten'
+        });
+    }
+
+    statScanned.textContent = layers.length;
+    statLabelled.textContent = labelled;
+    statRewritten.textContent = rewritten;
+    statSkipped.textContent = skipped;
+    statusEl.textContent = `Rewrote ${rewritten} label layer${rewritten === 1 ? '' : 's'} in place — same style, same tiles.`;
+
+    renderLog(entries);
+}
+
+map.on('style.load', () => {
+    if (originalTextFields.size === 0) {
+        for (const layer of map.getStyle().layers) {
+            const textField = layer.layout && layer.layout['text-field'];
+            if (textField !== undefined) {
+                originalTextFields.set(layer.id, textField);
+            }
+        }
+    }
+
+    // Show the triage for the initial English state without changing anything — this is
+    // a no-op restyle on first load, since English is what streets-v12 already loaded.
+    // Reading the toggle rather than hardcoding 'en' keeps the map and the switch in
+    // agreement if a style reload ever re-fires this while Japanese is selected.
+    const isInitialLoad = !toggle.checked;
+    applyLanguage(toggle.checked ? 'ja' : 'en');
+    if (isInitialLoad) {
+        statusEl.textContent = 'Loaded as shipped — streets-v12 labels default to English.';
+    }
+});
+
+toggle.addEventListener('change', () => {
+    applyLanguage(toggle.checked ? 'ja' : 'en');
+});
+
+</script>
+
+</html>
