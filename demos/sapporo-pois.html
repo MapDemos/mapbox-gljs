@@ -2,6 +2,7 @@
 <head>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
+  <script src="/shared/demo-kit.js"></script>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -215,7 +216,6 @@ const TYPE_ICONS = { medical: '🏥', airport: '✈️' };
 const TYPE_LABELS = { medical: 'Medical Facility', airport: 'Airport' };
 
 // ---- Map Init ----
-mapboxgl.accessToken = 'pk.REDACTED-internationalsos-TOKEN';
 
 const map = new mapboxgl.Map({
   container: 'map',

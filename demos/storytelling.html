@@ -398,8 +398,6 @@ if (footer.innerText.length > 0) {
     story.appendChild(footer);
 }
 
-mapboxgl.accessToken = config.accessToken;
-
 const transformRequest = (url) => {
     const hasQuery = url.indexOf('?') !== -1;
     const suffix = hasQuery ? '&pluginName=scrollytellingV2' : '?pluginName=scrollytellingV2';
