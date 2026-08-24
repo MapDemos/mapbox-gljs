@@ -294,11 +294,62 @@ js: details-search.js
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 12px;
     }
 
     .status-count {
       color: #8bb3ff;
       font-weight: 500;
+    }
+
+    .status-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+    }
+
+    .download-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+
+    .download-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .download-btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .download-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .download-icon {
+      font-size: 16px;
+    }
+
+    .download-count {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 12px;
     }
 
     /* Map container */
@@ -616,8 +667,15 @@ js: details-search.js
       </div>
 
       <div class="status-bar">
-        <span id="statusText">カテゴリーを選択してください</span>
-        <span id="statusCount"></span>
+        <div class="status-left">
+          <span id="statusText">カテゴリーを選択してください</span>
+          <span id="statusCount"></span>
+        </div>
+        <button id="downloadPhotoPOIsBtn" class="download-btn" onclick="exportPOIsWithPhotos()" disabled>
+          <span class="download-icon">📥</span>
+          <span>写真付きPOI</span>
+          <span class="download-count">0</span>
+        </button>
       </div>
     </div>
 

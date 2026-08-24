@@ -1,0 +1,464 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.81589031,
+            35.77940334
+          ],
+          [
+            139.81568465,
+            35.77708518
+          ]
+        ]
+      },
+      "properties": {
+        "id": "1",
+        "date": "2026-05-01",
+        "ticket": "18",
+        "order": "992662190937088000",
+        "rdp": "5237511",
+        "voc_kr": "앱의 루트대로라면 일방통행을 거꾸로 하는 루트를 안내한다. 과도한 거리 증가의 최종 경고를 받았기 때문에 걱정으로 연락했습니다.",
+        "voc_en": "According to the app's route guidance, it directs drivers to go against a one-way street. I contacted you out of concern because I received a final warning for excessive distance increase.",
+        "description": "replay, google — Red one-way street at (35.776355, 139.815821)",
+        "improve": "O",
+        "checked_by": "Mapbox issue",
+        "marker-color": "#276749",
+        "stroke": "#276749",
+        "stroke-width": 4
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.78460973,
+            35.6666126
+          ],
+          [
+            139.78577436,
+            35.6675472
+          ]
+        ]
+      },
+      "properties": {
+        "id": "2",
+        "date": "2026-05-02",
+        "ticket": "18",
+        "order": "993046244341592064",
+        "rdp": "5125054",
+        "voc_kr": "일방통행의 길을 역주하는 안내가 어제부터 여러 번 나온다. 개선하고 싶다. 부득이한 현상도 앱의 안내와 다른 루트로 달리고 있다",
+        "voc_en": "Since yesterday, the app has repeatedly provided route guidance that goes against one-way streets. I would like to see this improved. In some unavoidable situations, I am currently driving along routes that differ from the app's guidance.",
+        "description": "replay, google — Red one-way street at (35.667083, 139.785257)",
+        "improve": "O",
+        "checked_by": "Mapbox issue",
+        "marker-color": "#276749",
+        "stroke": "#276749",
+        "stroke-width": 4
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.70634001,
+            35.72549027
+          ],
+          [
+            139.70668362,
+            35.7282618
+          ]
+        ]
+      },
+      "properties": {
+        "id": "4",
+        "date": "2026-05-03",
+        "ticket": "18",
+        "order": "993492816363794432",
+        "rdp": "5232085",
+        "voc_kr": "해당 주문, 내비게이션에서 일방통행의 역주행을 지시 받았다.",
+        "voc_en": "For this order, the navigation instructed me to go against a one-way street.",
+        "description": "replay, google — Red one-way street at (35.727242, 139.706375)",
+        "improve": "O",
+        "checked_by": "Mapbox issue",
+        "marker-color": "#276749",
+        "stroke": "#276749",
+        "stroke-width": 4
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.82217398,
+            35.67825137
+          ],
+          [
+            139.82217398,
+            35.6811141
+          ]
+        ]
+      },
+      "properties": {
+        "id": "6",
+        "date": "2026-05-05",
+        "ticket": "18",
+        "order": "994058686013656",
+        "rdp": "5125054",
+        "voc_kr": "로켓 나우 앱에서 일방 통행으로 역주행하도록 나와 있기 때문에 대폭 루트 변경의 보고",
+        "voc_en": "Due to the Rocket Now app directing me to go against a one-way street, I am reporting a significant route change.",
+        "description": "replay — No issues found; one-way nearby 35.68060637, 139.82216318",
+        "improve": "O",
+        "checked_by": "Mapbox issue",
+        "marker-color": "#276749",
+        "stroke": "#276749",
+        "stroke-width": 4
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.69817384,
+            35.77328802
+          ],
+          [
+            139.69816126,
+            35.7729286
+          ]
+        ]
+      },
+      "properties": {
+        "id": "7",
+        "date": "2026-05-05",
+        "ticket": "18",
+        "order": "994065586432774144",
+        "rdp": "5128033",
+        "voc_kr": "본건을 수락하고 점포로 향하기 시작하자마자 우회전 할 수 없는 곳에서 우회전하라는 지시가 나왔다. 우회전할 수 없는 상황이었으므로, 직진하고 나서 경로를 변경해 향하고 있다고 하는 보고.",
+        "voc_en": "As soon as I accepted this order and started heading to the store, the navigation instructed me to make a right turn at a location where right turns are not allowed. Since it was not possible to make a right turn, I proceeded straight and changed the route afterward.",
+        "description": "replay, google (35.77293, 139.69816)",
+        "improve": "O",
+        "checked_by": "GMap issue",
+        "marker-color": "#276749",
+        "stroke": "#276749",
+        "stroke-width": 4
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.60261473,
+            35.59912371
+          ],
+          [
+            139.60268788,
+            35.59882438
+          ]
+        ]
+      },
+      "properties": {
+        "id": "9",
+        "date": "2026-05-05",
+        "ticket": "18",
+        "order": "994088656734397440",
+        "rdp": "5214377",
+        "voc_kr": "통과할 수 없는 길을 루트로 안내되었기 때문에 크게 우회했다. 신고",
+        "voc_en": "I made a significant detour because the navigation guided me along a road that cannot be passed. This is a report of that issue.",
+        "description": "replay — No issues found; road nearby 35.59907042, 139.60273995 seems blocked",
+        "improve": "X",
+        "checked_by": "Mapbox issue",
+        "marker-color": "#c53030",
+        "stroke": "#c53030",
+        "stroke-width": 4
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            135.49985987,
+            34.71361558
+          ],
+          [
+            135.49829808,
+            34.7252653
+          ]
+        ]
+      },
+      "properties": {
+        "id": "10",
+        "date": "2026-05-05",
+        "ticket": "18",
+        "order": "994126080699011072",
+        "rdp": "5254539",
+        "voc_kr": "RDP APP의 경로에 대해. 원부 주행 금지의 장소나 일방통행의 길이 표시된다. 그때마다 크게 우회해야 한다. 한 층 더 우회하면 매일로 지연에 조심해라고 알림이 온다. 자신은 나쁘지 않지만 이런 메일이 오는 것은 이상하다. 오늘 2회째이지만, 조속히 지도를 고쳐 주었으면 한다.",
+        "voc_en": "The app displays routes that include locations where driving is prohibited or roads that are one-way streets. Each time, I am forced to make significant detours. When the detour becomes longer, I receive email notifications warning about delays. I do not believe I am at fault, so receiving such emails feels unreasonable. This has happened twice today. Please correct the map as soon as possible.",
+        "description": "replay, google",
+        "improve": "O",
+        "checked_by": "Mapbox issue",
+        "marker-color": "#276749",
+        "stroke": "#276749",
+        "stroke-width": 4
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            135.49444,
+            34.77516
+          ],
+          [
+            135.46957,
+            34.76567
+          ]
+        ]
+      },
+      "properties": {
+        "id": "11",
+        "date": "2026-05-05",
+        "ticket": "18",
+        "order": "994243138556272640, 994231042162556928, 994225000133427200",
+        "rdp": "5268276",
+        "voc_kr": "상기 3건의 주문에 있어서, 배달 루트가 분명히 부적절하고, 우회를 실시할 필요가 있어, 각각 지연이 발생했다. 경고의 통지가 나오고, 확인을 누르는것도 납득이 가지 않고 고객으로부터 나쁜 리뷰가 붙어 있으면 어떻게 하는 것인가. 네비게이션의 잘못에 의해 발생한 손실에 대해 대응을 상석으로부터 회답 희망.",
+        "voc_en": "For 3 orders, the delivery routes were clearly inappropriate, requiring detours and causing delays. I find it unreasonable that I receive warning notifications. I am concerned about negative customer reviews due to these delays. I request a response from management regarding losses caused by incorrect navigation.",
+        "description": "replay, google — There is no bicycle path that allows crossing to the other side. The route suggested by the app appears to be intended for pedestrians rather than cyclists. This is a Gmap Route, not MapBox.",
+        "improve": "O",
+        "checked_by": "GMap issue",
+        "marker-color": "#276749",
+        "stroke": "#276749",
+        "stroke-width": 4
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          135.47077,
+          34.76757
+        ]
+      },
+      "properties": {
+        "id": "11",
+        "date": "2026-05-05",
+        "ticket": "18",
+        "order": "994243138556272640, 994231042162556928, 994225000133427200",
+        "rdp": "5268276",
+        "voc_kr": "상기 3건의 주문에 있어서, 배달 루트가 분명히 부적절하고, 우회를 실시할 필요가 있어, 각각 지연이 발생했다. 경고의 통지가 나오고, 확인을 누르는것도 납득이 가지 않고 고객으로부터 나쁜 리뷰가 붙어 있으면 어떻게 하는 것인가. 네비게이션의 잘못에 의해 발생한 손실에 대해 대응을 상석으로부터 회답 희망.",
+        "voc_en": "For 3 orders, the delivery routes were clearly inappropriate, requiring detours and causing delays. I find it unreasonable that I receive warning notifications. I am concerned about negative customer reviews due to these delays. I request a response from management regarding losses caused by incorrect navigation.",
+        "description": "replay, google — There is no bicycle path that allows crossing to the other side. The route suggested by the app appears to be intended for pedestrians rather than cyclists. This is a Gmap Route, not MapBox.",
+        "improve": "O",
+        "checked_by": "GMap issue",
+        "marker-color": "#276749",
+        "stroke": "#276749",
+        "stroke-width": 4
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.77570663,
+            35.70791112
+          ],
+          [
+            139.77570663,
+            35.70753808
+          ]
+        ]
+      },
+      "properties": {
+        "id": "12",
+        "date": "2026-05-06",
+        "ticket": "18",
+        "order": "994488655348797440",
+        "rdp": "5128033",
+        "voc_kr": "RDP APP의 경로가 정확하지 않기 때문에 사용하기 어렵습니다. 제일 처음부터 들어가지 않는 길을 안내 받아 루트를 변경하지 않을 수 없었다.",
+        "voc_en": "The routes provided by the RDP app are not accurate, making it difficult to use. From the very beginning, the navigation guided me to roads that cannot be entered, so I had no choice but to change the route.",
+        "description": "no across nearby 35.70770480, 139.77571878",
+        "improve": "O",
+        "checked_by": "Mapbox issue",
+        "marker-color": "#276749",
+        "stroke": "#276749",
+        "stroke-width": 4
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.62140789,
+            35.60626137
+          ],
+          [
+            139.62153084,
+            35.60630559
+          ]
+        ]
+      },
+      "properties": {
+        "id": "21",
+        "date": "2026-05-08",
+        "ticket": "18",
+        "order": "995281596351512576",
+        "rdp": "5214377",
+        "voc_kr": "막힌 도로가 루트가 되어 있었기 때문에 우회합니다.",
+        "voc_en": "The route included a blocked road, so I had to take a detour.",
+        "description": "Replay, Google (35.60626, 139.62141 ~ 35.60631, 139.62153)",
+        "improve": "O",
+        "checked_by": "",
+        "marker-color": "#276749",
+        "stroke": "#276749",
+        "stroke-width": 4
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            135.5005,
+            34.70952
+          ],
+          [
+            135.49852,
+            34.72532
+          ]
+        ]
+      },
+      "properties": {
+        "id": "24",
+        "date": "2026-05-09",
+        "ticket": "18",
+        "order": "995507511987802112",
+        "rdp": "5162427",
+        "voc_kr": "자전거로 배달하고 있지만, 앱의 루트는 자전거로 갈 수 없는 길. 오토바이차로밖에 통과할 수 없는 루트에서 최단거리의 가격이므로 비교적 적합하지 않다. 개선해 주었으면 합니다.",
+        "voc_en": "I deliver by bicycle, but the app is guiding routes not accessible by bicycle. Since pricing is based on shortest distance even when the route is only passable by motorcycles/cars, it is not appropriate. I would appreciate improvement.",
+        "description": "replay, google",
+        "improve": "O",
+        "checked_by": "",
+        "marker-color": "#276749",
+        "stroke": "#276749",
+        "stroke-width": 4
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.80082,
+            35.64564
+          ],
+          [
+            139.80024,
+            35.64716
+          ]
+        ]
+      },
+      "properties": {
+        "id": "25",
+        "date": "2026-05-09",
+        "ticket": "18",
+        "order": "995641193805389824",
+        "rdp": "5125054",
+        "voc_kr": "배송지 근처의 도로가 역상루트로 내비게이션이 안내되고 있다. 정정 희망. 특별구도173호의 일방통행을 역주 안내",
+        "voc_en": "The navigation is guiding an incorrect route near the delivery destination. Requesting correction — directing against the one-way traffic on Metropolitan Route 173.",
+        "description": "replay, google",
+        "improve": "O",
+        "checked_by": "",
+        "marker-color": "#276749",
+        "stroke": "#276749",
+        "stroke-width": 4
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.71606,
+            35.80459
+          ],
+          [
+            139.70589,
+            35.81423
+          ]
+        ]
+      },
+      "properties": {
+        "id": "28",
+        "date": "2026-05-10",
+        "ticket": "19",
+        "order": "996010689699254272",
+        "rdp": "5167078",
+        "voc_kr": "별도로, 앱 배달처 지정 루트가, 일방통행, 진입 금지의 루트를 지시하고 있다고 하는 일담당 부서에 보고 하는 취지 안내",
+        "voc_en": "Separately, we would like to inform the relevant team that the app's delivery route guidance is directing couriers to one-way roads and no-entry routes.",
+        "description": "replay, google",
+        "improve": "O",
+        "checked_by": "",
+        "marker-color": "#276749",
+        "stroke": "#276749",
+        "stroke-width": 4
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            135.50044,
+            34.70946
+          ],
+          [
+            135.49852,
+            34.72516
+          ]
+        ]
+      },
+      "properties": {
+        "id": "30",
+        "date": "2026-05-11",
+        "ticket": "19",
+        "order": "996402797442506752",
+        "rdp": "5162427",
+        "voc_kr": "자전거로는 234호선을 통과할 수 없는데 내비게이션으로 지시받았습니다. 몇 번이나 보고했는데도 전혀 수정되지 않습니다.",
+        "voc_en": "Bicycles are not allowed to pass through Route 234, yet I was directed to use it by the navigation system. Despite reporting this multiple times, it has not been corrected at all.",
+        "description": "replay, google",
+        "improve": "O",
+        "checked_by": "",
+        "marker-color": "#276749",
+        "stroke": "#276749",
+        "stroke-width": 4
+      }
+    }
+  ]
+}

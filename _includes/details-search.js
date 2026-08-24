@@ -322,6 +322,9 @@ let isLoadingDetails = false;
 const MAX_CONCURRENT_DETAILS_REQUESTS = 3;
 let activeDetailsRequests = 0;
 
+// Collection to store POIs with photos
+let poisWithPhotos = new Map(); // Key: mapbox_id, Value: POI feature with full details
+
 // Update map language
 function updateMapLanguage(language) {
   if (!map) return;
@@ -2067,6 +2070,9 @@ function clearMarkers() {
   // Clear progressive loading queue
   progressiveLoadingQueue = [];
   activeDetailsRequests = 0;
+  // Clear POIs with photos collection
+  poisWithPhotos.clear();
+  updateDownloadButtonCount();
 }
 
 // Fit map to show all markers
@@ -2200,6 +2206,12 @@ async function processProgressiveLoadingQueue() {
             // Update the marker's photo status to confirmed
             updatePOIPhotoStatus(mapboxId, 'confirmed');
             console.log(`✓ Photos confirmed for ${detailedPOI.properties.name} (${metadata.photos.length} photos)`);
+
+            // Add to poisWithPhotos collection
+            poisWithPhotos.set(mapboxId, detailedPOI);
+
+            // Update download button count
+            updateDownloadButtonCount();
           } else {
             // No photos found, update status to none
             updatePOIPhotoStatus(mapboxId, 'none');
@@ -2261,6 +2273,13 @@ function updatePOIPhotoStatus(mapboxId, photoStatus) {
     // Update the sidebar camera badge if showing confirmed photos
     if (photoStatus === 'confirmed' && featureIndex >= 0) {
       updateSidebarCameraBadge(featureIndex, true);
+
+      // Add to poisWithPhotos collection if it has photos and we have cached details
+      if (poiDetailsCache.has(mapboxId)) {
+        const detailedPOI = poiDetailsCache.get(mapboxId);
+        poisWithPhotos.set(mapboxId, detailedPOI);
+        updateDownloadButtonCount();
+      }
     }
   }
 }
@@ -2272,6 +2291,74 @@ function updateSidebarCameraBadge(poiIndex, show) {
     badge.style.display = show ? 'inline' : 'none';
   }
 }
+
+// Update the download button with current count of POIs with photos
+function updateDownloadButtonCount() {
+  const downloadBtn = document.getElementById('downloadPhotoPOIsBtn');
+  if (!downloadBtn) return;
+
+  const count = poisWithPhotos.size;
+  const countSpan = downloadBtn.querySelector('.download-count');
+
+  if (countSpan) {
+    countSpan.textContent = count;
+  }
+
+  // Enable/disable button based on count
+  if (count > 0) {
+    downloadBtn.disabled = false;
+    downloadBtn.style.opacity = '1';
+    downloadBtn.style.cursor = 'pointer';
+  } else {
+    downloadBtn.disabled = true;
+    downloadBtn.style.opacity = '0.5';
+    downloadBtn.style.cursor = 'not-allowed';
+  }
+}
+
+// Export POIs with photos as GeoJSON
+function exportPOIsWithPhotos() {
+  if (poisWithPhotos.size === 0) {
+    alert(currentRegion === 'japan' ?
+      '写真付きPOIがありません' :
+      'No POIs with photos to export');
+    return;
+  }
+
+  // Create GeoJSON FeatureCollection
+  const geojson = {
+    type: 'FeatureCollection',
+    features: Array.from(poisWithPhotos.values())
+  };
+
+  // Convert to JSON string with pretty formatting
+  const jsonStr = JSON.stringify(geojson, null, 2);
+
+  // Create blob and download
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+
+  // Generate filename with current date
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+  const filename = `pois-with-photos-${dateStr}.geojson`;
+
+  // Create temporary download link and trigger download
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+
+  // Cleanup
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  console.log(`Exported ${poisWithPhotos.size} POIs with photos to ${filename}`);
+}
+
+// Make export function globally accessible
+window.exportPOIsWithPhotos = exportPOIsWithPhotos;
 
 // Initialize on load
 // Switch between regions
@@ -2311,9 +2398,9 @@ async function switchRegion(region) {
       // Set map labels to Japanese
       updateMapLanguage('ja');
     } else {
-      // Move to San Francisco for global
+      // Move to New York City for global
       map.flyTo({
-        center: [-122.4194, 37.7749],
+        center: [-73.977332, 40.760924],
         zoom: 12,
         duration: 1500
       });
