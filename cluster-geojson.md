@@ -1,7 +1,7 @@
 ---
 layout: null
-title: Ports
-js: ports.js
+title: Cluster (GeoJSON)
+js: cluster-geojson.js
 ---
 
 <html lang="ja">

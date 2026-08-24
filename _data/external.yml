@@ -28,12 +28,6 @@
 - title: Auto Search
   url: https://demos.mapbox.com/auto-search/
 
-- title: MPL
-  url: https://demos.mapbox.com/mpl/
-
-- title: Japan Weather
-  url: https://codepen.io/kenji-shima/full/abedGJy
-
 - title: Fleet
   url: https://codepen.io/kenji-shima/full/MWxexpK
 
@@ -60,9 +54,6 @@
 
 - title: 3D Route
   url: https://codepen.io/kenji-shima/full/jOdRyMM
-
-- title: Nowcast
-  url: https://codepen.io/kenji-shima/full/yLWpPRW
 
 - title: Precipitation
   url: https://codepen.io/kenji-shima/full/NWoWyGJ

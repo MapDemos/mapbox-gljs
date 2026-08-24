@@ -1,5 +1,6 @@
 ---
 layout: none
+title: Wind Speed and Particles Demo
 ---
 <!DOCTYPE html>
 <html lang="en">

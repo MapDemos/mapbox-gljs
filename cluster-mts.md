@@ -1,7 +1,7 @@
 ---
 layout: null
-title: Radar
-js: radar.js
+title: Cluster (MTS)
+js: cluster-mts.js
 ---
 
 <html lang="ja">
@@ -15,9 +15,6 @@ js: radar.js
 
 <body>
   <div id="map" class="map"></div>
-  {{ content }}
-  {% include legend.html %}
-  {% include slider.html %}
 </body>
 <script>
   {% include {{ page.js }} %}

@@ -1,7 +1,7 @@
 ---
 layout: null
-title: Optimization V2
-js: optimization.js
+title: Fixed Optimization
+js: fixed-optimization.js
 ---
 <html lang="ja">
 
