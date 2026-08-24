@@ -1092,7 +1092,7 @@ js: feedback-table.js
 
   <script>
     // Map token for display
-    mapboxgl.accessToken = 'pk.eyJ1IjoibWJ4c29sdXRpb25zIiwiYSI6ImNqeWtiM250dzBjcGMzbnQ1NXpkZml6YjUifQ.EiJnPlDOMMlG5wr93SxVYQ';
+    mapboxgl.accessToken = 'pk.eyJ1Ijoia2Vuamktc2hpbWEiLCJhIjoiY2xpd2RwaHhzMGJoYjNlbnduYjJmMm5xNyJ9.Zi2lDBa9rXEAj6KyhLrINA';
 
     // Token management - declare this BEFORE including the JS file
     let feedbackApiToken = localStorage.getItem('mapbox_feedback_token') || null;

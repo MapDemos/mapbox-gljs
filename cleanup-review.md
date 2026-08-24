@@ -7,7 +7,7 @@ Run `bundle exec jekyll serve` (or `jekyll serve`) first so the `localhost:4000`
 Confirm/decide on these before going through everything else — they're either broken, possibly duplicate, or possibly stale.
 
 **Broken right now (placeholder token, cross-linked pair):**
-- [x] [Submit Feedback - Mapbox Feedback API](http://localhost:4000/feedback-submit.html) — `feedback-submit.html` — **KEEP + FIXED** (map token was placeholder, now set to the common token)
+- [x] [Submit Feedback - Mapbox Feedback API](http://localhost:4000/feedback-submit.html) — `feedback-submit.html` — **KEEP + FIXED** (map token was placeholder, now set to the standard kenji-shima token)
 - [x] [Mapbox Feedback API - Data Table View](http://localhost:4000/feedback-table.html) — `feedback-table.html` — **KEEP + FIXED** (same fix)
 
 **Depends on a token variable defined elsewhere — confirm it actually renders:**

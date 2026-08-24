@@ -657,7 +657,7 @@ js: feedback-submit.js
 
   <script>
     // Map display token
-    mapboxgl.accessToken = 'pk.eyJ1IjoibWJ4c29sdXRpb25zIiwiYSI6ImNqeWtiM250dzBjcGMzbnQ1NXpkZml6YjUifQ.EiJnPlDOMMlG5wr93SxVYQ';
+    mapboxgl.accessToken = 'pk.eyJ1Ijoia2Vuamktc2hpbWEiLCJhIjoiY2xpd2RwaHhzMGJoYjNlbnduYjJmMm5xNyJ9.Zi2lDBa9rXEAj6KyhLrINA';
 
     // Load saved token
     window.addEventListener('DOMContentLoaded', () => {

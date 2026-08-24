@@ -13,8 +13,8 @@
 <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.min.js"></script>
 <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.2/mapbox-gl-geocoder.css" type="text/css" />
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
-<script src="https://kenji-shima.github.io/resource-files/polyline.js" type="module"></script>
-<script src="https://kenji-shima.github.io/resource-files/utils.js"></script>
+<script src="/shared/polyline.js" type="module"></script>
+<script src="/shared/demo-kit.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <!-- Grid.js CSS - Removed mermaid theme to use custom dark theme -->
@@ -1085,7 +1085,7 @@
 
   <script>
     // Map token for display
-    mapboxgl.accessToken = 'pk.eyJ1IjoibWJ4c29sdXRpb25zIiwiYSI6ImNqeWtiM250dzBjcGMzbnQ1NXpkZml6YjUifQ.EiJnPlDOMMlG5wr93SxVYQ';
+    mapboxgl.accessToken = 'pk.eyJ1Ijoia2Vuamktc2hpbWEiLCJhIjoiY2xpd2RwaHhzMGJoYjNlbnduYjJmMm5xNyJ9.Zi2lDBa9rXEAj6KyhLrINA';
 
     // Token management - declare this BEFORE including the JS file
     let feedbackApiToken = localStorage.getItem('mapbox_feedback_token') || null;
