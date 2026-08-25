@@ -56,7 +56,7 @@
     "url": "cell-coverage.html",
     "tags": [
       "Geocoding API",
-      "Raster/Vector Tiles API"
+      "Tilequery API"
     ],
     "description": "Overlays cell signal coverage as a raster tile layer with geocoder search, centered on Japan."
   },
@@ -294,7 +294,9 @@
     "title": "MPL 3D",
     "type": "local",
     "url": "mpl-3d.html",
-    "tags": [],
+    "tags": [
+      "Tilequery API"
+    ],
     "description": "3D map demo plotting and filtering MPL point data by type, with click-to-set start/end points."
   },
   {
@@ -359,7 +361,8 @@
     "tags": [
       "Directions API",
       "Japan Weather Layers",
-      "Search Box API"
+      "Search Box API",
+      "Tilequery API"
     ],
     "description": "Combines precipitation radar overlays with address search and routing."
   },
@@ -413,7 +416,7 @@
     "type": "local",
     "url": "static-tiles.html",
     "tags": [
-      "Raster/Vector Tiles API"
+      "Raster Tiles API"
     ],
     "description": "Demonstrates rendering Mapbox static raster tiles."
   },
@@ -507,7 +510,8 @@
     "type": "local",
     "url": "weather3d.html",
     "tags": [
-      "Search Box API"
+      "Search Box API",
+      "Tilequery API"
     ],
     "description": "3D weather visualization demo."
   },
@@ -714,7 +718,8 @@
     "type": "codepen",
     "url": "https://codepen.io/kenji-shima/full/PoLwJor",
     "tags": [
-      "Raster/Vector Tiles API"
+      "Raster Tiles API",
+      "Vector Tiles API"
     ],
     "tagsVerified": false,
     "description": "Comparison of raster vs. vector tile rendering."
