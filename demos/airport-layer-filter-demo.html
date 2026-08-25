@@ -683,7 +683,7 @@
 
       try {
         // Load the airports_analysis.geojson file
-        const response = await fetch('airports_analysis.geojson');
+        const response = await fetch('data/airports_analysis.geojson');
         const geojsonData = await response.json();
 
         console.log('GeoJSON loaded:', geojsonData);

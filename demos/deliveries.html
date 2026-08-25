@@ -648,14 +648,14 @@ const loadMap = () => {
             }
         });
 
-        fetch('deliveryCenters.geojson')
+        fetch('data/deliveryCenters.geojson')
             .then(response => response.json())
             .then(data => {
                 addDeliveryCenters(data);
             })
             .catch(error => console.error('Error loading delivery centers:', error));
 
-        fetch('deliveries.geojson')
+        fetch('data/deliveries.geojson')
             .then(response => response.json())
             .then(data => {
                 addDeliveries(data);

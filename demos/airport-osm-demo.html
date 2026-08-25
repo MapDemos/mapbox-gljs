@@ -690,7 +690,7 @@
 
         try {
           // Load the OSM GeoJSON file
-          const response = await fetch('japan-airports-osm.geojson');
+          const response = await fetch('data/japan-airports-osm.geojson');
           geojsonData = await response.json();
 
           console.log('OSM GeoJSON loaded:', geojsonData);

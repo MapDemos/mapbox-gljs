@@ -377,7 +377,7 @@ const loadMap = () => {
             }
         });
 
-        fetch('ports.geojson')
+        fetch('data/ports.geojson')
             .then(response => response.json())
             .then(data => {
                 addAllLayers(data);

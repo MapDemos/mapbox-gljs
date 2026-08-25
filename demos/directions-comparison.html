@@ -245,9 +245,9 @@
     <button class="mode-btn" id="btn-destination">B&nbsp; 目的地を設定</button>
   </div>
   <select id="route-source">
-    <option value="cbcloud-routes.geojson">CBcloud 配送ルート</option>
-    <option value="japan-ferry-routes.geojson">日本のフェリー航路</option>
-    <option value="japan-nav-routes.geojson">日本ナビ検証ルート (1000件)</option>
+    <option value="data/cbcloud-routes.geojson">CBcloud 配送ルート</option>
+    <option value="data/japan-ferry-routes.geojson">日本のフェリー航路</option>
+    <option value="data/japan-nav-routes.geojson">日本ナビ検証ルート (1000件)</option>
   </select>
   <select id="route-preset">
     <option value="">-- ルートを選択 --</option>
@@ -1522,7 +1522,7 @@ function updateHints() {
 // Groups: [{ name, origin: feature, destination: feature }, ...]
 let presetGroups = [];
 
-async function loadPresetRoutes(url = 'cbcloud-routes.geojson') {
+async function loadPresetRoutes(url = 'data/cbcloud-routes.geojson') {
   const presetSelect = document.getElementById('route-preset');
   const batchBtn = document.getElementById('batch-btn');
 

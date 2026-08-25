@@ -414,7 +414,7 @@ const loadMap = () => {
 
     /*map.on('load', () => {
         // Fetch the GeoJSON data
-        fetch('randomPointsInJapan.geojson')
+        fetch('data/randomPointsInJapan.geojson')
             .then(response => response.json())
             .then(data => {
                 map.addSource('random-points', {
@@ -460,7 +460,7 @@ const loadMap = () => {
     });*/
     map.on('load', () => {
 
-        fetch('randomPointsInJapan.geojson')
+        fetch('data/randomPointsInJapan.geojson')
             .then(response => response.json())
             .then(data => {
                 geojsonData = data;

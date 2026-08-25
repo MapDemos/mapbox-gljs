@@ -416,7 +416,7 @@ const BRAND_MAPPING = {
 
 async function loadStoresFromJSON() {
   try {
-    const response = await fetch('skylark-stores.json');
+    const response = await fetch('data/skylark-stores.json');
     if (!response.ok) throw new Error(`Failed to load: ${response.status}`);
     const data = await response.json();
 
