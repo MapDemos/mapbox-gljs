@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mapbox Demos</title>
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: oklch(0.15 0.008 260);
+    --bg-elevated: oklch(0.195 0.01 260);
+    --card: oklch(0.185 0.01 260);
+    --border: oklch(0.30 0.012 260);
+    --text: oklch(0.96 0.004 260);
+    --muted: oklch(0.66 0.012 260);
+    --brand: oklch(0.66 0.19 264);
+    --brand-tint: oklch(0.66 0.19 264 / 0.16);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  a { color: var(--brand); text-decoration: none; }
+
+  .page { max-width: 900px; margin: 0 auto; padding: 28px 24px 64px; }
+
+  .topbar { display: flex; align-items: center; gap: 12px; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  .topbar .icon { color: var(--brand); display: flex; }
+  .topbar h1 { font-family: Raleway, sans-serif; font-weight: 700; font-size: 20px; margin: 0; }
+
+  .controls { display: flex; flex-direction: column; gap: 12px; margin-bottom: 6px; }
+  .search { position: relative; max-width: 420px; }
+  .search svg { position: absolute; left: 12px; top: 11px; color: var(--muted); pointer-events: none; }
+  .search input {
+    width: 100%; height: 38px; border-radius: 9px; border: 1px solid var(--border);
+    background: var(--bg-elevated); color: var(--text); font-size: 13px; padding: 0 12px 0 34px; outline: none;
+  }
+  .search input:focus { border-color: var(--brand); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 999px;
+    background: transparent; border: 1px solid var(--border); color: var(--text); font-size: 12px; cursor: pointer;
+    font-family: inherit;
+  }
+  .chip-count { font-size: 10px; color: var(--muted); }
+  .chip-selected { background: var(--chip-accent); border-color: var(--chip-accent); color: oklch(0.16 0 0); }
+  .chip-selected .chip-count { color: oklch(0.16 0 0 / 0.65); }
+
+  .result-count { font-size: 13px; color: var(--muted); margin: 18px 0 10px; }
+
+  .list { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .row {
+    display: flex; flex-direction: column; gap: 8px; padding: 10px 14px;
+    border-bottom: 1px solid var(--border); background: var(--card);
+  }
+  .row:last-child { border-bottom: none; }
+  .row:hover { background: var(--bg-elevated); }
+  .row-top { display: flex; align-items: center; gap: 10px; }
+  .row-top .title { flex: 1; font-size: 13px; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-top .source { font-size: 11px; color: var(--muted); flex-shrink: 0; display: none; }
+  .row-top .open { color: var(--muted); display: flex; flex-shrink: 0; }
+
+  .tags-full { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag {
+    font-size: 11px; padding: 3px 8px; border-radius: 6px; white-space: nowrap;
+    color: var(--tag-accent); background: var(--tag-tint); border: 1px solid var(--tag-accent);
+  }
+  .tag-none { font-size: 11px; color: var(--muted); }
+
+  .empty { color: var(--muted); font-size: 13px; padding: 40px 0; text-align: center; }
+
+  @media (min-width: 820px) {
+    .row-top .source { display: block; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <span class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M15.5 8.5 13 13l-4.5 2.5L11 11l4.5-2.5Z"/></svg></span>
+    <h1>Mapbox Demos</h1>
+  </header>
+
+  <div class="controls">
+    <div class="search">
+      <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M16.5 16.5 13 13"/></svg>
+      <input type="text" id="search-input" placeholder="Search demos" autocomplete="off" />
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <p class="result-count" id="result-count"></p>
+  <div id="list-container"></div>
+</div>
+
+<script>
+// Fixed hue-per-tag color scheme, ported from the approved design mock
+// (design-mapbox-demos/ListViewAllTags.dc.html) so a given tag always
+// renders in the same color everywhere on the page.
+const TAG_HUES = {
+  'Japan Weather Layers': 20, 'Raster Tiles API': 158, 'Directions API': 295,
+  'Map Matching API': 73, 'Navigation SDK': 210, 'Isochrone API': 348,
+  'Search Box API': 125, 'Geocoding API': 263, 'Indoor Map Tiles': 40,
+  'Mapbox Boundaries': 178, 'Tilequery API': 315, 'Optimization API': 93,
+  'Matrix API': 230, 'Vector Tiles API': 8, 'Mapbox Movement Data': 145,
+};
+const TAG_ORDER = Object.keys(TAG_HUES);
+const BRAND_ACCENT = 'oklch(0.66 0.19 264)';
+const BRAND_TINT = 'oklch(0.66 0.19 264 / 0.16)';
+const accentFor = (tag) => TAG_HUES[tag] === undefined ? BRAND_ACCENT : `oklch(0.74 0.15 ${TAG_HUES[tag]})`;
+const tintFor = (tag) => TAG_HUES[tag] === undefined ? BRAND_TINT : `oklch(0.74 0.15 ${TAG_HUES[tag]} / 0.16)`;
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function sourceDomain(item) {
+  if (item.type === 'local') return null;
+  try { return new URL(item.url).hostname; } catch { return null; }
+}
+
+let DATA = [];
+let searchQuery = '';
+const selectedTags = new Set();
+
+function matchesQuery(item) {
+  if (!searchQuery) return true;
+  const haystack = `${item.title} ${item.description} ${item.tags.join(' ')}`.toLowerCase();
+  return haystack.includes(searchQuery);
+}
+
+function matchesTags(item) {
+  if (selectedTags.size === 0) return true;
+  return item.tags.some((t) => selectedTags.has(t));
+}
+
+function render() {
+  const bySearch = DATA.filter(matchesQuery);
+  const filtered = bySearch.filter(matchesTags);
+
+  // Chips: "All" plus every tag that appears in the data, in the fixed
+  // taxonomy order. Counts reflect the current search text only, not the
+  // other selected tags, so a count always answers "how many demos have
+  // this tag given the current search" independent of the rest of the
+  // selection (multi-select is OR: selecting more tags broadens results).
+  const chipsHtml = [{ key: null, label: 'All' }, ...TAG_ORDER.map((t) => ({ key: t, label: t }))]
+    .map(({ key, label }) => {
+      const count = key === null
+        ? bySearch.length
+        : bySearch.filter((d) => d.tags.includes(key)).length;
+      const selected = key === null ? selectedTags.size === 0 : selectedTags.has(key);
+      const accent = key === null ? BRAND_ACCENT : accentFor(key);
+      return `<button class="chip${selected ? ' chip-selected' : ''}" style="--chip-accent:${accent}" data-tag="${key === null ? '' : escapeHtml(key)}">${escapeHtml(label)}<span class="chip-count">${count}</span></button>`;
+    })
+    .join('');
+  document.getElementById('chips').innerHTML = chipsHtml;
+
+  document.getElementById('result-count').textContent = `${filtered.length} of ${DATA.length} demos`;
+
+  const listContainer = document.getElementById('list-container');
+  if (filtered.length === 0) {
+    listContainer.innerHTML = '<p class="empty">No demos match your search.</p>';
+    return;
+  }
+
+  const rowsHtml = filtered.map((item) => {
+    const domain = sourceDomain(item);
+    const tagsHtml = item.tags.length === 0
+      ? '<span class="tag-none">&mdash;</span>'
+      : item.tags.map((t) => `<span class="tag" style="--tag-accent:${accentFor(t)};--tag-tint:${tintFor(t)}">${escapeHtml(t)}</span>`).join('');
+    return `
+      <a class="row" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">
+        <div class="row-top">
+          <span class="title">${escapeHtml(item.title)}</span>
+          ${domain ? `<span class="source">${escapeHtml(domain)}</span>` : ''}
+          <span class="open"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h6v6M12 4 4 12"/></svg></span>
+        </div>
+        <div class="tags-full">${tagsHtml}</div>
+      </a>`;
+  }).join('');
+  listContainer.innerHTML = `<div class="list">${rowsHtml}</div>`;
+}
+
+document.getElementById('search-input').addEventListener('input', (e) => {
+  searchQuery = e.target.value.trim().toLowerCase();
+  render();
+});
+
+document.getElementById('chips').addEventListener('click', (e) => {
+  const btn = e.target.closest('.chip');
+  if (!btn) return;
+  const tag = btn.dataset.tag;
+  if (tag === '') {
+    selectedTags.clear();
+  } else if (selectedTags.has(tag)) {
+    selectedTags.delete(tag);
+  } else {
+    selectedTags.add(tag);
+  }
+  render();
+});
+
+fetch('./demos.json')
+  .then((r) => r.json())
+  .then((data) => {
+    DATA = data;
+    render();
+  })
+  .catch((err) => {
+    document.getElementById('list-container').innerHTML = '<p class="empty">Could not load demos.json.</p>';
+    console.error(err);
+  });
+</script>
+</body>
+</html>
