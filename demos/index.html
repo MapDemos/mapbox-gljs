@@ -168,7 +168,7 @@ function render() {
       ? '<span class="tag-none">&mdash;</span>'
       : item.tags.map((t) => `<span class="tag" style="--tag-accent:${accentFor(t)};--tag-tint:${tintFor(t)}">${escapeHtml(t)}</span>`).join('');
     return `
-      <a class="row" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">
+      <a class="row" href="${escapeHtml(item.url)}" target="_blank" rel="noopener" title="${escapeHtml(item.description)}">
         <div class="row-top">
           <span class="title">${escapeHtml(item.title)}</span>
           ${domain ? `<span class="source">${escapeHtml(domain)}</span>` : ''}
