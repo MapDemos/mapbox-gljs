@@ -119,6 +119,11 @@ export default [
     }
   },
   {
-    ignores: ["_site/**", "node_modules/**", ".jekyll-cache/**", "eslint.config.js"]
+    // lambda/ and scripts/ are Node.js (ESM import/export), not browser
+    // demo code, and docs/ holds reference material (e.g. code snippets
+    // in merchant-filter-examples.js) that was never meant to run
+    // standalone — none of these fit this config's sourceType: "script" +
+    // browser-globals setup.
+    ignores: ["node_modules/**", "lambda/**", "scripts/**", "docs/**", "_build/**", "eslint.config.js"]
   }
 ];
