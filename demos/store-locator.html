@@ -2462,6 +2462,11 @@ function renderAreaGroupMarkers(groups, tier) {
   const bounds = map.getBounds();
 
   Object.entries(groups).forEach(([areaName, group]) => {
+    // Same rule as individual icons: don't render a pill for a group whose
+    // members are all padding-only (none of them actually on-screen right
+    // now), even though the group itself qualified via the padded set.
+    if (!group.strictCoordinates.length) return;
+
     const fixedStat = areaStats[statsKey][areaName];
 
     // Primary: the fixed, precomputed-from-the-whole-dataset centroid (see
@@ -2807,13 +2812,18 @@ function initMap() {
           const targetZoom = map.getZoom();
           const offsetCenter = getCenterOffset(feature.geometry.coordinates, targetZoom);
 
+          // Register the moveend listener BEFORE calling flyTo: when the OS
+          // has reduced-motion enabled, flyTo skips the animation and fires
+          // moveend synchronously, before this call even returns - if the
+          // listener isn't already registered by then, it fires on nothing
+          // and the popup never shows.
+          scheduleShowPopupOnMoveEnd(feature);
+
           map.flyTo({
             center: offsetCenter,
             zoom: targetZoom,
             duration: 500
           });
-
-          scheduleShowPopupOnMoveEnd(feature);
         }
       });
 
@@ -2852,11 +2862,13 @@ function initMap() {
     // Add map move handler to update visible stores (no API reload needed)
     // Viewport filtering happens in updateMapLayers() - no debouncing needed
     map.on('moveend', () => {
-      // Update map layers, list, and count with viewport filtering
-      // This only processes visible stores, making it fast enough for real-time updates
-      updateMapLayers();
-      updateStoreListImmediate();
-      updateStoreCount();
+      // Update map layers, list, and count with viewport filtering.
+      // Compute the strict (0-padding) visible set once and share it across
+      // all three, instead of each re-scanning the full filteredStores array.
+      const strictVisibleStores = getStrictVisibleStores();
+      updateMapLayers(strictVisibleStores);
+      updateStoreListImmediate(strictVisibleStores);
+      updateStoreCount(strictVisibleStores);
       updateUrlFromState(); // Keep the shareable URL's lat/lng/zoom current
     });
   });
@@ -2884,8 +2896,21 @@ function getVisibleStores(allStores, mapBounds, padding = 0.15) {
   });
 }
 
-// Update map layers based on current zoom and filtered stores
-function updateMapLayers() {
+// Strict (0-padding) visibility check - the single source of truth for "is
+// anything actually on screen right now", shared by updateMapLayers,
+// updateStoreListImmediate and updateStoreCount. Call once per moveend and
+// pass the result to all three instead of each re-scanning the full
+// filteredStores array independently.
+function getStrictVisibleStores(bounds) {
+  return getVisibleStores(filteredStores, bounds || map.getBounds(), 0);
+}
+
+// Update map layers based on current zoom and filtered stores.
+// strictVisibleStores is optional - pass the result of getStrictVisibleStores()
+// when calling this alongside updateStoreListImmediate/updateStoreCount to
+// avoid each of the three re-scanning the full filteredStores array; omitted,
+// it's computed locally (e.g. for standalone calls after a filter change).
+function updateMapLayers(strictVisibleStores) {
   if (!map.getSource('stores')) return;
 
   const zoom = map.getZoom();
@@ -2895,13 +2920,17 @@ function updateMapLayers() {
   // This reduces processing from ~255 stores to ~30-80 stores
   const visibleStores = getVisibleStores(filteredStores, bounds);
 
-  // Strictly on-screen subset (no padding) - a group pill should be centered
-  // on whichever of its members are actually visible, not pulled off-screen
-  // by padding-only members averaged in from just outside the viewport
-  // (e.g. a large city only partially in view, whose other stores sit south
-  // of the visible area - see calculateCentroid).
+  // Strictly on-screen subset (no padding). Used two ways below: (1) to
+  // decide which of a group's members its pill centroid is averaged from,
+  // and (2) as the actual filter for what gets rendered as an individual
+  // icon - a store icon's icon-anchor: 'bottom' graphic can visibly poke a
+  // few px into the viewport even when its own coordinate sits just outside
+  // it, so individual icons render per-store from this strict set rather
+  // than the padded one. That keeps every rendered icon consistent with the
+  // "no stores here, jump to nearest" empty state, which is also driven off
+  // a strict, unpadded bounds check (see updateStoreListImmediate).
   const strictVisibleIds = new Set(
-    getVisibleStores(filteredStores, bounds, 0).map(f => f.properties.id)
+    (strictVisibleStores || getStrictVisibleStores(bounds)).map(f => f.properties.id)
   );
 
   // R009: once the viewport has narrowed to a single prefecture, switch to
@@ -2919,17 +2948,19 @@ function updateMapLayers() {
   }
 
   const { groups, individualStores } = groupStoresByArea(visibleStores, effectiveZoom, strictVisibleIds);
+  const strictIndividualStores = individualStores.filter(f => strictVisibleIds.has(f.properties.id));
 
   // Render area-group markers as DOM pills (label + count)
   renderAreaGroupMarkers(groups, getZoomLevel(effectiveZoom));
 
-  // Update individual stores source
+  // Update individual stores source - strict set only, so nothing renders
+  // whose coordinate isn't actually inside the current viewport.
   map.getSource('stores').setData({
     type: 'FeatureCollection',
-    features: individualStores
+    features: strictIndividualStores
   });
 
-  console.log(`Zoom ${zoom.toFixed(1)}: ${visibleStores.length} visible of ${filteredStores.length} total | ${Object.keys(groups).length} groups, ${individualStores.length} individual stores`);
+  console.log(`Zoom ${zoom.toFixed(1)}: ${strictIndividualStores.length} strictly visible of ${filteredStores.length} total | ${Object.keys(groups).length} groups, ${individualStores.length} padded individual stores`);
 }
 
 // Parse an "HH:MM～HH:MM" (or "24時間") hours string into minutes-of-day.
@@ -3479,9 +3510,12 @@ function applyFilters() {
 
   areaStats = computeAreaStats();
 
-  updateStoreListImmediate(); // Direct call for immediate response to filter clicks
-  updateMapLayers(); // Direct call - no debouncing needed for discrete filter actions
-  updateStoreCount();
+  // Direct calls - no debouncing needed for discrete filter actions. Compute
+  // the strict visible set once and share it, same as the moveend handler.
+  const strictVisibleStores = getStrictVisibleStores();
+  updateStoreListImmediate(strictVisibleStores);
+  updateMapLayers(strictVisibleStores);
+  updateStoreCount(strictVisibleStores);
 
   const hasActiveFilters = selectedAmenities.length > 0 || selectedBrands.length > 0;
   document.getElementById('floating-clear-filters').classList.toggle('visible', hasActiveFilters);
@@ -3569,8 +3603,9 @@ function showNearestStoreLink(centerCoords) {
     // 12 matches our own individual-marker threshold (getZoomLevel()).
     const targetZoom = 12;
     const offsetCenter = getCenterOffset(nearest.geometry.coordinates, targetZoom);
-    map.flyTo({ center: offsetCenter, zoom: targetZoom, duration: 1000 });
+    // Register before flyTo - see the store-icons click handler for why.
     scheduleShowPopupOnMoveEnd(nearest);
+    map.flyTo({ center: offsetCenter, zoom: targetZoom, duration: 1000 });
   });
 
   nearestStoreMarker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
@@ -3578,7 +3613,8 @@ function showNearestStoreLink(centerCoords) {
     .addTo(map);
 }
 
-function updateStoreListImmediate() {
+// strictVisibleStores is optional - see updateMapLayers for why.
+function updateStoreListImmediate(strictVisibleStores) {
   const storeList = document.getElementById('store-list');
   storeList.innerHTML = '';
 
@@ -3590,7 +3626,7 @@ function updateStoreListImmediate() {
 
   // Sort by distance from the map's current center (not the user's GPS position),
   // so the list re-orders live as the viewport pans/zooms.
-  currentVisibleStores = getVisibleStores(filteredStores, bounds, 0) // No padding
+  currentVisibleStores = (strictVisibleStores || getStrictVisibleStores(bounds)) // No padding
     .slice()
     .sort((a, b) =>
       getDistanceKm(centerCoords, a.geometry.coordinates) -
@@ -3670,25 +3706,25 @@ function appendStoreListBatch() {
         // our own individual-marker threshold (getZoomLevel()).
         const offsetCenter = getCenterOffset(feature.geometry.coordinates, 12);
 
+        // Register before flyTo - see the store-icons click handler for why.
+        scheduleShowPopupOnMoveEnd(feature);
+
         map.flyTo({
           center: offsetCenter,
           zoom: 12,
           duration: 1000
         });
-
-        // Show popup after zoom animation completes
-        scheduleShowPopupOnMoveEnd(feature);
       } else {
         // Already zoomed in - just center, don't change zoom
         const offsetCenter = getCenterOffset(feature.geometry.coordinates, currentZoom);
+
+        scheduleShowPopupOnMoveEnd(feature);
 
         map.flyTo({
           center: offsetCenter,
           zoom: currentZoom,
           duration: 800
         });
-
-        scheduleShowPopupOnMoveEnd(feature);
       }
     }
 
@@ -3752,10 +3788,11 @@ function updateStoreList() {
 }
 
 // Update store count
-function updateStoreCount() {
+// strictVisibleStores is optional - see updateMapLayers for why.
+function updateStoreCount(strictVisibleStores) {
   const bounds = map.getBounds();
   // Use no padding to match what's shown in the list
-  const visibleStores = getVisibleStores(filteredStores, bounds, 0);
+  const visibleStores = strictVisibleStores || getStrictVisibleStores(bounds);
 
   // Show count of visible stores - 0 gets its own message, 100+ is capped
   // rather than showing an exact (and unstably-changing) large number.
