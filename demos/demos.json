@@ -1,0 +1,775 @@
+[
+  {
+    "slug": "airport-demo",
+    "title": "Airport Explorer Demo",
+    "type": "local",
+    "url": "airport-demo.html",
+    "tags": [],
+    "description": "Explore Japan airport locations centered on Tokyo, with category-based filtering."
+  },
+  {
+    "slug": "airport-layer-filter-demo",
+    "title": "Airport Layer Filter Demo",
+    "type": "local",
+    "url": "airport-layer-filter-demo.html",
+    "tags": [],
+    "description": "Toggle airport data layers on and off over a Tokyo-centered map."
+  },
+  {
+    "slug": "airport-osm-demo",
+    "title": "Japan Airports OSM Demo",
+    "type": "local",
+    "url": "airport-osm-demo.html",
+    "tags": [],
+    "description": "Displays Japan airport locations sourced from OpenStreetMap data."
+  },
+  {
+    "slug": "amap",
+    "title": "AMAP",
+    "type": "local",
+    "url": "amap.html",
+    "tags": [],
+    "description": "Map demo centered on Beijing using the AMap (AutoNavi) map library alongside Mapbox."
+  },
+  {
+    "slug": "building-heatmap",
+    "title": "Building Heatmap",
+    "type": "local",
+    "url": "building-heatmap.html",
+    "tags": [],
+    "description": "Renders a heatmap layer over building footprint data."
+  },
+  {
+    "slug": "category-search-nested",
+    "title": "SearchBox POI検索",
+    "type": "local",
+    "url": "category-search-nested.html",
+    "tags": [
+      "Search Box API"
+    ],
+    "description": "Nested category search over points of interest using the Mapbox Search Box API, centered on Tokyo."
+  },
+  {
+    "slug": "cell-coverage",
+    "title": "Cell Coverage Map",
+    "type": "local",
+    "url": "cell-coverage.html",
+    "tags": [
+      "Geocoding API",
+      "Raster/Vector Tiles API"
+    ],
+    "description": "Overlays cell signal coverage as a raster tile layer with geocoder search, centered on Japan."
+  },
+  {
+    "slug": "cluster-geojson",
+    "title": "Cluster (GeoJSON)",
+    "type": "local",
+    "url": "cluster-geojson.html",
+    "tags": [],
+    "description": "Point clustering demo backed by a static GeoJSON data source."
+  },
+  {
+    "slug": "cluster-mts",
+    "title": "Cluster (MTS)",
+    "type": "local",
+    "url": "cluster-mts.html",
+    "tags": [],
+    "description": "Point clustering demo backed by a Mapbox Tiling Service (MTS) tileset, as a comparison to the GeoJSON version."
+  },
+  {
+    "slug": "deliveries",
+    "title": "Deliveries",
+    "type": "local",
+    "url": "deliveries.html",
+    "tags": [
+      "Isochrone API"
+    ],
+    "description": "Delivery coverage visualization using isochrone (drive-time) polygons."
+  },
+  {
+    "slug": "details-search",
+    "title": "TV POI Details Search",
+    "type": "local",
+    "url": "details-search.html",
+    "tags": [
+      "Search Box API"
+    ],
+    "description": "Nearby-search demo (周辺検索) showing POI detail info, with a toggle between full and basic information display."
+  },
+  {
+    "slug": "dhl-demo",
+    "title": "DHL Capabilities Demo - Mapbox GL JS",
+    "type": "local",
+    "url": "dhl-demo.html",
+    "tags": [
+      "Directions API",
+      "Map Matching API"
+    ],
+    "description": "DHL-branded logistics capabilities demo combining routing and map-matching, centered on the Rhine/Ruhr region."
+  },
+  {
+    "slug": "directions-comparison",
+    "title": "Directions Comparison - Mapbox vs Google",
+    "type": "local",
+    "url": "directions-comparison.html",
+    "tags": [
+      "Directions API",
+      "Search Box API",
+      "Geocoding API"
+    ],
+    "description": "Side-by-side comparison of Mapbox and Google driving directions for the same route."
+  },
+  {
+    "slug": "dynamic-style",
+    "title": "Dynamic Style — Label Language",
+    "type": "local",
+    "url": "dynamic-style.html",
+    "tags": [],
+    "description": "Demonstrates switching the map's label language dynamically."
+  },
+  {
+    "slug": "feedback-submit",
+    "title": "Submit Feedback - Mapbox Feedback API",
+    "type": "local",
+    "url": "feedback-submit.html",
+    "tags": [
+      "Geocoding API"
+    ],
+    "description": "Submits map feedback via the Mapbox Feedback API; companion page to feedback-table."
+  },
+  {
+    "slug": "feedback-table",
+    "title": "Mapbox Feedback API - Data Table View",
+    "type": "local",
+    "url": "feedback-table.html",
+    "tags": [],
+    "description": "Displays submitted Mapbox Feedback API entries in a data table view; companion page to feedback-submit."
+  },
+  {
+    "slug": "fixed-optimization",
+    "title": "Fixed Optimization",
+    "type": "local",
+    "url": "fixed-optimization.html",
+    "tags": [
+      "Optimization API",
+      "Search Box API",
+      "Geocoding API",
+      "Tilequery API"
+    ],
+    "description": "Multi-stop route optimization demo using the Mapbox Optimization API, with address search and tile-based POI lookup."
+  },
+  {
+    "slug": "flight-map-demo",
+    "title": "Flight Map",
+    "type": "local",
+    "url": "flight-map-demo.html",
+    "tags": [],
+    "description": "Animated flight route from San Francisco to London with a scrubber and chase camera."
+  },
+  {
+    "slug": "fuzzy-geocoding",
+    "title": "Fuzzy Geocoding",
+    "type": "local",
+    "url": "fuzzy-geocoding.html",
+    "tags": [
+      "Search Box API"
+    ],
+    "description": "Demonstrates fuzzy/approximate address search, including handling of no-match results."
+  },
+  {
+    "slug": "india-boundaries",
+    "title": "India Boundaries Coverage",
+    "type": "local",
+    "url": "india-boundaries.html",
+    "tags": [
+      "Search Box API"
+    ],
+    "description": "Looks up administrative boundary coverage across India place names, backed by a static local dataset rather than the live Mapbox Boundaries tileset."
+  },
+  {
+    "slug": "indoor-airport-brazil",
+    "title": "Indoor Airports - Brazil",
+    "type": "local",
+    "url": "indoor-airport-brazil.html",
+    "tags": [
+      "Indoor Map Tiles"
+    ],
+    "description": "Indoor airport navigation demo for a Brazil airport, built on the Mapbox Standard style's indoor map rendering."
+  },
+  {
+    "slug": "indoor-airport-gps",
+    "title": "Indoor Airport Navigation",
+    "type": "local",
+    "url": "indoor-airport-gps.html",
+    "tags": [
+      "Indoor Map Tiles"
+    ],
+    "description": "Indoor airport navigation/wayfinding demo centered on SFO, using a custom Mapbox style."
+  },
+  {
+    "slug": "indoor-airports",
+    "title": "Indoor Airports - Search",
+    "type": "local",
+    "url": "indoor-airports.html",
+    "tags": [
+      "Indoor Map Tiles",
+      "Search Box API"
+    ],
+    "description": "Indoor airport search demo built on the Mapbox Standard style's indoor map rendering."
+  },
+  {
+    "slug": "indoor",
+    "title": "Indoor Map",
+    "type": "local",
+    "url": "indoor.html",
+    "tags": [
+      "Indoor Map Tiles"
+    ],
+    "description": "Multi-level indoor map with floor filtering, using Mapxus indoor tileset layers."
+  },
+  {
+    "slug": "jwl-nowcast",
+    "title": "JWL Nowcast",
+    "type": "local",
+    "url": "jwl-nowcast.html",
+    "tags": [
+      "Japan Weather Layers"
+    ],
+    "description": "Japan Weather Layers nowcast demo showing rain, wind, alerts, and landslide risk tilesets."
+  },
+  {
+    "slug": "language-selector",
+    "title": "Language Selector — Map Labels",
+    "type": "local",
+    "url": "language-selector.html",
+    "tags": [],
+    "description": "Lets the user switch the map's label language via a selector control."
+  },
+  {
+    "slug": "logistics-checkout",
+    "title": "3PL Handoff Demo · Mapbox",
+    "type": "local",
+    "url": "logistics-checkout.html",
+    "tags": [
+      "Search Box API"
+    ],
+    "description": "Third-party logistics (3PL) handoff/checkout flow using the Mapbox Search JS address-search component."
+  },
+  {
+    "slug": "lottery",
+    "title": "抽選 (Lottery)",
+    "type": "local",
+    "url": "lottery.html",
+    "tags": [],
+    "description": "Event lottery demo with a globe animation, backed by an AWS Lambda + DynamoDB probability engine (see docs/LOTTERY-SETUP.md)."
+  },
+  {
+    "slug": "map-matching-demo",
+    "title": "マップマッチングデモ (Map Matching Demo)",
+    "type": "local",
+    "url": "map-matching-demo.html",
+    "tags": [
+      "Map Matching API"
+    ],
+    "description": "Click-to-snap map matching demo aligning clicked points to the road network, centered on Tokyo."
+  },
+  {
+    "slug": "mapbox-amap",
+    "title": "Mapbox AMAP",
+    "type": "local",
+    "url": "mapbox-amap.html",
+    "tags": [],
+    "description": "Map demo combining Mapbox with the AMap (AutoNavi) library, centered on Beijing."
+  },
+  {
+    "slug": "merchants-overlay-demo",
+    "title": "Merchants Tileset Overlay Demo",
+    "type": "local",
+    "url": "merchants-overlay-demo.html",
+    "tags": [],
+    "description": "Overlays and filters a merchant-location tileset (加盟店フィルター) on the map."
+  },
+  {
+    "slug": "mpl-3d",
+    "title": "MPL 3D",
+    "type": "local",
+    "url": "mpl-3d.html",
+    "tags": [],
+    "description": "3D map demo plotting and filtering MPL point data by type, with click-to-set start/end points."
+  },
+  {
+    "slug": "naurt-data",
+    "title": "Naurt Data Visualization",
+    "type": "local",
+    "url": "naurt-data.html",
+    "tags": [
+      "Search Box API"
+    ],
+    "description": "Visualizes Naurt location-data points on the map."
+  },
+  {
+    "slug": "navigation-trace-demo",
+    "title": "Navigation Trace Visualization",
+    "type": "local",
+    "url": "navigation-trace-demo.html",
+    "tags": [
+      "Map Matching API"
+    ],
+    "description": "Visualizes a navigation trace snapped to roads via map matching, centered on Tokyo."
+  },
+  {
+    "slug": "nea",
+    "title": "NEA",
+    "type": "local",
+    "url": "nea.html",
+    "tags": [],
+    "description": "Map demo built around NEA (National Environment Agency) data."
+  },
+  {
+    "slug": "notam-demo",
+    "title": "NOTAM Proximity Demo",
+    "type": "local",
+    "url": "notam-demo.html",
+    "tags": [],
+    "description": "Shows proximity to NOTAM (Notice to Airmen) zones, centered over Southeast Asia."
+  },
+  {
+    "slug": "osaka-indoor",
+    "title": "Osaka Indoor",
+    "type": "local",
+    "url": "osaka-indoor.html",
+    "tags": [
+      "Indoor Map Tiles"
+    ],
+    "description": "Indoor map demo for an Osaka venue, using an 'indoor' vector source with floor-level filtering."
+  },
+  {
+    "slug": "poi-map-builder",
+    "title": "POI Map Builder - Mapbox GL JS",
+    "type": "local",
+    "url": "poi-map-builder.html",
+    "tags": [],
+    "description": "Tool for building custom POI maps, centered on Japan (see docs/poi-map-builder-guide.html)."
+  },
+  {
+    "slug": "precipitation-search",
+    "title": "Precipitation Search",
+    "type": "local",
+    "url": "precipitation-search.html",
+    "tags": [
+      "Directions API",
+      "Japan Weather Layers",
+      "Search Box API"
+    ],
+    "description": "Combines precipitation radar overlays with address search and routing."
+  },
+  {
+    "slug": "random-points",
+    "title": "Random",
+    "type": "local",
+    "url": "random-points.html",
+    "tags": [],
+    "description": "Generates and displays random points within polygon boundaries, loaded from a large local GeoJSON dataset."
+  },
+  {
+    "slug": "return-to-route",
+    "title": "Return to Route Demo",
+    "type": "local",
+    "url": "return-to-route.html",
+    "tags": [
+      "Directions API",
+      "Map Matching API",
+      "Matrix API"
+    ],
+    "description": "Demonstrates recalculating a return-to-route path after a vehicle deviates, centered on Melbourne."
+  },
+  {
+    "slug": "rivers",
+    "title": "Rivers",
+    "type": "local",
+    "url": "rivers.html",
+    "tags": [],
+    "description": "Displays river/waterway data as a map layer."
+  },
+  {
+    "slug": "sapporo-pois",
+    "title": "Sapporo Medical Facilities & Airport - Mapbox GL JS",
+    "type": "local",
+    "url": "sapporo-pois.html",
+    "tags": [],
+    "description": "Shows medical facilities and airport POIs around Sapporo."
+  },
+  {
+    "slug": "singapore-disaster",
+    "title": "Singapore Disaster Response",
+    "type": "local",
+    "url": "singapore-disaster.html",
+    "tags": [],
+    "description": "Disaster-response visualization centered on Singapore."
+  },
+  {
+    "slug": "static-tiles",
+    "title": "Static Tiles Demo",
+    "type": "local",
+    "url": "static-tiles.html",
+    "tags": [
+      "Raster/Vector Tiles API"
+    ],
+    "description": "Demonstrates rendering Mapbox static raster tiles."
+  },
+  {
+    "slug": "store-list",
+    "title": "新店舗一覧 (Store List)",
+    "type": "local",
+    "url": "store-list.html",
+    "tags": [],
+    "description": "Lists new store locations in a table/list view."
+  },
+  {
+    "slug": "store-location-comparison",
+    "title": "Store Location Comparison - Mapbox vs Google",
+    "type": "local",
+    "url": "store-location-comparison.html",
+    "tags": [
+      "Tilequery API"
+    ],
+    "description": "Compares store location data queries between Mapbox and Google, centered on Tokyo."
+  },
+  {
+    "slug": "store-locator",
+    "title": "Store Locator",
+    "type": "local",
+    "url": "store-locator.html",
+    "tags": [
+      "Directions API",
+      "Search Box API"
+    ],
+    "description": "Store locator demo with address search and driving directions to the nearest store."
+  },
+  {
+    "slug": "storytelling",
+    "title": "Storytelling",
+    "type": "local",
+    "url": "storytelling.html",
+    "tags": [],
+    "description": "Scroll-driven storytelling map (scrollytelling) with camera animation, centered on Washington DC."
+  },
+  {
+    "slug": "streets-extruded",
+    "title": "Streets Extruded",
+    "type": "local",
+    "url": "streets-extruded.html",
+    "tags": [],
+    "description": "Renders street geometry as extruded 3D lines."
+  },
+  {
+    "slug": "style-check-demo",
+    "title": "Style Check Demo",
+    "type": "local",
+    "url": "style-check-demo.html",
+    "tags": [],
+    "description": "Displays a custom Mapbox style for easy viewing and testing."
+  },
+  {
+    "slug": "tap-payment",
+    "title": "Tap Payment",
+    "type": "local",
+    "url": "tap-payment.html",
+    "tags": [
+      "Directions API"
+    ],
+    "description": "Transit tap-payment usage history demo (利用履歴) with route display."
+  },
+  {
+    "slug": "travel-highlights-demo",
+    "title": "Travel Highlights 2024",
+    "type": "local",
+    "url": "travel-highlights-demo.html",
+    "tags": [
+      "Search Box API"
+    ],
+    "description": "Animated year-in-review travel highlights tour with a completion summary modal."
+  },
+  {
+    "slug": "turn-by-turn-demo",
+    "title": "Turn-by-Turn Navigation Demo",
+    "type": "local",
+    "url": "turn-by-turn-demo.html",
+    "tags": [
+      "Directions API",
+      "Map Matching API"
+    ],
+    "description": "Turn-by-turn navigation demo with live route guidance."
+  },
+  {
+    "slug": "weather3d",
+    "title": "Weather 3D",
+    "type": "local",
+    "url": "weather3d.html",
+    "tags": [
+      "Search Box API"
+    ],
+    "description": "3D weather visualization demo."
+  },
+  {
+    "slug": "wind-bom",
+    "title": "Wind Speed and Particles Demo",
+    "type": "local",
+    "url": "wind-bom.html",
+    "tags": [],
+    "description": "Animated wind speed/particle visualization over Australia, sourced from BOM data."
+  },
+  {
+    "slug": "wind-jwl",
+    "title": "Wind (JWL)",
+    "type": "local",
+    "url": "wind-jwl.html",
+    "tags": [
+      "Japan Weather Layers"
+    ],
+    "description": "Wind visualization using Japan Weather Layers tilesets."
+  },
+  {
+    "slug": "zenrin-osm-comparison",
+    "title": "Directions Comparison - OSM vs Zenrin",
+    "type": "local",
+    "url": "zenrin-osm-comparison.html",
+    "tags": [
+      "Directions API"
+    ],
+    "description": "Compares driving directions computed from OSM-based vs. Zenrin-based road data."
+  },
+  {
+    "slug": "real-estate-jp",
+    "title": "Real Estate (JP)",
+    "type": "external",
+    "url": "https://demos.mapbox.com/japan-real-estate/",
+    "tags": [],
+    "tagsVerified": false,
+    "description": "Real estate listing/search map for Japan."
+  },
+  {
+    "slug": "real-estate-en",
+    "title": "Real Estate (EN)",
+    "type": "external",
+    "url": "https://demos.mapbox.com/japan-real-estate/?lng=en",
+    "tags": [],
+    "tagsVerified": false,
+    "description": "English-language version of the Japan real estate listing/search map."
+  },
+  {
+    "slug": "tokyo-movement",
+    "title": "Tokyo Movement",
+    "type": "external",
+    "url": "https://demos.mapbox.com/tokyo-movement/",
+    "tags": [
+      "Mapbox Movement Data"
+    ],
+    "tagsVerified": false,
+    "description": "Movement/mobility data visualization for Tokyo."
+  },
+  {
+    "slug": "optimization",
+    "title": "Optimization",
+    "type": "external",
+    "url": "https://demos.mapbox.com/japan-optimization-v2/",
+    "tags": [
+      "Optimization API"
+    ],
+    "tagsVerified": false,
+    "description": "Route optimization demo for Japan."
+  },
+  {
+    "slug": "tokyo-weather",
+    "title": "Tokyo Weather",
+    "type": "external",
+    "url": "https://demos.mapbox.com/tokyo-weather/",
+    "tags": [
+      "Japan Weather Layers"
+    ],
+    "tagsVerified": false,
+    "description": "Weather visualization for Tokyo."
+  },
+  {
+    "slug": "tokyo-news",
+    "title": "Tokyo News",
+    "type": "external",
+    "url": "https://demos.mapbox.com/tokyo-news/",
+    "tags": [],
+    "tagsVerified": false,
+    "description": "News-location visualization for Tokyo."
+  },
+  {
+    "slug": "navigate-trace",
+    "title": "Navigate Trace",
+    "type": "external",
+    "url": "https://demos.mapbox.com/tokyo-navigate-trace/",
+    "tags": [
+      "Map Matching API"
+    ],
+    "tagsVerified": false,
+    "description": "Navigation trace visualization hosted demo for Tokyo."
+  },
+  {
+    "slug": "calculate-area",
+    "title": "Calculate Area",
+    "type": "external",
+    "url": "https://demos.mapbox.com/japan-calculate-area/",
+    "tags": [],
+    "tagsVerified": false,
+    "description": "Tool for calculating area over drawn map regions in Japan."
+  },
+  {
+    "slug": "search-japan",
+    "title": "Search Japan",
+    "type": "external",
+    "url": "https://demos.mapbox.com/search-japan/",
+    "tags": [
+      "Search Box API"
+    ],
+    "tagsVerified": false,
+    "description": "Address/place search demo for Japan."
+  },
+  {
+    "slug": "auto-search",
+    "title": "Auto Search",
+    "type": "external",
+    "url": "https://demos.mapbox.com/auto-search/",
+    "tags": [
+      "Search Box API"
+    ],
+    "tagsVerified": false,
+    "description": "Automated search demo."
+  },
+  {
+    "slug": "fleet",
+    "title": "Fleet",
+    "type": "codepen",
+    "url": "https://codepen.io/kenji-shima/full/MWxexpK",
+    "tags": [],
+    "tagsVerified": false,
+    "description": "Fleet tracking/visualization CodePen demo."
+  },
+  {
+    "slug": "nowcast",
+    "title": "Nowcast",
+    "type": "codepen",
+    "url": "https://codepen.io/kenji-shima/full/yLWpPRW",
+    "tags": [
+      "Japan Weather Layers"
+    ],
+    "tagsVerified": false,
+    "description": "Weather nowcast visualization CodePen demo."
+  },
+  {
+    "slug": "global-weather",
+    "title": "Global Weather",
+    "type": "codepen",
+    "url": "https://codepen.io/kenji-shima/full/NWVwRQb",
+    "tags": [],
+    "tagsVerified": false,
+    "description": "Global weather visualization CodePen demo."
+  },
+  {
+    "slug": "typhoon",
+    "title": "Typhoon",
+    "type": "codepen",
+    "url": "https://codepen.io/kenji-shima/full/gOJOeNW",
+    "tags": [],
+    "tagsVerified": false,
+    "description": "Typhoon tracking visualization CodePen demo."
+  },
+  {
+    "slug": "tokushima-movement",
+    "title": "Tokushima Movement",
+    "type": "codepen",
+    "url": "https://codepen.io/kenji-shima/full/LYvPedE",
+    "tags": [
+      "Mapbox Movement Data"
+    ],
+    "tagsVerified": false,
+    "description": "Movement data visualization for Tokushima."
+  },
+  {
+    "slug": "nearest-vs-bilinear",
+    "title": "Nearest vs Bilinear",
+    "type": "codepen",
+    "url": "https://codepen.io/kenji-shima/full/PoLLBzJ",
+    "tags": [],
+    "tagsVerified": false,
+    "description": "Comparison of nearest-neighbor vs. bilinear raster resampling."
+  },
+  {
+    "slug": "dosha",
+    "title": "Dosha",
+    "type": "codepen",
+    "url": "https://codepen.io/kenji-shima/full/abMwVOj",
+    "tags": [],
+    "tagsVerified": false,
+    "description": "Dosha (landslide/soil hazard) visualization CodePen demo."
+  },
+  {
+    "slug": "raster-vs-vector",
+    "title": "Raster vs Vector",
+    "type": "codepen",
+    "url": "https://codepen.io/kenji-shima/full/PoLwJor",
+    "tags": [
+      "Raster/Vector Tiles API"
+    ],
+    "tagsVerified": false,
+    "description": "Comparison of raster vs. vector tile rendering."
+  },
+  {
+    "slug": "3d-route",
+    "title": "3D Route",
+    "type": "codepen",
+    "url": "https://codepen.io/kenji-shima/full/jOdRyMM",
+    "tags": [
+      "Directions API"
+    ],
+    "tagsVerified": false,
+    "description": "3D route animation CodePen demo."
+  },
+  {
+    "slug": "precipitation",
+    "title": "Precipitation",
+    "type": "codepen",
+    "url": "https://codepen.io/kenji-shima/full/NWoWyGJ",
+    "tags": [
+      "Japan Weather Layers"
+    ],
+    "tagsVerified": false,
+    "description": "Precipitation radar visualization CodePen demo."
+  },
+  {
+    "slug": "static-images-boundaries",
+    "title": "Static Images Boundaries",
+    "type": "codepen",
+    "url": "https://codepen.io/kenji-shima/full/KKbBQjQ",
+    "tags": [
+      "Mapbox Boundaries"
+    ],
+    "tagsVerified": false,
+    "description": "Static map image demo showing boundary overlays."
+  },
+  {
+    "slug": "exclude-from-directions",
+    "title": "Exclude from Directions",
+    "type": "codepen",
+    "url": "https://codepen.io/kenji-shima/full/dyggRXM",
+    "tags": [
+      "Directions API"
+    ],
+    "tagsVerified": false,
+    "description": "Demonstrates excluding road types/areas from Directions API routes."
+  },
+  {
+    "slug": "mapbox-pois-to-google-codes",
+    "title": "Mapbox POIs to Google Codes",
+    "type": "codepen",
+    "url": "https://codepen.io/kenji-shima/full/eYPzLep",
+    "tags": [],
+    "tagsVerified": false,
+    "description": "Converts Mapbox POI data to Google Plus Codes."
+  }
+]
