@@ -6,5 +6,6 @@ LOTTERY-SETUP.md
 
 _build/
 docs/
+demos/autopilot-map.html
 
 .claude/
