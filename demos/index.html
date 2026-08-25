@@ -47,25 +47,13 @@
 
   .result-count { font-size: 13px; color: var(--muted); margin: 18px 0 10px; }
 
-  .list { border: 1px solid var(--border); border-radius: 12px; }
+  .list { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
   .row {
-    position: relative;
     display: flex; flex-direction: column; gap: 8px; padding: 10px 14px;
     border-bottom: 1px solid var(--border); background: var(--card);
   }
-  .row:first-child { border-radius: 12px 12px 0 0; }
-  .row:last-child { border-bottom: none; border-radius: 0 0 12px 12px; }
+  .row:last-child { border-bottom: none; }
   .row:hover { background: var(--bg-elevated); }
-
-  .row[data-tooltip]::after {
-    content: attr(data-tooltip);
-    position: absolute; top: 100%; left: 14px; right: 14px; margin-top: 6px;
-    background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px;
-    padding: 8px 10px; font-size: 12px; line-height: 1.4; color: var(--text);
-    box-shadow: 0 8px 20px oklch(0 0 0 / 0.4);
-    opacity: 0; pointer-events: none; transition: opacity 0.12s ease; z-index: 20;
-  }
-  .row[data-tooltip]:hover::after { opacity: 1; }
   .row-top { display: flex; align-items: center; gap: 10px; }
   .row-top .title { flex: 1; font-size: 13px; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row-top .source { font-size: 11px; color: var(--muted); flex-shrink: 0; display: none; }
@@ -79,6 +67,14 @@
   .tag-none { font-size: 11px; color: var(--muted); }
 
   .empty { color: var(--muted); font-size: 13px; padding: 40px 0; text-align: center; }
+
+  .floating-tooltip {
+    position: fixed; z-index: 1000; max-width: 320px; pointer-events: none;
+    background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 12px; line-height: 1.4; color: var(--text);
+    box-shadow: 0 8px 20px oklch(0 0 0 / 0.4);
+    opacity: 0; transition: opacity 0.1s ease;
+  }
 
   @media (min-width: 820px) {
     .row-top .source { display: block; }
@@ -103,6 +99,7 @@
   <p class="result-count" id="result-count"></p>
   <div id="list-container"></div>
 </div>
+<div class="floating-tooltip" id="tooltip"></div>
 
 <script>
 // Fixed hue-per-tag color scheme, ported from the approved design mock
@@ -209,6 +206,39 @@ document.getElementById('chips').addEventListener('click', (e) => {
     selectedTags.add(tag);
   }
   render();
+});
+
+const tooltip = document.getElementById('tooltip');
+let tooltipRow = null;
+
+function positionTooltip(x, y) {
+  const pad = 12;
+  const rect = tooltip.getBoundingClientRect();
+  let left = x + 16;
+  let top = y + 20;
+  if (left + rect.width + pad > window.innerWidth) left = x - rect.width - 16;
+  if (top + rect.height + pad > window.innerHeight) top = y - rect.height - 20;
+  tooltip.style.left = `${Math.max(pad, left)}px`;
+  tooltip.style.top = `${Math.max(pad, top)}px`;
+}
+
+document.getElementById('list-container').addEventListener('mousemove', (e) => {
+  const row = e.target.closest('.row');
+  if (row !== tooltipRow) {
+    tooltipRow = row;
+    if (row) {
+      tooltip.textContent = row.dataset.tooltip;
+      tooltip.style.opacity = '1';
+    } else {
+      tooltip.style.opacity = '0';
+    }
+  }
+  if (row) positionTooltip(e.clientX, e.clientY);
+});
+
+document.getElementById('list-container').addEventListener('mouseleave', () => {
+  tooltipRow = null;
+  tooltip.style.opacity = '0';
 });
 
 fetch('./demos.json')
