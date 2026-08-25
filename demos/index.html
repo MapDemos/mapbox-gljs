@@ -47,13 +47,25 @@
 
   .result-count { font-size: 13px; color: var(--muted); margin: 18px 0 10px; }
 
-  .list { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .list { border: 1px solid var(--border); border-radius: 12px; }
   .row {
+    position: relative;
     display: flex; flex-direction: column; gap: 8px; padding: 10px 14px;
     border-bottom: 1px solid var(--border); background: var(--card);
   }
-  .row:last-child { border-bottom: none; }
+  .row:first-child { border-radius: 12px 12px 0 0; }
+  .row:last-child { border-bottom: none; border-radius: 0 0 12px 12px; }
   .row:hover { background: var(--bg-elevated); }
+
+  .row[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute; top: 100%; left: 14px; right: 14px; margin-top: 6px;
+    background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 12px; line-height: 1.4; color: var(--text);
+    box-shadow: 0 8px 20px oklch(0 0 0 / 0.4);
+    opacity: 0; pointer-events: none; transition: opacity 0.12s ease; z-index: 20;
+  }
+  .row[data-tooltip]:hover::after { opacity: 1; }
   .row-top { display: flex; align-items: center; gap: 10px; }
   .row-top .title { flex: 1; font-size: 13px; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row-top .source { font-size: 11px; color: var(--muted); flex-shrink: 0; display: none; }
@@ -168,7 +180,7 @@ function render() {
       ? '<span class="tag-none">&mdash;</span>'
       : item.tags.map((t) => `<span class="tag" style="--tag-accent:${accentFor(t)};--tag-tint:${tintFor(t)}">${escapeHtml(t)}</span>`).join('');
     return `
-      <a class="row" href="${escapeHtml(item.url)}" target="_blank" rel="noopener" title="${escapeHtml(item.description)}">
+      <a class="row" href="${escapeHtml(item.url)}" target="_blank" rel="noopener" data-tooltip="${escapeHtml(item.description)}">
         <div class="row-top">
           <span class="title">${escapeHtml(item.title)}</span>
           ${domain ? `<span class="source">${escapeHtml(domain)}</span>` : ''}
