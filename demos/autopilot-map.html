@@ -661,8 +661,9 @@ button:hover {
   // Autopilot Map API Demo with Dynamic Tile Loading
 // Display lane-level navigation data with multiple layers
 
-// Use secret token with tilesets:read scope for Autopilot API
-const AUTOPILOT_TOKEN = 'sk.REDACTED-autopilot-secret-TOKEN';
+// Autopilot API requires a secret token (tilesets:read scope) - do not hardcode one here.
+// This demo has no server-side proxy yet, so tile fetches below will 401 until one is added.
+const AUTOPILOT_TOKEN = '';
 
 // Initialize map centered on Tokyo
 const map = new mapboxgl.Map({
