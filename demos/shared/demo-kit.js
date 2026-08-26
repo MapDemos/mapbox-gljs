@@ -128,8 +128,33 @@ async function fetchIsochrone(profile, coordinates, minutes, colors) {
     if (colors) {
         contourColors = `contours_colors=${colors}`
     }
-    const query = await fetch(`${isochrone_uri}${profile}/${coordinates[0]},${coordinates[1]}?contours_minutes=${minutes}&polygons=true&${contourColors}&access_token=${mapboxgl.accessToken}`)
-    return await query.json()
+    const url = `${isochrone_uri}${profile}/${coordinates[0]},${coordinates[1]}?contours_minutes=${minutes}&polygons=true&${contourColors}&access_token=${mapboxgl.accessToken}`
+
+    const maxRetries = 3
+    let retries = 0
+    while (retries < maxRetries) {
+        try {
+            const response = await fetch(url)
+            if (response.status === 429) {
+                const retryAfter = response.headers.get('Retry-After') || 2
+                console.warn(`Rate limited, waiting ${retryAfter}s before retry ${retries + 1}/${maxRetries}`)
+                await new Promise(resolve => setTimeout(resolve, retryAfter * 1000))
+                retries++
+                continue
+            }
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`)
+            }
+            return await response.json()
+        } catch (error) {
+            retries++
+            if (retries >= maxRetries) {
+                console.error(`Failed to fetch isochrone after ${maxRetries} retries:`, error)
+                throw error
+            }
+            await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+    }
 }
 
 async function fetchReverseSearchAddress(coordinates) {
@@ -425,7 +450,7 @@ const randomPointInPoly = (polygon) => {
 function japanifyMap(map) {
     map.getStyle().layers.forEach(function (layer) {
         if (layer.type === 'symbol' && layer.layout && layer.layout['text-field']) {
-            map.setLayoutProperty(layer.id, 'text-field', ['coalesce', ['get', 'name_ja'], ['get', 'text-field']])
+            map.setLayoutProperty(layer.id, 'text-field', ['coalesce', ['get', 'name_ja'], ['get', 'name']])
         }
     })
 }
@@ -810,4 +835,78 @@ polyline.toGeoJSON = function (str, precision) {
 
 if (typeof module === 'object' && module.exports) {
     module.exports = polyline;
+}
+
+function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+}
+
+function haversineDistanceMeters(a, b) {
+    const R = 6371000;
+    const toRad = (deg) => deg * Math.PI / 180;
+    const dLat = toRad(b[1] - a[1]);
+    const dLng = toRad(b[0] - a[0]);
+    const lat1 = toRad(a[1]);
+    const lat2 = toRad(b[1]);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function createTeardropMarkerEl(label, color, innerSvg) {
+    const el = document.createElement('div');
+    const inner = innerSvg || `<text x="14" y="18" font-size="11" font-weight="700" fill="white" text-anchor="middle" dominant-baseline="middle" font-family="-apple-system,sans-serif">${label}</text>`;
+    el.innerHTML = `
+    <svg width="28" height="40" viewBox="0 0 28 40" xmlns="http://www.w3.org/2000/svg">
+      <path d="M14 0C6.268 0 0 6.268 0 14c0 9.333 14 26 14 26S28 23.333 28 14C28 6.268 21.732 0 14 0z" fill="${color}" stroke="white" stroke-width="1.5"/>
+      ${inner}
+    </svg>`;
+    el.style.cssText = 'cursor:pointer;';
+    return el;
+}
+
+async function downloadElementScreenshot(elementId, filename, { format = 'png', quality } = {}) {
+    const isJpg = format === 'jpg';
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { displaySurface: 'browser' },
+        preferCurrentTab: true,
+    });
+    const video = document.createElement('video');
+    video.srcObject = stream;
+    await video.play();
+    // Wait for an actually-painted frame (play() can resolve before the first
+    // frame is composited, which would capture a black/blank image).
+    await new Promise(resolve => {
+        if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(() => resolve());
+        else requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+
+    const rect = document.getElementById(elementId).getBoundingClientRect();
+    const scaleX = video.videoWidth / window.innerWidth;
+    const scaleY = video.videoHeight / window.innerHeight;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = rect.width * scaleX;
+    canvas.height = rect.height * scaleY;
+    const ctx = canvas.getContext('2d');
+    if (isJpg) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+    ctx.drawImage(
+        video,
+        rect.left * scaleX, rect.top * scaleY, rect.width * scaleX, rect.height * scaleY,
+        0, 0, canvas.width, canvas.height
+    );
+    stream.getTracks().forEach(t => t.stop());
+
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = canvas.toDataURL(isJpg ? 'image/jpeg' : 'image/png', isJpg ? (quality ?? 0.92) : undefined);
+    link.click();
+}
+
+function wireProjectionSelector(map, selectEl) {
+    selectEl.addEventListener('change', (e) => map.setProjection(e.target.value));
 }

@@ -716,48 +716,7 @@ const addDeliveries = (data) => {
     });
 };
 
-// Update the fetchIsochrone function to include retry logic:
-async function fetchIsochrone(profile, coordinates, minutes, colors) {
-    let contourColors = '';
-    if (colors) {
-        contourColors = `contours_colors=${colors}`;
-    }
-    const isochrone_uri = 'https://api.mapbox.com/isochrone/v1/';
-    const url = `${isochrone_uri}${profile}/${coordinates[0]},${coordinates[1]}?contours_minutes=${minutes}&polygons=true&${contourColors}&access_token=${mapboxgl.accessToken}`;
-    
-    const maxRetries = 3;
-    let retries = 0;
-    
-    while (retries < maxRetries) {
-        try {
-            const response = await fetch(url);
-            
-            if (response.status === 429) {
-                // Rate limited, wait and retry
-                const retryAfter = response.headers.get('Retry-After') || 2; // Default 2 seconds
-                console.warn(`Rate limited, waiting ${retryAfter} seconds before retry ${retries + 1}/${maxRetries}`);
-                await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
-                retries++;
-                continue;
-            }
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            return await response.json();
-            
-        } catch (error) {
-            retries++;
-            if (retries >= maxRetries) {
-                console.error(`Failed to fetch isochrone after ${maxRetries} retries:`, error);
-                throw error;
-            }
-            // Wait before retry
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-    }
-}
+// fetchIsochrone (with retry/backoff) now lives in shared/demo-kit.js.
 
 // Add a throttled request function:
 function delay(ms) {

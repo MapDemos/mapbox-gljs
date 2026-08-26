@@ -926,14 +926,6 @@ let routeLayers = []; // Track route layer IDs for cleanup
 let originalBounds = null; // Store original bounds showing all results
 let clickedMarkerId = null; // Track which marker is currently clicked/highlighted
 
-// Generate UUIDv4 for session token
-function generateSessionToken() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-}
 
 // Clear all suggestion markers from the map
 function clearSuggestionMarkers() {
@@ -1961,7 +1953,7 @@ function initSearch() {
         const clearBtn = document.getElementById('clear-search');
 
         // Generate initial session token
-        sessionToken = generateSessionToken();
+        sessionToken = uuidv4();
         console.log('Search session token:', sessionToken);
 
         // Debounce search input
@@ -2561,7 +2553,7 @@ async function handleResultSelection(suggestion) {
         selectedMarker.togglePopup();
 
         // Generate new session token after selection (session ends after retrieve)
-        sessionToken = generateSessionToken();
+        sessionToken = uuidv4();
         console.log('New session token generated after selection:', sessionToken);
     } else {
         console.error('Marker not found for suggestion:', suggestion.name);

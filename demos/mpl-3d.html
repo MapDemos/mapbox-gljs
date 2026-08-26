@@ -145,23 +145,6 @@ label {
   }
 }
 
-a.boxclose {
-  float: right;
-  cursor: pointer;
-  display: block;
-  box-sizing: border-box;
-  width: 20px;
-  height: 20px;
-  border-width: 3px;
-  border-style: solid;
-  border-color: #605F61;
-  border-radius: 100%;
-  background: -webkit-linear-gradient(-45deg, transparent 0%, transparent 46%, white 46%, white 56%, transparent 56%, transparent 100%), -webkit-linear-gradient(45deg, transparent 0%, transparent 46%, white 46%, white 56%, transparent 56%, transparent 100%);
-  background-color: #605F61;
-  box-shadow: 0px 0px 5px 2px rgba(0, 0, 0, 0.5);
-  transition: all 0.3s ease;
-}
-
 h3 {
   /*background: #0076D1;
   color: #fff;*/
@@ -193,21 +176,6 @@ h1 {
   font-size: 40px;
 }
 
-.map-overlay-legend {
-  position: absolute;
-  opacity: 0.8;
-  top: 30;
-  right: 0;
-  background: #fff;
-  margin-right: 20px;
-  overflow: auto;
-  border-radius: 3px;
-  width: 300px;
-  padding: 10px;
-  font: 400 12px/22px 'Source Sans Pro', 'Helvetica Neue', sans-serif;
-  transition: transform .5s ease-in-out;
-}
-
 .mapboxgl-popup {
   padding-bottom: 10px;
   opacity: 0.8;
@@ -226,42 +194,6 @@ h1 {
   height: 56px;
   width: 56px;
   background-image: url(../images/alert.png);
-}
-
-.blinking {
-  -webkit-animation: blink .5s ease-in-out infinite alternate;
-  -moz-animation: blink .5s ease-in-out infinite alternate;
-  animation: blink .5s ease-in-out infinite alternate;
-}
-
-@-webkit-keyframes blink {
-  0% {
-    opacity: 0;
-  }
-
-  100% {
-    opacity: 1;
-  }
-}
-
-@-moz-keyframes blink {
-  0% {
-    opacity: 0;
-  }
-
-  100% {
-    opacity: 1;
-  }
-}
-
-@keyframes blink {
-  0% {
-    opacity: 0;
-  }
-
-  100% {
-    opacity: 1;
-  }
 }
 
 a.replay {
@@ -294,26 +226,6 @@ a.replay {
 
 .legend-scale {
   text-align: center;
-}
-
-.legend-bar {
-  position: relative;
-  height: 30px;
-  background: linear-gradient(to right,
-      rgba(80, 74, 154, 1),
-      rgba(84, 172, 162, 1),
-      rgba(193, 228, 148, 1),
-      rgba(252, 244, 162, 1),
-      rgba(251, 166, 91, 1),
-      rgba(216, 66, 65, 1),
-      rgba(143, 3, 58, 1));
-  border: 1px solid #999;
-  border-radius: 3px;
-  margin-bottom: 5px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 5px;
 }
 
 .legend-bar-humidity {
@@ -408,27 +320,8 @@ a.replay {
   <div id="map-overlay-wrapper"></div>
 </body>
 <script>
-  function getRandomInt(max) {
-    return Math.floor(Math.random() * max);
-}
-
-async function fetchDataJson(file) {
+  async function fetchDataJson(file) {
     const query = await fetch(`https://kenji-shima.github.io/resource-files/models/${file}`, { method: 'GET' });
-    return await query.json();
-}
-
-async function fetchJson(file) {
-    const query = await fetch(file, { method: 'GET' });
-    return await query.json();
-}
-
-async function fetchReverseGeo(coordinates) {
-    const query = await fetch(`${geocoding_uri}${coordinates[0]},${coordinates[1]}.json?${common_params}`, { method: 'GET' });
-    return await query.json();
-}
-
-async function fetchGeo(searchText) {
-    const query = await fetch(`${geocoding_uri}${searchText}.json?${common_params}`, { method: 'GET' });
     return await query.json();
 }
 
@@ -449,7 +342,7 @@ map.on('load', () => {
     setAltitude = cityAltitude;
     setPitch = cityPitch;
     setMultiplyBy = cityMultiplyBy;
-    startMarker = setMarker([lng, lat], 'blue');
+    startMarker = createMarker(map, [lng, lat], 'blue');
 
     map.addSource('mpl-points', {
         type: 'geojson',
@@ -509,7 +402,7 @@ const setStartMarker = (longitude, latitude) => {
     if (startMarker) {
         startMarker.remove();
     }
-    startMarker = setMarker([lng, lat], 'blue');
+    startMarker = createMarker(map, [lng, lat], 'blue');
 
 };
 
@@ -518,19 +411,12 @@ map.on('dblclick', (e) => {
     if (endMarker) {
         endMarker.remove();
     }
-    endMarker = setMarker(end, 'red');
+    endMarker = createMarker(map, end, 'red');
     getRoute(end);
 });
 
 let startMarker;
 let endMarker;
-
-function setMarker(coordinates, color) {
-    if (!color) color = '#ff0000';
-    const marker = new mapboxgl.Marker({ color: color });
-    marker.setLngLat(coordinates).addTo(map);
-    return marker;
-}
 
 function resetPrevious(remove_menu) {
 

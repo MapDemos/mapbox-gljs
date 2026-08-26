@@ -68,61 +68,8 @@ a {
   border-radius: 0;
 }
 
-.map-overlay-right {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  opacity: 0.8;
-  background-color: black;
-  color: white;
-  opacity: 0.8;
-  text-align: left;
-  overflow: auto;
-  border-radius: 3px;
-  padding: 10px;
-  font: 400 12px/22px 'Source Sans Pro', 'Helvetica Neue', sans-serif;
-  animation: slide-up 1s;
-}
-
 .title {
   font-weight: bold;
-}
-
-@keyframes slide-up {
-  from {
-    transform: translateY(100%);
-  }
-
-  to {
-    transform: translateY(0%);
-  }
-}
-
-@keyframes slide-right {
-  from {
-    transform: translateX(-100%);
-  }
-
-  to {
-    transform: translateX(0%);
-  }
-}
-
-a.boxclose {
-  float: right;
-  cursor: pointer;
-  display: block;
-  box-sizing: border-box;
-  width: 20px;
-  height: 20px;
-  border-width: 3px;
-  border-style: solid;
-  border-color: #605F61;
-  border-radius: 100%;
-  background: -webkit-linear-gradient(-45deg, transparent 0%, transparent 46%, white 46%, white 56%, transparent 56%, transparent 100%), -webkit-linear-gradient(45deg, transparent 0%, transparent 46%, white 46%, white 56%, transparent 56%, transparent 100%);
-  background-color: #605F61;
-  box-shadow: 0px 0px 5px 2px rgba(0, 0, 0, 0.5);
-  transition: all 0.3s ease;
 }
 
 h3 {
@@ -156,21 +103,6 @@ h1 {
   font-size: 40px;
 }
 
-.map-overlay-legend {
-  position: absolute;
-  opacity: 0.8;
-  top: 30;
-  right: 0;
-  background: #fff;
-  margin-right: 20px;
-  overflow: auto;
-  border-radius: 3px;
-  width: 300px;
-  padding: 10px;
-  font: 400 12px/22px 'Source Sans Pro', 'Helvetica Neue', sans-serif;
-  transition: transform .5s ease-in-out;
-}
-
 .mapboxgl-popup {
   padding-bottom: 10px;
   opacity: 0.8;
@@ -189,42 +121,6 @@ h1 {
   height: 56px;
   width: 56px;
   background-image: url(../images/alert.png);
-}
-
-.blinking {
-  -webkit-animation: blink .5s ease-in-out infinite alternate;
-  -moz-animation: blink .5s ease-in-out infinite alternate;
-  animation: blink .5s ease-in-out infinite alternate;
-}
-
-@-webkit-keyframes blink {
-  0% {
-    opacity: 0;
-  }
-
-  100% {
-    opacity: 1;
-  }
-}
-
-@-moz-keyframes blink {
-  0% {
-    opacity: 0;
-  }
-
-  100% {
-    opacity: 1;
-  }
-}
-
-@keyframes blink {
-  0% {
-    opacity: 0;
-  }
-
-  100% {
-    opacity: 1;
-  }
 }
 
 a.replay {
@@ -257,26 +153,6 @@ a.replay {
 
 .legend-scale {
   text-align: center;
-}
-
-.legend-bar {
-  position: relative;
-  height: 30px;
-  background: linear-gradient(to right,
-      rgba(80, 74, 154, 1),
-      rgba(84, 172, 162, 1),
-      rgba(193, 228, 148, 1),
-      rgba(252, 244, 162, 1),
-      rgba(251, 166, 91, 1),
-      rgba(216, 66, 65, 1),
-      rgba(143, 3, 58, 1));
-  border: 1px solid #999;
-  border-radius: 3px;
-  margin-bottom: 5px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 5px;
 }
 
 .label {
@@ -588,16 +464,7 @@ function initializeMap() {
   });
 
   map.on('load', () => {
-    // Set map to Japanese
-    map.getStyle().layers.forEach((layer) => {
-      if (layer.layout && layer.layout['text-field']) {
-        map.setLayoutProperty(layer.id, 'text-field', [
-          'coalesce',
-          ['get', 'name_ja'],
-          ['get', 'name']
-        ]);
-      }
-    });
+    japanifyMap(map);
 
     // Add atmosphere styling
     map.setFog({

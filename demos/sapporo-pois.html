@@ -248,20 +248,6 @@ function flyToView(tab) {
 }
 
 
-function makeMarkerEl(label, color, iconKey) {
-  const el = document.createElement('div');
-  const inner = iconKey && ICON_SVG[iconKey]
-    ? ICON_SVG[iconKey]
-    : `<text x="14" y="18" font-size="11" font-weight="700" fill="white" text-anchor="middle" dominant-baseline="middle" font-family="-apple-system,sans-serif">${label}</text>`;
-  el.innerHTML = `
-    <svg width="28" height="40" viewBox="0 0 28 40" xmlns="http://www.w3.org/2000/svg">
-      <path d="M14 0C6.268 0 0 6.268 0 14c0 9.333 14 26 14 26S28 23.333 28 14C28 6.268 21.732 0 14 0z" fill="${color}" stroke="white" stroke-width="1.5"/>
-      ${inner}
-    </svg>`;
-  el.style.cssText = 'cursor:pointer;';
-  return el;
-}
-
 function popupHTML(poi) {
   return `
     <div style="font-family:-apple-system,sans-serif;min-width:180px">
@@ -291,7 +277,7 @@ map.on('load', () => {
 
   // POI markers
   POIS.forEach((poi, i) => {
-    const el = makeMarkerEl(i + 1, poi.color, poi.icon);
+    const el = createTeardropMarkerEl(i + 1, poi.color, poi.icon && ICON_SVG[poi.icon]);
     poiMarkers[poi.id] = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
       .setLngLat([poi.lng, poi.lat])
       .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(popupHTML(poi)))
@@ -299,7 +285,7 @@ map.on('load', () => {
   });
 
   // Sapporo city marker (tab 1 overview)
-  poiMarkers.sapporo = new mapboxgl.Marker({ element: makeMarkerEl('', '#e11d48', null), anchor: 'bottom' })
+  poiMarkers.sapporo = new mapboxgl.Marker({ element: createTeardropMarkerEl('', '#e11d48', null), anchor: 'bottom' })
     .setLngLat([SAPPORO.lng, SAPPORO.lat])
     .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(
       `<div style="font-family:-apple-system,sans-serif"><b>Sapporo</b><br><span style="font-size:11px;color:#64748b">Client Location · Hokkaido, Japan</span></div>`
@@ -345,33 +331,7 @@ document.getElementById('btn-screenshot').addEventListener('click', async functi
   btn.textContent = 'Capturing…';
 
   try {
-    const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: { displaySurface: 'browser' },
-      preferCurrentTab: true,
-    });
-    const video = document.createElement('video');
-    video.srcObject = stream;
-    await video.play();
-
-    // Crop to #main only — compute scale between video pixels and CSS pixels
-    const rect = document.getElementById('main').getBoundingClientRect();
-    const scaleX = video.videoWidth / window.innerWidth;
-    const scaleY = video.videoHeight / window.innerHeight;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = rect.width * scaleX;
-    canvas.height = rect.height * scaleY;
-    canvas.getContext('2d').drawImage(
-      video,
-      rect.left * scaleX, rect.top * scaleY, rect.width * scaleX, rect.height * scaleY,
-      0, 0, canvas.width, canvas.height
-    );
-    stream.getTracks().forEach(t => t.stop());
-
-    const link = document.createElement('a');
-    link.download = `sapporo-map-tab${currentTab}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
+    await downloadElementScreenshot('main', `sapporo-map-tab${currentTab}.png`);
   } catch {
     // user cancelled
   } finally {

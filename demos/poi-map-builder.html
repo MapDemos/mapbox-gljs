@@ -318,20 +318,6 @@ minimap.on('moveend', () => {
 });
 
 // ---- Marker element factory ----
-function makeMarkerEl(label, color, iconKey) {
-  const el = document.createElement('div');
-  const inner = iconKey && ICON_SVG[iconKey]
-    ? ICON_SVG[iconKey]
-    : `<text x="14" y="18" font-size="11" font-weight="700" fill="white" text-anchor="middle" dominant-baseline="middle" font-family="-apple-system,sans-serif">${label}</text>`;
-  el.innerHTML = `
-    <svg width="28" height="40" viewBox="0 0 28 40" xmlns="http://www.w3.org/2000/svg">
-      <path d="M14 0C6.268 0 0 6.268 0 14c0 9.333 14 26 14 26S28 23.333 28 14C28 6.268 21.732 0 14 0z" fill="${color}" stroke="white" stroke-width="1.5"/>
-      ${inner}
-    </svg>`;
-  el.style.cssText = 'cursor:pointer;';
-  return el;
-}
-
 // Small inline SVG for legend rows that use a pin or icon style
 function legendPinSVG(color, iconKey) {
   const inner = iconKey && ICON_SVG[iconKey]
@@ -348,7 +334,7 @@ function rebuildMarkers() {
   state.pois.forEach((poi, i) => {
     const label = poi.style === 'numbered' ? (poi.label || (i + 1)) : '';
     const iconKey = poi.style === 'icon' ? (poi.icon || 'airport') : null;
-    const el = makeMarkerEl(label, poi.color, iconKey);
+    const el = createTeardropMarkerEl(label, poi.color, iconKey && ICON_SVG[iconKey]);
     const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
       .setLngLat([poi.lng, poi.lat])
       .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(
@@ -611,41 +597,7 @@ document.getElementById('btn-export').addEventListener('click', async function (
   btn.disabled = true;
   btn.textContent = 'Capturing…';
   try {
-    const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: { displaySurface: 'browser' },
-      preferCurrentTab: true,
-    });
-    const video = document.createElement('video');
-    video.srcObject = stream;
-    await video.play();
-    // Wait for an actually-painted frame (play() can resolve before the first
-    // frame is composited, which would capture a black/blank image).
-    await new Promise(resolve => {
-      if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(() => resolve());
-      else requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-    });
-
-    // Crop to #main only — scale between captured pixels and CSS pixels
-    const rect = document.getElementById('main').getBoundingClientRect();
-    const scaleX = video.videoWidth / window.innerWidth;
-    const scaleY = video.videoHeight / window.innerHeight;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = rect.width * scaleX;
-    canvas.height = rect.height * scaleY;
-    const ctx = canvas.getContext('2d');
-    if (isJpg) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
-    ctx.drawImage(
-      video,
-      rect.left * scaleX, rect.top * scaleY, rect.width * scaleX, rect.height * scaleY,
-      0, 0, canvas.width, canvas.height
-    );
-    stream.getTracks().forEach(t => t.stop());
-
-    const link = document.createElement('a');
-    link.download = `${slug(state.title)}.${isJpg ? 'jpg' : 'png'}`;
-    link.href = canvas.toDataURL(isJpg ? 'image/jpeg' : 'image/png', isJpg ? 0.92 : undefined);
-    link.click();
+    await downloadElementScreenshot('main', `${slug(state.title)}.${isJpg ? 'jpg' : 'png'}`, { format: fmt });
   } catch {
     // user cancelled
   } finally {

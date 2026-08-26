@@ -263,19 +263,11 @@ class SearchBoxControl {
     
     _getSessionToken() {
         if (!this._sessionToken) {
-            this._sessionToken = this._generateSessionToken();
+            this._sessionToken = uuidv4();
         }
         return this._sessionToken;
     }
-    
-    _generateSessionToken() {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            const r = Math.random() * 16 | 0;
-            const v = c == 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-    }
-    
+
     async _retrievePlace(suggestion) {
         try {
             const url = `https://api.mapbox.com/search/searchbox/v1/retrieve/${suggestion.mapbox_id}?access_token=${this.accessToken}&session_token=${this._getSessionToken()}`;
