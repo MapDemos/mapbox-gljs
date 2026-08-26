@@ -140,7 +140,7 @@ function matchesQuery(item) {
 
 function matchesTags(item) {
   if (selectedTags.size === 0) return true;
-  return item.tags.some((t) => selectedTags.has(t));
+  return [...selectedTags].every((t) => item.tags.includes(t));
 }
 
 function render() {
@@ -148,15 +148,16 @@ function render() {
   const filtered = bySearch.filter(matchesTags);
 
   // Chips: "All" plus every tag that appears in the data, in the fixed
-  // taxonomy order. Counts reflect the current search text only, not the
-  // other selected tags, so a count always answers "how many demos have
-  // this tag given the current search" independent of the rest of the
-  // selection (multi-select is OR: selecting more tags broadens results).
+  // taxonomy order. Multi-select is AND: selecting more tags narrows
+  // results to demos that have every selected tag. A chip's count answers
+  // "how many demos would match if this tag were added to the current
+  // selection" (given the search text) -- for an already-selected chip
+  // that's just the current result count, since it's already included.
   const chipsHtml = [{ key: null, label: 'All' }, ...TAG_ORDER.map((t) => ({ key: t, label: t }))]
     .map(({ key, label }) => {
       const count = key === null
         ? bySearch.length
-        : bySearch.filter((d) => d.tags.includes(key)).length;
+        : bySearch.filter((d) => [...selectedTags, key].every((t) => d.tags.includes(t))).length;
       const selected = key === null ? selectedTags.size === 0 : selectedTags.has(key);
       const accent = key === null ? BRAND_ACCENT : accentFor(key);
       return `<button class="chip${selected ? ' chip-selected' : ''}" style="--chip-accent:${accent}" data-tag="${key === null ? '' : escapeHtml(key)}">${escapeHtml(label)}<span class="chip-count">${count}</span></button>`;
