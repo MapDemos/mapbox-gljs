@@ -1,0 +1,398 @@
+/*
+  Tarmac Glass -- reusable style pack extracted from
+  demos/indoor-airport-brazil.html ("playful airport wayfinding" style,
+  rated NICE in the step-9 UI review).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/tarmac-glass.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Bebas Neue, IBM Plex Mono):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  Then build markup using the class/id contract below (see
+  tarmac-glass-template.html in this same folder for a full working
+  example you can copy the markup from):
+
+  - #map                        full-bleed map container
+  - .radio-group                dark-glass pill, 4 light-preset radio icons
+                                 (dawn/day/dusk/night) -- wire each input's
+                                 change event to
+                                 map.setConfigProperty('basemap','lightPreset', value)
+  - .info-bar (#info-bar)       floating "current selection" board
+    .bar-main                     row: .tour-btn, .chips-toggle, .live, .current
+    .tour-btn                     play/stop toggle -- add/remove .running
+    .chips-toggle                 expand/collapse the drawer -- toggles
+                                   .expanded on .info-bar
+    .live                         small pulsing dot, shown only while
+                                   .info-bar has .touring
+    .current > .cur-title/.cur-sub  the current item's code + label
+    .bar-drawer > .item-buttons     collapsible row of .item-btn chips
+                                     (add .active to the selected one)
+  .info-bar states (toggle these classes on #info-bar from JS):
+    .expanded   shows the .bar-drawer
+    .touring    hides .chips-toggle + .bar-drawer, shows .live
+
+  Optional: .mapboxgl-ctrl-* rules re-theme Mapbox's native IndoorControl
+  to match. Only relevant if your demo also uses Standard style's native
+  indoor floors -- delete that block below if not.
+*/
+
+:root {
+    --tarmac: #0b0f14;
+    --glass: rgba(13, 18, 25, 0.72);
+    --hairline: rgba(255, 255, 255, 0.10);
+    --amber: #ffb000;
+    --stop: #ff5a3c;
+    --ink: #eef2f6;
+    --muted: rgba(238, 242, 246, 0.55);
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background: var(--tarmac);
+    color: var(--ink);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+#map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+}
+
+/* Light preset selector (dawn / day / dusk / night) -- dark glass pill.
+   Requires a Standard-style map (map.setConfigProperty('basemap', 'lightPreset', value)). */
+.radio-group {
+    position: absolute;
+    z-index: 2;
+    top: 18px;
+    left: 18px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px;
+    border-radius: 999px;
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid var(--hairline);
+    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+}
+
+.radio-wrapper {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease;
+}
+
+.radio-wrapper:hover {
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.radiobutton {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.radio-group svg {
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+}
+
+.radio-group svg circle {
+    fill: transparent;
+    transition: fill 0.2s ease;
+}
+
+.radio-group svg path {
+    stroke: rgba(238, 242, 246, 0.5);
+    transition: stroke 0.2s ease;
+}
+
+.radio-group label:hover svg path {
+    stroke: var(--ink);
+}
+
+.radio-group input:checked + svg circle {
+    fill: var(--amber);
+}
+
+.radio-group input:checked + svg path {
+    stroke: var(--tarmac);
+}
+
+/* Info bar -- compact "current selection" board with a play/tour toggle
+   and an expandable drawer of choices. */
+.info-bar {
+    position: absolute;
+    z-index: 2;
+    left: 206px;
+    top: 18px;
+    max-width: calc(100vw - 224px);
+    padding: 9px 11px 9px 15px;
+    border-radius: 14px;
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(22px) saturate(140%);
+    backdrop-filter: blur(22px) saturate(140%);
+    border: 1px solid var(--hairline);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+.bar-main {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+}
+
+/* Live indicator -- shown only while a tour is running */
+.live {
+    display: none;
+    align-items: center;
+}
+
+.info-bar.touring .live {
+    display: inline-flex;
+}
+
+.live i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--amber);
+    animation: live-pulse 1.4s infinite;
+}
+
+@keyframes live-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(255, 176, 0, 0.6); }
+    70%  { box-shadow: 0 0 0 7px rgba(255, 176, 0, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 176, 0, 0); }
+}
+
+.current {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    white-space: nowrap;
+}
+
+.cur-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 23px;
+    line-height: 0.9;
+    letter-spacing: 1.5px;
+    color: var(--amber);
+}
+
+.cur-sub {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.tour-btn {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px;
+    letter-spacing: 2px;
+    color: var(--tarmac);
+    background: var(--amber);
+    outline: none;
+    border: none;
+    padding: 7px 20px 5px;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(255, 176, 0, 0.35);
+    transition: transform 0.12s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.tour-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 7px 22px rgba(255, 176, 0, 0.5);
+}
+
+.tour-btn:active {
+    transform: translateY(0);
+}
+
+.tour-btn.running {
+    background: transparent;
+    color: var(--stop);
+    box-shadow: inset 0 0 0 1.5px var(--stop);
+}
+
+.tour-btn.running:hover {
+    background: rgba(255, 90, 60, 0.12);
+    box-shadow: inset 0 0 0 1.5px var(--stop);
+}
+
+/* Chips expander toggle */
+.chips-toggle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    line-height: 1;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--hairline);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.chips-toggle:hover {
+    color: var(--ink);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.info-bar.expanded .chips-toggle {
+    color: var(--amber);
+    transform: rotate(180deg);
+}
+
+.info-bar.touring .chips-toggle {
+    display: none;
+}
+
+/* Collapsible drawer of item chips */
+.bar-drawer {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.32s ease, opacity 0.25s ease, margin-top 0.32s ease, padding-top 0.32s ease;
+}
+
+.info-bar.expanded .bar-drawer {
+    max-height: 220px;
+    opacity: 1;
+    margin-top: 11px;
+    padding-top: 11px;
+    border-top: 1px solid var(--hairline);
+}
+
+.info-bar.touring .bar-drawer {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}
+
+.item-buttons {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    justify-content: center;
+    overflow-x: auto;
+}
+
+.item-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--hairline);
+    padding: 7px 11px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.item-btn:hover {
+    color: var(--ink);
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
+.item-btn.active {
+    color: var(--tarmac);
+    background: var(--amber);
+    border-color: var(--amber);
+    box-shadow: 0 0 16px rgba(255, 176, 0, 0.35);
+}
+
+/* Optional: only needed if your demo also uses Mapbox Standard style's
+   native indoor floors (mapboxgl.IndoorControl) -- re-themes it to match.
+   Delete this block if you're not using indoor floors. */
+.mapboxgl-ctrl-top-right {
+    top: 0 !important;
+    right: 16px !important;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-end;
+    transform: none !important;
+}
+
+.mapboxgl-ctrl-group {
+    background: var(--glass) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid var(--hairline) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5) !important;
+    overflow: hidden;
+}
+
+.mapboxgl-ctrl-group button {
+    width: 36px;
+    height: 36px;
+    background: transparent !important;
+}
+
+.mapboxgl-ctrl-group button + button {
+    border-top: 1px solid var(--hairline) !important;
+}
+
+.mapboxgl-ctrl-level-button {
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: var(--muted) !important;
+    background: transparent !important;
+}
+
+.mapboxgl-ctrl-level-button:hover {
+    color: var(--ink) !important;
+    background: rgba(255, 255, 255, 0.07) !important;
+}
+
+.mapboxgl-ctrl-level-button-selected {
+    color: var(--amber) !important;
+    background: rgba(255, 176, 0, 0.1) !important;
+    font-weight: 700 !important;
+    box-shadow: inset 3px 0 0 var(--amber) !important;
+    text-shadow: 0 0 12px rgba(255, 176, 0, 0.75);
+}
+
+.mapboxgl-ctrl-level-button-selected:hover {
+    background: rgba(255, 176, 0, 0.16) !important;
+    color: var(--amber) !important;
+}
+
+@media (max-width: 640px) {
+    .info-bar {
+        left: 10px;
+        right: 10px;
+        transform: none;
+        max-width: none;
+    }
+
+    .bar-main {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
