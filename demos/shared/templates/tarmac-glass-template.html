@@ -1,0 +1,506 @@
+<!--
+  Starting-point template, extracted from demos/indoor-airport-brazil.html
+  ("playful airport wayfinding" style, rated NICE in the step-9 UI review).
+
+  What's generic (safe to reuse as-is): the CSS variables, the light-preset
+  pill, and the "info bar with a play/tour toggle + expandable item-chip
+  drawer" pattern. None of it references airports by name in the markup --
+  #current-item / .item-btn etc. are filled in by JS at runtime, so this
+  works for any "pick one of several places/things, optionally play a tour
+  through them" demo, not just airports.
+
+  What's specific to indoor-airport-brazil.html and NOT included here: the
+  cinematic multi-airport tour camera choreography, and the floor-polling
+  logic that clicks Mapbox's native IndoorControl buttons (only relevant if
+  your new demo also uses Standard style's native indoor floors -- the CSS
+  block that re-themes .mapboxgl-ctrl-level-button etc. IS included below
+  since it's generic theming, just delete it if you don't need indoor floors).
+
+  This file is a real, runnable page -- open it directly to see the pattern
+  working with 4 placeholder items before you copy/adapt it.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+    :root {
+        --tarmac: #0b0f14;
+        --glass: rgba(13, 18, 25, 0.72);
+        --hairline: rgba(255, 255, 255, 0.10);
+        --amber: #ffb000;
+        --stop: #ff5a3c;
+        --ink: #eef2f6;
+        --muted: rgba(238, 242, 246, 0.55);
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        background: var(--tarmac);
+        color: var(--ink);
+        font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    }
+
+    #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+    }
+
+    /* Light preset selector (dawn / day / dusk / night) -- dark glass pill.
+       Requires a Standard-style map (map.setConfigProperty('basemap', 'lightPreset', value)). */
+    .radio-group {
+        position: absolute;
+        z-index: 2;
+        top: 18px;
+        left: 18px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px;
+        border-radius: 999px;
+        background: var(--glass);
+        -webkit-backdrop-filter: blur(18px) saturate(140%);
+        backdrop-filter: blur(18px) saturate(140%);
+        border: 1px solid var(--hairline);
+        box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+    }
+
+    .radio-wrapper {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s ease;
+    }
+
+    .radio-wrapper:hover {
+        background: rgba(255, 255, 255, 0.07);
+    }
+
+    .radiobutton {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .radio-group svg {
+        width: 30px;
+        height: 30px;
+        cursor: pointer;
+    }
+
+    .radio-group svg circle {
+        fill: transparent;
+        transition: fill 0.2s ease;
+    }
+
+    .radio-group svg path {
+        stroke: rgba(238, 242, 246, 0.5);
+        transition: stroke 0.2s ease;
+    }
+
+    .radio-group label:hover svg path {
+        stroke: var(--ink);
+    }
+
+    .radio-group input:checked + svg circle {
+        fill: var(--amber);
+    }
+
+    .radio-group input:checked + svg path {
+        stroke: var(--tarmac);
+    }
+
+    /* Info bar -- compact "current selection" board with a play/tour toggle
+       and an expandable drawer of choices. Rename .item-btn/#current-item/
+       #info-bar to fit your content (e.g. .store-btn, #current-store). */
+    .info-bar {
+        position: absolute;
+        z-index: 2;
+        left: 206px;
+        top: 18px;
+        max-width: calc(100vw - 224px);
+        padding: 9px 11px 9px 15px;
+        border-radius: 14px;
+        background: var(--glass);
+        -webkit-backdrop-filter: blur(22px) saturate(140%);
+        backdrop-filter: blur(22px) saturate(140%);
+        border: 1px solid var(--hairline);
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+    }
+
+    .bar-main {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+    }
+
+    /* Live indicator -- shown only while a tour is running */
+    .live {
+        display: none;
+        align-items: center;
+    }
+
+    .info-bar.touring .live {
+        display: inline-flex;
+    }
+
+    .live i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--amber);
+        animation: live-pulse 1.4s infinite;
+    }
+
+    @keyframes live-pulse {
+        0%   { box-shadow: 0 0 0 0 rgba(255, 176, 0, 0.6); }
+        70%  { box-shadow: 0 0 0 7px rgba(255, 176, 0, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(255, 176, 0, 0); }
+    }
+
+    .current {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 1px;
+        white-space: nowrap;
+    }
+
+    .cur-title {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 23px;
+        line-height: 0.9;
+        letter-spacing: 1.5px;
+        color: var(--amber);
+    }
+
+    .cur-sub {
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+    }
+
+    .tour-btn {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 16px;
+        letter-spacing: 2px;
+        color: var(--tarmac);
+        background: var(--amber);
+        outline: none;
+        border: none;
+        padding: 7px 20px 5px;
+        border-radius: 8px;
+        cursor: pointer;
+        box-shadow: 0 4px 16px rgba(255, 176, 0, 0.35);
+        transition: transform 0.12s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+    }
+
+    .tour-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 7px 22px rgba(255, 176, 0, 0.5);
+    }
+
+    .tour-btn:active {
+        transform: translateY(0);
+    }
+
+    .tour-btn.running {
+        background: transparent;
+        color: var(--stop);
+        box-shadow: inset 0 0 0 1.5px var(--stop);
+    }
+
+    .tour-btn.running:hover {
+        background: rgba(255, 90, 60, 0.12);
+        box-shadow: inset 0 0 0 1.5px var(--stop);
+    }
+
+    /* Chips expander toggle */
+    .chips-toggle {
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 13px;
+        line-height: 1;
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        color: var(--muted);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--hairline);
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .chips-toggle:hover {
+        color: var(--ink);
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .info-bar.expanded .chips-toggle {
+        color: var(--amber);
+        transform: rotate(180deg);
+    }
+
+    .info-bar.touring .chips-toggle {
+        display: none;
+    }
+
+    /* Collapsible drawer of item chips */
+    .bar-drawer {
+        max-height: 0;
+        overflow: hidden;
+        opacity: 0;
+        transition: max-height 0.32s ease, opacity 0.25s ease, margin-top 0.32s ease, padding-top 0.32s ease;
+    }
+
+    .info-bar.expanded .bar-drawer {
+        max-height: 220px;
+        opacity: 1;
+        margin-top: 11px;
+        padding-top: 11px;
+        border-top: 1px solid var(--hairline);
+    }
+
+    .info-bar.touring .bar-drawer {
+        max-height: 0;
+        opacity: 0;
+        margin-top: 0;
+        padding-top: 0;
+        border-top: none;
+    }
+
+    .item-buttons {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 6px;
+        justify-content: center;
+        overflow-x: auto;
+    }
+
+    .item-btn {
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--hairline);
+        padding: 7px 11px;
+        border-radius: 7px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .item-btn:hover {
+        color: var(--ink);
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.22);
+    }
+
+    .item-btn.active {
+        color: var(--tarmac);
+        background: var(--amber);
+        border-color: var(--amber);
+        box-shadow: 0 0 16px rgba(255, 176, 0, 0.35);
+    }
+
+    /* Optional: only needed if your demo also uses Mapbox Standard style's
+       native indoor floors (mapboxgl.IndoorControl) -- re-themes it to match.
+       Delete this block if you're not using indoor floors. */
+    .mapboxgl-ctrl-top-right {
+        top: 0 !important;
+        right: 16px !important;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-end;
+        transform: none !important;
+    }
+
+    .mapboxgl-ctrl-group {
+        background: var(--glass) !important;
+        -webkit-backdrop-filter: blur(18px) saturate(140%);
+        backdrop-filter: blur(18px) saturate(140%);
+        border: 1px solid var(--hairline) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5) !important;
+        overflow: hidden;
+    }
+
+    .mapboxgl-ctrl-group button {
+        width: 36px;
+        height: 36px;
+        background: transparent !important;
+    }
+
+    .mapboxgl-ctrl-group button + button {
+        border-top: 1px solid var(--hairline) !important;
+    }
+
+    .mapboxgl-ctrl-level-button {
+        font-family: 'IBM Plex Mono', monospace !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        color: var(--muted) !important;
+        background: transparent !important;
+    }
+
+    .mapboxgl-ctrl-level-button:hover {
+        color: var(--ink) !important;
+        background: rgba(255, 255, 255, 0.07) !important;
+    }
+
+    .mapboxgl-ctrl-level-button-selected {
+        color: var(--amber) !important;
+        background: rgba(255, 176, 0, 0.1) !important;
+        font-weight: 700 !important;
+        box-shadow: inset 3px 0 0 var(--amber) !important;
+        text-shadow: 0 0 12px rgba(255, 176, 0, 0.75);
+    }
+
+    .mapboxgl-ctrl-level-button-selected:hover {
+        background: rgba(255, 176, 0, 0.16) !important;
+        color: var(--amber) !important;
+    }
+
+    @media (max-width: 640px) {
+        .info-bar {
+            left: 10px;
+            right: 10px;
+            transform: none;
+            max-width: none;
+        }
+
+        .bar-main {
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+    }
+</style>
+</head>
+<body>
+<!-- Light preset selector -->
+<div class="radio-group">
+    <label class="radio-wrapper">
+        <input type="radio" name="light" value="dawn" class="radiobutton" />
+        <svg width="38" height="38" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="19" cy="19" r="18.5" fill="white"></circle><path d="M29.9414 29.9673L7.44141 29.9673" stroke="#282828" stroke-width="2" stroke-linecap="round"></path><path d="M18.998 12.7725L18.998 6.53246" stroke="#282828" stroke-width="2" stroke-linecap="round"></path></svg>
+    </label>
+    <label class="radio-wrapper">
+        <input type="radio" name="light" value="day" class="radiobutton" checked />
+        <svg width="38" height="38" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="19" cy="19.0002" r="18.5" fill="white"></circle><circle cx="19" cy="19" r="5.5" stroke="#282828" stroke-width="2"></circle></svg>
+    </label>
+    <label class="radio-wrapper">
+        <input type="radio" name="light" class="radiobutton" value="dusk" />
+        <svg width="38" height="38" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="19" cy="19" r="18.5" fill="white"></circle><path d="M19 17.3643V19.6833" stroke="#282828" stroke-width="2" stroke-linecap="round"></path></svg>
+    </label>
+    <label class="radio-wrapper">
+        <input type="radio" name="light" class="radiobutton" value="night" />
+        <svg width="38" height="38" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="19" cy="19" r="18.5" fill="white"></circle><path d="M18.53 27.9489C14.9462 28.7919 11.3593 27.5714 9.01172 25.0631C10.617 25.5423 12.3651 25.6235 14.1138 25.2139C19.4467 23.9597 22.7537 18.6189 21.4996 13.2864C21.0884 11.5378 20.2364 10.01 19.0919 8.78589C22.3837 9.77013 25.0744 12.4361 25.9173 16.0214C27.1705 21.3549 23.864 26.6947 18.53 27.9489Z" stroke="#282828" stroke-width="2"></path></svg>
+    </label>
+</div>
+
+<div id="map"></div>
+
+<!-- Info bar: current selection + play/tour toggle + expandable chip drawer -->
+<div class="info-bar expanded" id="info-bar">
+    <div class="bar-main">
+        <button id="tour-toggle" class="tour-btn">▶ Play</button>
+        <button id="chips-toggle" class="chips-toggle" title="Choose item" aria-label="Choose item">▾</button>
+        <span class="live"><i></i></span>
+        <div class="current" id="current-item"></div>
+    </div>
+    <div class="bar-drawer">
+        <div class="item-buttons" id="item-buttons"></div>
+    </div>
+</div>
+
+<script>
+// Placeholder data -- replace with your own items. Each needs at minimum a
+// short code (shown in the chip), a title/subtitle for the board, and
+// somewhere to fly the camera to.
+const ITEMS = [
+    { code: 'HND', title: 'Haneda', sub: 'Tokyo, Japan', center: [139.7798, 35.5494], zoom: 15.5 },
+    { code: 'CDG', title: 'Charles de Gaulle', sub: 'Paris, France', center: [2.5479, 49.0097], zoom: 15.5 },
+    { code: 'JFK', title: 'John F. Kennedy', sub: 'New York, USA', center: [-73.7781, 40.6413], zoom: 15.5 },
+    { code: 'DXB', title: 'Dubai Intl', sub: 'Dubai, UAE', center: [55.3644, 25.2532], zoom: 15.5 },
+];
+
+const map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/standard',
+    center: ITEMS[0].center,
+    zoom: ITEMS[0].zoom,
+    pitch: 60,
+});
+
+const barEl = document.getElementById('info-bar');
+const currentEl = document.getElementById('current-item');
+const itemButtonsEl = document.getElementById('item-buttons');
+const chipsToggle = document.getElementById('chips-toggle');
+const tourBtn = document.getElementById('tour-toggle');
+
+chipsToggle.addEventListener('click', () => barEl.classList.toggle('expanded'));
+
+function renderCurrent(item) {
+    currentEl.innerHTML = `<div class="cur-title">${item.code}</div><div class="cur-sub">${item.title}</div>`;
+}
+
+function selectItem(item, { fly = true } = {}) {
+    document.querySelectorAll('.item-btn').forEach((b) => b.classList.toggle('active', b.dataset.code === item.code));
+    renderCurrent(item);
+    if (fly) map.flyTo({ center: item.center, zoom: item.zoom, duration: 1400 });
+}
+
+ITEMS.forEach((item) => {
+    const btn = document.createElement('button');
+    btn.className = 'item-btn';
+    btn.dataset.code = item.code;
+    btn.textContent = item.code;
+    btn.addEventListener('click', () => selectItem(item));
+    itemButtonsEl.appendChild(btn);
+});
+selectItem(ITEMS[0], { fly: false });
+
+document.querySelectorAll('input[name="light"]').forEach((input) => {
+    input.addEventListener('change', function () {
+        map.setConfigProperty('basemap', 'lightPreset', this.value);
+    });
+});
+
+let tourTimer = null;
+tourBtn.addEventListener('click', () => {
+    const running = barEl.classList.contains('touring');
+    if (running) {
+        clearInterval(tourTimer);
+        barEl.classList.remove('touring');
+        tourBtn.textContent = '▶ Play';
+        tourBtn.classList.remove('running');
+        return;
+    }
+    barEl.classList.add('touring');
+    barEl.classList.remove('expanded');
+    tourBtn.textContent = '■ Stop';
+    tourBtn.classList.add('running');
+    let i = ITEMS.findIndex((it) => it.code === document.querySelector('.item-btn.active')?.dataset.code);
+    tourTimer = setInterval(() => {
+        i = (i + 1) % ITEMS.length;
+        selectItem(ITEMS[i]);
+    }, 3000);
+});
+</script>
+</body>
+</html>
