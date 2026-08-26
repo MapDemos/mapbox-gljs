@@ -435,14 +435,6 @@
     "description": "Toggles a base map between Mapbox Satellite raster tiles and a custom style rendered via the raster tile endpoint, with a switcher for 8 map projections."
   },
   {
-    "slug": "store-list",
-    "title": "新店舗一覧 (Store List)",
-    "type": "local",
-    "url": "store-list.html",
-    "tags": [],
-    "description": "A map-free, paginated list of newly opened stores filtered from a local JSON file, linking each entry to store-locator.html with lat/lng/zoom params."
-  },
-  {
     "slug": "store-location-comparison",
     "title": "Store Location Comparison - Mapbox vs Google",
     "type": "local",
@@ -476,14 +468,6 @@
     "url": "streets-extruded.html",
     "tags": [],
     "description": "3D extruded-buildings view of downtown Singapore/Marina Bay with live sliders to change the building layer's fill-extrusion color and opacity."
-  },
-  {
-    "slug": "style-check-demo",
-    "title": "Style Check Demo",
-    "type": "local",
-    "url": "style-check-demo.html",
-    "tags": [],
-    "description": "Simple viewer for previewing a custom Mapbox style, with quick-jump city buttons, click-to-see-coordinates popups, and a live camera readout."
   },
   {
     "slug": "tap-payment",
@@ -539,16 +523,6 @@
       "Raster Array Tiles"
     ],
     "description": "Wind-speed heatmap and animated particle layer over Australia from a raster-array-particle tileset, with controls for opacity, color scale, and particle behavior."
-  },
-  {
-    "slug": "wind-jwl",
-    "title": "Wind (JWL)",
-    "type": "local",
-    "url": "wind-jwl.html",
-    "tags": [
-      "Raster Array Tiles"
-    ],
-    "description": "Wind particle/heatmap viewer whose active tilesets are the same Australian BOM wind data as wind-bom, despite large unused code for Japanese rain/snow/flood/landslide layers."
   },
   {
     "slug": "zenrin-osm-comparison",
@@ -721,15 +695,6 @@
     "description": "Comparison of nearest-neighbor vs. bilinear raster resampling."
   },
   {
-    "slug": "dosha",
-    "title": "Dosha",
-    "type": "codepen",
-    "url": "https://codepen.io/kenji-shima/full/abMwVOj",
-    "tags": [],
-    "tagsVerified": false,
-    "description": "Dosha (landslide/soil hazard) visualization CodePen demo."
-  },
-  {
     "slug": "raster-vs-vector",
     "title": "Raster vs Vector",
     "type": "codepen",
@@ -753,17 +718,6 @@
     "description": "3D route animation CodePen demo."
   },
   {
-    "slug": "precipitation",
-    "title": "Precipitation",
-    "type": "codepen",
-    "url": "https://codepen.io/kenji-shima/full/NWoWyGJ",
-    "tags": [
-      "Japan Weather Layers"
-    ],
-    "tagsVerified": false,
-    "description": "Precipitation radar visualization CodePen demo."
-  },
-  {
     "slug": "static-images-boundaries",
     "title": "Static Images Boundaries",
     "type": "codepen",
@@ -784,14 +738,5 @@
     ],
     "tagsVerified": false,
     "description": "Demonstrates excluding road types/areas from Directions API routes."
-  },
-  {
-    "slug": "mapbox-pois-to-google-codes",
-    "title": "Mapbox POIs to Google Codes",
-    "type": "codepen",
-    "url": "https://codepen.io/kenji-shima/full/eYPzLep",
-    "tags": [],
-    "tagsVerified": false,
-    "description": "Converts Mapbox POI data to Google Plus Codes."
   }
 ]
