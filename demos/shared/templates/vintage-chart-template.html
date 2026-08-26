@@ -1,0 +1,129 @@
+<!--
+  Working EXAMPLE of the Vintage Chart style pack (vintage-chart.css, in
+  this same folder). Open this file directly to see the pattern working
+  with a simple simulated route playback, then copy the markup below into
+  your own demo and link vintage-chart.css from its <head> -- see the
+  class/id contract documented at the top of that CSS file for what to
+  build.
+
+  Extracted from demos/flight-map-demo.html ("dark cinematic globe
+  dashboard" style, rated NICE in the step-9 UI review). What's NOT
+  included: the real flight-path sampling/haversine math, the 3D camera
+  modes, and the airplane model loading -- all specific to that demo's
+  simulation, not part of the visual style. This example uses a plain
+  mapboxgl.Marker moving in a straight line instead, to keep it simple.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<link href="vintage-chart.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="scrubber-bar">
+  <input type="range" id="scrubber" min="0" max="1000" value="0" step="1" disabled />
+  <div class="scrubber-time" id="scrubber-time">0h 00m / 0h 00m</div>
+</div>
+
+<div class="panel">
+  <h3>Route Playback</h3>
+  <div class="route">San Francisco &rarr; Denver</div>
+  <button id="zoom-toggle">Zoom to Marker</button>
+  <button id="follow-toggle" class="secondary" hidden>Follow Marker</button>
+  <button id="style-toggle" class="secondary">Satellite View</button>
+</div>
+
+<script>
+const START = [-122.4194, 37.7749]; // San Francisco
+const END = [-104.9903, 39.7392];   // Denver
+const TOTAL_MINUTES = 165; // illustrative total flight time
+
+function mix(a, b, f) { return a + (b - a) * f; }
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/dark-v11',
+  center: START,
+  zoom: 4,
+});
+
+const marker = new mapboxgl.Marker({ color: '#c08a3e' }).setLngLat(START).addTo(map);
+
+const scrubber = document.getElementById('scrubber');
+const scrubberTime = document.getElementById('scrubber-time');
+const zoomBtn = document.getElementById('zoom-toggle');
+const followBtn = document.getElementById('follow-toggle');
+const styleBtn = document.getElementById('style-toggle');
+
+function formatDuration(totalMin) {
+  const h = Math.floor(totalMin / 60);
+  const m = Math.round(totalMin % 60);
+  return `${h}h ${String(m).padStart(2, '0')}m`;
+}
+
+let following = false;
+
+function renderAt(fraction) {
+  const pos = [mix(START[0], END[0], fraction), mix(START[1], END[1], fraction)];
+  marker.setLngLat(pos);
+  const elapsed = TOTAL_MINUTES * fraction;
+  scrubberTime.textContent = `${formatDuration(elapsed)} / ${formatDuration(TOTAL_MINUTES)}`;
+  if (following) map.easeTo({ center: pos, duration: 200 });
+}
+
+map.on('load', () => {
+  map.addSource('route', {
+    type: 'geojson',
+    data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [START, END] } },
+  });
+  map.addLayer({
+    id: 'route-line',
+    type: 'line',
+    source: 'route',
+    paint: { 'line-color': '#c08a3e', 'line-width': 2, 'line-dasharray': [2, 2] },
+  });
+  scrubber.disabled = false;
+  renderAt(0);
+});
+
+scrubber.addEventListener('input', () => renderAt(scrubber.value / 1000));
+
+zoomBtn.addEventListener('click', () => {
+  map.flyTo({ center: marker.getLngLat(), zoom: 8, duration: 1200 });
+  followBtn.hidden = false;
+});
+
+followBtn.addEventListener('click', () => {
+  following = !following;
+  followBtn.textContent = following ? 'Stop Following' : 'Follow Marker';
+});
+
+let satellite = false;
+styleBtn.addEventListener('click', () => {
+  satellite = !satellite;
+  map.setStyle(satellite ? 'mapbox://styles/mapbox/satellite-streets-v12' : 'mapbox://styles/mapbox/dark-v11');
+  styleBtn.textContent = satellite ? 'Dark View' : 'Satellite View';
+  map.once('style.load', () => {
+    if (!map.getSource('route')) {
+      map.addSource('route', {
+        type: 'geojson',
+        data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [START, END] } },
+      });
+      map.addLayer({
+        id: 'route-line',
+        type: 'line',
+        source: 'route',
+        paint: { 'line-color': '#c08a3e', 'line-width': 2, 'line-dasharray': [2, 2] },
+      });
+    }
+  });
+});
+</script>
+</body>
+</html>
