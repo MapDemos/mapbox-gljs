@@ -383,6 +383,11 @@ body {
     color: var(--amber) !important;
 }
 
+.mapboxgl-ctrl-indoor-toggle .mapboxgl-ctrl-icon {
+    filter: invert(1) brightness(1.7);
+    opacity: 0.75;
+}
+
 @media (max-width: 640px) {
     .info-bar {
         left: 10px;
