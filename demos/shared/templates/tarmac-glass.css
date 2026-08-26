@@ -9,15 +9,17 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 
+  The light-preset pill (dawn/day/dusk/night) lives in its own file,
+  light-preset-pill.css in this same folder, since it's independently
+  useful outside this "info bar / tour" pattern. Link both if you want
+  both -- light-preset-pill.css's default colors already match this
+  file's palette, so the combination just works with no extra overrides.
+
   Then build markup using the class/id contract below (see
   tarmac-glass-template.html in this same folder for a full working
   example you can copy the markup from):
 
   - #map                        full-bleed map container
-  - .radio-group                dark-glass pill, 4 light-preset radio icons
-                                 (dawn/day/dusk/night) -- wire each input's
-                                 change event to
-                                 map.setConfigProperty('basemap','lightPreset', value)
   - .info-bar (#info-bar)       floating "current selection" board
     .bar-main                     row: .tour-btn, .chips-toggle, .live, .current
     .tour-btn                     play/stop toggle -- add/remove .running
@@ -60,74 +62,6 @@ body {
     top: 0;
     bottom: 0;
     width: 100%;
-}
-
-/* Light preset selector (dawn / day / dusk / night) -- dark glass pill.
-   Requires a Standard-style map (map.setConfigProperty('basemap', 'lightPreset', value)). */
-.radio-group {
-    position: absolute;
-    z-index: 2;
-    top: 18px;
-    left: 18px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px;
-    border-radius: 999px;
-    background: var(--glass);
-    -webkit-backdrop-filter: blur(18px) saturate(140%);
-    backdrop-filter: blur(18px) saturate(140%);
-    border: 1px solid var(--hairline);
-    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
-}
-
-.radio-wrapper {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s ease;
-}
-
-.radio-wrapper:hover {
-    background: rgba(255, 255, 255, 0.07);
-}
-
-.radiobutton {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.radio-group svg {
-    width: 30px;
-    height: 30px;
-    cursor: pointer;
-}
-
-.radio-group svg circle {
-    fill: transparent;
-    transition: fill 0.2s ease;
-}
-
-.radio-group svg path {
-    stroke: rgba(238, 242, 246, 0.5);
-    transition: stroke 0.2s ease;
-}
-
-.radio-group label:hover svg path {
-    stroke: var(--ink);
-}
-
-.radio-group input:checked + svg circle {
-    fill: var(--amber);
-}
-
-.radio-group input:checked + svg path {
-    stroke: var(--tarmac);
 }
 
 /* Info bar -- compact "current selection" board with a play/tour toggle

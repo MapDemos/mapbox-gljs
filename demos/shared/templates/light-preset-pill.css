@@ -1,0 +1,97 @@
+/*
+  Light Preset Pill -- a dark-glass pill of 4 radio icons (dawn/day/dusk/
+  night) for switching a Mapbox Standard-style map's light preset.
+  Extracted out of tarmac-glass.css so it can be used on its own, in a demo
+  that has nothing to do with the "info bar / tour" pattern.
+
+  Usage:
+    <link href="shared/templates/light-preset-pill.css" rel="stylesheet" />
+
+  Markup contract -- a .radio-group of 4 <label class="radio-wrapper"> each
+  wrapping a hidden <input type="radio" name="light" class="radiobutton"
+  value="dawn|day|dusk|night"> plus an inline <svg> icon (see
+  tarmac-glass-template.html for the actual icon markup to copy). Wire each
+  input's change event to:
+    map.setConfigProperty('basemap', 'lightPreset', input.value)
+
+  Theming: comes with standalone defaults (dark glass background, amber
+  selected-state) so it looks right with nothing else loaded. Override the
+  variables below in your own page's CSS (after this link) to match a
+  different palette -- no dependency on tarmac-glass.css or any other file.
+*/
+
+:root {
+    --pill-bg: rgba(13, 18, 25, 0.72);
+    --pill-hairline: rgba(255, 255, 255, 0.10);
+    --pill-accent: #ffb000;
+    --pill-accent-ink: #0b0f14;
+    --pill-icon-idle: rgba(238, 242, 246, 0.5);
+    --pill-icon-hover: #eef2f6;
+}
+
+.radio-group {
+    position: absolute;
+    z-index: 2;
+    top: 18px;
+    left: 18px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px;
+    border-radius: 999px;
+    background: var(--pill-bg);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid var(--pill-hairline);
+    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+}
+
+.radio-wrapper {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease;
+}
+
+.radio-wrapper:hover {
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.radiobutton {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.radio-group svg {
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+}
+
+/* Theme the inline icons (CSS overrides the SVG presentation attrs) */
+.radio-group svg circle {
+    fill: transparent;
+    transition: fill 0.2s ease;
+}
+
+.radio-group svg path {
+    stroke: var(--pill-icon-idle);
+    transition: stroke 0.2s ease;
+}
+
+.radio-group label:hover svg path {
+    stroke: var(--pill-icon-hover);
+}
+
+.radio-group input:checked + svg circle {
+    fill: var(--pill-accent);
+}
+
+.radio-group input:checked + svg path {
+    stroke: var(--pill-accent-ink);
+}
