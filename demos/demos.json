@@ -1,7 +1,7 @@
 [
   {
     "slug": "airport-demo",
-    "title": "Airport Explorer Demo",
+    "title": "Airport Explorer",
     "type": "local",
     "url": "airport-demo.html",
     "tags": [],
@@ -9,7 +9,7 @@
   },
   {
     "slug": "airport-layer-filter-demo",
-    "title": "Airport Layer Filter Demo",
+    "title": "Airport Layer Filter",
     "type": "local",
     "url": "airport-layer-filter-demo.html",
     "tags": [],
@@ -17,19 +17,11 @@
   },
   {
     "slug": "airport-osm-demo",
-    "title": "Japan Airports OSM Demo",
+    "title": "Japan Airports OSM",
     "type": "local",
     "url": "airport-osm-demo.html",
     "tags": [],
     "description": "Loads a local OSM-derived Japan airport GeoJSON, showing civilian vs military polygons/labels; dropdown selection flies to and highlights an airport."
-  },
-  {
-    "slug": "amap",
-    "title": "AMAP",
-    "type": "local",
-    "url": "amap.html",
-    "tags": [],
-    "description": "Uses the AMap (Gaode) JS SDK, not Mapbox GL JS, showing a 3D Beijing map with a marker/popup, a polyline, a toolbar control, and a live traffic layer."
   },
   {
     "slug": "building-heatmap",
@@ -41,7 +33,7 @@
   },
   {
     "slug": "category-search-nested",
-    "title": "SearchBox POI検索",
+    "title": "POI Category Search",
     "type": "local",
     "url": "category-search-nested.html",
     "tags": [
@@ -97,7 +89,7 @@
   },
   {
     "slug": "dhl-demo",
-    "title": "DHL Capabilities Demo - Mapbox GL JS",
+    "title": "DHL Capabilities - Mapbox GL JS",
     "type": "local",
     "url": "dhl-demo.html",
     "tags": [
@@ -250,7 +242,7 @@
   },
   {
     "slug": "logistics-checkout",
-    "title": "3PL Handoff Demo · Mapbox",
+    "title": "3PL Handoff · Mapbox",
     "type": "local",
     "url": "logistics-checkout.html",
     "tags": [
@@ -260,7 +252,7 @@
   },
   {
     "slug": "lottery",
-    "title": "抽選 (Lottery)",
+    "title": "Lottery",
     "type": "local",
     "url": "lottery.html",
     "tags": [],
@@ -268,7 +260,7 @@
   },
   {
     "slug": "map-matching-demo",
-    "title": "マップマッチングデモ (Map Matching Demo)",
+    "title": "Map Matching",
     "type": "local",
     "url": "map-matching-demo.html",
     "tags": [
@@ -286,7 +278,7 @@
   },
   {
     "slug": "merchants-overlay-demo",
-    "title": "Merchants Tileset Overlay Demo",
+    "title": "Merchants Tileset Overlay",
     "type": "local",
     "url": "merchants-overlay-demo.html",
     "tags": [],
@@ -336,7 +328,7 @@
   },
   {
     "slug": "notam-demo",
-    "title": "NOTAM Proximity Demo",
+    "title": "NOTAM Proximity",
     "type": "local",
     "url": "notam-demo.html",
     "tags": [],
@@ -388,7 +380,7 @@
   },
   {
     "slug": "return-to-route",
-    "title": "Return to Route Demo",
+    "title": "Return to Route",
     "type": "local",
     "url": "return-to-route.html",
     "tags": [
@@ -426,7 +418,7 @@
   },
   {
     "slug": "static-tiles",
-    "title": "Static Tiles Demo",
+    "title": "Static Tiles",
     "type": "local",
     "url": "static-tiles.html",
     "tags": [
@@ -492,7 +484,7 @@
   },
   {
     "slug": "turn-by-turn-demo",
-    "title": "Turn-by-Turn Navigation Demo",
+    "title": "Turn-by-Turn Navigation",
     "type": "local",
     "url": "turn-by-turn-demo.html",
     "tags": [
@@ -516,7 +508,7 @@
   },
   {
     "slug": "wind-bom",
-    "title": "Wind Speed and Particles Demo",
+    "title": "Wind Speed and Particles",
     "type": "local",
     "url": "wind-bom.html",
     "tags": [
