@@ -26,28 +26,9 @@
 <link href="tarmac-glass.css" rel="stylesheet" />
 <link href="light-preset-pill.css" rel="stylesheet" />
 <script src="../demo-kit.js"></script>
+<script src="light-preset-pill.js"></script>
 </head>
 <body>
-<!-- Light preset selector -->
-<div class="radio-group">
-    <label class="radio-wrapper">
-        <input type="radio" name="light" value="dawn" class="radiobutton" />
-        <svg width="38" height="38" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="19" cy="19" r="18.5" fill="white"></circle><path d="M29.9414 29.9673L7.44141 29.9673" stroke="#282828" stroke-width="2" stroke-linecap="round"></path><path d="M18.998 12.7725L18.998 6.53246" stroke="#282828" stroke-width="2" stroke-linecap="round"></path></svg>
-    </label>
-    <label class="radio-wrapper">
-        <input type="radio" name="light" value="day" class="radiobutton" checked />
-        <svg width="38" height="38" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="19" cy="19.0002" r="18.5" fill="white"></circle><circle cx="19" cy="19" r="5.5" stroke="#282828" stroke-width="2"></circle></svg>
-    </label>
-    <label class="radio-wrapper">
-        <input type="radio" name="light" class="radiobutton" value="dusk" />
-        <svg width="38" height="38" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="19" cy="19" r="18.5" fill="white"></circle><path d="M19 17.3643V19.6833" stroke="#282828" stroke-width="2" stroke-linecap="round"></path></svg>
-    </label>
-    <label class="radio-wrapper">
-        <input type="radio" name="light" class="radiobutton" value="night" />
-        <svg width="38" height="38" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="19" cy="19" r="18.5" fill="white"></circle><path d="M18.53 27.9489C14.9462 28.7919 11.3593 27.5714 9.01172 25.0631C10.617 25.5423 12.3651 25.6235 14.1138 25.2139C19.4467 23.9597 22.7537 18.6189 21.4996 13.2864C21.0884 11.5378 20.2364 10.01 19.0919 8.78589C22.3837 9.77013 25.0744 12.4361 25.9173 16.0214C27.1705 21.3549 23.864 26.6947 18.53 27.9489Z" stroke="#282828" stroke-width="2"></path></svg>
-    </label>
-</div>
-
 <div id="map"></div>
 
 <!-- Info bar: current selection + play/tour toggle + expandable chip drawer -->
@@ -82,6 +63,8 @@ const map = new mapboxgl.Map({
     pitch: 60,
 });
 
+createLightPresetPill(map);
+
 const barEl = document.getElementById('info-bar');
 const currentEl = document.getElementById('current-item');
 const itemButtonsEl = document.getElementById('item-buttons');
@@ -109,12 +92,6 @@ ITEMS.forEach((item) => {
     itemButtonsEl.appendChild(btn);
 });
 selectItem(ITEMS[0], { fly: false });
-
-document.querySelectorAll('input[name="light"]').forEach((input) => {
-    input.addEventListener('change', function () {
-        map.setConfigProperty('basemap', 'lightPreset', this.value);
-    });
-});
 
 let tourTimer = null;
 tourBtn.addEventListener('click', () => {

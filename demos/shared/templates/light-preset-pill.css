@@ -4,14 +4,18 @@
   Extracted out of tarmac-glass.css so it can be used on its own, in a demo
   that has nothing to do with the "info bar / tour" pattern.
 
-  Usage:
+  Usage -- easiest way, JS builds the whole thing (markup + icons + wiring):
     <link href="shared/templates/light-preset-pill.css" rel="stylesheet" />
+    <script src="shared/templates/light-preset-pill.js"></script>
+    <script> createLightPresetPill(map); </script>
 
-  Markup contract -- a .radio-group of 4 <label class="radio-wrapper"> each
-  wrapping a hidden <input type="radio" name="light" class="radiobutton"
-  value="dawn|day|dusk|night"> plus an inline <svg> icon (see
-  tarmac-glass-template.html for the actual icon markup to copy). Wire each
-  input's change event to:
+  Markup contract, if you'd rather hand-write it (e.g. to control exactly
+  where it sits in the DOM) -- a .radio-group of 4 <label class="radio-
+  wrapper"> each wrapping a hidden <input type="radio" name="light"
+  class="radiobutton" value="dawn|day|dusk|night"> plus an inline <svg>
+  icon (see light-preset-pill.js's ICONS object for the exact icon markup,
+  or tarmac-glass-template.html for it in context). Wire each input's
+  change event to:
     map.setConfigProperty('basemap', 'lightPreset', input.value)
 
   Theming: comes with standalone defaults (dark glass background, amber
