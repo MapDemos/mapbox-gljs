@@ -70,7 +70,9 @@
     "title": "Cluster (MTS)",
     "type": "local",
     "url": "cluster-mts.html",
-    "tags": [],
+    "tags": [
+      "MTS"
+    ],
     "description": "Renders a hosted Mapbox vector tileset of ports with pre-aggregated 'count' clusters and icons; clicking a port only logs its properties, no popup shown."
   },
   {
@@ -129,7 +131,8 @@
     "type": "local",
     "url": "feedback-submit.html",
     "tags": [
-      "Geocoding API"
+      "Geocoding API",
+      "Feedback API"
     ],
     "description": "Form to submit map-data feedback: pick a location by map click, coordinates, or geolocation, reverse-geocodes it via Geocoding v5, and POSTs to the Mapbox user-feedback v1 API."
   },
@@ -138,7 +141,9 @@
     "title": "Mapbox Feedback API - Data Table View",
     "type": "local",
     "url": "feedback-table.html",
-    "tags": [],
+    "tags": [
+      "Feedback API"
+    ],
     "description": "Grid.js-powered dashboard that pages, filters, and exports (CSV/JSON) feedback items from the Mapbox user-feedback v1 API, with a map drawer showing each item's location."
   },
   {
@@ -230,7 +235,8 @@
     "type": "local",
     "url": "jwl-nowcast.html",
     "tags": [
-      "Japan Weather Layers"
+      "Japan Weather Layers",
+      "Raster Array Tiles"
     ],
     "description": "A layer switcher over Mapbox's Japan Weather Layers tilesets (nowcast precipitation, rain/snow forecasts, wind particles, flood/landslide/alert risk meters) with a time-band slider and playback."
   },
@@ -302,7 +308,8 @@
     "type": "local",
     "url": "naurt-data.html",
     "tags": [
-      "Search Box API"
+      "Search Box API",
+      "MTS"
     ],
     "description": "Compares Naurt-derived door/address point tilesets against Mapbox geocoding across Japan/NZ/US regions, with match-rate stats and click popups that reverse-geocode via the Geocoding v6 API."
   },
@@ -321,7 +328,10 @@
     "title": "NEA",
     "type": "local",
     "url": "nea.html",
-    "tags": [],
+    "tags": [
+      "Raster Array Tiles",
+      "MTS"
+    ],
     "description": "A raster-array tileset viewer for Singapore NEA weather data (rainfall, radar, satellite, lightning, hotspots) with projection switching, color-scale controls, and a time-band slider."
   },
   {
@@ -360,7 +370,8 @@
       "Directions API",
       "Japan Weather Layers",
       "Search Box API",
-      "Tilequery API"
+      "Tilequery API",
+      "Raster Array Tiles"
     ],
     "description": "Plays back Japan precipitation nowcast/forecast raster tiles on a timeline; search results get a driving route, ETA, and current vs. arrival-time precipitation."
   },
@@ -370,7 +381,8 @@
     "type": "local",
     "url": "random-points.html",
     "tags": [
-      "Isochrone API"
+      "Isochrone API",
+      "MTS"
     ],
     "description": "Plots a color-coded vector tileset of points across Japan, filterable by type, and generates a driving isochrone to list only points inside it."
   },
@@ -391,7 +403,9 @@
     "title": "Rivers",
     "type": "local",
     "url": "rivers.html",
-    "tags": [],
+    "tags": [
+      "MTS"
+    ],
     "description": "Shows a vector tileset of Japanese rivers as colored lines and auto-labels each visible river segment with its river code."
   },
   {
@@ -510,7 +524,9 @@
     "url": "weather3d.html",
     "tags": [
       "Geocoding API",
-      "Tilequery API"
+      "Tilequery API",
+      "Raster Array Tiles",
+      "Japan Weather Layers"
     ],
     "description": "Japan precipitation nowcast/forecast viewer with a time slider over raster-array tiles, using the Tilequery API for local rain intensity and reverse geocoding for place names."
   },
@@ -519,7 +535,9 @@
     "title": "Wind Speed and Particles Demo",
     "type": "local",
     "url": "wind-bom.html",
-    "tags": [],
+    "tags": [
+      "Raster Array Tiles"
+    ],
     "description": "Wind-speed heatmap and animated particle layer over Australia from a raster-array-particle tileset, with controls for opacity, color scale, and particle behavior."
   },
   {
@@ -527,7 +545,9 @@
     "title": "Wind (JWL)",
     "type": "local",
     "url": "wind-jwl.html",
-    "tags": [],
+    "tags": [
+      "Raster Array Tiles"
+    ],
     "description": "Wind particle/heatmap viewer whose active tilesets are the same Australian BOM wind data as wind-bom, despite large unused code for Japanese rain/snow/flood/landslide layers."
   },
   {
