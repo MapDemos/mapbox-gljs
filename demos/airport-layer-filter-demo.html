@@ -20,150 +20,58 @@
   <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<link href="shared/templates/highway-sign.css" rel="stylesheet" />
 <script src="shared/demo-kit.js"></script>
   <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    }
     #map {
       position: absolute;
       top: 0;
       bottom: 0;
-      width: 100%;
+      left: 380px;
+      right: 0;
     }
 
-    /* Layer filter panel */
-    #layer-filter {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      background: white;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-      min-width: 320px;
-      max-width: 400px;
-      z-index: 1000;
-    }
-
-    #layer-filter h2 {
-      margin-top: 0;
-      margin-bottom: 15px;
-      color: #333;
-      font-size: 20px;
+    /* Aeroway toggle -- plain caption, not a field name (same convention
+       as highway-sign.css's own label[for="simulation-mode"] pattern) */
+    label[for="aeroway-toggle"] {
       display: flex;
       align-items: center;
       gap: 8px;
-    }
-
-    #layer-filter p {
-      color: #666;
-      font-size: 14px;
-      margin-bottom: 20px;
-      line-height: 1.5;
-    }
-
-    .filter-group {
-      margin-bottom: 20px;
-    }
-
-    .filter-group label {
-      display: block;
-      margin-bottom: 8px;
-      color: #555;
-      font-weight: 600;
-      font-size: 14px;
-    }
-
-    #layer-dropdown {
-      width: 100%;
-      padding: 10px;
-      border: 2px solid #e5e7eb;
-      border-radius: 6px;
-      font-size: 14px;
-      background: white;
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-size: 13px;
       cursor: pointer;
-      transition: all 0.2s;
     }
 
-    #layer-dropdown:hover {
-      border-color: #3b82f6;
-    }
-
-    #layer-dropdown:focus {
-      outline: none;
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    }
-
-    /* Statistics display */
-    #stats-container {
-      margin-top: 20px;
-      padding: 15px;
-      background: #f0f9ff;
-      border-radius: 8px;
-      border: 1px solid #bfdbfe;
-    }
-
-    .stat-item {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 10px;
-      font-size: 14px;
-    }
-
-    .stat-item:last-child {
-      margin-bottom: 0;
-    }
-
-    .stat-label {
-      color: #1e40af;
-      font-weight: 500;
-    }
-
-    .stat-value {
-      color: #1e3a8a;
-      font-weight: 700;
-    }
-
-    /* Selected airport info */
-    #selected-airport {
-      margin-top: 20px;
-      padding: 15px;
-      background: #fef3c7;
-      border-radius: 8px;
-      border: 1px solid #fcd34d;
-      display: none;
-    }
-
-    #selected-airport.visible {
-      display: block;
-    }
-
-    #selected-airport h3 {
-      margin: 0 0 10px 0;
-      font-size: 16px;
-      color: #92400e;
-    }
-
+    /* Statistics / selected-airport rows, inside a .trip-card */
+    .stat-item,
     .airport-detail {
       display: flex;
       justify-content: space-between;
+      gap: 10px;
       margin-bottom: 8px;
       font-size: 13px;
     }
 
+    .stat-item:last-child,
+    .airport-detail:last-child {
+      margin-bottom: 0;
+    }
+
+    .stat-label,
     .detail-label {
-      color: #92400e;
+      color: var(--muted);
       font-weight: 500;
     }
 
+    .stat-value,
     .detail-value {
-      color: #78350f;
+      color: var(--ink);
       font-weight: 600;
       text-align: right;
       max-width: 200px;
@@ -173,71 +81,43 @@
     }
 
     /* Legend */
-    #legend {
-      margin-top: 20px;
-      padding: 15px;
-      background: #f9fafb;
-      border-radius: 8px;
-      border: 1px solid #e5e7eb;
-    }
-
-    #legend h4 {
-      margin: 0 0 10px 0;
-      font-size: 14px;
-      color: #374151;
-      font-weight: 600;
-    }
-
     .legend-item {
       display: flex;
       align-items: center;
       margin-bottom: 8px;
       font-size: 13px;
+      color: var(--ink);
+    }
+
+    .legend-item:last-child {
+      margin-bottom: 0;
     }
 
     .legend-color {
-      width: 20px;
-      height: 20px;
+      width: 16px;
+      height: 16px;
       border-radius: 50%;
       margin-right: 10px;
-      border: 2px solid white;
+      flex: none;
+      border: 2px solid var(--cream);
       box-shadow: 0 1px 3px rgba(0,0,0,0.2);
     }
 
-    /* Loading state */
-    .loading {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 3px solid #f3f4f6;
-      border-top: 3px solid #3b82f6;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-left: 10px;
+    .legend-divider {
+      margin: 12px 0;
+      border: none;
+      border-top: 1px solid var(--line);
     }
 
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    .status-message {
-      color: #3b82f6;
-      font-size: 13px;
-      font-style: italic;
-      margin-top: 10px;
-      display: flex;
-      align-items: center;
-    }
-
-    /* Style switcher */
+    /* Style switcher -- floats over the map, top-right */
     #style-switcher {
       position: absolute;
       top: 20px;
       right: 20px;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      background: var(--cream);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
       display: flex;
       overflow: hidden;
       z-index: 1000;
@@ -246,8 +126,9 @@
     .style-btn {
       padding: 10px 16px;
       border: none;
-      background: white;
-      color: #6b7280;
+      background: var(--cream);
+      color: var(--green-dark);
+      font-family: var(--font-body);
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
@@ -258,36 +139,22 @@
     }
 
     .style-btn:hover {
-      background: #f3f4f6;
+      background: var(--green-tint);
     }
 
     .style-btn.active {
-      background: #3b82f6;
-      color: white;
+      background: var(--green);
+      color: var(--cream);
     }
 
     .style-btn:first-child {
-      border-right: 1px solid #e5e7eb;
+      border-right: 1px solid var(--line);
     }
 
     /* Mobile responsive */
     @media (max-width: 768px) {
-      #layer-filter {
-        top: 10px;
-        left: 10px;
-        right: 10px;
-        min-width: unset;
-        padding: 15px;
-      }
-
-      #layer-filter h2 {
-        font-size: 18px;
-        margin-bottom: 10px;
-      }
-
-      #layer-filter p {
-        font-size: 13px;
-        margin-bottom: 15px;
+      #map {
+        left: 0;
       }
 
       #style-switcher {
@@ -315,28 +182,35 @@
     </button>
   </div>
 
-  <div id="layer-filter">
-    <h2>🗺️ Airport Layer Filter</h2>
-    <p>Filter airports based on their best map layer. This shows what type of map feature each airport is most strongly associated with.</p>
+  <div id="setup-panel">
+    <h2>Airport Layer Filter</h2>
+    <p class="intro-text">Filter airports based on their best map layer. This shows what type of map feature each airport is most strongly associated with.</p>
 
-    <div class="filter-group">
-      <label for="layer-dropdown">Filter by Important Layer:</label>
-      <select id="layer-dropdown">
-        <option value="">Loading...</option>
-      </select>
+    <div class="location-status loading hidden" id="location-status">
+      <div class="status-header">
+        <span class="status-icon spinning" id="status-icon">&#8635;</span>
+        <span class="status-text" id="status-text"></span>
+      </div>
     </div>
 
-    <div class="filter-group" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
-      <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px; color: #555;">
-        <input type="checkbox" id="aeroway-toggle" checked="" style="margin-right: 8px;" />
-        <span style="display: flex; align-items: center; gap: 6px;">
-          <span style="display: inline-block; width: 16px; height: 16px; background: #ff6b35; opacity: 0.4; border-radius: 2px;"></span>
-          Show aeroway areas (runways, taxiways, helipads)
-        </span>
+    <div class="trip-card">
+      <div class="input-group">
+        <label for="layer-dropdown">Filter by Important Layer</label>
+        <select id="layer-dropdown">
+          <option value="">Loading...</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="input-group">
+      <label for="aeroway-toggle">
+        <input type="checkbox" id="aeroway-toggle" checked="" />
+        Show aeroway areas (runways, taxiways, helipads)
       </label>
     </div>
 
-    <div id="stats-container">
+    <div class="trip-card">
+      <div class="input-group"><label>Statistics</label></div>
       <div class="stat-item">
         <span class="stat-label">Total Airports:</span>
         <span class="stat-value" id="total-airports">-</span>
@@ -351,8 +225,8 @@
       </div>
     </div>
 
-    <div id="selected-airport">
-      <h3>Selected Airport</h3>
+    <div class="trip-card hidden" id="selected-airport">
+      <div class="input-group"><label>Selected Airport</label></div>
       <div class="airport-detail">
         <span class="detail-label">Name:</span>
         <span class="detail-value" id="airport-name">-</span>
@@ -371,14 +245,14 @@
       </div>
     </div>
 
-    <div id="legend">
-      <h4>Map Layers</h4>
+    <div class="trip-card">
+      <div class="input-group"><label>Map Layers</label></div>
       <div class="legend-item">
         <div class="legend-color" style="background-color: #ff6b35; opacity: 0.4;"></div>
         <span>Aeroway Areas (Runways, Taxiways)</span>
       </div>
-      <hr style="margin: 10px 0; border: none; border-top: 1px solid #e5e7eb;" />
-      <h4>Airport Types</h4>
+      <hr class="legend-divider" />
+      <div class="input-group"><label>Airport Types</label></div>
       <div class="legend-item">
         <div class="legend-color" style="background-color: #10b981;"></div>
         <span>Heliport</span>
@@ -404,8 +278,6 @@
         <span>Balloonport</span>
       </div>
     </div>
-
-    <div id="status-container"></div>
   </div>
 
   <script>
@@ -436,19 +308,23 @@
       'closed': '#6b7280'             // Gray - Closed facilities
     };
 
-    // Show status message
-    function showStatus(message, isLoading = false) {
-      const statusContainer = document.getElementById('status-container');
-      if (message) {
-        statusContainer.innerHTML = `
-          <div class="status-message">
-            ${message}
-            ${isLoading ? '<span class="loading"></span>' : ''}
-          </div>
-        `;
-      } else {
-        statusContainer.innerHTML = '';
+    // Show status message using the highway-sign .location-status card
+    // (state is 'loading', 'success', or 'error'; omit message to hide it)
+    function showStatus(message, state = 'loading') {
+      const statusEl = document.getElementById('location-status');
+      const iconEl = document.getElementById('status-icon');
+      const textEl = document.getElementById('status-text');
+
+      if (!message) {
+        statusEl.classList.add('hidden');
+        return;
       }
+
+      statusEl.classList.remove('hidden', 'loading', 'success', 'error');
+      statusEl.classList.add(state);
+      iconEl.classList.toggle('spinning', state === 'loading');
+      iconEl.innerHTML = state === 'loading' ? '&#8635;' : (state === 'error' ? '&#9888;' : '&#10003;');
+      textEl.textContent = message;
     }
 
     // Update statistics
@@ -672,7 +548,7 @@
     // Load the GeoJSON file
     map.on('load', async () => {
       console.log('Map loaded, loading airport data...');
-      showStatus('Loading airports', true);
+      showStatus('Loading airports…', 'loading');
 
       try {
         // Load the airports_analysis.geojson file
@@ -711,12 +587,13 @@
         // Update initial stats
         updateStats(allAirports.length, allAirports.length, 'All');
 
-        showStatus('');
+        showStatus(`Loaded ${allAirports.length} airports`, 'success');
+        setTimeout(() => showStatus(''), 2500);
         console.log(`Loaded ${allAirports.length} airports`);
 
       } catch (error) {
         console.error('Error loading GeoJSON:', error);
-        showStatus('Error loading airport data');
+        showStatus('Error loading airport data', 'error');
       }
     });
 
@@ -754,7 +631,7 @@
       }
 
       // Clear any selected airport
-      document.getElementById('selected-airport').classList.remove('visible');
+      document.getElementById('selected-airport').classList.add('hidden');
       map.setFilter('airport-points-highlighted', ['==', ['get', 'ident'], '']);
     });
 
@@ -770,7 +647,7 @@
 
         // Update selected airport info panel
         const selectedDiv = document.getElementById('selected-airport');
-        selectedDiv.classList.add('visible');
+        selectedDiv.classList.remove('hidden');
 
         document.getElementById('airport-name').textContent = props.name || 'Unknown';
         document.getElementById('airport-name').title = props.name || 'Unknown';
@@ -813,7 +690,7 @@
 
         const popupContent = `
           <div style="padding: 8px; max-width: 300px;">
-            <h3 style="margin: 0 0 10px 0; font-size: 14px; color: #1e40af;">${props.name || 'Unknown'}</h3>
+            <h3 style="margin: 0 0 10px 0; font-size: 14px; color: var(--green-dark);">${props.name || 'Unknown'}</h3>
             <table style="font-size: 12px; line-height: 1.4;">
               ${propertiesHtml}
             </table>
@@ -837,7 +714,7 @@
       map.getCanvas().style.cursor = '';
 
       // Hide the selected airport info panel
-      document.getElementById('selected-airport').classList.remove('visible');
+      document.getElementById('selected-airport').classList.add('hidden');
 
       // Clear the highlight
       map.setFilter('airport-points-highlighted', ['==', ['get', 'ident'], '']);
@@ -923,7 +800,7 @@
               <div style="margin: 6px 0; padding: 8px;
                           background: linear-gradient(90deg, ${color}15 0%, transparent 100%);
                           border-left: 3px solid ${color}; border-radius: 4px;">
-                <div style="font-weight: 600; color: #1e40af; font-size: 12px; margin-bottom: 4px;">
+                <div style="font-weight: 600; color: var(--green-dark); font-size: 12px; margin-bottom: 4px;">
                   ✈️ ${props.name || 'Unknown Airport'}
                 </div>
                 <details style="cursor: pointer;">
@@ -1015,14 +892,14 @@
         // Build the complete popup
         const popupContent = `
           <div style="padding: 12px; min-width: 350px; max-width: 500px;">
-            <h3 style="margin: 0 0 12px 0; font-size: 14px; color: #1e40af;
-                       border-bottom: 2px solid #e5e7eb; padding-bottom: 8px;">
+            <h3 style="margin: 0 0 12px 0; font-size: 14px; color: var(--green-dark);
+                       border-bottom: 2px solid var(--line); padding-bottom: 8px;">
               📍 All Features at This Location
             </h3>
 
             ${airportFeatures.length > 0 ? `
               <div style="margin-bottom: 12px;">
-                <h4 style="margin: 0 0 8px 0; font-size: 12px; color: #1e40af;
+                <h4 style="margin: 0 0 8px 0; font-size: 12px; color: var(--green-dark);
                           font-weight: 600;">
                   ✈️ Airports (${airportFeatures.length})
                 </h4>
