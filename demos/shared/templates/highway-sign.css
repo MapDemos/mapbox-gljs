@@ -4,9 +4,20 @@
   review turned out to be a headless-testing artifact: the screenshot was
   taken with geolocation denied, so it only ever showed the error state. A
   real route reveals a genuinely polished MUTCD highway-guide-sign palette
-  (route green, reflective cream, instrument-cluster asphalt, caution amber)
+  (route teal, reflective cream, instrument-cluster asphalt, caution amber)
   applied consistently across a setup form, status cards, and an active
   navigation HUD.
+
+  The route color was originally MUTCD guide-sign green (#0E6B3A) but was
+  swapped to teal at the user's request after real rendering -- the green
+  read as muddy on screen. Teal was picked over four other options (a
+  brighter green, highway-service blue, park-sign brown, and a railroad-
+  crossing maroon) partly because it also nods to real airport wayfinding
+  signage, which is commonly teal/blue-green -- fitting, since most demos
+  built from this pack are airport-themed. The --green/--green-dark/
+  --green-tint variable NAMES were kept as-is rather than renamed to
+  --teal-*, to avoid churning every consumer's var() reference for a
+  values-only change.
 
   Usage: link this file from a new demo's <head> --
     <link href="shared/templates/highway-sign.css" rel="stylesheet" />
@@ -22,7 +33,7 @@
                                   own #map rule `left: 380px` to sit beside
                                   it (every demo defines its own #map rule,
                                   so that's not included here)
-    #setup-panel h2                green guide-sign header band, with a
+    #setup-panel h2                teal guide-sign header band, with a
                                     one-time sheen-sweep animation on load
     .intro-text                    optional class on a long intro
                                     paragraph -- hidden once the panel
@@ -44,7 +55,7 @@
 
   Navigation HUD (shown once a route/trip is active) -- same palette, meant
   to float over the map to the right of #setup-panel:
-  - .nav-instruction-banner      green guide-sign turn instruction
+  - .nav-instruction-banner      teal guide-sign turn instruction
     .nav-turn-icon .chevron        rotate the chevron per maneuver, or swap
                                     in your own icon markup
     .nav-instruction-primary       instruction text
@@ -68,10 +79,11 @@
 */
 
 :root {
-  /* Route Green -- MUTCD highway guide-sign green */
-  --green: #0E6B3A;
-  --green-dark: #0A4C29;
-  --green-tint: #E3EEE7;
+  /* Route Teal -- was MUTCD guide-sign green (#0E6B3A), swapped to teal
+     (see the file header comment for why) */
+  --green: #0E6B6B;
+  --green-dark: #0A4C4C;
+  --green-tint: #E3ECEC;
   /* Reflective sheeting cream */
   --cream: #F6F3EA;
   /* Instrument-cluster asphalt */
@@ -80,7 +92,7 @@
   --amber: #F2A900;
   --red: #C8102E;
   --ink: #2A2A28;
-  --line: rgba(14, 107, 58, 0.22);
+  --line: rgba(14, 107, 107, 0.22);
 
   --font-display: 'Overpass', sans-serif;
   --font-body: 'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -283,7 +295,7 @@ button, input, select {
 }
 
 .btn-primary:hover {
-  background: #0F7A41;
+  background: #107A7A;
 }
 
 .btn-primary:active {
