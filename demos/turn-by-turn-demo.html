@@ -2798,8 +2798,11 @@ class NavigationUI {
 
     if (stopBtn) {
       stopBtn.addEventListener('click', () => {
-        this.navigation.stopNavigation();
-        this.hide();
+        // backToSetup() is the full cleanup -- it also stops navigation and
+        // hides this UI, but additionally closes the debug panel and
+        // simulation-controls panel, which this button used to leave
+        // stranded on screen since they're outside #nav-ui.
+        backToSetup();
       });
     }
 
