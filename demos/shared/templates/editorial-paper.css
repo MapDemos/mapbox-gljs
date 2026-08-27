@@ -1,0 +1,299 @@
+/*
+  Editorial Paper -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: warm paper, oversized serif headlines,
+  hairline rules, muted ink -- a magazine/newspaper aesthetic, deliberately
+  distinct from every other style pack in this folder: Tarmac Glass is
+  dark blur-glass + amber, Vintage Chart is navy/parchment/brass, Highway
+  Sign is cream/green MUTCD signage).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/editorial-paper.css" rel="stylesheet" />
+  plus the three Google Fonts it expects (Playfair Display for headlines,
+  Lora for body serif, Inter for small-caps labels):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lora:ital,wght@0,400;0,600;1,400&family=Inter:wght@500;600&display=swap" rel="stylesheet" />
+
+  Signature touch: a subtle paper-grain texture (a tiled noise SVG data
+  URI, very low opacity) on <body>, so panels read as paper sitting on a
+  desk rather than a flat color swatch.
+
+  Class/id contract (see editorial-paper-template.html in this same
+  folder for a full working example):
+
+  - #map                      full-bleed map container (every demo defines
+                               its own, per convention -- not included here)
+  - .masthead                 nameplate header, floating top-left --
+    .masthead h1                big serif title, double-rule beneath
+    .masthead .dateline         small-caps meta line (e.g. an edition/
+                                 issue string), sits between the two rules
+  - .paper-card               the main panel -- sharp corners, hairline
+                               border, faint shadow (paper on a desk, not
+                               a floating glass sheet)
+    .section-label              small-caps sans-serif sub-header with a
+                                 rule -- use one per grouped block
+    .drop-cap                   put on a <p>'s first letter for a large
+                                 serif drop cap (optional flourish)
+  - .pull-quote               oversized serif highlight for one key
+                               stat/headline (e.g. a selected item's name)
+    .pull-quote .byline         small-caps attribution/meta line under it
+  - .btn, .btn-primary,       rubber-stamp buttons: sharp corners, thin
+    .btn-secondary              border, uppercase small-caps, ink-fill on
+                                 hover instead of a color swap
+  - .status-note (+.loading/  a marginal-note style status line (italic
+    .success/.error)           serif + small icon), not a boxed card --
+                                editorial marginalia, not a UI alert
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --paper: #F5F1E8;
+  --paper-card: #FBF8F1;
+  --paper-shadow: rgba(26, 26, 26, 0.12);
+  --ink: #1A1A1A;
+  --ink-muted: #5C5850;
+  --ink-faint: #8A8474;
+  --rule: #C9C0AC;
+  --accent: #A6231D;
+  --accent-ink: #FBF8F1;
+  --success: #3F6B4A;
+  --error: #A6231D;
+
+  --font-headline: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-body: 'Lora', Georgia, 'Times New Roman', serif;
+  --font-label: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  /* Paper-grain texture: a tiled noise SVG, kept extremely faint so it
+     reads as tooth/texture rather than visible speckling. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+}
+
+button, input, select {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Nameplate header -- classic double-rule newspaper masthead */
+.masthead {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 2;
+  background: var(--paper-card);
+  border: 1px solid var(--rule);
+  box-shadow: 0 6px 20px var(--paper-shadow);
+  padding: 16px 22px 14px;
+  max-width: 360px;
+}
+
+.masthead h1 {
+  margin: 0;
+  font-family: var(--font-headline);
+  font-weight: 900;
+  font-size: 26px;
+  line-height: 1.1;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+}
+
+.masthead .dateline {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 3px double var(--rule);
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+/* Main panel -- sharp corners, hairline border, faint desk-shadow */
+.paper-card {
+  position: absolute;
+  background: var(--paper-card);
+  border: 1px solid var(--rule);
+  box-shadow: 0 10px 30px var(--paper-shadow);
+  padding: 20px 22px;
+}
+
+.paper-card p {
+  color: var(--ink-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0 0 16px;
+}
+
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+}
+
+.paper-card + .paper-card,
+.paper-card .section-label:not(:first-child) {
+  margin-top: 18px;
+}
+
+/* Optional flourish: a large serif drop cap on a paragraph's first letter */
+.drop-cap::first-letter {
+  font-family: var(--font-headline);
+  font-weight: 900;
+  font-size: 42px;
+  line-height: 0.8;
+  float: left;
+  margin: 4px 6px 0 0;
+  color: var(--accent);
+}
+
+/* Pull-quote -- an oversized serif highlight for one key stat/headline */
+.pull-quote {
+  margin: 4px 0 16px;
+  padding: 4px 0 4px 16px;
+  border-left: 3px solid var(--accent);
+}
+
+.pull-quote .headline {
+  display: block;
+  font-family: var(--font-headline);
+  font-weight: 700;
+  font-style: italic;
+  font-size: 22px;
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+.pull-quote .byline {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* Buttons -- rubber-stamp: sharp corners, thin border, ink-fill on hover */
+.btn {
+  display: inline-block;
+  padding: 10px 18px;
+  border: 1.5px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-label);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.btn:hover {
+  background: var(--ink);
+  color: var(--paper-card);
+}
+
+.btn-primary {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-primary:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.btn-secondary {
+  border-color: var(--rule);
+  color: var(--ink-muted);
+}
+
+.btn-secondary:hover {
+  background: var(--ink-muted);
+  border-color: var(--ink-muted);
+  color: var(--paper-card);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Status note -- marginalia, not a boxed alert */
+.status-note {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.status-note .status-icon {
+  font-style: normal;
+  flex: none;
+}
+
+.status-note.loading .status-icon {
+  display: inline-block;
+  animation: paper-spin 0.9s linear infinite;
+}
+
+@keyframes paper-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.status-note.success {
+  color: var(--success);
+}
+
+.status-note.error {
+  color: var(--error);
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (max-width: 640px) {
+  .masthead {
+    left: 10px;
+    top: 10px;
+    right: 10px;
+    max-width: none;
+  }
+
+  .paper-card {
+    left: 10px;
+    right: 10px;
+  }
+}

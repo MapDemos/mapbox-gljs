@@ -1,0 +1,150 @@
+<!--
+  Working EXAMPLE of the Editorial Paper style pack (editorial-paper.css,
+  in this same folder). Open this file directly to see the pattern
+  working with four illustrative "dispatch" locations, then copy the
+  markup below into your own demo and link editorial-paper.css from its
+  <head> -- see the class/id contract documented at the top of that CSS
+  file for what to build.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (warm paper, serif headlines, hairline rules) at
+  the user's request for something distinct from every other pack in
+  this folder. The "dispatches" framing and copy here are illustrative
+  placeholders, not real content -- swap in your own.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lora:ital,wght@0,400;0,600;1,400&family=Inter:wght@500;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<link href="editorial-paper.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+  }
+
+  .paper-card {
+    top: 130px;
+    left: 20px;
+    width: 320px;
+  }
+
+  #dispatch-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+
+  #dispatch-list .btn {
+    text-align: left;
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="masthead">
+  <h1>The Cartographer's Desk</h1>
+  <div class="dateline">Vol. I &mdash; Field Dispatches</div>
+</div>
+
+<div class="paper-card">
+  <p class="drop-cap">Four correspondents, four cities. Select a dispatch below to read its notes and fly the map to where it was filed.</p>
+
+  <div class="section-label">Dispatches</div>
+  <div id="dispatch-list"></div>
+
+  <div class="pull-quote hidden" id="pull-quote">
+    <span class="headline" id="quote-headline"></span>
+    <span class="byline" id="quote-byline"></span>
+  </div>
+
+  <div class="status-note hidden" id="status-note">
+    <span class="status-icon" id="status-icon">&#10003;</span>
+    <span id="status-text"></span>
+  </div>
+</div>
+
+<script>
+const DISPATCHES = [
+  {
+    code: 'No. 1',
+    city: 'Reykjavík',
+    center: [-21.9426, 64.1466],
+    zoom: 11,
+    headline: '“The fog lifted at noon, and for an hour the whole bay was silver.”',
+  },
+  {
+    code: 'No. 2',
+    city: 'Marrakesh',
+    center: [-7.9811, 31.6295],
+    zoom: 12,
+    headline: '“Every alley in the medina argues with the map; the map loses.”',
+  },
+  {
+    code: 'No. 3',
+    city: 'Kyoto',
+    center: [135.7681, 35.0116],
+    zoom: 12,
+    headline: '“The temple bell keeps better time than any clock in the station.”',
+  },
+  {
+    code: 'No. 4',
+    city: 'Valparaíso',
+    center: [-71.6197, -33.0472],
+    zoom: 12,
+    headline: '“The funicular groans uphill past murals older than the port records.”',
+  },
+];
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  center: [10, 25],
+  zoom: 1.4,
+});
+
+const listEl = document.getElementById('dispatch-list');
+const quoteEl = document.getElementById('pull-quote');
+const quoteHeadlineEl = document.getElementById('quote-headline');
+const quoteBylineEl = document.getElementById('quote-byline');
+const statusEl = document.getElementById('status-note');
+const statusIconEl = document.getElementById('status-icon');
+const statusTextEl = document.getElementById('status-text');
+
+function selectDispatch(dispatch, btn) {
+  document.querySelectorAll('#dispatch-list .btn').forEach((b) => b.classList.remove('btn-primary'));
+  btn.classList.add('btn-primary');
+
+  quoteEl.classList.remove('hidden');
+  quoteHeadlineEl.textContent = dispatch.headline;
+  quoteBylineEl.textContent = `${dispatch.code} — ${dispatch.city}`;
+
+  statusEl.classList.remove('hidden', 'loading', 'error');
+  statusEl.classList.add('success');
+  statusIconEl.textContent = '✓';
+  statusTextEl.textContent = `Dispatch received from ${dispatch.city}.`;
+
+  map.flyTo({ center: dispatch.center, zoom: dispatch.zoom, duration: 1600 });
+}
+
+DISPATCHES.forEach((dispatch) => {
+  const btn = document.createElement('button');
+  btn.className = 'btn btn-secondary';
+  btn.textContent = `${dispatch.code} — ${dispatch.city}`;
+  btn.addEventListener('click', () => selectDispatch(dispatch, btn));
+  listEl.appendChild(btn);
+});
+</script>
+</body>
+</html>
