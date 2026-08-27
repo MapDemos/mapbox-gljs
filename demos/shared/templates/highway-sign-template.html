@@ -1,0 +1,205 @@
+<!--
+  Working EXAMPLE of the Highway Sign style pack (highway-sign.css, in this
+  same folder). Open this file directly to see the pattern working with a
+  simulated location check and a scripted turn sequence, then copy the
+  markup below into your own demo and link highway-sign.css from its
+  <head> -- see the class/id contract documented at the top of that CSS
+  file for what to build.
+
+  Extracted from demos/turn-by-turn-demo.html ("civic navigation HUD"
+  style). What's NOT included: the real Directions API routing, GPS
+  tracking, map matching, camera-following logic, the map-picker banner,
+  debug panel, and simulation-controls panel -- all specific to that
+  demo's real navigation implementation, not part of the visual style.
+  This example scripts a fixed sequence of turn instructions on a timer
+  instead of computing a real route.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<link href="highway-sign.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map, offset to sit beside
+     #setup-panel's 380px width. */
+  #map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 380px;
+    right: 0;
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="setup-panel">
+  <h2>Highway Sign Demo</h2>
+  <p>A simulated trip with a scripted turn sequence, styled with the Highway Sign pack.</p>
+
+  <div class="location-status loading" id="location-status">
+    <div class="status-header">
+      <span class="status-icon spinning" id="status-icon">&#8635;</span>
+      <span class="status-text" id="status-text">Finding your location&hellip;</span>
+    </div>
+    <div class="status-details" id="status-details"></div>
+  </div>
+
+  <div class="trip-card">
+    <div class="input-group">
+      <label>Destination <span class="hint">pick a stop below</span></label>
+      <select id="destination-select">
+        <option value="denver">Denver, CO</option>
+        <option value="phoenix">Phoenix, AZ</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="button-group">
+    <button class="btn btn-primary" id="start-btn" disabled>Start Navigation</button>
+    <button class="btn btn-secondary hidden" id="cancel-btn">Cancel</button>
+  </div>
+</div>
+
+<div class="nav-ui-container hidden" id="nav-ui">
+  <div class="nav-controls">
+    <button class="nav-button nav-button-danger" id="nav-stop-btn" title="Stop">&#10005;</button>
+    <button class="nav-button nav-button-secondary" id="nav-voice-btn" title="Toggle voice">&#128266;</button>
+  </div>
+
+  <div class="nav-instruction-banner">
+    <div class="nav-turn-icon"><span class="chevron" id="nav-chevron"></span></div>
+    <div class="nav-instruction-text">
+      <div class="nav-instruction-primary" id="nav-instruction">Waiting for route&hellip;</div>
+      <div class="nav-instruction-distance" id="nav-distance-to-step">--</div>
+    </div>
+  </div>
+
+  <div class="nav-info-panel">
+    <div class="nav-info-item">
+      <div class="nav-info-label">Total Distance</div>
+      <div class="nav-info-value" id="nav-distance-remaining">--</div>
+    </div>
+    <div class="nav-info-item">
+      <div class="nav-info-label">Time Remaining</div>
+      <div class="nav-info-value" id="nav-time-remaining">--</div>
+    </div>
+  </div>
+
+  <div class="nav-status success hidden" id="nav-status">
+    <div id="nav-status-text"></div>
+  </div>
+</div>
+
+<script>
+const START = [-122.4194, 37.7749]; // San Francisco
+const DESTINATIONS = {
+  denver: { name: 'Denver, CO', center: [-104.9903, 39.7392] },
+  phoenix: { name: 'Phoenix, AZ', center: [-112.0740, 33.4484] },
+};
+
+// Scripted turn sequence -- replaces a real Directions API response for
+// this illustrative example.
+const TURN_SEQUENCE = [
+  { text: 'Head east on Market St', distance: '0.4 km', rotation: 45, durationMs: 2200 },
+  { text: 'Turn right onto US-101 South', distance: '1.2 km', rotation: 135, durationMs: 2200 },
+  { text: 'Merge onto I-80 East', distance: '3.8 km', rotation: 45, durationMs: 2200 },
+  { text: 'Continue straight for 340 km', distance: '340 km', rotation: -45, durationMs: 2200 },
+  { text: 'You have arrived', distance: '0 m', rotation: 45, durationMs: 0 },
+];
+
+function mix(a, b, f) { return a + (b - a) * f; }
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/streets-v12',
+  center: START,
+  zoom: 10,
+});
+
+const marker = new mapboxgl.Marker({ color: '#0E6B3A' }).setLngLat(START).addTo(map);
+
+const statusEl = document.getElementById('location-status');
+const statusIcon = document.getElementById('status-icon');
+const statusText = document.getElementById('status-text');
+const statusDetails = document.getElementById('status-details');
+const startBtn = document.getElementById('start-btn');
+const cancelBtn = document.getElementById('cancel-btn');
+const setupPanel = document.getElementById('setup-panel');
+const navUi = document.getElementById('nav-ui');
+const destinationSelect = document.getElementById('destination-select');
+
+// Simulate a geolocation lookup resolving after a short delay.
+setTimeout(() => {
+  statusEl.classList.remove('loading');
+  statusEl.classList.add('success');
+  statusIcon.classList.remove('spinning');
+  statusIcon.textContent = '✓';
+  statusText.textContent = 'Location confirmed';
+  statusDetails.innerHTML = `<strong>Longitude:</strong> ${START[0].toFixed(4)}  <strong>Latitude:</strong> ${START[1].toFixed(4)}`;
+  startBtn.disabled = false;
+}, 1200);
+
+let animFrame = null;
+
+function stopNavigation() {
+  if (animFrame) cancelAnimationFrame(animFrame);
+  navUi.classList.add('hidden');
+  setupPanel.classList.remove('hidden');
+  marker.setLngLat(START);
+  map.flyTo({ center: START, zoom: 10 });
+}
+
+document.getElementById('nav-stop-btn').addEventListener('click', stopNavigation);
+cancelBtn.addEventListener('click', stopNavigation);
+
+startBtn.addEventListener('click', () => {
+  const dest = DESTINATIONS[destinationSelect.value];
+  setupPanel.classList.add('hidden');
+  navUi.classList.remove('hidden');
+  map.flyTo({ center: [mix(START[0], dest.center[0], 0.5), mix(START[1], dest.center[1], 0.5)], zoom: 5, duration: 1500 });
+
+  const instructionEl = document.getElementById('nav-instruction');
+  const distanceEl = document.getElementById('nav-distance-to-step');
+  const chevronEl = document.getElementById('nav-chevron');
+  const remainingEl = document.getElementById('nav-distance-remaining');
+  const timeEl = document.getElementById('nav-time-remaining');
+  const navStatusEl = document.getElementById('nav-status');
+  const navStatusTextEl = document.getElementById('nav-status-text');
+
+  navStatusEl.classList.remove('hidden');
+  navStatusTextEl.textContent = `Route found to ${dest.name}`;
+  setTimeout(() => navStatusEl.classList.add('hidden'), 2500);
+
+  let step = 0;
+  const totalSteps = TURN_SEQUENCE.length;
+
+  function playStep() {
+    if (step >= totalSteps) return;
+    const turn = TURN_SEQUENCE[step];
+    instructionEl.textContent = turn.text;
+    distanceEl.textContent = turn.distance;
+    chevronEl.style.transform = `rotate(${turn.rotation}deg)`;
+    remainingEl.textContent = `${(340 * (1 - step / (totalSteps - 1))).toFixed(0)} km`;
+    timeEl.textContent = `${Math.round(210 * (1 - step / (totalSteps - 1)))} min`;
+
+    const f = step / (totalSteps - 1);
+    marker.setLngLat([mix(START[0], dest.center[0], f), mix(START[1], dest.center[1], f)]);
+
+    step++;
+    if (step < totalSteps) {
+      animFrame = setTimeout(playStep, turn.durationMs);
+    }
+  }
+  playStep();
+});
+</script>
+</body>
+</html>
