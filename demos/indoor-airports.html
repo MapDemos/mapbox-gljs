@@ -11,30 +11,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet" />
     <style>
-        :root {
-            --tarmac: #0b0f14;
-            --glass: rgba(13, 18, 25, 0.72);
-            --hairline: rgba(255, 255, 255, 0.10);
-            --amber: #ffb000;
-            --ink: #eef2f6;
-            --muted: rgba(238, 242, 246, 0.55);
-        }
-
-        body {
-            margin: 0;
-            padding: 0;
-            background: var(--tarmac);
-            color: var(--ink);
-            font-family: 'IBM Plex Mono', ui-monospace, monospace;
-        }
-
-        #map {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            width: 100%;
-        }
-
         /* Airport search — compact flight-information bar */
         .search-bar {
             position: absolute;
@@ -206,70 +182,6 @@
             color: var(--muted);
         }
 
-        /* Theme Mapbox's built-in indoor floor selector to match the board */
-        /* Float the indoor floor selector vertically centered on the right edge */
-        .mapboxgl-ctrl-top-right {
-            top: 0 !important;
-            right: 16px !important;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: flex-end;
-            transform: none !important;
-        }
-
-        .mapboxgl-ctrl-group {
-            background: var(--glass) !important;
-            -webkit-backdrop-filter: blur(18px) saturate(140%);
-            backdrop-filter: blur(18px) saturate(140%);
-            border: 1px solid var(--hairline) !important;
-            border-radius: 12px !important;
-            box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5) !important;
-            overflow: hidden;
-        }
-
-        .mapboxgl-ctrl-group button {
-            width: 36px;
-            height: 36px;
-            background: transparent !important;
-        }
-
-        .mapboxgl-ctrl-group button + button {
-            border-top: 1px solid var(--hairline) !important;
-        }
-
-        .mapboxgl-ctrl-level-button {
-            font-family: 'IBM Plex Mono', monospace !important;
-            font-size: 13px !important;
-            font-weight: 600 !important;
-            color: var(--muted) !important;
-            background: transparent !important;
-        }
-
-        .mapboxgl-ctrl-level-button:hover {
-            color: var(--ink) !important;
-            background: rgba(255, 255, 255, 0.07) !important;
-        }
-
-        .mapboxgl-ctrl-level-button-selected {
-            color: var(--amber) !important;
-            background: rgba(255, 176, 0, 0.1) !important;
-            font-weight: 700 !important;
-            box-shadow: inset 3px 0 0 var(--amber) !important;
-            text-shadow: 0 0 12px rgba(255, 176, 0, 0.75);
-        }
-
-        .mapboxgl-ctrl-level-button-selected:hover {
-            background: rgba(255, 176, 0, 0.16) !important;
-            color: var(--amber) !important;
-        }
-
-        .mapboxgl-ctrl-indoor-toggle .mapboxgl-ctrl-icon {
-            filter: invert(1) brightness(1.7);
-            opacity: 0.75;
-        }
-
         @media (max-width: 640px) {
             .search-bar {
                 left: 10px;
@@ -279,6 +191,7 @@
             }
         }
     </style>
+    <link href="shared/templates/tarmac-glass.css" rel="stylesheet" />
     <link href="shared/templates/light-preset-pill.css" rel="stylesheet" />
     <!-- Indoor maps require Mapbox GL JS v3.21+ (experimental indoor feature) -->
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.21.0/mapbox-gl.js"></script>
