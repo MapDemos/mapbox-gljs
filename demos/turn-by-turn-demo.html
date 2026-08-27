@@ -143,10 +143,11 @@
       transform: translateY(-50%) scale(0.95);
     }
 
-    /* Debug Panel */
+    /* Debug Panel -- top is set below .nav-info-panel (now top: 110px,
+       ~61px tall), with clearance for its own possible wrap. */
     #debug-panel {
       position: fixed;
-      top: 155px;
+      top: 180px;
       right: 10px;
       z-index: 1000;
       background: rgba(28, 29, 31, 0.92);
@@ -309,7 +310,7 @@
         font-size: 14px;
       }
       #debug-panel {
-        top: 133px;
+        top: 165px;
         right: 5px;
         padding: 8px 10px;
         font-size: 10px;

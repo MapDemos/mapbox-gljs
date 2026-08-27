@@ -24,6 +24,9 @@
                                   so that's not included here)
     #setup-panel h2                green guide-sign header band, with a
                                     one-time sheen-sweep animation on load
+    .intro-text                    optional class on a long intro
+                                    paragraph -- hidden once the panel
+                                    becomes a mobile bottom sheet
   - .input-group > label         uppercase field label
     .input-group label .hint       de-emphasized inline caption
     .input-group input/select      bordered field
@@ -526,10 +529,12 @@ button, input, select {
 }
 
 /* Trip computer -- dashboard instrument-cluster motif, distinct material
-   from the sign banner */
+   from the sign banner. top is set below the instruction banner's own
+   height (10px top + ~87px tall at one line) with clearance for a second
+   wrapped line on a long instruction. */
 .nav-info-panel {
   position: fixed;
-  top: 95px;
+  top: 110px;
   right: 10px;
   background: var(--asphalt);
   color: var(--cream);
@@ -672,6 +677,12 @@ button, input, select {
     line-height: 1.4;
   }
 
+  /* Optional: put this class on a long intro paragraph to save space once
+     the setup panel becomes a bottom sheet. */
+  .intro-text {
+    display: none;
+  }
+
   .input-group {
     margin-bottom: 8px;
   }
@@ -758,7 +769,7 @@ button, input, select {
   }
 
   .nav-info-panel {
-    top: 80px;
+    top: 100px;
     right: 5px;
     padding: 10px 12px;
     gap: 15px;
