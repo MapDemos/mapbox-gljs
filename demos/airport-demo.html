@@ -29,12 +29,9 @@
 <link href="shared/templates/tarmac-glass.css" rel="stylesheet" />
 <script src="shared/demo-kit.js"></script>
   <style>
-    #map {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 100%;
-    }
+    /* #map's own base rule (position/top/bottom/width) comes from
+       tarmac-glass.css -- unlike vintage-chart.css/highway-sign.css, it
+       bakes that in rather than leaving it to each demo. */
 
     /* Airport selector panel -- dark glass card, matching tarmac-glass.css's palette */
     #airport-selector {
