@@ -1,0 +1,157 @@
+/*
+  Slate Console -- reusable style pack extracted from demos/language-
+  selector.html ("dark cinematic globe" style, rated NICE in the step-9
+  UI review). A compact technical-readout panel: dark blue-slate body,
+  a bright cyan accent stripe across the top, IBM Plex Sans/Mono
+  throughout -- no display/condensed headline face, unlike Tarmac Glass's
+  Bebas Neue. Genuinely distinct from every other pack in this folder --
+  confirmed by reading the source rather than trusting its category label
+  (it shares a "dark cinematic globe" label with flight-map-demo, which
+  became Vintage Chart, but the two share no colors, fonts, or classes).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/slate-console.css" rel="stylesheet" />
+  plus the two font weights it expects (IBM Plex Sans, IBM Plex Mono):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  Class/id contract (see slate-console-template.html in this same folder
+  for a full working example):
+
+  - #map / .map               full-bleed map container (every demo
+                               defines its own, per convention)
+  - .console-panel            floating panel, sharp top / rounded bottom
+                               corners, cyan top border -- pick where it
+                               sits (top:16px;left:16px in the example)
+    .console-head               padding wrapper for the title block
+      .console-title              small-caps cyan section label
+      .console-sub                muted description text -- wrap any
+                                   inline code/values in a <code> tag for
+                                   mono styling
+    .console-row                 a bordered, slightly-lighter content
+                                  row for one control (label + field)
+      .console-row label           small-caps muted field label
+      .console-row select/input    the field itself
+    .console-status              bottom readout line, mono font, cyan --
+                                  use it for live status text
+
+  What's NOT included: any buttons -- the source demo is just a header +
+  one dropdown + a status readout, so this stays faithful to that rather
+  than inventing an unused button style. Add your own using --cyan/
+  --slate-700 if a future demo built from this needs one.
+*/
+
+:root {
+  --slate-900: #12181f;
+  --slate-800: #1a222b;
+  --slate-700: #232e39;
+  --cyan: #3ec6d9;
+  --paper: #e8ecef;
+  --muted: #8b9aa8;
+  --hairline: rgba(232, 236, 239, 0.1);
+
+  --font-body: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-body);
+}
+
+.console-panel {
+  position: absolute;
+  z-index: 1;
+  width: 280px;
+  box-sizing: border-box;
+  background: var(--slate-900);
+  border-top: 2px solid var(--cyan);
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
+  color: var(--paper);
+  font-family: var(--font-body);
+}
+
+.console-head {
+  padding: 12px 14px 10px;
+}
+
+.console-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  margin: 0 0 2px;
+}
+
+.console-sub {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.console-sub code {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--paper);
+}
+
+.console-row {
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--slate-800);
+}
+
+.console-row label {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.console-row select,
+.console-row input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: 3px;
+  border: 1px solid var(--hairline);
+  background: var(--slate-700);
+  color: var(--paper);
+  font-family: var(--font-body);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.console-row select:focus-visible,
+.console-row input:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.console-status {
+  margin: 0;
+  padding: 10px 14px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--cyan);
+}
+
+@media (max-width: 480px) {
+  .console-panel {
+    top: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    border-radius: 0;
+    border-top: none;
+    border-bottom: 2px solid var(--cyan);
+  }
+}

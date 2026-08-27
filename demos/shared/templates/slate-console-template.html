@@ -1,0 +1,87 @@
+<!--
+  Working EXAMPLE of the Slate Console style pack (slate-console.css, in
+  this same folder). Open this file directly to see the pattern working
+  with a simple style-switcher, then copy the markup below into your own
+  demo and link slate-console.css from its <head> -- see the class/id
+  contract documented at the top of that CSS file for what to build.
+
+  Extracted from demos/language-selector.html ("dark cinematic globe"
+  style). What's NOT included: the real language-switching logic (it
+  rewrites each label layer's text-field to a different name_* field) --
+  demo-specific, not part of the visual style. This example swaps the
+  whole basemap style instead, to keep it simple.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<link href="slate-console.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+  }
+
+  .console-panel {
+    top: 16px;
+    left: 16px;
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<section class="console-panel" aria-label="Map style controls">
+  <div class="console-head">
+    <p class="console-title">Map Style</p>
+    <p class="console-sub">Switches the whole basemap via <code>map.setStyle()</code>.</p>
+  </div>
+
+  <div class="console-row">
+    <label for="style-select">Basemap</label>
+    <select id="style-select" aria-label="Basemap style">
+      <option value="streets-v12" selected>Streets</option>
+      <option value="satellite-streets-v12">Satellite Streets</option>
+      <option value="dark-v11">Dark</option>
+    </select>
+  </div>
+
+  <p class="console-status" id="status" role="status">Loaded as shipped — streets-v12.</p>
+</section>
+
+<script>
+const STYLE_LABELS = {
+  'streets-v12': 'Streets',
+  'satellite-streets-v12': 'Satellite Streets',
+  'dark-v11': 'Dark',
+};
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/streets-v12',
+  center: [30, 22],
+  zoom: 1.7,
+});
+
+map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+
+const select = document.getElementById('style-select');
+const statusEl = document.getElementById('status');
+
+select.addEventListener('change', () => {
+  const styleId = select.value;
+  map.setStyle(`mapbox://styles/mapbox/${styleId}`);
+  statusEl.textContent = `Basemap set to ${STYLE_LABELS[styleId]}.`;
+});
+</script>
+</body>
+</html>
