@@ -398,6 +398,14 @@ button, input, select {
   position: relative;
   z-index: 1000;
   font-family: var(--font-body);
+  /* The HUD's own children are position:fixed, so this element has no
+     footprint of its own -- without this it silently blocks map drag/zoom
+     underneath it. */
+  pointer-events: none;
+}
+
+.nav-ui-container * {
+  pointer-events: auto;
 }
 
 .nav-controls {
