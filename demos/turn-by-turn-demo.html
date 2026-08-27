@@ -3418,88 +3418,17 @@ class NavigationUI {
         currentTime = performance.now();
       }
 
-      // INTERPOLATE PUCK ALONG ROUTE (every frame for smooth movement)
-      if (puckInterpolation.initialized && simulationRouteLine) {
-        try {
-          const elapsed = currentTime - puckInterpolation.startTime;
-          const t = Math.min(1, elapsed / puckInterpolation.duration);
+      // Interpolate the puck's on-screen position (see interpolatePuck --
+      // split out so a bad frame in there can't abort this function before
+      // it reaches requestAnimationFrame below).
+      interpolatePuck(currentTime);
 
-          // Interpolate distance traveled
-          puckInterpolation.distanceTraveled =
-            puckInterpolation.startDistance +
-            (puckInterpolation.targetDistance - puckInterpolation.startDistance) * t;
-
-          // Debug: check simulationRouteLine validity
-          if (!simulationRouteLine.geometry || !simulationRouteLine.geometry.coordinates || simulationRouteLine.geometry.coordinates.length < 2) {
-            console.error('🎬 Invalid simulationRouteLine:', simulationRouteLine);
-            return;
-          }
-
-          const distanceInKm = puckInterpolation.distanceTraveled / 1000;
-
-          // Debug: log the values being used
-          if (isNaN(distanceInKm) || distanceInKm < 0 || distanceInKm > simulationRouteLength / 1000) {
-            console.error('🎬 Invalid distance for turf.along:', {
-              distanceTraveled: puckInterpolation.distanceTraveled,
-              distanceInKm: distanceInKm,
-              routeLengthKm: simulationRouteLength / 1000,
-              startDistance: puckInterpolation.startDistance,
-              targetDistance: puckInterpolation.targetDistance,
-              t: t,
-              elapsed: elapsed,
-              duration: puckInterpolation.duration
-            });
-            return;
-          }
-
-          // Get point along route at this distance
-          const pointOnRoute = turf.along(
-            simulationRouteLine,
-            distanceInKm,
-            { units: 'kilometers' }
-          );
-
-          if (!pointOnRoute || !pointOnRoute.geometry || !pointOnRoute.geometry.coordinates) {
-            console.error('🎬 Invalid pointOnRoute from turf.along at distance', puckInterpolation.distanceTraveled);
-            return;
-          }
-
-          // Update puck position (perfectly follows route!)
-          if (navigation && navigation.puckController && navigation.puckController.puckMarker) {
-            navigation.puckController.puckMarker.setLngLat(pointOnRoute.geometry.coordinates);
-
-            // Calculate bearing from route direction
-            // Get a point slightly ahead to calculate bearing
-            const lookAheadDistance = Math.min(
-              puckInterpolation.distanceTraveled + 10, // 10m ahead
-              simulationRouteLength
-            );
-            const aheadPoint = turf.along(
-              simulationRouteLine,
-              lookAheadDistance / 1000,
-              { units: 'kilometers' }
-            );
-
-            if (aheadPoint && aheadPoint.geometry && aheadPoint.geometry.coordinates) {
-              const bearing = calculateBearing(
-                pointOnRoute.geometry.coordinates[1],
-                pointOnRoute.geometry.coordinates[0],
-                aheadPoint.geometry.coordinates[1],
-                aheadPoint.geometry.coordinates[0]
-              );
-
-              if (bearing !== null && !isNaN(bearing)) {
-                navigation.puckController.puckMarker.setRotation(bearing);
-              }
-            }
-          }
-        } catch (error) {
-          console.error('🎬 Error interpolating puck:', error);
-        }
-      }
-
-      // Calculate time since last frame
-      const deltaTime = currentTime - lastSimulationTime;
+      // Calculate time since last frame. requestAnimationFrame's timestamp
+      // can occasionally read a hair behind a performance.now() captured
+      // late in the previous frame (heavy synchronous work in between,
+      // e.g. the console logging in processSimulationCoordinate) -- clamp
+      // to 0 so that never reads as a negative delta.
+      const deltaTime = Math.max(0, currentTime - lastSimulationTime);
       lastSimulationTime = currentTime;
 
       // Accumulate time (in seconds) scaled by speed
@@ -3526,6 +3455,97 @@ class NavigationUI {
 
       // Continue loop
       simulationAnimationFrame = requestAnimationFrame(runSimulationLoop);
+    }
+
+    // Interpolates the puck's on-screen position between the last processed
+    // route coordinate and the next one (every frame, for smooth movement).
+    // Kept separate from runSimulationLoop so an invalid/out-of-range
+    // distance here just skips this frame's puck update instead of
+    // aborting runSimulationLoop before it reaches requestAnimationFrame --
+    // that used to permanently kill the whole simulation loop on one bad
+    // frame (see the `t` clamp below for why a bad frame could happen at
+    // all: a mismatch between requestAnimationFrame's timestamp and the
+    // performance.now() call in processSimulationCoordinate could produce
+    // a briefly negative elapsed time).
+    function interpolatePuck(currentTime) {
+      if (!puckInterpolation.initialized || !simulationRouteLine) return;
+
+      try {
+        const elapsed = currentTime - puckInterpolation.startTime;
+        const t = Math.max(0, Math.min(1, elapsed / puckInterpolation.duration));
+
+        // Interpolate distance traveled
+        puckInterpolation.distanceTraveled =
+          puckInterpolation.startDistance +
+          (puckInterpolation.targetDistance - puckInterpolation.startDistance) * t;
+
+        // Debug: check simulationRouteLine validity
+        if (!simulationRouteLine.geometry || !simulationRouteLine.geometry.coordinates || simulationRouteLine.geometry.coordinates.length < 2) {
+          console.error('🎬 Invalid simulationRouteLine:', simulationRouteLine);
+          return;
+        }
+
+        const distanceInKm = puckInterpolation.distanceTraveled / 1000;
+
+        // Debug: log the values being used
+        if (isNaN(distanceInKm) || distanceInKm < 0 || distanceInKm > simulationRouteLength / 1000) {
+          console.error('🎬 Invalid distance for turf.along:', {
+            distanceTraveled: puckInterpolation.distanceTraveled,
+            distanceInKm: distanceInKm,
+            routeLengthKm: simulationRouteLength / 1000,
+            startDistance: puckInterpolation.startDistance,
+            targetDistance: puckInterpolation.targetDistance,
+            t: t,
+            elapsed: elapsed,
+            duration: puckInterpolation.duration
+          });
+          return;
+        }
+
+        // Get point along route at this distance
+        const pointOnRoute = turf.along(
+          simulationRouteLine,
+          distanceInKm,
+          { units: 'kilometers' }
+        );
+
+        if (!pointOnRoute || !pointOnRoute.geometry || !pointOnRoute.geometry.coordinates) {
+          console.error('🎬 Invalid pointOnRoute from turf.along at distance', puckInterpolation.distanceTraveled);
+          return;
+        }
+
+        // Update puck position (perfectly follows route!)
+        if (navigation && navigation.puckController && navigation.puckController.puckMarker) {
+          navigation.puckController.puckMarker.setLngLat(pointOnRoute.geometry.coordinates);
+
+          // Calculate bearing from route direction
+          // Get a point slightly ahead to calculate bearing
+          const lookAheadDistance = Math.min(
+            puckInterpolation.distanceTraveled + 10, // 10m ahead
+            simulationRouteLength
+          );
+          const aheadPoint = turf.along(
+            simulationRouteLine,
+            lookAheadDistance / 1000,
+            { units: 'kilometers' }
+          );
+
+          if (aheadPoint && aheadPoint.geometry && aheadPoint.geometry.coordinates) {
+            const bearing = calculateBearing(
+              pointOnRoute.geometry.coordinates[1],
+              pointOnRoute.geometry.coordinates[0],
+              aheadPoint.geometry.coordinates[1],
+              aheadPoint.geometry.coordinates[0]
+            );
+
+            if (bearing !== null && !isNaN(bearing)) {
+              navigation.puckController.puckMarker.setRotation(bearing);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('🎬 Error interpolating puck:', error);
+      }
     }
 
     function processSimulationCoordinate(index, isEnd) {
