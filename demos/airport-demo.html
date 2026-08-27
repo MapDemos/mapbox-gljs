@@ -20,16 +20,15 @@
   <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<link href="shared/templates/tarmac-glass.css" rel="stylesheet" />
 <script src="shared/demo-kit.js"></script>
   <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    }
     #map {
       position: absolute;
       top: 0;
@@ -37,29 +36,35 @@
       width: 100%;
     }
 
-    /* Airport selector panel */
+    /* Airport selector panel -- dark glass card, matching tarmac-glass.css's palette */
     #airport-selector {
       position: absolute;
       top: 20px;
       left: 20px;
-      background: white;
+      background: var(--glass);
+      -webkit-backdrop-filter: blur(22px) saturate(140%);
+      backdrop-filter: blur(22px) saturate(140%);
+      border: 1px solid var(--hairline);
       padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      border-radius: 14px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
       min-width: 300px;
       z-index: 1000;
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
     }
 
     #airport-selector h2 {
       margin-top: 0;
       margin-bottom: 15px;
-      color: #333;
-      font-size: 20px;
+      color: var(--amber);
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 26px;
+      letter-spacing: 1px;
     }
 
     #airport-selector p {
-      color: #666;
-      font-size: 14px;
+      color: var(--muted);
+      font-size: 13px;
       margin-bottom: 20px;
       line-height: 1.5;
     }
@@ -71,38 +76,48 @@
     .selector-group label {
       display: block;
       margin-bottom: 8px;
-      color: #555;
+      color: var(--muted);
       font-weight: 600;
-      font-size: 14px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
     }
 
     #airport-dropdown {
       width: 100%;
       padding: 10px;
-      border: 2px solid #e5e7eb;
-      border-radius: 6px;
-      font-size: 14px;
-      background: white;
+      border: 1px solid var(--hairline);
+      border-radius: 7px;
+      font-size: 13px;
+      font-family: 'IBM Plex Mono', monospace;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--ink);
       cursor: pointer;
       transition: all 0.2s;
     }
 
+    #airport-dropdown option {
+      background: var(--tarmac);
+      color: var(--ink);
+    }
+
     #airport-dropdown:hover {
-      border-color: #667eea;
+      border-color: var(--amber);
+      background: rgba(255, 255, 255, 0.1);
     }
 
     #airport-dropdown:focus {
       outline: none;
-      border-color: #667eea;
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      border-color: var(--amber);
+      box-shadow: 0 0 0 3px rgba(255, 176, 0, 0.15);
     }
 
     #airport-info {
       margin-top: 20px;
       padding: 15px;
-      background: #f9fafb;
+      background: rgba(255, 255, 255, 0.05);
       border-radius: 8px;
-      border: 1px solid #e5e7eb;
+      border: 1px solid var(--hairline);
       display: none;
     }
 
@@ -118,12 +133,12 @@
     }
 
     .info-label {
-      color: #6b7280;
+      color: var(--muted);
       font-weight: 500;
     }
 
     .info-value {
-      color: #374151;
+      color: var(--ink);
       font-weight: 600;
     }
 
@@ -132,8 +147,8 @@
       display: inline-block;
       width: 20px;
       height: 20px;
-      border: 3px solid #f3f4f6;
-      border-top: 3px solid #667eea;
+      border: 3px solid var(--hairline);
+      border-top: 3px solid var(--amber);
       border-radius: 50%;
       animation: spin 1s linear infinite;
       margin-left: 10px;
@@ -145,7 +160,7 @@
     }
 
     .status-message {
-      color: #667eea;
+      color: var(--amber);
       font-size: 13px;
       font-style: italic;
       margin-top: 10px;
@@ -153,29 +168,33 @@
       align-items: center;
     }
 
-    /* Zoom display */
+    /* Zoom display -- glass pill, matching tarmac-glass.css's palette */
     #zoom-display {
       position: absolute;
       bottom: 40px;
       left: 10px;
-      background: white;
+      background: var(--glass);
+      -webkit-backdrop-filter: blur(18px) saturate(140%);
+      backdrop-filter: blur(18px) saturate(140%);
+      border: 1px solid var(--hairline);
       padding: 8px 12px;
-      border-radius: 6px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      border-radius: 8px;
+      box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
       font-size: 13px;
+      font-family: 'IBM Plex Mono', monospace;
       font-weight: 600;
-      color: #374151;
+      color: var(--ink);
       z-index: 999;
     }
 
     #zoom-display .zoom-label {
-      color: #6b7280;
+      color: var(--muted);
       font-weight: 500;
       margin-right: 4px;
     }
 
     #zoom-display .zoom-value {
-      color: #667eea;
+      color: var(--amber);
       font-weight: 700;
     }
 
@@ -190,7 +209,7 @@
       }
 
       #airport-selector h2 {
-        font-size: 18px;
+        font-size: 22px;
         margin-bottom: 10px;
       }
 
@@ -256,7 +275,7 @@
   <script>
     const map = new mapboxgl.Map({
       container: 'map',
-      style: 'mapbox://styles/mapbox/streets-v12',
+      style: 'mapbox://styles/mapbox/dark-v11',
       center: [139.7671, 35.6812], // Tokyo Station
       zoom: 10
     });
@@ -317,9 +336,9 @@
           type: 'fill',
           source: 'airports',
           paint: {
-            'fill-color': '#667eea',
-            'fill-opacity': 0.3,
-            'fill-outline-color': '#667eea'
+            'fill-color': '#ffb000',
+            'fill-opacity': 0.18,
+            'fill-outline-color': 'rgba(255, 176, 0, 0.5)'
           }
         });
 
@@ -329,9 +348,9 @@
           type: 'fill',
           source: 'airports',
           paint: {
-            'fill-color': '#764ba2',
+            'fill-color': '#ffb000',
             'fill-opacity': 0.6,
-            'fill-outline-color': '#764ba2'
+            'fill-outline-color': '#ffb000'
           },
           filter: ['==', ['get', 'searchbox_name'], ''] // Initially hide all
         });
@@ -466,7 +485,7 @@
 
         // Add marker at centroid
         currentMarker = new mapboxgl.Marker({
-          color: '#764ba2'
+          color: '#ffb000'
         })
         .setLngLat(airport.centroid)
         .setPopup(new mapboxgl.Popup().setHTML(
@@ -503,19 +522,18 @@
     // Handle polygon visibility toggle
     document.getElementById('polygon-toggle').addEventListener('change', (e) => {
       const isVisible = e.target.checked;
-      const opacity = isVisible ? 0.3 : 0;
-      const outlineOpacity = isVisible ? 1 : 0;
+      const opacity = isVisible ? 0.18 : 0;
 
       // Update the main polygon layer opacity
       map.setPaintProperty('airport-polygons', 'fill-opacity', opacity);
       map.setPaintProperty('airport-polygons', 'fill-outline-color',
-        isVisible ? '#667eea' : 'rgba(102, 126, 234, 0)');
+        isVisible ? 'rgba(255, 176, 0, 0.5)' : 'rgba(255, 176, 0, 0)');
 
       // Update the highlighted layer opacity (keep it more visible when selected)
       map.setPaintProperty('airport-polygons-highlighted', 'fill-opacity',
         isVisible ? 0.6 : 0);
       map.setPaintProperty('airport-polygons-highlighted', 'fill-outline-color',
-        isVisible ? '#764ba2' : 'rgba(118, 75, 162, 0)');
+        isVisible ? '#ffb000' : 'rgba(255, 176, 0, 0)');
 
       console.log(`Airport polygons ${isVisible ? 'shown' : 'hidden'}`);
     });
