@@ -81,9 +81,9 @@
 :root {
   /* Route Teal -- was MUTCD guide-sign green (#0E6B3A), swapped to teal
      (see the file header comment for why) */
-  --green: #0B4F8A;
-  --green-dark: #083862;
-  --green-tint: #E1E8F0;
+  --green: #0E6B6B;
+  --green-dark: #0A4C4C;
+  --green-tint: #E3ECEC;
   /* Reflective sheeting cream */
   --cream: #F6F3EA;
   /* Instrument-cluster asphalt */
@@ -92,7 +92,7 @@
   --amber: #F2A900;
   --red: #C8102E;
   --ink: #2A2A28;
-  --line: rgba(11, 79, 138, 0.22);
+  --line: rgba(14, 107, 107, 0.22);
 
   --font-display: 'Overpass', sans-serif;
   --font-body: 'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -295,7 +295,7 @@ button, input, select {
 }
 
 .btn-primary:hover {
-  background: #0D5A9D;
+  background: #107A7A;
 }
 
 .btn-primary:active {
