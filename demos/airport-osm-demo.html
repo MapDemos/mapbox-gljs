@@ -20,260 +20,103 @@
   <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<link href="shared/templates/highway-sign.css" rel="stylesheet" />
 <script src="shared/demo-kit.js"></script>
   <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    }
     #map {
       position: absolute;
       top: 0;
       bottom: 0;
-      width: 100%;
+      left: 380px;
+      right: 0;
     }
 
-    /* UI Toggle button */
-    #ui-toggle {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      background: white;
-      padding: 10px 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-      z-index: 1001;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      border: 2px solid transparent;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      color: #333;
-    }
-
-    #ui-toggle:hover {
-      border-color: #3b82f6;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    }
-
-    #ui-toggle.panels-hidden {
-      background: rgba(255, 255, 255, 0.95);
-    }
-
-    /* Airport selector panel */
-    #airport-selector {
-      position: absolute;
-      top: 70px;
-      left: 20px;
-      background: white;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-      min-width: 320px;
-      max-width: 380px;
-      z-index: 1000;
-      max-height: 85vh;
-      overflow-y: auto;
-      transition: transform 0.3s ease, opacity 0.3s ease;
-      transform: translateX(0);
-      opacity: 1;
-    }
-
-    #airport-selector.hidden {
-      transform: translateX(-120%);
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    #airport-selector h2 {
-      margin-top: 0;
-      margin-bottom: 15px;
-      color: #333;
-      font-size: 20px;
-    }
-
-    #airport-selector p {
-      color: #666;
-      font-size: 14px;
-      margin-bottom: 20px;
-      line-height: 1.5;
-    }
-
-    .selector-group {
-      margin-bottom: 15px;
-    }
-
-    .selector-group label {
-      display: block;
-      margin-bottom: 8px;
-      color: #555;
-      font-weight: 600;
-      font-size: 14px;
-    }
-
-    #airport-dropdown {
-      width: 100%;
-      padding: 10px;
-      border: 2px solid #e5e7eb;
-      border-radius: 6px;
-      font-size: 14px;
-      background: white;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    #airport-dropdown:hover {
-      border-color: #3b82f6;
-    }
-
-    #airport-dropdown:focus {
-      outline: none;
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    }
-
-    /* Style selector */
-    .style-selector {
-      margin-top: 15px;
-      margin-bottom: 15px;
-      padding: 15px;
-      background: #f9fafb;
-      border-radius: 8px;
-      border: 1px solid #e5e7eb;
-    }
-
-    .style-selector h3 {
-      font-size: 14px;
-      color: #333;
-      margin-bottom: 10px;
-      font-weight: 600;
-    }
-
-    .style-buttons {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-
-    .style-btn {
-      padding: 8px 12px;
-      border: 2px solid #e5e7eb;
-      background: white;
-      border-radius: 6px;
-      font-size: 13px;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-align: center;
-      font-weight: 500;
-    }
-
-    .style-btn:hover {
-      border-color: #3b82f6;
-      background: #f0f9ff;
-    }
-
-    .style-btn.active {
-      border-color: #3b82f6;
-      background: #3b82f6;
-      color: white;
-    }
-
-    /* Filter section */
-    .filter-section {
-      margin-top: 20px;
-      padding-top: 20px;
-      border-top: 1px solid #e5e7eb;
-    }
-
-    .filter-section h3 {
-      font-size: 16px;
-      color: #333;
-      margin-bottom: 10px;
-    }
-
-    .checkbox-group {
-      margin-bottom: 10px;
-    }
-
-    .checkbox-group label {
-      display: flex;
-      align-items: center;
-      cursor: pointer;
-      font-size: 14px;
-      color: #555;
-      padding: 5px 0;
-      transition: color 0.2s;
-    }
-
-    .checkbox-group label:hover {
-      color: #3b82f6;
-    }
-
-    .checkbox-group input[type="checkbox"] {
-      margin-right: 8px;
-      cursor: pointer;
-    }
-
-    #airport-info {
-      margin-top: 20px;
-      padding: 15px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      border-radius: 8px;
-      color: white;
-      display: none;
-    }
-
-    #airport-info.visible {
-      display: block;
-    }
-
+    /* Stats / legend / airport-info rows -- not part of the shared
+       highway-sign.css contract, so defined locally (same convention as
+       airport-layer-filter-demo.html's .stat-item/.airport-detail). */
+    .stat-item,
     .info-item {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 10px;
+      gap: 10px;
+      margin-bottom: 8px;
       font-size: 13px;
     }
 
+    .stat-item:last-child,
+    .info-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .stat-item span:first-child,
     .info-label {
-      color: rgba(255, 255, 255, 0.8);
+      color: var(--ink-muted, #5B5B57);
       font-weight: 500;
     }
 
+    .stat-value,
     .info-value {
-      color: white;
+      color: var(--ink);
       font-weight: 600;
       text-align: right;
-      max-width: 60%;
-      word-break: break-word;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
-    #toggle-selected-polygon:hover {
-      background: rgba(255, 255, 255, 0.3) !important;
-      transform: scale(1.02);
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: var(--ink);
     }
 
-    #toggle-selected-polygon:active {
-      transform: scale(0.98);
+    .legend-item:last-child {
+      margin-bottom: 0;
     }
 
-    /* Comparison mode indicator */
+    .legend-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+      flex: none;
+      border: 1px solid var(--line);
+    }
+
+    /* Display-option checkboxes -- plain captions, not field names (same
+       convention as highway-sign.css's own label[for="simulation-mode"]) */
+    #setup-panel > label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    /* Comparison-mode toast -- transient, centered over the map */
     .comparison-indicator {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background: rgba(0, 0, 0, 0.8);
-      color: white;
+      background: var(--asphalt);
+      color: var(--cream);
       padding: 12px 24px;
-      border-radius: 8px;
-      font-size: 16px;
+      border-radius: 4px;
+      font-family: var(--font-body);
+      font-size: 14px;
       font-weight: 600;
       z-index: 1100;
       pointer-events: none;
@@ -285,178 +128,16 @@
       opacity: 1;
     }
 
-    /* Statistics display */
-    #stats-display {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      background: white;
-      padding: 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      font-size: 13px;
-      z-index: 999;
-      transition: transform 0.3s ease, opacity 0.3s ease;
-      transform: translateX(0);
-      opacity: 1;
+    #shortcuts-panel kbd {
+      background: rgba(255,255,255,0.15);
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-family: var(--font-mono);
     }
 
-    #stats-display.hidden {
-      transform: translateX(120%);
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    #stats-display h3 {
-      margin: 0 0 10px 0;
-      font-size: 14px;
-      color: #333;
-    }
-
-    .stat-item {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 5px;
-      color: #666;
-    }
-
-    .stat-value {
-      font-weight: 600;
-      color: #3b82f6;
-    }
-
-    /* Loading state */
-    .loading {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 3px solid #f3f4f6;
-      border-top: 3px solid #3b82f6;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-left: 10px;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    .status-message {
-      color: #3b82f6;
-      font-size: 13px;
-      font-style: italic;
-      margin-top: 10px;
-      display: flex;
-      align-items: center;
-    }
-
-    /* Zoom display */
-    #zoom-display {
-      position: absolute;
-      bottom: 40px;
-      left: 10px;
-      background: white;
-      padding: 8px 12px;
-      border-radius: 6px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      font-size: 13px;
-      font-weight: 600;
-      color: #374151;
-      z-index: 999;
-    }
-
-    #zoom-display .zoom-label {
-      color: #6b7280;
-      font-weight: 500;
-      margin-right: 4px;
-    }
-
-    #zoom-display .zoom-value {
-      color: #3b82f6;
-      font-weight: 700;
-    }
-
-    /* Legend */
-    #legend {
-      position: absolute;
-      bottom: 80px;
-      right: 20px;
-      background: white;
-      padding: 12px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      font-size: 12px;
-      z-index: 999;
-      transition: transform 0.3s ease, opacity 0.3s ease;
-      transform: translateX(0);
-      opacity: 1;
-    }
-
-    #legend.hidden {
-      transform: translateX(120%);
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    #legend h4 {
-      margin: 0 0 8px 0;
-      font-size: 13px;
-      color: #333;
-    }
-
-    .legend-item {
-      display: flex;
-      align-items: center;
-      margin-bottom: 5px;
-    }
-
-    .legend-color {
-      width: 20px;
-      height: 12px;
-      margin-right: 8px;
-      border-radius: 2px;
-      border: 1px solid rgba(0,0,0,0.1);
-    }
-
-    /* Mobile responsive */
     @media (max-width: 768px) {
-      #ui-toggle {
-        top: 10px;
-        left: 10px;
-      }
-
-      #airport-selector {
-        top: 60px;
-        left: 10px;
-        right: 10px;
-        min-width: unset;
-        max-width: unset;
-        padding: 15px;
-        max-height: 70vh;
-      }
-
-      #airport-selector h2 {
-        font-size: 18px;
-        margin-bottom: 10px;
-      }
-
-      #stats-display {
-        top: unset;
-        bottom: 120px;
-        right: 10px;
-        padding: 10px;
-      }
-
-      #legend {
-        display: none;
-      }
-
-      #zoom-display {
-        bottom: 30px;
-        left: 5px;
-        padding: 6px 10px;
-        font-size: 12px;
+      #map {
+        left: 0;
       }
     }
   </style>
@@ -464,119 +145,87 @@
 <body>
   <div id="map"></div>
 
-  <!-- UI Toggle button -->
-  <button id="ui-toggle" title="Toggle UI Panels">
-    <span id="toggle-icon">👁️</span>
-    <span id="toggle-text">Hide Panels</span>
-  </button>
-
   <!-- Comparison mode indicator -->
   <div id="comparison-indicator" class="comparison-indicator">
     Polygon Hidden - Compare with Base Map
   </div>
 
-  <!-- Zoom level display -->
-  <div id="zoom-display">
-    <span class="zoom-label">Zoom:</span>
-    <span class="zoom-value" id="zoom-value">10.00</span>
-  </div>
+  <div id="setup-panel">
+    <h2>Japan Airports (OSM)</h2>
+    <p class="intro-text">Explore comprehensive airport boundaries extracted from OpenStreetMap data for Japan.</p>
 
-  <!-- Statistics display -->
-  <div id="stats-display">
-    <h3>OSM Airport Statistics</h3>
-    <div class="stat-item">
-      <span>Total Airports:</span>
-      <span class="stat-value" id="stat-total">0</span>
-    </div>
-    <div class="stat-item">
-      <span>Visible:</span>
-      <span class="stat-value" id="stat-visible">0</span>
-    </div>
-    <div class="stat-item">
-      <span>Named:</span>
-      <span class="stat-value" id="stat-named">0</span>
-    </div>
-    <div class="stat-item">
-      <span>Military:</span>
-      <span class="stat-value" id="stat-military">0</span>
-    </div>
-  </div>
-
-  <!-- Legend -->
-  <div id="legend">
-    <h4>Airport Types</h4>
-    <div class="legend-item">
-      <div class="legend-color" style="background: rgba(59, 130, 246, 0.4);"></div>
-      <span>Regular Airports</span>
-    </div>
-    <div class="legend-item">
-      <div class="legend-color" style="background: rgba(239, 68, 68, 0.4);"></div>
-      <span>Military Airfields</span>
-    </div>
-    <div class="legend-item">
-      <div class="legend-color" style="background: rgba(147, 51, 234, 0.6);"></div>
-      <span>Selected Airport</span>
-    </div>
-  </div>
-
-  <div id="airport-selector">
-    <h2>🛩️ Japan Airports (OSM)</h2>
-    <p>Explore comprehensive airport boundaries extracted from OpenStreetMap data for Japan.</p>
-
-    <div class="selector-group">
-      <label for="airport-dropdown">Choose an Airport:</label>
-      <select id="airport-dropdown">
-        <option value="">Loading airports...</option>
-      </select>
-    </div>
-
-    <div class="style-selector">
-      <h3>Map Style</h3>
-      <div class="style-buttons">
-        <button class="style-btn active" id="style-satellite" data-style="mapbox://styles/mapbox/satellite-streets-v12">
-          🛰️ Satellite
-        </button>
-        <button class="style-btn" id="style-streets" data-style="mapbox://styles/mapbox/streets-v12">
-          🗺️ Streets
-        </button>
+    <div class="location-status hidden" id="location-status">
+      <div class="status-header">
+        <span class="status-icon spinning" id="status-icon">&#8635;</span>
+        <span class="status-text" id="status-text"></span>
       </div>
     </div>
 
-    <div class="filter-section">
-      <h3>Display Options</h3>
-
-      <div class="checkbox-group">
-        <label>
-          <input type="checkbox" id="polygon-toggle" checked="" />
-          Show airport polygons
-        </label>
-      </div>
-
-      <div class="checkbox-group">
-        <label>
-          <input type="checkbox" id="military-toggle" checked="" />
-          Show military airfields
-        </label>
-      </div>
-
-      <div class="checkbox-group">
-        <label>
-          <input type="checkbox" id="labels-toggle" checked="" />
-          Show airport labels
-        </label>
-      </div>
-
-      <div class="checkbox-group">
-        <label>
-          <input type="checkbox" id="small-toggle" checked="" />
-          Show small airfields
-        </label>
+    <div class="trip-card">
+      <div class="input-group">
+        <label for="airport-dropdown">Choose an Airport</label>
+        <select id="airport-dropdown">
+          <option value="">Loading airports...</option>
+        </select>
       </div>
     </div>
 
-    <div id="status-container"></div>
+    <div class="trip-card">
+      <div class="input-group"><label>Map Style</label></div>
+      <div class="button-group">
+        <button class="btn btn-primary" id="style-satellite" data-style="mapbox://styles/mapbox/satellite-streets-v12">Satellite</button>
+        <button class="btn btn-secondary" id="style-streets" data-style="mapbox://styles/mapbox/streets-v12">Streets</button>
+      </div>
+    </div>
 
-    <div id="airport-info">
+    <div class="input-group"><label>Display Options</label></div>
+    <label for="polygon-toggle"><input type="checkbox" id="polygon-toggle" checked="" /> Show airport polygons</label>
+    <label for="military-toggle"><input type="checkbox" id="military-toggle" checked="" /> Show military airfields</label>
+    <label for="labels-toggle"><input type="checkbox" id="labels-toggle" checked="" /> Show airport labels</label>
+    <label for="small-toggle"><input type="checkbox" id="small-toggle" checked="" /> Show small airfields</label>
+
+    <div class="trip-card">
+      <div class="input-group"><label>Statistics</label></div>
+      <div class="stat-item">
+        <span>Zoom Level:</span>
+        <span class="stat-value" id="zoom-value">5.50</span>
+      </div>
+      <div class="stat-item">
+        <span>Total Airports:</span>
+        <span class="stat-value" id="stat-total">0</span>
+      </div>
+      <div class="stat-item">
+        <span>Visible:</span>
+        <span class="stat-value" id="stat-visible">0</span>
+      </div>
+      <div class="stat-item">
+        <span>Named:</span>
+        <span class="stat-value" id="stat-named">0</span>
+      </div>
+      <div class="stat-item">
+        <span>Military:</span>
+        <span class="stat-value" id="stat-military">0</span>
+      </div>
+    </div>
+
+    <div class="trip-card">
+      <div class="input-group"><label>Airport Types</label></div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: rgba(59, 130, 246, 0.4);"></div>
+        <span>Regular Airports</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: rgba(239, 68, 68, 0.4);"></div>
+        <span>Military Airfields</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: rgba(242, 169, 0, 0.6);"></div>
+        <span>Selected Airport</span>
+      </div>
+    </div>
+
+    <div class="trip-card hidden" id="airport-info">
+      <div class="input-group"><label>Selected Airport</label></div>
       <div class="info-item">
         <span class="info-label">Name:</span>
         <span class="info-value" id="info-name">-</span>
@@ -601,21 +250,8 @@
         <span class="info-label">Area:</span>
         <span class="info-value" id="info-area">-</span>
       </div>
-      <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.2);">
-        <button id="toggle-selected-polygon" style="
-          width: 100%;
-          padding: 10px;
-          background: rgba(255, 255, 255, 0.2);
-          border: 1px solid rgba(255, 255, 255, 0.4);
-          color: white;
-          border-radius: 6px;
-          cursor: pointer;
-          font-size: 14px;
-          font-weight: 600;
-          transition: all 0.2s;
-        ">
-          🔄 Toggle Polygon (Space)
-        </button>
+      <div class="button-group">
+        <button class="btn btn-secondary" id="toggle-selected-polygon">Toggle Polygon (Space)</button>
       </div>
     </div>
   </div>
@@ -633,7 +269,6 @@
     let geojsonData = null;
     let currentStyle = 'satellite';
     let mapLoaded = false;
-    let panelsVisible = true;
     let selectedPolygonVisible = true;
     let currentSelectedAirport = null;
 
@@ -651,19 +286,23 @@
     map.on('zoomend', updateZoomDisplay);
     map.on('move', updateZoomDisplay);
 
-    // Show status message
-    function showStatus(message, isLoading = false) {
-      const statusContainer = document.getElementById('status-container');
-      if (message) {
-        statusContainer.innerHTML = `
-          <div class="status-message">
-            ${message}
-            ${isLoading ? '<span class="loading"></span>' : ''}
-          </div>
-        `;
-      } else {
-        statusContainer.innerHTML = '';
+    // Show status message using the highway-sign .location-status card
+    // (state is 'loading', 'success', or 'error'; omit message to hide it)
+    function showStatus(message, state = 'loading') {
+      const statusEl = document.getElementById('location-status');
+      const iconEl = document.getElementById('status-icon');
+      const textEl = document.getElementById('status-text');
+
+      if (!message) {
+        statusEl.classList.add('hidden');
+        return;
       }
+
+      statusEl.classList.remove('hidden', 'loading', 'success', 'error');
+      statusEl.classList.add(state);
+      iconEl.classList.toggle('spinning', state === 'loading');
+      iconEl.innerHTML = state === 'loading' ? '&#8635;' : (state === 'error' ? '&#9888;' : '&#10003;');
+      textEl.textContent = message;
     }
 
     // Calculate area in square kilometers
@@ -680,7 +319,7 @@
     async function setupMapLayers() {
       if (!geojsonData) {
         console.log('Loading OSM airport data...');
-        showStatus('Loading OSM airports', true);
+        showStatus('Loading OSM airports…', 'loading');
 
         try {
           // Load the OSM GeoJSON file
@@ -710,7 +349,7 @@
           extractAirportData(geojsonData);
         } catch (error) {
           console.error('Error loading OSM GeoJSON:', error);
-          showStatus('Error loading OSM airport data');
+          showStatus('Error loading OSM airport data', 'error');
           return;
         }
       }
@@ -779,7 +418,7 @@
           type: 'fill',
           source: 'airports-osm',
           paint: {
-            'fill-color': '#9333ea',
+            'fill-color': '#F2A900',
             'fill-opacity': 0.6
           },
           filter: ['==', ['get', 'name'], ''] // Initially hide all
@@ -791,7 +430,7 @@
           type: 'line',
           source: 'airports-osm',
           paint: {
-            'line-color': '#7c3aed',
+            'line-color': '#B37A00',
             'line-width': 3,
             'line-opacity': 1
           },
@@ -820,7 +459,8 @@
       }
 
       updateStatistics();
-      showStatus('');
+      showStatus(`Loaded ${airports.length} airports`, 'success');
+      setTimeout(() => showStatus(''), 2500);
     }
 
     // Load the map and data
@@ -879,7 +519,7 @@
 
       } catch (error) {
         console.error('Error extracting OSM airport data:', error);
-        showStatus('Error processing OSM airport data');
+        showStatus('Error processing OSM airport data', 'error');
       }
     }
 
@@ -953,7 +593,7 @@
           currentMarker.remove();
           currentMarker = null;
         }
-        document.getElementById('airport-info').classList.remove('visible');
+        document.getElementById('airport-info').classList.add('hidden');
 
         // Clear highlight filter
         map.setFilter('airport-polygons-highlighted', ['==', ['get', 'name'], '']);
@@ -977,7 +617,7 @@
 
       // Update info panel
       const infoPanel = document.getElementById('airport-info');
-      infoPanel.classList.add('visible');
+      infoPanel.classList.remove('hidden');
 
       document.getElementById('info-name').textContent = airport.name || 'N/A';
       document.getElementById('info-name-en').textContent = airport.nameEn || 'N/A';
@@ -1017,7 +657,7 @@
 
         // Add marker at centroid
         currentMarker = new mapboxgl.Marker({
-          color: '#7c3aed'
+          color: '#B37A00'
         })
         .setLngLat(airport.centroid)
         .setPopup(new mapboxgl.Popup().setHTML(
@@ -1138,8 +778,10 @@
       if (currentStyle === 'satellite') return;
 
       // Update button states
-      document.getElementById('style-satellite').classList.add('active');
-      document.getElementById('style-streets').classList.remove('active');
+      document.getElementById('style-satellite').classList.add('btn-primary');
+      document.getElementById('style-satellite').classList.remove('btn-secondary');
+      document.getElementById('style-streets').classList.add('btn-secondary');
+      document.getElementById('style-streets').classList.remove('btn-primary');
 
       // Change map style
       map.setStyle('mapbox://styles/mapbox/satellite-streets-v12');
@@ -1158,8 +800,10 @@
       if (currentStyle === 'streets') return;
 
       // Update button states
-      document.getElementById('style-streets').classList.add('active');
-      document.getElementById('style-satellite').classList.remove('active');
+      document.getElementById('style-streets').classList.add('btn-primary');
+      document.getElementById('style-streets').classList.remove('btn-secondary');
+      document.getElementById('style-satellite').classList.add('btn-secondary');
+      document.getElementById('style-satellite').classList.remove('btn-primary');
 
       // Change map style
       map.setStyle('mapbox://styles/mapbox/streets-v12');
@@ -1296,53 +940,8 @@
       toggleSelectedPolygon();
     });
 
-    // Toggle UI panels functionality
-    function togglePanels() {
-      panelsVisible = !panelsVisible;
-
-      const panels = [
-        'airport-selector',
-        'stats-display',
-        'legend'
-      ];
-
-      panels.forEach(panelId => {
-        const panel = document.getElementById(panelId);
-        if (panel) {
-          if (panelsVisible) {
-            panel.classList.remove('hidden');
-          } else {
-            panel.classList.add('hidden');
-          }
-        }
-      });
-
-      // Update toggle button
-      const toggleBtn = document.getElementById('ui-toggle');
-      const toggleIcon = document.getElementById('toggle-icon');
-      const toggleText = document.getElementById('toggle-text');
-
-      if (panelsVisible) {
-        toggleIcon.textContent = '👁️';
-        toggleText.textContent = 'Hide Panels';
-        toggleBtn.classList.remove('panels-hidden');
-      } else {
-        toggleIcon.textContent = '👁️‍🗨️';
-        toggleText.textContent = 'Show Panels';
-        toggleBtn.classList.add('panels-hidden');
-      }
-    }
-
-    // Add click handler for toggle button
-    document.getElementById('ui-toggle').addEventListener('click', togglePanels);
-
     // Add keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-      // Press 'H' to toggle panels
-      if (e.key === 'h' || e.key === 'H') {
-        togglePanels();
-      }
-
       // Press 'P' to toggle polygons
       if (e.key === 'p' || e.key === 'P') {
         const polygonToggle = document.getElementById('polygon-toggle');
@@ -1404,7 +1003,6 @@
         backdrop-filter: blur(5px);
       ">
         <span>⌨️ Shortcuts:</span>
-        <span><kbd>H</kbd> Hide Panels</span>
         <span><kbd>P</kbd> Polygons</span>
         <span><kbd>L</kbd> Labels</span>
         <span><kbd>M</kbd> Military</span>
