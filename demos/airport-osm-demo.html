@@ -128,6 +128,51 @@
       opacity: 1;
     }
 
+    /* Style switcher -- floats over the map, top-right (same widget as
+       airport-layer-filter-demo.html) */
+    #style-switcher {
+      position: absolute;
+      top: 20px;
+      /* Cleared to the left of the native NavigationControl (zoom +/-,
+         compass), which sits in the same top-right corner. */
+      right: 70px;
+      background: var(--cream);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      display: flex;
+      overflow: hidden;
+      z-index: 1000;
+    }
+
+    .style-btn {
+      padding: 10px 16px;
+      border: none;
+      background: var(--cream);
+      color: var(--green-dark);
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .style-btn:hover {
+      background: var(--green-tint);
+    }
+
+    .style-btn.active {
+      background: var(--green);
+      color: var(--cream);
+    }
+
+    .style-btn:first-child {
+      border-right: 1px solid var(--line);
+    }
+
     #shortcuts-panel kbd {
       background: rgba(255,255,255,0.15);
       border-radius: 3px;
@@ -139,6 +184,16 @@
       #map {
         left: 0;
       }
+
+      #style-switcher {
+        top: 10px;
+        right: 55px;
+      }
+
+      .style-btn {
+        padding: 8px 12px;
+        font-size: 12px;
+      }
     }
   </style>
 </head>
@@ -148,6 +203,16 @@
   <!-- Comparison mode indicator -->
   <div id="comparison-indicator" class="comparison-indicator">
     Polygon Hidden - Compare with Base Map
+  </div>
+
+  <!-- Style Switcher -->
+  <div id="style-switcher">
+    <button class="style-btn active" id="style-satellite" data-style="mapbox://styles/mapbox/satellite-streets-v12">
+      🛰️ Satellite
+    </button>
+    <button class="style-btn" id="style-streets" data-style="mapbox://styles/mapbox/streets-v12">
+      🗺️ Streets
+    </button>
   </div>
 
   <div id="setup-panel">
@@ -167,14 +232,6 @@
         <select id="airport-dropdown">
           <option value="">Loading airports...</option>
         </select>
-      </div>
-    </div>
-
-    <div class="trip-card">
-      <div class="input-group"><label>Map Style</label></div>
-      <div class="button-group">
-        <button class="btn btn-primary" id="style-satellite" data-style="mapbox://styles/mapbox/satellite-streets-v12">Satellite</button>
-        <button class="btn btn-secondary" id="style-streets" data-style="mapbox://styles/mapbox/streets-v12">Streets</button>
       </div>
     </div>
 
@@ -778,10 +835,8 @@
       if (currentStyle === 'satellite') return;
 
       // Update button states
-      document.getElementById('style-satellite').classList.add('btn-primary');
-      document.getElementById('style-satellite').classList.remove('btn-secondary');
-      document.getElementById('style-streets').classList.add('btn-secondary');
-      document.getElementById('style-streets').classList.remove('btn-primary');
+      document.getElementById('style-satellite').classList.add('active');
+      document.getElementById('style-streets').classList.remove('active');
 
       // Change map style
       map.setStyle('mapbox://styles/mapbox/satellite-streets-v12');
@@ -800,10 +855,8 @@
       if (currentStyle === 'streets') return;
 
       // Update button states
-      document.getElementById('style-streets').classList.add('btn-primary');
-      document.getElementById('style-streets').classList.remove('btn-secondary');
-      document.getElementById('style-satellite').classList.add('btn-secondary');
-      document.getElementById('style-satellite').classList.remove('btn-primary');
+      document.getElementById('style-streets').classList.add('active');
+      document.getElementById('style-satellite').classList.remove('active');
 
       // Change map style
       map.setStyle('mapbox://styles/mapbox/streets-v12');
