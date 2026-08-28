@@ -5,230 +5,124 @@
 <link rel="icon" href="data:;base64,iVBORw0KGgo=" />
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="shared/templates/arena.css" rel="stylesheet" />
 <script src="shared/demo-kit.js"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      height: 100vh; display: flex; flex-direction: column;
-      background: #f5f5f5; color: #333;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      overflow: hidden;
-    }
+    /* Everything below is specific to this demo's own widgets (mode
+       buttons, avoid-dropdowns, the click hint, the Google API key
+       field) -- anything that matched arena.css's contract exactly
+       (.app-header/.title/.spacer, .split-grid/.pane/.pane-header/
+       .pane-body, .btn/select/input, .metric-card family, .route-info,
+       .step-item family, .modal family, .data-table, .badge family,
+       .spinner) was deleted here to let the shared CSS provide it
+       instead of duplicating it. */
+    * { margin: 0; padding: 0; }
 
-    #header {
-      display: flex; align-items: center; gap: 12px;
-      padding: 12px 20px; background: #fff;
-      border-bottom: 2px solid #e0e0e0; flex-shrink: 0;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-    .title {
-      font-size: 16px; font-weight: 700; color: #333;
-      white-space: nowrap; display: flex; align-items: center; gap: 8px;
-    }
-    .spacer { flex: 1; }
+    #layout { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
 
-    /* Mode buttons */
-    #mode-btns { display: flex; gap: 8px; }
+    /* Mode buttons -- green/red for origin (A) / destination (B), the
+       same convention as the on-map A/B markers (a different meaning
+       from the Mapbox/Google source colors, so intentionally not using
+       --source-a/--source-b here). */
+    #mode-btns { display: flex; gap: 8px; flex-shrink: 0; }
     .mode-btn {
-      padding: 7px 14px; border: 1px solid #ddd; border-radius: 6px;
-      font-size: 13px; cursor: pointer; background: white; color: #555;
+      padding: 7px 14px; border: 1px solid var(--border-strong); border-radius: 6px;
+      font-size: 13px; cursor: pointer; background: var(--surface-raised); color: var(--ink-secondary);
+      font-family: var(--font-body);
+      white-space: nowrap;
       transition: all 0.2s;
     }
     .mode-btn.active { color: white; font-weight: 600; }
     #btn-origin.active { background: #34a853; border-color: #34a853; }
     #btn-destination.active { background: #ea4335; border-color: #ea4335; }
 
-    /* Select and buttons */
-    select, .btn {
-      padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;
-      font-size: 13px; outline: none; cursor: pointer;
-      background: white; color: #333;
-    }
-    select:focus, .btn:hover { border-color: #4285f4; }
-    .btn-clear:hover { background: #f5f5f5; border-color: #999; }
+    .btn-clear:hover { border-color: var(--error); color: var(--error); }
 
-    #layout { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+    /* #route-preset's options are populated from route data at runtime
+       and can be long descriptive names -- a <select> otherwise sizes
+       itself to fit its widest option, which was blowing out the whole
+       header (measured at ~980px) and squeezing #mode-btns to the point
+       .mode-btn's Japanese text wrapped one character per line. This bug
+       predates this migration (confirmed against the pre-migration
+       file), but it directly breaks the header being restyled here, so
+       fixing it as part of this pass. */
+    #route-source, #route-preset { max-width: 220px; text-overflow: ellipsis; flex-shrink: 1; }
 
-    #map-row {
-      display: grid; grid-template-columns: 1fr 1fr;
-      flex: 1; min-height: 0; overflow: hidden; border-bottom: 2px solid #e0e0e0;
-    }
-
-    .map-pane {
-      display: flex; flex-direction: column; overflow: hidden;
-      background: white; position: relative;
-    }
-    .map-pane:first-child { border-right: 1px solid #e0e0e0; }
-
-    .map-header {
-      padding: 10px 16px; font-size: 13px; font-weight: 600;
-      background: #fafafa; border-bottom: 1px solid #e0e0e0;
-      display: flex; align-items: center; justify-content: space-between;
-    }
     .param-group { display: flex; align-items: center; gap: 6px; }
-    .param-label { font-size: 12px; color: #666; font-weight: 500; }
+    .param-label { font-size: 12px; color: var(--ink-muted); font-weight: 500; }
     .param-group .btn { padding: 5px 10px; font-size: 12px; }
     #google-key-group { display: flex; align-items: center; gap: 6px; }
-    #google-key-group label { font-size: 12px; color: #666; white-space: nowrap; }
-    #google-key-input {
-      padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px;
-      font-size: 12px; width: 220px; outline: none;
-    }
-    #google-key-input:focus { border-color: #4285f4; }
+    #google-key-group label { font-size: 12px; color: var(--ink-muted); white-space: nowrap; }
+    #google-key-input { width: 220px; font-size: 12px; padding: 6px 10px; }
     #google-key-btn { padding: 6px 10px; font-size: 12px; }
-    .api-badge {
-      font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 12px;
-    }
-    .mapbox-badge { background: #e8f0fe; color: #1a73e8; }
-    .google-badge { background: #fce8e6; color: #d93025; }
 
     .map-container { flex: 1; min-height: 0; }
     .map-container canvas { cursor: crosshair !important; }
 
-    /* Results row */
-    #results-row {
-      display: grid; grid-template-columns: 1fr 1fr;
-      flex: 0 1 280px; overflow: hidden; background: white;
-    }
-    .result-pane { display: flex; flex-direction: column; overflow: hidden; }
-    .result-pane:first-child { border-right: 1px solid #e0e0e0; }
-    .result-header {
-      padding: 10px 16px; font-size: 13px; font-weight: 600;
-      background: #fafafa; border-bottom: 1px solid #e0e0e0;
-    }
-    .result-content { flex: 1; overflow-y: auto; padding: 16px; }
     .result-placeholder {
       display: flex; flex-direction: column; align-items: center;
-      justify-content: center; height: 100%; color: #aaa;
+      justify-content: center; height: 100%; color: var(--ink-faint);
       font-size: 13px; gap: 8px;
     }
     .result-placeholder .icon { font-size: 32px; }
 
-    /* Metric cards in results */
-    .result-summary {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;
-    }
-    .metric-card {
-      background: #f8f9fa; border-radius: 8px; padding: 12px;
-      border: 1px solid #e0e0e0;
-    }
-    .metric-label {
-      font-size: 11px; color: #666; font-weight: 600;
-      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;
-    }
-    .metric-value { font-size: 22px; font-weight: 700; color: #333; }
-    .metric-unit { font-size: 12px; color: #666; margin-left: 2px; }
-    .route-info {
-      font-size: 13px; color: #555; margin-bottom: 12px;
-      padding: 8px 12px; background: #f0f4ff; border-radius: 6px;
-      border-left: 3px solid #4285f4;
-    }
-    .steps-title {
-      font-size: 12px; font-weight: 600; color: #666;
-      text-transform: uppercase; letter-spacing: 0.5px;
-      margin-bottom: 8px; margin-top: 12px;
-    }
-    .step-item {
-      display: flex; gap: 10px; align-items: flex-start;
-      padding: 6px 0; border-bottom: 1px solid #f0f0f0;
-      font-size: 12px; color: #444;
-    }
-    .step-item:last-child { border-bottom: none; }
-    .step-number {
-      flex-shrink: 0; width: 22px; height: 22px;
-      background: #e8f0fe; color: #1a73e8;
-      border-radius: 50%; font-size: 11px; font-weight: 700;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .step-text { flex: 1; line-height: 1.4; }
-
     /* Click hint overlay */
     .click-hint {
       position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
-      background: rgba(0,0,0,0.7); color: white; padding: 6px 14px;
+      background: var(--surface-raised); color: var(--ink); padding: 6px 14px;
+      border: 1px solid var(--border-strong);
       border-radius: 20px; font-size: 12px; pointer-events: none;
       white-space: nowrap; z-index: 10;
     }
 
-    /* Loading spinner */
     .loading-indicator {
       display: flex; align-items: center; justify-content: center;
-      gap: 10px; padding: 20px; color: #666; font-size: 13px;
+      gap: 10px; padding: 20px; color: var(--ink-muted); font-size: 13px;
     }
-    .spinner {
-      width: 20px; height: 20px; border: 2px solid #e0e0e0;
-      border-top-color: #4285f4; border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* Avoid dropdowns */
     .avoid-dropdown { position: relative; }
     .avoid-btn {
-      padding: 5px 10px; border: 1px solid #ddd; border-radius: 6px;
-      font-size: 12px; cursor: pointer; background: white; color: #555;
+      padding: 5px 10px; border: 1px solid var(--border-strong); border-radius: 6px;
+      font-size: 12px; cursor: pointer; background: var(--surface-raised); color: var(--ink-secondary);
+      font-family: var(--font-body);
       display: flex; align-items: center; gap: 5px; white-space: nowrap;
       transition: border-color 0.2s;
     }
-    .avoid-btn:hover, .avoid-dropdown.open .avoid-btn { border-color: #4285f4; }
+    .avoid-btn:hover, .avoid-dropdown.open .avoid-btn { border-color: var(--accent-bright); }
     .avoid-panel {
       display: none; position: absolute; top: calc(100% + 4px); left: 0;
-      background: white; border: 1px solid #ddd; border-radius: 8px;
+      background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px;
       padding: 6px; z-index: 200; min-width: 175px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
     .avoid-dropdown.open .avoid-panel { display: block; }
     .avoid-option {
       display: flex; align-items: center; gap: 8px;
       padding: 5px 6px; font-size: 12px; cursor: pointer; border-radius: 4px;
-      color: #333; user-select: none;
+      color: var(--ink); user-select: none;
     }
-    .avoid-option:hover { background: #f5f5f5; }
+    .avoid-option:hover { background: var(--surface-raised); }
     .avoid-option input[type="checkbox"] { cursor: pointer; }
 
-    /* Batch modal */
-    #batch-modal {
-      display: none; position: fixed; inset: 0; z-index: 500;
-      background: rgba(0,0,0,0.45); overflow-y: auto; padding: 40px 20px;
-    }
-    #batch-modal.open { display: block; }
-    #batch-panel {
-      background: white; border-radius: 12px;
-      max-width: 1100px; margin: 0 auto;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.2); overflow: hidden;
-    }
-    #batch-panel-header {
-      display: flex; align-items: center; gap: 12px;
-      padding: 14px 20px; border-bottom: 1px solid #e0e0e0; background: #fafafa;
-    }
+    /* Batch modal extras -- the modal shell itself is arena.css's .modal.
+       Wider than arena.css's default 900px max-width: this table has 10
+       columns (route + 3 metrics x 3 sources). */
+    #batch-panel { max-width: 1250px; }
     #batch-panel-title { font-size: 15px; font-weight: 700; flex: 1; margin: 0; }
-    #batch-progress { font-size: 13px; color: #666; white-space: nowrap; }
+    #batch-progress { font-size: 13px; color: var(--ink-muted); white-space: nowrap; }
     .batch-table-wrap { overflow-x: auto; max-height: calc(100vh - 180px); overflow-y: auto; }
-    #batch-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    #batch-table thead th {
-      position: sticky; top: 0; z-index: 1;
-      background: #f8f9fa; padding: 8px 12px;
-      font-weight: 600; border-bottom: 1px solid #e0e0e0;
-      white-space: nowrap; text-align: right;
-    }
-    #batch-table thead th:first-child { text-align: left; }
-    #batch-table .col-group-mapbox { background: #e8f0fe; color: #1a73e8; text-align: center; }
-    #batch-table .col-group-google { background: #fce8e6; color: #d93025; text-align: center; }
-    #batch-table .col-group-delta  { background: #f0f0f0; color: #555;    text-align: center; }
-    #batch-table tbody td {
-      padding: 7px 12px; border-bottom: 1px solid #f0f0f0;
-      text-align: right; white-space: nowrap;
-    }
-    #batch-table tbody td:first-child { text-align: left; font-weight: 500; }
-    #batch-table tbody tr:hover td { background: #f5f7ff; }
-    .batch-cell-loading { color: #aaa; font-size: 12px; text-align: center !important; }
-    .batch-cell-error { color: #ea4335; font-size: 12px; text-align: center !important; }
-    .batch-cell-skip { color: #aaa; text-align: center !important; }
+    .batch-cell-loading { color: var(--ink-faint); font-size: 12px; text-align: center !important; }
+    .batch-cell-error { color: var(--error); font-size: 12px; text-align: center !important; }
+    .batch-cell-skip { color: var(--ink-faint); text-align: center !important; }
   </style>
 </head>
 <body>
 
-<div id="header">
+<div id="header" class="app-header">
   <span class="title">
     <span>🗺️</span>
     Directions API 比較
@@ -260,9 +154,9 @@
 </div>
 
 <div id="layout">
-  <div id="map-row">
-    <div class="map-pane">
-      <div class="map-header">
+  <div id="map-row" class="split-grid">
+    <div class="map-pane pane">
+      <div class="map-header pane-header">
         <span>Mapbox Directions API</span>
         <div class="param-group">
           <span class="param-label">パラメータ</span>
@@ -278,13 +172,13 @@
           </div>
           <button class="btn" id="mapbox-execute-btn">実行</button>
         </div>
-        <span class="api-badge mapbox-badge">mapbox/directions/v5</span>
+        <span class="badge badge-a">mapbox/directions/v5</span>
       </div>
       <div id="mapbox-map" class="map-container"></div>
       <div class="click-hint" id="mapbox-hint">クリックして出発地 (A) を設定</div>
     </div>
-    <div class="map-pane">
-      <div class="map-header">
+    <div class="map-pane pane">
+      <div class="map-header pane-header">
         <span>Google Routes API</span>
         <div class="param-group">
           <span class="param-label">パラメータ</span>
@@ -298,26 +192,26 @@
           </div>
           <button class="btn" id="google-execute-btn">実行</button>
         </div>
-        <span class="api-badge google-badge">routes/v2</span>
+        <span class="badge badge-b">routes/v2</span>
       </div>
       <div id="google-map" class="map-container"></div>
       <div class="click-hint" id="google-hint">クリックして出発地 (A) を設定</div>
     </div>
   </div>
 
-  <div id="results-row">
-    <div class="result-pane">
-      <div class="result-header">Mapbox 結果</div>
-      <div class="result-content" id="mapbox-result-content">
+  <div id="results-row" class="split-grid" style="flex: 0 1 280px;">
+    <div class="result-pane pane">
+      <div class="result-header pane-header">Mapbox 結果</div>
+      <div class="result-content pane-body" id="mapbox-result-content">
         <div class="result-placeholder">
           <span class="icon">🗺️</span>
           <span>出発地と目的地を設定するとルートが表示されます</span>
         </div>
       </div>
     </div>
-    <div class="result-pane">
-      <div class="result-header">Google 結果</div>
-      <div class="result-content" id="google-result-content">
+    <div class="result-pane pane">
+      <div class="result-header pane-header">Google 結果</div>
+      <div class="result-content pane-body" id="google-result-content">
         <div class="result-placeholder">
           <span class="icon">🗺️</span>
           <span>出発地と目的地を設定するとルートが表示されます</span>
@@ -327,21 +221,21 @@
   </div>
 </div>
 
-<div id="batch-modal">
-  <div id="batch-panel">
-    <div id="batch-panel-header">
+<div id="batch-modal" class="modal">
+  <div id="batch-panel" class="modal-panel">
+    <div id="batch-panel-header" class="modal-header">
       <h2 id="batch-panel-title">バッチ実行結果</h2>
       <span id="batch-progress"></span>
       <button class="btn" id="batch-csv-btn" disabled="">CSVダウンロード</button>
       <button class="btn btn-clear" id="batch-close-btn">閉じる</button>
     </div>
-    <div class="batch-table-wrap">
-      <table id="batch-table">
+    <div class="batch-table-wrap modal-body">
+      <table id="batch-table" class="data-table">
         <thead>
           <tr>
             <th rowspan="2">ルート</th>
-            <th colspan="3" class="col-group-mapbox">Mapbox</th>
-            <th colspan="3" class="col-group-google">Google</th>
+            <th colspan="3" class="col-group-a">Mapbox</th>
+            <th colspan="3" class="col-group-b">Google</th>
             <th colspan="3" class="col-group-delta">Δ (Mapbox − Google)</th>
           </tr>
           <tr>
@@ -391,7 +285,11 @@ const CONGESTION_COLORS = {
   SLOW:        '#ff9800',
   TRAFFIC_JAM: '#f44336',
 };
-const DEFAULT_ROUTE_COLOR = '#4285f4';
+// Matches arena.css's --source-b -- was #4285f4 (blue), which mismatched
+// the Google badge's own red/orange color. Colors can't be read from CSS
+// custom properties into a Google Maps polyline paint value, so this is
+// a literal duplicate of the variable; keep them in sync if that changes.
+const DEFAULT_ROUTE_COLOR = '#c1503a';
 let googleApiKey = localStorage.getItem(GOOGLE_KEY_STORAGE) || '';
 const INITIAL_CENTER = [139.7671, 35.6812]; // Tokyo
 const INITIAL_ZOOM = 12;
@@ -510,14 +408,16 @@ function initMapboxMap() {
       data: { type: 'FeatureCollection', features: [] },
     });
 
-    // Casing layer (wider, on full geometry)
+    // Casing layer (wider, on full geometry). Color matches arena.css's
+    // --source-a (was #1a56c4) so the Mapbox route line, its badge, and
+    // its batch-table column all agree on the same blue.
     mapboxMap.addLayer({
       id: 'route-line-casing',
       type: 'line',
       source: 'route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: {
-        'line-color': '#1a56c4',
+        'line-color': '#2f6fd6',
         'line-width': 8,
         'line-opacity': 0.8,
       },
@@ -1055,7 +955,7 @@ function buildResultHTML({ durationSec, distanceM, turnCount, summary, stepTexts
   const moreHTML = '';
 
   return `
-    <div class="result-summary" style="grid-template-columns: 1fr 1fr;">
+    <div class="metric-grid">
       <div class="metric-card">
         <div class="metric-label">所要時間</div>
         <div class="metric-value">${formatDuration(durationSec)}<span class="metric-unit">${formatDurationUnit(durationSec)}</span></div>
