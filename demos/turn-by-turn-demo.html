@@ -591,7 +591,7 @@ class GLJSLocationPuckController {
                 <circle cx="20" cy="20" r="12" fill="var(--cream, #F6F3EA)"/>
 
                 <!-- Route Green circle background -->
-                <circle cx="20" cy="20" r="10" fill="var(--green, #0E6B6B)"/>
+                <circle cx="20" cy="20" r="10" fill="var(--green, #0B4F8A)"/>
 
                 <!-- Directional triangle with dented back (points upward) -->
                 <path d="M 20 10 L 26 22 L 20 18 L 14 22 Z"
@@ -2540,7 +2540,7 @@ class NavigationUI {
         width: 40px;
         height: 40px;
         padding: 0;
-        border: 2px solid var(--green, #0E6B6B);
+        border: 2px solid var(--green, #0B4F8A);
         border-radius: 6px;
         font-size: 16px;
         cursor: pointer;
@@ -2560,11 +2560,11 @@ class NavigationUI {
         display: flex;
         align-items: center;
         gap: 16px;
-        background: var(--green, #0E6B6B);
+        background: var(--green, #0B4F8A);
         color: var(--cream, #F6F3EA);
         padding: 14px 20px;
         border: 3px solid var(--cream, #F6F3EA);
-        box-shadow: 0 0 0 2px var(--green-dark, #0A4C4C), 0 4px 20px rgba(0,0,0,0.3);
+        box-shadow: 0 0 0 2px var(--green-dark, #083862), 0 4px 20px rgba(0,0,0,0.3);
         border-radius: 4px;
         z-index: 1000;
       }
@@ -2665,15 +2665,15 @@ class NavigationUI {
 
       .nav-button-secondary {
         background: var(--cream, #F6F3EA);
-        color: var(--green-dark, #0A4C4C);
+        color: var(--green-dark, #083862);
       }
 
       .nav-button-secondary:hover {
-        background: var(--green-tint, #E3ECEC);
+        background: var(--green-tint, #E1E8F0);
       }
 
       .nav-button-secondary.active {
-        background: var(--green, #0E6B6B);
+        background: var(--green, #0B4F8A);
         color: var(--cream, #F6F3EA);
       }
 
@@ -2724,12 +2724,12 @@ class NavigationUI {
       }
 
       .nav-status.success {
-        background: var(--green, #0E6B6B);
+        background: var(--green, #0B4F8A);
         color: var(--cream, #F6F3EA);
       }
 
       .nav-status.success::before {
-        background: var(--green, #0E6B6B);
+        background: var(--green, #0B4F8A);
       }
 
       @media (max-width: 768px) {
@@ -3841,7 +3841,7 @@ class NavigationUI {
       }
 
       departureMarker = new mapboxgl.Marker({
-        color: '#0E6B6B',
+        color: '#0B4F8A',
         scale: 1.2
       })
         .setLngLat([lng, lat])
@@ -4285,7 +4285,7 @@ class NavigationUI {
       // Restore departure/location marker if available
       if (customDeparture && !departureMarker) {
         departureMarker = new mapboxgl.Marker({
-          color: '#0E6B6B',
+          color: '#0B4F8A',
           scale: 1.2
         })
           .setLngLat([customDeparture.lng, customDeparture.lat])
@@ -4465,8 +4465,8 @@ class NavigationUI {
 
       // Show feedback
       const destInput = document.getElementById('destination-input');
-      destInput.style.borderColor = '#0E6B6B';
-      destInput.style.backgroundColor = '#E3ECEC';
+      destInput.style.borderColor = '#0B4F8A';
+      destInput.style.backgroundColor = '#E1E8F0';
       setTimeout(() => {
         destInput.style.borderColor = '';
         destInput.style.backgroundColor = '';
@@ -4507,8 +4507,8 @@ class NavigationUI {
           // Visual feedback on input field
           const inputId = target === 'departure' ? 'departure-input' : 'destination-input';
           const targetInput = document.getElementById(inputId);
-          const color = target === 'departure' ? '#0E6B6B' : '#C8102E';
-          const bg = target === 'departure' ? '#E3ECEC' : '#FBE9EB';
+          const color = target === 'departure' ? '#0B4F8A' : '#C8102E';
+          const bg = target === 'departure' ? '#E1E8F0' : '#FBE9EB';
           targetInput.style.borderColor = color;
           targetInput.style.backgroundColor = bg;
           setTimeout(() => {
