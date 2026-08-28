@@ -1,0 +1,187 @@
+<!--
+  Working EXAMPLE of the Arena style pack (arena.css, in this same
+  folder). Open this file directly to see the pattern working with two
+  illustrative "sources" being compared, then copy the markup below into
+  your own demo and link arena.css from its <head> -- see the class/id
+  contract documented at the top of that CSS file for what to build.
+
+  Extracted in spirit from demos/directions-comparison.html's layout
+  (header + split map panes + split results panes + a comparison-table
+  modal), but restyled from scratch with a Linear-inspired dark palette
+  rather than keeping that demo's plain gray/white look. What's NOT
+  included: the real click-to-set origin/destination interaction, any
+  batch-fetch logic, and any real routing API calls -- this example
+  draws a static straight-line "route" between two fixed points on each
+  map instead, with hand-written illustrative metrics.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<link href="arena.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: each map pane sizes to its own container. */
+  .map-container {
+    flex: 1;
+    min-height: 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <span class="title">🏟️ Arena</span>
+  <div class="spacer"></div>
+  <div class="btn-group">
+    <button class="btn btn-primary" id="compare-btn">Compare in Table</button>
+  </div>
+</div>
+
+<div class="split-grid">
+  <div class="pane">
+    <div class="pane-header">
+      <span>Source A</span>
+      <span class="badge badge-a">SOURCE A</span>
+    </div>
+    <div class="pane-body" style="padding: 0; display: flex;">
+      <div id="map-a" class="map-container"></div>
+    </div>
+  </div>
+  <div class="pane">
+    <div class="pane-header">
+      <span>Source B</span>
+      <span class="badge badge-b">SOURCE B</span>
+    </div>
+    <div class="pane-body" style="padding: 0; display: flex;">
+      <div id="map-b" class="map-container"></div>
+    </div>
+  </div>
+</div>
+
+<div class="split-grid" style="flex: 0 1 260px;">
+  <div class="pane">
+    <div class="pane-body">
+      <div class="metric-grid">
+        <div class="metric-card">
+          <div class="metric-label">Distance</div>
+          <div class="metric-value">383<span class="metric-unit">mi</span></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Duration</div>
+          <div class="metric-value">5h 42<span class="metric-unit">m</span></div>
+        </div>
+      </div>
+      <div class="route-info">Fastest route via I-5 N, avoiding the coastal highway.</div>
+      <div class="steps-title">Steps</div>
+      <div class="step-item"><span class="step-number">1</span><span class="step-text">Head north on I-5</span></div>
+      <div class="step-item"><span class="step-number">2</span><span class="step-text">Continue for 340 mi</span></div>
+      <div class="step-item"><span class="step-number">3</span><span class="step-text">Arrive at destination</span></div>
+    </div>
+  </div>
+  <div class="pane">
+    <div class="pane-body">
+      <div class="metric-grid">
+        <div class="metric-card">
+          <div class="metric-label">Distance</div>
+          <div class="metric-value">379<span class="metric-unit">mi</span></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Duration</div>
+          <div class="metric-value">5h 58<span class="metric-unit">m</span></div>
+        </div>
+      </div>
+      <div class="route-info">Fastest route via US-101 N, through downtown.</div>
+      <div class="steps-title">Steps</div>
+      <div class="step-item"><span class="step-number">1</span><span class="step-text">Head northwest on US-101</span></div>
+      <div class="step-item"><span class="step-number">2</span><span class="step-text">Continue for 335 mi</span></div>
+      <div class="step-item"><span class="step-number">3</span><span class="step-text">Arrive at destination</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="compare-modal">
+  <div class="modal-panel">
+    <div class="modal-header">
+      <h2>Comparison</h2>
+      <button class="btn" id="modal-close">Close</button>
+    </div>
+    <div class="modal-body">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th class="col-group-a">Source A</th>
+            <th class="col-group-b">Source B</th>
+            <th class="col-group-delta">Delta</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Distance (mi)</td>
+            <td class="col-group-a">383</td>
+            <td class="col-group-b">379</td>
+            <td class="col-group-delta">+4</td>
+          </tr>
+          <tr>
+            <td>Duration</td>
+            <td class="col-group-a">5h 42m</td>
+            <td class="col-group-b">5h 58m</td>
+            <td class="col-group-delta">-16m</td>
+          </tr>
+          <tr>
+            <td>Steps</td>
+            <td class="col-group-a">3</td>
+            <td class="col-group-b">3</td>
+            <td class="col-group-delta">0</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const START = [-122.4194, 37.7749]; // San Francisco
+const END = [-118.2437, 34.0522];   // Los Angeles
+
+function makeMap(containerId, lineColor) {
+  const map = new mapboxgl.Map({
+    container: containerId,
+    style: 'mapbox://styles/mapbox/dark-v11',
+    center: [-120.3, 35.9],
+    zoom: 5,
+  });
+
+  map.on('load', () => {
+    map.addSource('route', {
+      type: 'geojson',
+      data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [START, END] } },
+    });
+    map.addLayer({
+      id: 'route-line',
+      type: 'line',
+      source: 'route',
+      paint: { 'line-color': lineColor, 'line-width': 3 },
+    });
+    new mapboxgl.Marker({ color: lineColor }).setLngLat(START).addTo(map);
+    new mapboxgl.Marker({ color: lineColor }).setLngLat(END).addTo(map);
+  });
+
+  return map;
+}
+
+makeMap('map-a', '#4c9aff');
+makeMap('map-b', '#f2994a');
+
+const modal = document.getElementById('compare-modal');
+document.getElementById('compare-btn').addEventListener('click', () => modal.classList.add('open'));
+document.getElementById('modal-close').addEventListener('click', () => modal.classList.remove('open'));
+</script>
+</body>
+</html>
