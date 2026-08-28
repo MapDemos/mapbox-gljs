@@ -64,23 +64,23 @@
 */
 
 :root {
-  --bg: #170f1a;
-  --surface: #241521;
-  --surface-raised: #2f1c2b;
-  --border: rgba(255, 240, 245, 0.07);
-  --border-strong: rgba(255, 240, 245, 0.12);
+  --bg: #f4f1ec;
+  --surface: #ffffff;
+  --surface-raised: #eee9e2;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.14);
 
-  --ink: #f0e6ec;
-  --ink-secondary: #d9c8d1;
-  --ink-muted: #a8919e;
-  --ink-faint: #7a6570;
+  --ink: #2a2622;
+  --ink-secondary: #55504a;
+  --ink-muted: #8a8478;
+  --ink-faint: #b0aa9c;
 
-  --accent: #e8b04b;
-  --accent-bright: #f2c368;
+  --accent: #b8791f;
+  --accent-bright: #d99a3a;
 
   /* Deliberately distinct from --accent -- override per demo. */
-  --source-a: #4c9aff;
-  --source-b: #d9645a;
+  --source-a: #2f6fd6;
+  --source-b: #c1503a;
 
   --success: #4cb782;
   --error: #eb5757;
@@ -116,7 +116,7 @@ body {
   align-items: center;
   gap: 14px;
   padding: 12px 20px;
-  background: var(--surface);
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -244,12 +244,12 @@ select:focus, input:focus {
 }
 
 .badge-a {
-  background: rgba(76, 154, 255, 0.15);
+  background: rgba(47, 111, 214, 0.12);
   color: var(--source-a);
 }
 
 .badge-b {
-  background: rgba(217, 100, 90, 0.15);
+  background: rgba(193, 80, 58, 0.12);
   color: var(--source-b);
 }
 
@@ -299,7 +299,7 @@ select:focus, input:focus {
   color: var(--ink-secondary);
   margin-bottom: 14px;
   padding: 8px 12px;
-  background: rgba(232, 176, 75, 0.1);
+  background: rgba(184, 121, 31, 0.1);
   border-radius: 6px;
   border-left: 3px solid var(--accent);
 }
@@ -385,7 +385,7 @@ select:focus, input:focus {
   border-radius: 12px;
   max-width: 900px;
   margin: 0 auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
   overflow: hidden;
 }
 
@@ -442,8 +442,8 @@ select:focus, input:focus {
   font-family: var(--font-body);
 }
 
-.data-table .col-group-a { background: rgba(76, 154, 255, 0.08); color: var(--source-a); }
-.data-table .col-group-b { background: rgba(217, 100, 90, 0.08); color: var(--source-b); }
+.data-table .col-group-a { background: rgba(47, 111, 214, 0.08); color: var(--source-a); }
+.data-table .col-group-b { background: rgba(193, 80, 58, 0.08); color: var(--source-b); }
 .data-table .col-group-delta { background: var(--surface-raised); color: var(--ink-muted); }
 
 .data-table tbody td {
@@ -455,7 +455,7 @@ select:focus, input:focus {
 }
 
 .data-table tbody tr:hover td {
-  background: rgba(255, 240, 245, 0.03);
+  background: rgba(0, 0, 0, 0.03);
 }
 
 @media (max-width: 768px) {
