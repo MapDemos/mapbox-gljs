@@ -38,8 +38,32 @@
     select:focus, .btn:hover, #store-search:focus {
       border-color: #4285f4;
     }
+    #google-key-group { display: flex; align-items: center; gap: 6px; }
+    #google-key-group label { font-size: 12px; color: #666; white-space: nowrap; }
+    #google-key-input {
+      padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px;
+      font-size: 12px; width: 220px; outline: none;
+    }
+    #google-key-input:focus { border-color: #4285f4; }
+    #google-key-btn { padding: 6px 10px; font-size: 12px; }
 
     #layout { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+
+    #map-row {
+      display: grid; grid-template-columns: 1fr 1fr;
+      height: 100%; overflow: hidden;
+    }
+
+    .map-pane {
+      display: flex; flex-direction: column; overflow: hidden;
+      background: white; position: relative;
+    }
+    .map-pane:first-child { border-right: 1px solid #e0e0e0; }
+
+    .map-header {
+      padding: 10px 16px; font-size: 13px; font-weight: 600;
+      background: #fafafa; border-bottom: 1px solid #e0e0e0;
+    }
 
     .map-container { flex: 1; min-height: 0; position: relative; }
 
@@ -71,11 +95,26 @@
     <option value="">店舗を選択...</option>
   </select>
   <div class="spacer"></div>
+  <div id="google-key-group">
+    <label for="google-key-input">Google API Key</label>
+    <input type="password" id="google-key-input" placeholder="APIキーを入力" />
+    <button class="btn" id="google-key-btn">設定</button>
+  </div>
 </div>
 
 <div id="layout">
-  <div id="mapbox-map" class="map-container">
-    <div id="zoom-display">Zoom: 0</div>
+  <!-- 地図比較 -->
+  <div id="map-row">
+    <div class="map-pane">
+      <div class="map-header">Google Maps</div>
+      <div id="google-map" class="map-container"></div>
+    </div>
+    <div class="map-pane">
+      <div class="map-header">Mapbox GL JS</div>
+      <div id="mapbox-map" class="map-container">
+        <div id="zoom-display">Zoom: 0</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -83,6 +122,8 @@
   // ============================================================
 // CONSTANTS & DATA
 // ============================================================
+const GOOGLE_KEY_STORAGE = 'store_comparison_google_api_key';
+let googleApiKey = localStorage.getItem(GOOGLE_KEY_STORAGE) || '';
 
 // Brand icon URLs - using map marker icons from store-info.skylark.co.jp
 const brandIconURLs = {
@@ -183,7 +224,70 @@ let state = {
 // ============================================================
 // MAPS
 // ============================================================
+let googleMap = null;
 let mapboxMap = null;
+let googleStoreMarker = null;
+let isSyncing = false;
+
+// ============================================================
+// GOOGLE MAPS
+// ============================================================
+function loadGoogleMaps() {
+  return new Promise((resolve, reject) => {
+    if (window.google?.maps) { resolve(); return; }
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${googleApiKey}&libraries=places`;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+async function initGoogleMap() {
+  await loadGoogleMaps();
+  googleMap = new google.maps.Map(document.getElementById('google-map'), {
+    center: { lat: 35.6812, lng: 139.7671 },
+    zoom: 16,  // +1 for parity with Mapbox zoom 15
+    mapId: 'DEMO_MAP_ID',  // Required for WebGL features like tilt/heading
+    tilt: 0,
+    heading: 0
+  });
+
+  // Set up sync listeners
+  ['center_changed', 'zoom_changed', 'tilt_changed', 'heading_changed'].forEach(event => {
+    googleMap.addListener(event, syncFromGoogle);
+  });
+}
+
+function plotGoogleStoreMarker(lat, lng, name, brand) {
+  if (googleStoreMarker) {
+    googleStoreMarker.setMap(null);
+  }
+
+  // Use brand icon if available, otherwise use default red marker
+  const iconUrl = brandIconURLs[brand];
+  const icon = iconUrl ? {
+    url: iconUrl,
+    scaledSize: new google.maps.Size(48, 48),
+    anchor: new google.maps.Point(24, 24)
+  } : {
+    path: google.maps.SymbolPath.CIRCLE,
+    scale: 15,
+    fillColor: '#ED1C24',
+    fillOpacity: 1,
+    strokeColor: '#ffffff',
+    strokeWeight: 3
+  };
+
+  googleStoreMarker = new google.maps.Marker({
+    position: { lat, lng },
+    map: googleMap,
+    icon: icon,
+    title: name,
+    zIndex: 1000
+  });
+}
 
 // ============================================================
 // MAPBOX
@@ -215,6 +319,9 @@ function initMapboxMap() {
     pitchWithRotate: false,  // Disable pitch adjustment with rotation
     touchZoomRotate: false  // Disable rotation on touch devices
   });
+
+  // Set up sync listener - 'move' covers center, zoom, pitch, and bearing
+  mapboxMap.on('move', syncFromMapbox);
 
   // Update zoom display
   const updateZoomDisplay = () => {
@@ -277,6 +384,39 @@ function initMapboxMap() {
   });
 }
 
+// Sync functions
+function syncFromGoogle() {
+  if (isSyncing || !mapboxMap) return;
+  isSyncing = true;
+
+  const center = googleMap.getCenter();
+  mapboxMap.jumpTo({
+    center: [center.lng(), center.lat()],
+    zoom: googleMap.getZoom() - 1,  // Google zoom - 1 for parity (256px vs 512px tiles)
+    pitch: googleMap.getTilt(),
+    bearing: googleMap.getHeading()
+  });
+
+  // Reset flag after events have been processed
+  requestAnimationFrame(() => { isSyncing = false; });
+}
+
+function syncFromMapbox() {
+  if (isSyncing || !googleMap) return;
+  isSyncing = true;
+
+  const center = mapboxMap.getCenter();
+  googleMap.setOptions({
+    center: { lat: center.lat, lng: center.lng },
+    zoom: mapboxMap.getZoom() + 1,  // Mapbox zoom + 1 for parity (512px vs 256px tiles)
+    tilt: mapboxMap.getPitch(),
+    heading: mapboxMap.getBearing()
+  });
+
+  // Reset flag after events have been processed
+  requestAnimationFrame(() => { isSyncing = false; });
+}
+
 function plotMapboxStoreMarker(lng, lat, name, brand) {
   // Update the GeoJSON source with the selected store location
   if (!mapboxMap.getSource('selected-store')) return;
@@ -301,13 +441,24 @@ function plotMapboxStoreMarker(lng, lat, name, brand) {
 // SEARCH
 // ============================================================
 function performSearch() {
-  if (!state.selectedStore || !mapboxMap) return;
+  if (!state.selectedStore || !googleMap || !mapboxMap) return;
 
   const { lat, lng } = state.selectedStore;
+
+  // Update maps (disable sync first to avoid loops)
+  isSyncing = true;
+
+  googleMap.setCenter({ lat, lng });
+  googleMap.setZoom(18);  // +1 for parity with Mapbox zoom 17
 
   mapboxMap.setCenter([lng, lat]);
   mapboxMap.setZoom(17);
 
+  // Re-enable sync after position update
+  requestAnimationFrame(() => { isSyncing = false; });
+
+  // Plot store markers
+  plotGoogleStoreMarker(lat, lng, state.selectedStore.name, state.selectedStore.brand);
   plotMapboxStoreMarker(lng, lat, state.selectedStore.name, state.selectedStore.brand);
 }
 
@@ -354,12 +505,28 @@ function setupEventListeners() {
       performSearch();
     }
   });
-
 }
 
 // ============================================================
 // INITIALIZATION
 // ============================================================
+function setupGoogleKeyInput() {
+  const input = document.getElementById('google-key-input');
+  const btn   = document.getElementById('google-key-btn');
+
+  if (googleApiKey) input.value = googleApiKey;
+
+  function saveKey() {
+    const val = input.value.trim();
+    if (!val) return;
+    localStorage.setItem(GOOGLE_KEY_STORAGE, val);
+    location.reload();
+  }
+
+  btn.addEventListener('click', saveKey);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveKey(); });
+}
+
 async function init() {
   // Load stores from JSON
   await loadStoresFromJSON();
@@ -369,9 +536,17 @@ async function init() {
 
   // Setup event listeners
   setupEventListeners();
+  setupGoogleKeyInput();
 
-  // Initialize map
+  // Initialize maps
   initMapboxMap();
+
+  if (googleApiKey) {
+    await initGoogleMap();
+  } else {
+    document.getElementById('google-map').innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999;font-size:13px;">Google API Keyを入力してください</div>';
+  }
 }
 
 // Start
