@@ -64,23 +64,23 @@
 */
 
 :root {
-  --bg: #08090a;
-  --surface: #13141a;
-  --surface-raised: #1a1b23;
-  --border: rgba(255, 255, 255, 0.06);
-  --border-strong: rgba(255, 255, 255, 0.1);
+  --bg: #170f1a;
+  --surface: #241521;
+  --surface-raised: #2f1c2b;
+  --border: rgba(255, 240, 245, 0.07);
+  --border-strong: rgba(255, 240, 245, 0.12);
 
-  --ink: #f7f8f8;
-  --ink-secondary: #d0d6e0;
-  --ink-muted: #8a8f98;
-  --ink-faint: #62666d;
+  --ink: #f0e6ec;
+  --ink-secondary: #d9c8d1;
+  --ink-muted: #a8919e;
+  --ink-faint: #7a6570;
 
-  --accent: #5e6ad2;
-  --accent-bright: #7170ff;
+  --accent: #e8b04b;
+  --accent-bright: #f2c368;
 
   /* Deliberately distinct from --accent -- override per demo. */
   --source-a: #4c9aff;
-  --source-b: #f2994a;
+  --source-b: #d9645a;
 
   --success: #4cb782;
   --error: #eb5757;
@@ -249,7 +249,7 @@ select:focus, input:focus {
 }
 
 .badge-b {
-  background: rgba(242, 153, 74, 0.15);
+  background: rgba(217, 100, 90, 0.15);
   color: var(--source-b);
 }
 
@@ -299,7 +299,7 @@ select:focus, input:focus {
   color: var(--ink-secondary);
   margin-bottom: 14px;
   padding: 8px 12px;
-  background: rgba(94, 106, 210, 0.1);
+  background: rgba(232, 176, 75, 0.1);
   border-radius: 6px;
   border-left: 3px solid var(--accent);
 }
@@ -443,7 +443,7 @@ select:focus, input:focus {
 }
 
 .data-table .col-group-a { background: rgba(76, 154, 255, 0.08); color: var(--source-a); }
-.data-table .col-group-b { background: rgba(242, 153, 74, 0.08); color: var(--source-b); }
+.data-table .col-group-b { background: rgba(217, 100, 90, 0.08); color: var(--source-b); }
 .data-table .col-group-delta { background: var(--surface-raised); color: var(--ink-muted); }
 
 .data-table tbody td {
@@ -455,7 +455,7 @@ select:focus, input:focus {
 }
 
 .data-table tbody tr:hover td {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 240, 245, 0.03);
 }
 
 @media (max-width: 768px) {
