@@ -139,20 +139,6 @@
     "description": "A dashboard for reviewing map feedback submitted through Mapbox's Feedback API — filter it, page through it, export it, and see each item's location on a map."
   },
   {
-    "slug": "fixed-optimization",
-    "title": "Fixed Optimization",
-    "type": "local",
-    "url": "fixed-optimization.html",
-    "tags": [
-      "Optimization API",
-      "Search Box API",
-      "Geocoding API",
-      "Tilequery API",
-      "Directions API"
-    ],
-    "description": "A vehicle-routing planner — add shipments and vehicles, and Mapbox's Optimization API works out the best assignment and stop order, then draws each leg of the route with the Directions API."
-  },
-  {
     "slug": "flight-map-demo",
     "title": "Flight Map",
     "type": "local",
