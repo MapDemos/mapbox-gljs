@@ -4,74 +4,37 @@
 <link rel="icon" href="data:;base64,iVBORw0KGgo=" />
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<link href="shared/templates/highway-sign.css" rel="stylesheet" />
 <script src="shared/demo-kit.js"></script>
   <style>
-    body {
-      margin: 0;
-      padding: 0;
-      display: flex;
-      height: 100vh;
-      font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif;
-    }
-    #sidebar {
-      width: 400px;
-      min-width: 250px; /* Minimum width */
-      max-width: 50%; /* Maximum width */
-      background-color: #fff;
-      padding: 20px;
-      overflow-y: auto;
-      box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-      z-index: 1;
-      flex-shrink: 0; /* Prevent sidebar from shrinking */
-      box-sizing: border-box;
-    }
-    #resizer {
-      width: 5px;
-      background: #f1f1f1;
-      cursor: col-resize;
-      flex-shrink: 0;
-    }
-    #map-container {
-      flex-grow: 1; /* Allow map container to grow */
-      position: relative; /* Needed for the map to position correctly */
-    }
+    /* Demo-owned: every demo positions its own #map, offset to sit beside
+       #setup-panel's 380px width. */
     #map {
       position: absolute;
       top: 0;
       bottom: 0;
-      width: 100%;
+      left: 380px;
+      right: 0;
     }
-    /* UI element styles */
-    #address-input {
-      width: calc(100% - 80px);
-      padding: 5px;
-      margin-right: 5px;
-      box-sizing: border-box;
-    }
-    #search-button {
-      width: 70px;
-      padding: 5px;
-    }
+
+    /* Search results -- specific to this demo, not part of the Highway
+       Sign contract. */
     #results {
       margin-top: 15px;
       padding-top: 15px;
-      border-top: 1px solid #ccc;
+      border-top: 1px solid var(--line);
       font-size: 12px;
       line-height: 1.5;
     }
-    #results pre {
-      background-color: #eee;
-      padding: 10px;
-      border-radius: 3px;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-    }
     .matched {
-      color: #28a745; /* Green */
+      color: var(--green);
       font-weight: bold;
     }
     .unmatched {
-      color: #dc3545; /* Red */
+      color: var(--red);
       text-decoration: line-through;
     }
     .result-item {
@@ -82,7 +45,7 @@
       transition: background-color 0.2s ease;
     }
     .result-item:hover {
-      background-color: #f0f0f0;
+      background-color: var(--green-tint);
     }
     .match-code-list {
       list-style-type: none;
@@ -91,24 +54,26 @@
       font-size: 11px;
       text-transform: capitalize;
     }
-    
 </style>
 </head>
 
 <body>
-  <div id="sidebar">
-      <h3>Fuzzy Geocoding</h3>
-      <div>
-          <input type="text" id="address-input" placeholder="Enter an address..." value="4/7 Trent Street, Island Bay, Wellington" />
-          <button id="search-button">Search</button>
+  <div id="map"></div>
+
+  <div id="setup-panel">
+      <h2>Fuzzy Geocoding</h2>
+      <p class="intro-text">Geocodes an address with Mapbox's Geocoding API. When the full address doesn't get a match, it retries with a simplified version of the query — stripping a unit or apartment number, for example — so a small formatting mismatch doesn't sink the whole search.</p>
+
+      <div class="input-group">
+        <label>Address</label>
+        <input type="text" id="address-input" placeholder="Enter an address..." value="4/7 Trent Street, Island Bay, Wellington" />
       </div>
+
+      <div class="button-group">
+        <button class="btn btn-primary" id="search-button">Search</button>
+      </div>
+
       <div id="results"></div>
-  </div>
-
-  <div id="resizer"></div>
-
-  <div id="map-container">
-      <div id="map"></div>
   </div>
 <script>
   const defaultCoordinates = [174.7762, -41.2865]; // Wellington
@@ -361,40 +326,6 @@ document.addEventListener('DOMContentLoaded', (event) => {
 });
 
 loadMap();
-
-// Resizer logic
-document.addEventListener('DOMContentLoaded', function () {
-    const resizer = document.getElementById('resizer');
-    const sidebar = document.getElementById('sidebar');
-    let isResizing = false;
-
-    resizer.addEventListener('mousedown', function (e) {
-        isResizing = true;
-        document.body.style.cursor = 'col-resize'; // Change cursor for the whole page
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mouseup', stopResize);
-    });
-
-    function handleMouseMove(e) {
-        if (!isResizing) return;
-        // Prevent selecting text while dragging
-        e.preventDefault();
-        const newWidth = e.clientX;
-        sidebar.style.width = newWidth + 'px';
-        // Crucially, tell the map to resize itself
-        if (map) {
-            map.resize();
-        }
-    }
-
-    function stopResize() {
-        isResizing = false;
-        document.body.style.cursor = 'default'; // Reset cursor
-        // Clean up event listeners
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', stopResize);
-    }
-});
 
 </script>
 </body>
