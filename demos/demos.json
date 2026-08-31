@@ -440,6 +440,14 @@
     "description": "A scroll-driven story map that flies through chapters of Mapbox's company history as you scroll, with a small overview map that highlights each chapter's location."
   },
   {
+    "slug": "connecting-worlds",
+    "title": "Connecting Worlds",
+    "type": "local",
+    "url": "connecting-worlds.html",
+    "tags": ["Storytelling", "Globe"],
+    "description": "A globe-based scrollytelling story tracing a life across 41 scenes, from postwar Japan through global family and career chapters to the present."
+  },
+  {
     "slug": "streets-extruded",
     "title": "Streets Extruded",
     "type": "local",

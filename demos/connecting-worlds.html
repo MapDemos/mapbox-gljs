@@ -1,0 +1,1618 @@
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<script src="shared/demo-kit.js"></script>
+    <script src="https://unpkg.com/intersection-observer@0.12.0/intersection-observer.js"></script>
+    <script src="https://unpkg.com/scrollama"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lora:ital,wght@0,400;0,600;1,400&family=Inter:wght@500;600&display=swap" rel="stylesheet" />
+    <link href="shared/templates/editorial-paper.css" rel="stylesheet" />
+    <style>
+        a,
+a:hover,
+a:visited {
+    color: var(--accent);
+}
+
+#map {
+    top: 0;
+    height: 100vh;
+    width: 100vw;
+    position: fixed;
+}
+
+.hero-step {
+    position: relative;
+    padding: 0;
+    justify-content: center;
+}
+
+.hero-step::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: linear-gradient(180deg, rgba(245, 241, 232, 0.8) 0%, rgba(251, 248, 241, 0.8) 50%, rgba(245, 241, 232, 0.8) 100%);
+}
+
+.hero {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.hero-tagline {
+    margin: 0 0 24px;
+    font-family: var(--font-label);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+}
+
+.hero-name {
+    font-family: var(--font-headline);
+    font-weight: 900;
+    line-height: 0.95;
+    color: var(--ink);
+}
+
+.hero-name div {
+    font-size: clamp(48px, 11vw, 120px);
+}
+
+.chapter-divider {
+    box-sizing: border-box;
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 100px 20px;
+}
+
+.chapter-divider::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(180deg, rgba(245, 241, 232, 0.8) 0%, rgba(251, 248, 241, 0.8) 50%, rgba(245, 241, 232, 0.8) 100%);
+}
+
+.chapter-divider .chapter-number {
+    margin: 0 0 10px;
+    font-family: var(--font-label);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+}
+
+.chapter-divider h2 {
+    margin: 0;
+    font-family: var(--font-headline);
+    font-weight: 900;
+    font-size: clamp(40px, 8vw, 80px);
+    color: var(--ink);
+}
+
+#features {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.hidden {
+    visibility: hidden;
+}
+
+.centered {
+    justify-content: center;
+}
+
+.lefty {
+    justify-content: flex-start;
+}
+
+.righty {
+    justify-content: flex-end;
+}
+
+.fully {
+    justify-content: center;
+}
+
+.step {
+    box-sizing: border-box;
+    min-height: 100vh;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    padding: 0 8vw;
+    opacity: 0.25;
+}
+
+.step.active {
+    opacity: 0.9;
+}
+
+.step .paper-card {
+    max-width: 480px;
+    width: 100%;
+}
+
+.step .paper-card h3 {
+    margin: 0 0 10px;
+    font-family: var(--font-headline);
+    font-weight: 900;
+    font-size: 24px;
+    color: var(--ink);
+}
+
+.step .paper-card img {
+    display: block;
+    width: calc(100% + 44px);
+    margin: 0 -22px 16px;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    filter: grayscale(0.4) sepia(0.15);
+    border-bottom: 1px solid var(--rule);
+}
+
+@media (max-width: 750px) {
+    .step {
+        justify-content: center;
+        padding: 0 6vw;
+    }
+}
+
+/* Fix issue on mobile browser where scroll breaks  */
+.mapboxgl-canvas-container.mapboxgl-touch-zoom-rotate.mapboxgl-touch-drag-pan,
+.mapboxgl-canvas-container.mapboxgl-touch-zoom-rotate.mapboxgl-touch-drag-pan .mapboxgl-canvas {
+    touch-action: unset;
+}
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="mapInset"></div>
+    <div id="story"></div>
+    <script>
+        // Full 41-scene build from the "Digital Map Biography" production sheet.
+        // Coordinates below are best-effort approximations, not yet verified against the
+        // sheet's own "next data pass" (exact lat/long, confirmed dates, rights-cleared photos).
+        // sheetId on each chapter is the sheet's own row ID (00-40), used for the on-screen
+        // "Scene NN" label so it stays traceable back to the source sheet.
+        var config = {
+    style: 'mapbox://styles/mapbox/standard',
+    showMarkers: false,
+    markerColor: '#3FB1CE',
+    inset: false,
+    use3dTerrain: false, //set true for enabling 3D maps.
+    auto: false,
+    projection: 'globe',
+    chapters: [
+        {
+            id: 'opening',
+            alignment: 'center',
+            hidden: false,
+            isHero: true,
+            heroName: ['ASUKA', 'TAKAYAMA'],
+            title: 'CONNECTING WORLDS',
+            era: 'Prologue',
+            place: 'Earth → Japan',
+            subtitle: 'A life shaped by people, places, culture and connection.',
+            narration: '地球全体から日本へ。祖父母の世代から始まり、政治・経済・文化・アート・金融・オリンピック・テクノロジー、そしてAIへと続く物語。',
+            location: {
+                center: [138.5, 20],
+                zoom: 0.6,
+                pitch: 0,
+                bearing: 0
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'genzo-kageyama',
+            alignment: 'left',
+            hidden: false,
+            chapterGroup: { number: '01', label: 'The Maternal Line' },
+            title: 'GENZO KAGEYAMA',
+            image: placeholderImage('Kyoto, Japan'),
+            sheetId: '01',
+            era: 'Grandparents’ generation',
+            place: 'Kyoto, Japan',
+            subtitle: 'Kyoto → Leiden → Postwar Japan',
+            narration: '京都大学、ライデン大学へ。戦後日本で、人と組織を結ぶ。母方祖父・影山源三。家族史では京都大学・ライデン大学卒業後、戦後の政界・官界・企業・自治体・皇室周辺を横断して活動したと伝わる。学歴・具体的役職は追加一次資料で確定する。',
+            location: {
+                center: [135.7681, 35.0116],
+                zoom: 12,
+                pitch: 45,
+                bearing: 0,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'meiji-jingu-1947',
+            alignment: 'right',
+            hidden: false,
+            title: 'MEIJI JINGU',
+            image: placeholderImage('Meiji Jingu, Tokyo'),
+            sheetId: '02',
+            era: '1947',
+            place: 'Meiji Jingu, Tokyo',
+            subtitle: 'A postwar network takes shape',
+            narration: '1947年、明治神宮崇敬会理事へ。明治神宮公式歴史DBには、1947年9月3日の理事就任奉告式で宮地直一、出光佐三、三輪善兵衛、影山源三の4名が理事に就任したと記録されている。',
+            location: {
+                center: [139.6993, 35.6764],
+                zoom: 15,
+                pitch: 60,
+                bearing: 30,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'kuroyon',
+            alignment: 'left',
+            hidden: false,
+            title: 'KUROYON',
+            image: placeholderImage('Kurobe Dam, Toyama'),
+            sheetId: '03',
+            era: '1956–1963',
+            place: 'Kurobe Dam, Toyama',
+            subtitle: 'Building postwar Japan',
+            narration: '黒部川第四発電所建設。戦後日本を象徴する巨大インフラ。関西電力は1956年7月に黒部川第四発電所新設工事へ着工し、7年の難工事を経て1963年6月に竣工。影山源三のプロジェクトへの具体的関与は家族史として保持し、社史等で追加検証する。',
+            location: {
+                center: [137.6155, 36.5679],
+                zoom: 13,
+                pitch: 50,
+                bearing: 20,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'corporate-japan',
+            alignment: 'right',
+            hidden: false,
+            title: 'CORPORATE JAPAN',
+            image: placeholderImage('Osaka / Tokyo'),
+            sheetId: '04',
+            era: 'Postwar period',
+            place: 'Osaka / Tokyo',
+            subtitle: 'Industry, infrastructure, diplomacy',
+            narration: '関西電力、日商岩井、間組などへ。家族史では影山源三は関西電力、日商岩井、間組などで特別顧問を歴任。役職・在任年は各社社史、人事興信録、新聞データベース等で確定する。',
+            location: {
+                center: [135.5023, 34.6937],
+                zoom: 11,
+                pitch: 30,
+                bearing: -15,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'tomi',
+            alignment: 'left',
+            hidden: false,
+            title: 'TOMI',
+            image: placeholderImage('Setagaya, Tokyo'),
+            sheetId: '05',
+            era: 'Grandmother’s generation',
+            place: 'Setagaya, Tokyo',
+            subtitle: 'The discipline of tea',
+            narration: '表千家師範。茶の湯を通じて、日本文化を次代へ。母方祖母・富。表千家の茶の湯は千利休が大成した『わび茶』を底流とし、人と人との心の交わりを重んじる。',
+            location: {
+                center: [139.6455, 35.6464],
+                zoom: 14,
+                pitch: 55,
+                bearing: 10,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'ginza-soroptimist',
+            alignment: 'right',
+            hidden: false,
+            title: 'GINZA / SOROPTIMIST',
+            image: placeholderImage('Ginza, Tokyo'),
+            sheetId: '06',
+            era: 'Mother’s generation',
+            place: 'Ginza, Tokyo',
+            subtitle: 'Women serving communities',
+            narration: '国際ソロプチミスト銀座でリーダーシップを担う。母は国際ソロプチミスト銀座支部長を歴任したとの家族情報。団体の活動説明とともに、女性の社会貢献・奉仕という軸を見せる。',
+            location: {
+                center: [139.7671, 35.6717],
+                zoom: 15,
+                pitch: 55,
+                bearing: -20,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'makoto-watanabe',
+            alignment: 'left',
+            hidden: false,
+            chapterGroup: { number: '02', label: 'The Paternal Line' },
+            title: 'MAKOTO WATANABE',
+            image: placeholderImage('University of Tokyo → Kasumigaseki'),
+            sheetId: '07',
+            era: '1960s',
+            place: 'University of Tokyo → Kasumigaseki',
+            subtitle: 'Japan returns to the global economy',
+            narration: '東京大学から大蔵省へ。為替自由化と国際金融の転換期へ。父方祖父・渡辺誠。財務省『100年史』資料では昭和39年の為替局長として記録され、1964年6月18日に為替局は国際金融局へ改組。研究資料ではIMF8条国移行・貿易為替自由化をめぐる政策過程で渡辺の発言・関与が確認できる。',
+            location: {
+                center: [139.7623, 35.7128],
+                zoom: 15,
+                pitch: 55,
+                bearing: 15,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'the-diet',
+            alignment: 'right',
+            hidden: false,
+            title: 'THE DIET',
+            image: placeholderImage('National Diet, Tokyo'),
+            sheetId: '08',
+            era: '1964',
+            place: 'National Diet, Tokyo',
+            subtitle: 'Policy becomes national direction',
+            narration: '戦後日本の経済政策が、国会と世界を結ぶ。国会議事堂を背景に、日本の為替自由化・国際経済復帰という時代文脈を視覚化。渡辺誠個人の首相原稿作成については証拠取得後に追加。',
+            location: {
+                center: [139.7449, 35.6759],
+                zoom: 16,
+                pitch: 60,
+                bearing: -25,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'sadako',
+            alignment: 'left',
+            hidden: false,
+            title: 'SADAKO',
+            image: placeholderImage('Otowa, Tokyo'),
+            sheetId: '09',
+            era: 'Grandmother’s generation',
+            place: 'Otowa, Tokyo',
+            subtitle: 'The rhythm of tradition',
+            narration: '長唄師範。声と三味線で受け継ぐ日本文化。父方祖母・貞子。長唄は歌舞伎舞踊などと深く結びつく三味線音楽。個人の師範資格・流派は家族資料で確定する。',
+            location: {
+                center: [139.7264, 35.7186],
+                zoom: 14,
+                pitch: 45,
+                bearing: 0,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'sampei-takayama',
+            alignment: 'right',
+            hidden: false,
+            title: 'SAMPEI TAKAYAMA',
+            image: placeholderImage('Keio University, Tokyo'),
+            sheetId: '10',
+            era: 'Father’s generation',
+            place: 'Keio University, Tokyo',
+            subtitle: 'Tokyo → New York',
+            narration: '慶應義塾大学から金融へ、そしてNew Yorkへ。父・高山三平。慶應卒業後、日本債券信用銀行へ。慶應義塾は1858年創立、1871年に三田へ移転。',
+            location: {
+                center: [139.7449, 35.6485],
+                zoom: 15,
+                pitch: 55,
+                bearing: 20,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'nyu-mba',
+            alignment: 'left',
+            hidden: false,
+            title: 'NYU MBA',
+            image: placeholderImage('New York University'),
+            sheetId: '11',
+            era: '1970/1971',
+            place: 'New York University',
+            subtitle: 'A Japanese banker in New York',
+            narration: 'NYUでMBAを取得。家族史では成績上位2位。NYUの大学院ビジネス教育は1916年に始まり、当時は現在のStern名称以前。高山三平のMBA取得年・順位は卒業証書・成績記録等で確定する。',
+            location: {
+                center: [-73.9962, 40.7295],
+                zoom: 15,
+                pitch: 50,
+                bearing: -10,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'chase-manhattan',
+            alignment: 'right',
+            hidden: false,
+            title: 'CHASE MANHATTAN',
+            image: placeholderImage('Chase Manhattan, New York'),
+            sheetId: '12',
+            era: '1970/1971',
+            place: 'Chase Manhattan, New York',
+            subtitle: 'Entering global finance',
+            narration: 'Chase Manhattan Bank本社へ。家族史ではNYU MBA後、Chase Manhattan Bank本社に日本人として初めて採用され、国際部門のエリートコースへ。Chase Manhattan Bankは1955年にChase National BankとBank of the Manhattan Companyの合併で成立。',
+            location: {
+                center: [-74.0089, 40.7074],
+                zoom: 15,
+                pitch: 55,
+                bearing: 25,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'born-in-new-york-1971',
+            alignment: 'left',
+            hidden: false,
+            chapterGroup: { number: '03', label: 'Born Between Worlds' },
+            title: 'BORN IN NEW YORK',
+            image: placeholderImage('New York, 1971'),
+            sheetId: '13',
+            era: '1971',
+            place: 'Lenox Hill Hospital, New York',
+            subtitle: 'The journey begins',
+            narration: '1971年1月21日、New York。髙山明日香誕生。出生地は家族情報に基づきLenox Hill Hospitalとして表示。',
+            location: {
+                center: [-73.9626, 40.7648],
+                zoom: 14,
+                pitch: 45,
+                bearing: 0,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'dusseldorf',
+            alignment: 'right',
+            hidden: false,
+            title: 'DÜSSELDORF',
+            image: placeholderImage('Düsseldorf, Germany'),
+            sheetId: '14',
+            era: 'Early childhood',
+            place: 'Düsseldorf, Germany',
+            subtitle: 'Learning to compete, learning to adapt',
+            narration: '現地幼稚園へ。異文化の中で育つ。幼少期をドイツ・デュッセルドルフで過ごす。現地幼稚園で毎週行われる競争で1番を目指したという本人エピソード。',
+            location: {
+                center: [6.7735, 51.2277],
+                zoom: 12,
+                pitch: 40,
+                bearing: 0,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'tokyo-school',
+            alignment: 'left',
+            hidden: false,
+            title: 'TOKYO',
+            image: placeholderImage('Tokyo'),
+            sheetId: '15',
+            era: 'School age',
+            place: 'Tokyo',
+            subtitle: 'Growing up between cultures',
+            narration: '立教女学院小学校からCollegeへ。東京へ戻り、立教女学院で学ぶ。New YorkとGermanyで始まった国際感覚と、日本での教育が重なる。',
+            location: {
+                center: [139.5648, 35.71],
+                zoom: 13,
+                pitch: 45,
+                bearing: -15,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'oxford',
+            alignment: 'right',
+            hidden: false,
+            title: 'OXFORD',
+            image: placeholderImage('Oxford, UK'),
+            sheetId: '16',
+            era: 'Study abroad',
+            place: 'Oxford, UK',
+            subtitle: 'International Relations',
+            narration: 'Mansfield College / International Relations. OxfordでInternational Relationsを学び、ボートにも参加したという本人プロフィール情報。カレッジ名・コース正式名称・在籍年は学籍資料で最終確定する。',
+            location: {
+                center: [-1.2536, 51.7548],
+                zoom: 15,
+                pitch: 50,
+                bearing: 10,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'sothebys-london',
+            alignment: 'left',
+            hidden: false,
+            title: 'SOTHEBY’S LONDON',
+            image: placeholderImage('London, UK'),
+            sheetId: '17',
+            era: 'Study abroad',
+            place: 'London, UK',
+            subtitle: 'Learning to curate',
+            narration: 'Art, context, audience. 本人プロフィールにはSotheby’s LondonでStyles in ArtのDiplomaと記載。現在のSotheby’s Instituteのcurating educationは、美術館・商業ギャラリー・独立空間など多様な文脈でのキュレーションを扱う。',
+            location: {
+                center: [-0.1419, 51.5104],
+                zoom: 16,
+                pitch: 55,
+                bearing: -20,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'tadanori-yokoo-office',
+            alignment: 'right',
+            hidden: false,
+            chapterGroup: { number: '04', label: 'Art & Culture in Tokyo' },
+            title: 'TADANORI YOKOO OFFICE',
+            image: placeholderImage('Seijo, Tokyo'),
+            sheetId: '18',
+            era: '1994–1996',
+            place: 'Seijo, Tokyo',
+            subtitle: 'Artist management at the source',
+            narration: 'Artist Manager & Curator. 横尾忠則事務所でアーティストマネジメント、国内外展覧会、グラフィック・ファッション・舞台関連の調整などに携わった。',
+            location: {
+                center: [139.6098, 35.6558],
+                zoom: 14,
+                pitch: 50,
+                bearing: 15,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'bunkamura',
+            alignment: 'left',
+            hidden: false,
+            title: 'BUNKAMURA',
+            image: placeholderImage('Shibuya, Tokyo'),
+            sheetId: '19',
+            era: '1996–2001',
+            place: 'Shibuya, Tokyo',
+            subtitle: 'Culture at city scale',
+            narration: 'Marketing, PR, Membership, Sponsorship. 1989年開業のBunkamuraはコンサートホール、劇場、美術館、映画館等を備えた大型複合文化施設。髙山は広報、メンバーシップ、イベント、スポンサー営業等を担当。10周年企画やNew York City Ballet関連企画は社内資料で年・役割を確定する。',
+            location: {
+                center: [139.6966, 35.6595],
+                zoom: 15,
+                pitch: 55,
+                bearing: -10,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'goldman-sachs',
+            alignment: 'right',
+            hidden: false,
+            title: 'GOLDMAN SACHS',
+            image: placeholderImage('Tokyo'),
+            sheetId: '20',
+            era: '2001–2002',
+            place: 'Tokyo',
+            subtitle: 'Precision under pressure',
+            narration: 'Event Coordinator. Goldman Sachs TokyoでIR関連を中心とするイベント運営。本人プロフィールでは年間100件超のハイレベル企業イベント、家族・本人情報では4名で約400件規模を担った。',
+            location: {
+                center: [139.7295, 35.662],
+                zoom: 15,
+                pitch: 50,
+                bearing: 20,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'roppongi-hills-mori',
+            alignment: 'left',
+            hidden: false,
+            title: 'ROPPONGI HILLS / MORI ART MUSEUM',
+            image: placeholderImage('Roppongi, Tokyo'),
+            sheetId: '21',
+            era: '2002–2005',
+            place: 'Roppongi, Tokyo',
+            subtitle: 'Building a museum before it existed',
+            narration: 'Founding team / Communications. 六本木ヒルズ・森美術館の開業準備期から参画。森ビルによる六本木ヒルズは2003年4月竣工・開業、森美術館は2003年10月18日に開館。本人プロフィールではスタートアップメンバーとして広報責任者を務めた。',
+            location: {
+                center: [139.7292, 35.6604],
+                zoom: 15,
+                pitch: 60,
+                bearing: 0,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'happiness-mori-2003',
+            alignment: 'right',
+            hidden: false,
+            title: 'HAPPINESS',
+            image: placeholderImage('Mori Art Museum, 2003'),
+            sheetId: '22',
+            era: '2003',
+            place: 'Mori Art Museum, Tokyo',
+            subtitle: 'The inaugural exhibition',
+            narration: '森美術館開館記念展。2003年10月18日から2004年1月18日まで開催。東西・古今の作品を通じて『幸福』を探った。',
+            location: {
+                center: [139.7292, 35.6604],
+                zoom: 15,
+                pitch: 60,
+                bearing: -30,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'family-2002',
+            alignment: 'left',
+            hidden: false,
+            title: 'FAMILY',
+            image: placeholderImage('Minato, Tokyo'),
+            sheetId: '23',
+            era: '2002-09-20',
+            place: 'Minato, Tokyo',
+            subtitle: 'A new generation',
+            narration: '2002年9月20日、長女誕生。仕事の大きな転換期と家族の始まりを同じ東京のタイムラインに重ねる。',
+            location: {
+                center: [139.7514, 35.658],
+                zoom: 13,
+                pitch: 40,
+                bearing: -10,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'hong-kong',
+            alignment: 'right',
+            hidden: false,
+            chapterGroup: { number: '05', label: 'A Global Family' },
+            title: 'HONG KONG',
+            image: placeholderImage('Hong Kong'),
+            sheetId: '24',
+            era: '2005–',
+            place: 'Hong Kong',
+            subtitle: 'Tokyo → Hong Kong',
+            narration: '2005年、香港へ。国際都市香港で家族生活とアート活動が再び交差する。',
+            location: {
+                center: [114.1694, 22.295],
+                zoom: 12,
+                pitch: 45,
+                bearing: 15,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'second-daughter',
+            alignment: 'left',
+            hidden: false,
+            title: 'SECOND DAUGHTER',
+            image: placeholderImage('Hong Kong'),
+            sheetId: '25',
+            era: '2006-03-03',
+            place: 'Hong Kong',
+            subtitle: 'Family in Hong Kong',
+            narration: '2006年3月3日、次女誕生。Peak周辺の病院で出産との本人情報。病院名は確認後に表示。',
+            location: {
+                center: [114.1499, 22.2711],
+                zoom: 14,
+                pitch: 55,
+                bearing: -20,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'opera-gallery',
+            alignment: 'right',
+            hidden: false,
+            title: 'OPERA GALLERY',
+            image: placeholderImage('Hong Kong'),
+            sheetId: '26',
+            era: 'Hong Kong period',
+            place: 'Hong Kong',
+            subtitle: 'Independent Curator',
+            narration: 'Curating across borders. 香港でOpera GalleryにてIndependent Curatorとして展覧会をキュレーションしたという本人情報。',
+            location: {
+                center: [114.1577, 22.282],
+                zoom: 15,
+                pitch: 50,
+                bearing: 10,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'saint-germain-en-laye',
+            alignment: 'left',
+            hidden: false,
+            title: 'SAINT-GERMAIN-EN-LAYE',
+            image: placeholderImage('Saint-Germain-en-Laye, France'),
+            sheetId: '27',
+            era: 'France period',
+            place: 'Saint-Germain-en-Laye, France',
+            subtitle: 'Education moves the family',
+            narration: 'Lycée International. 子どものLycée International進学を機にSaint-Germain-en-Layeへ移住。家族の選択が次の地理をつくる。',
+            location: {
+                center: [2.0947, 48.8988],
+                zoom: 14,
+                pitch: 45,
+                bearing: 0,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'paris',
+            alignment: 'right',
+            hidden: false,
+            title: 'PARIS',
+            image: placeholderImage('Paris, France'),
+            sheetId: '28',
+            era: '2011-11-29',
+            place: 'Paris, France',
+            subtitle: 'A son is born',
+            narration: 'American Hospital of Paris. 2011年11月29日、長男誕生。その後、子どもの体調を契機に日本へ帰国。',
+            location: {
+                center: [2.2718, 48.8809],
+                zoom: 14,
+                pitch: 50,
+                bearing: -15,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'tokyo-2020',
+            alignment: 'left',
+            hidden: false,
+            chapterGroup: { number: '06', label: 'The Olympic Movement' },
+            title: 'TOKYO 2020',
+            image: placeholderImage('Tokyo'),
+            sheetId: '29',
+            era: '2019-10',
+            place: 'Tokyo',
+            subtitle: 'Main Press Centre',
+            narration: 'Building the media operation for the world. 2019年10月、Tokyo 2020 Main Press Centre責任者へ。世界の報道機関・フォトグラファーを支える24時間オペレーションの準備を担う。',
+            location: {
+                center: [139.793, 35.6298],
+                zoom: 14,
+                pitch: 50,
+                bearing: 20,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'covid-19',
+            alignment: 'right',
+            hidden: false,
+            title: 'COVID-19',
+            image: placeholderImage('Tokyo / World'),
+            sheetId: '30',
+            era: '2020-03',
+            place: 'Tokyo / World',
+            subtitle: 'The Games stop',
+            narration: 'Tokyo 2020 is postponed. 新型コロナウイルスの世界的流行により東京2020は延期。キャリアの役割も大きく変化する。',
+            location: {
+                center: [139.6917, 35.6895],
+                zoom: 9,
+                pitch: 20,
+                bearing: 0,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'digital-communications',
+            alignment: 'left',
+            hidden: false,
+            title: 'DIGITAL COMMUNICATIONS',
+            image: placeholderImage('Tokyo'),
+            sheetId: '31',
+            era: '2020-11–2021-09',
+            place: 'Tokyo',
+            subtitle: 'From venue operations to global information',
+            narration: 'Digital Communications Director. 延期後、Digital Communications Directorへ。デジタルを通じて大会情報を世界へ届ける役割へ移行。大会期間中はMain Operation CentreのDigital Deskとして有事の情報配信統制に携わった。',
+            location: {
+                center: [139.793, 35.628],
+                zoom: 14,
+                pitch: 45,
+                bearing: -10,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'president-branding',
+            alignment: 'right',
+            hidden: false,
+            title: 'PRESIDENT BRANDING',
+            image: placeholderImage('Tokyo'),
+            sheetId: '32',
+            era: '2021',
+            place: 'Tokyo',
+            subtitle: 'Leadership under scrutiny',
+            narration: 'Chairperson Seiko Hashimoto branding project. 2021年、橋本聖子会長のOwned/Earned Mediaを含む特別プロジェクトに関与したという本人プロフィール情報。',
+            location: {
+                center: [139.7148, 35.6779],
+                zoom: 15,
+                pitch: 55,
+                bearing: 15,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'mapbox-japan-2022',
+            alignment: 'left',
+            hidden: false,
+            chapterGroup: { number: '07', label: 'Technology & Diplomacy' },
+            title: 'MAPBOX JAPAN',
+            image: placeholderImage('Tokyo / APAC'),
+            sheetId: '33',
+            era: '2022–2025',
+            place: 'Tokyo / APAC',
+            subtitle: 'Technology becomes the next canvas',
+            narration: 'Mapbox Japanの初期成長期にMarketing Advisorとして参画。イベント、PR、デジタル、APACブランド戦略を横断。',
+            location: {
+                center: [139.73, 35.67],
+                zoom: 12,
+                pitch: 30,
+                bearing: 0,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'tiff',
+            alignment: 'right',
+            hidden: false,
+            title: 'TOKYO INTERNATIONAL FILM FESTIVAL',
+            image: placeholderImage('Tokyo'),
+            sheetId: '34',
+            era: '2023-08–2023-12',
+            place: 'Tokyo',
+            subtitle: 'Global Communications',
+            narration: 'Film, media, the world in Tokyo. Mapboxと並行し、東京国際映画祭でGlobal Communications。海外・国内外国メディア向け記者会見、リリース、メディアリレーション、複数劇場での対応、開閉幕関連コミュニケーションを担当。',
+            location: {
+                center: [139.7314, 35.6627],
+                zoom: 15,
+                pitch: 50,
+                bearing: -20,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'ennova-art-biennale',
+            alignment: 'left',
+            hidden: false,
+            title: 'ENNOVA ART BIENNALE',
+            image: placeholderImage('Langfang, China'),
+            sheetId: '35',
+            era: '2024-08–2025-05',
+            place: 'Langfang, China',
+            subtitle: 'Multiple Future',
+            narration: 'Executive Global Director of Communications / N&A. Mapboxと並行し、N&Aで国際コミュニケーションを担当。第1回Ennova Art Biennaleは2024年10月27日開幕、24カ国から多数のアーティストが参加し、南條史生が主導した国際展。',
+            location: {
+                center: [116.7033, 39.5196],
+                zoom: 12,
+                pitch: 40,
+                bearing: 10,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'odaiba-triennale',
+            alignment: 'right',
+            hidden: false,
+            title: 'TOKYO ODAIBA TRIENNALE 2025',
+            image: placeholderImage('Odaiba, Tokyo'),
+            sheetId: '36',
+            era: '2024-11 onward',
+            place: 'Odaiba, Tokyo',
+            subtitle: 'Art, city, and a new world',
+            narration: 'International communications in parallel. 2024年11月27日にTokyo Odaiba Triennale 2025の記者会見。本人プロフィールには同案件のPress Conference Reportが掲載されている。',
+            location: {
+                center: [139.7798, 35.6267],
+                zoom: 13,
+                pitch: 45,
+                bearing: -10,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'milano-cortina-2026',
+            alignment: 'left',
+            hidden: false,
+            title: 'MILANO CORTINA 2026',
+            image: placeholderImage('Milan / Cortina / Tokyo'),
+            sheetId: '37',
+            era: '2025-02–2026',
+            place: 'Milan / Cortina / Tokyo',
+            subtitle: 'The Olympic journey continues',
+            narration: 'IOC Communications Consultant / Storylines Project. Tokyo 2020で培った経験が再びOlympic Movementへ。Milano Cortina 2026に向け、日本でArt, Culture, Fashion, Lifestyle, Peopleを含むストーリーテリングに携わる。',
+            location: {
+                center: [9.19, 45.4642],
+                zoom: 15,
+                pitch: 55,
+                bearing: 20,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'jurin-ai',
+            alignment: 'right',
+            hidden: false,
+            title: 'JURIN AI',
+            image: placeholderImage('Tokyo'),
+            sheetId: '38',
+            era: '2025-10',
+            place: 'Tokyo',
+            subtitle: 'Everything converges',
+            narration: 'Head of Diplomacy / Executive Officer. 2025年10月、樹林AIへ。Art、Finance、Culture、Media、Olympics、Technologyで培った『異なる世界をつなぐ』経験がAIへ収束する。',
+            location: {
+                center: [139.7016, 35.6598],
+                zoom: 13,
+                pitch: 40,
+                bearing: 0,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'forged-in-japan',
+            alignment: 'left',
+            hidden: false,
+            title: 'FORGED IN JAPAN',
+            image: placeholderImage('Tokyo → World'),
+            sheetId: '39',
+            era: '2026-08-18',
+            place: 'Tokyo → World',
+            subtitle: 'How Jurin AI Is Building AI for the Real World',
+            narration: '日本で鍛えたAIを、世界へ。Forbes BrandVoiceで樹林AIが特集。記事写真にはCEO Rise Ooi、Executive Chairman Yukihiro Osawa、CTO Fahrzin Hemmati、Head of Diplomacy Asuka Takayama、COO Sho Suwaが掲載。',
+            location: {
+                center: [139.77, 35.68],
+                zoom: 9,
+                pitch: 20,
+                bearing: -15,
+                speed: 1.2,
+                curve: 1.4
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: false,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        },
+        {
+            id: 'ending',
+            alignment: 'center',
+            hidden: false,
+            isHero: true,
+            heroName: ['ASUKA', 'TAKAYAMA'],
+            title: 'CONNECTING WORLDS',
+            era: 'Epilogue',
+            place: 'Tokyo → World',
+            subtitle: 'The next chapter is being written now.',
+            narration: '祖父母から始まった『つなぐ』というテーマが、樹林AIで未来へ続く。地球儀上の全ピンを一度点灯し、最後に東京のJurin AIへ収束、その後世界へ広げる。',
+            location: {
+                center: [80, 15],
+                zoom: 0.6,
+                pitch: 0,
+                bearing: 0,
+                speed: 0.6,
+                curve: 1.6
+            },
+            mapAnimation: 'flyTo',
+            rotateAnimation: true,
+            callback: '',
+            onChapterEnter: [],
+            onChapterExit: []
+        }
+    ]
+};
+
+var initLoad = true;
+var layerTypes = {
+    'fill': ['fill-opacity'],
+    'line': ['line-opacity'],
+    'circle': ['circle-opacity', 'circle-stroke-opacity'],
+    'symbol': ['icon-opacity', 'text-opacity'],
+    'raster': ['raster-opacity'],
+    'fill-extrusion': ['fill-extrusion-opacity'],
+    'heatmap': ['heatmap-opacity']
+};
+
+var alignments = {
+    'left': 'lefty',
+    'center': 'centered',
+    'right': 'righty',
+    'full': 'fully'
+};
+
+function getLayerPaintType(layer) {
+    var layerType = map.getLayer(layer).type;
+    return layerTypes[layerType];
+}
+
+function setLayerOpacity(layer) {
+    var paintProps = getLayerPaintType(layer.layer);
+    paintProps.forEach(function (prop) {
+        var options = {};
+        if (layer.duration) {
+            var transitionProp = prop + '-transition';
+            options = { 'duration': layer.duration };
+            map.setPaintProperty(layer.layer, transitionProp, options);
+        }
+        map.setPaintProperty(layer.layer, prop, layer.opacity, options);
+    });
+}
+
+function placeholderImage(label) {
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">' +
+        '<rect width="100%" height="100%" fill="#DCD3BE"/>' +
+        '<text x="50%" y="50%" font-family="Inter, sans-serif" font-size="26" font-weight="600" ' +
+        'letter-spacing="3" fill="#8A8474" text-anchor="middle" dominant-baseline="middle">' +
+        label.toUpperCase() + '</text></svg>';
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+
+var story = document.getElementById('story');
+var features = document.createElement('div');
+features.setAttribute('id', 'features');
+
+config.chapters.forEach((record, idx) => {
+    if (record.chapterGroup) {
+        var divider = document.createElement('div');
+        divider.classList.add('chapter-divider');
+
+        var chapterNumber = document.createElement('div');
+        chapterNumber.classList.add('chapter-number');
+        chapterNumber.innerText = 'Chapter ' + record.chapterGroup.number;
+        divider.appendChild(chapterNumber);
+
+        var chapterTitle = document.createElement('h2');
+        chapterTitle.innerText = record.chapterGroup.label;
+        divider.appendChild(chapterTitle);
+
+        features.appendChild(divider);
+    }
+
+    var container = document.createElement('div');
+    var chapter = document.createElement('div');
+
+    if (record.isHero) {
+        chapter.classList.add('hero');
+
+        if (record.subtitle) {
+            var heroTagline = document.createElement('div');
+            heroTagline.classList.add('hero-tagline');
+            heroTagline.innerText = record.subtitle;
+            chapter.appendChild(heroTagline);
+        }
+
+        if (record.heroName) {
+            var heroName = document.createElement('div');
+            heroName.classList.add('hero-name');
+            record.heroName.forEach((line) => {
+                var lineEl = document.createElement('div');
+                lineEl.innerText = line;
+                heroName.appendChild(lineEl);
+            });
+            chapter.appendChild(heroName);
+        }
+    } else {
+        if (record.era) {
+            var sectionLabel = document.createElement('div');
+            sectionLabel.classList.add('section-label');
+            sectionLabel.innerText = 'Scene ' + record.sheetId + ' · ' + record.era;
+            chapter.appendChild(sectionLabel);
+        }
+
+        if (record.title) {
+            var title = document.createElement('h3');
+            title.innerText = record.title;
+            chapter.appendChild(title);
+        }
+
+        if (record.image) {
+            var image = new Image();
+            image.src = record.image;
+            chapter.appendChild(image);
+        }
+
+        if (record.subtitle) {
+            var pullQuote = document.createElement('div');
+            pullQuote.classList.add('pull-quote');
+
+            var headline = document.createElement('span');
+            headline.classList.add('headline');
+            headline.innerText = record.subtitle;
+            pullQuote.appendChild(headline);
+
+            var byline = document.createElement('span');
+            byline.classList.add('byline');
+            byline.innerText = [record.era, record.place].filter(Boolean).join(' — ');
+            pullQuote.appendChild(byline);
+
+            chapter.appendChild(pullQuote);
+        }
+
+        if (record.narration) {
+            var story = document.createElement('p');
+            story.innerHTML = record.narration;
+            chapter.appendChild(story);
+        }
+    }
+
+    container.setAttribute('id', record.id);
+    container.classList.add('step');
+    if (record.isHero) {
+        container.classList.add('hero-step');
+    }
+    if (idx === 0) {
+        container.classList.add('active');
+    }
+
+    if (!record.isHero) {
+        chapter.classList.add('paper-card');
+    }
+    container.appendChild(chapter);
+    if (!record.isHero) {
+        container.classList.add(alignments[record.alignment] || 'centered');
+    }
+    if (record.hidden) {
+        container.classList.add('hidden');
+    }
+    features.appendChild(container);
+});
+
+story.appendChild(features);
+
+const transformRequest = (url) => {
+    const hasQuery = url.indexOf('?') !== -1;
+    const suffix = hasQuery ? '&pluginName=scrollytellingV2' : '?pluginName=scrollytellingV2';
+    return {
+        url: url + suffix
+    };
+};
+
+var map = new mapboxgl.Map({
+    container: 'map',
+    style: config.style,
+    center: config.chapters[0].location.center,
+    zoom: config.chapters[0].location.zoom,
+    bearing: config.chapters[0].location.bearing,
+    pitch: config.chapters[0].location.pitch,
+    interactive: false,
+    transformRequest: transformRequest,
+    projection: config.projection,
+    language: 'ja'
+});
+
+// Create a inset map if enabled in config.js
+if (config.inset) {
+    var insetMap = new mapboxgl.Map({
+        container: 'mapInset', // container id
+        style: 'mapbox://styles/mapbox/dark-v10', //hosted style id
+        center: config.chapters[0].location.center,
+        // Hardcode above center value if you want insetMap to be static.
+        zoom: 3, // starting zoom
+        hash: false,
+        interactive: false,
+        attributionControl: false,
+        //Future: Once official mapbox-gl-js has globe view enabled,
+        //insetmap can be a globe with the following parameter.
+        //projection: 'globe'
+    });
+}
+
+if (config.showMarkers) {
+    var marker = new mapboxgl.Marker({ color: config.markerColor });
+    marker.setLngLat(config.chapters[0].location.center).addTo(map);
+}
+
+// instantiate the scrollama
+var scroller = scrollama();
+
+
+map.on('load', function () {
+    map.setConfigProperty('basemap', 'lightPreset', 'day');
+
+    if (config.use3dTerrain) {
+        map.addSource('mapbox-dem', {
+            'type': 'raster-dem',
+            'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+            'tileSize': 512,
+            'maxzoom': 14
+        });
+        // add the DEM source as a terrain layer with exaggerated height
+        map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+
+        // add a sky layer that will show when the map is highly pitched
+        map.addLayer({
+            'id': 'sky',
+            'type': 'sky',
+            'paint': {
+                'sky-type': 'atmosphere',
+                'sky-atmosphere-sun': [0.0, 0.0],
+                'sky-atmosphere-sun-intensity': 15
+            }
+        });
+    };
+
+    // As the map moves, grab and update bounds in inset map.
+    if (config.inset) {
+        map.on('move', getInsetBounds);
+    }
+    // setup the instance, pass callback functions
+    scroller
+        .setup({
+            step: '.step',
+            offset: 0.5,
+            progress: true
+        })
+        .onStepEnter(async response => {
+            var current_chapter = config.chapters.findIndex(chap => chap.id === response.element.id);
+            var chapter = config.chapters[current_chapter];
+
+            response.element.classList.add('active');
+            map[chapter.mapAnimation || 'flyTo'](chapter.location);
+
+            // Incase you do not want to have a dynamic inset map,
+            // rather want to keep it a static view but still change the
+            // bbox as main map move: comment out the below if section.
+            if (config.inset) {
+                if (chapter.location.zoom < 5) {
+                    insetMap.flyTo({ center: chapter.location.center, zoom: 0 });
+                }
+                else {
+                    insetMap.flyTo({ center: chapter.location.center, zoom: 3 });
+                }
+            }
+            if (config.showMarkers) {
+                marker.setLngLat(chapter.location.center);
+            }
+            if (chapter.onChapterEnter.length > 0) {
+                chapter.onChapterEnter.forEach(setLayerOpacity);
+            }
+            if (chapter.callback) {
+                window[chapter.callback]();
+            }
+            if (chapter.rotateAnimation) {
+                map.once('moveend', () => {
+                    const rotateNumber = map.getBearing();
+                    map.rotateTo(rotateNumber + 180, {
+                        duration: 30000, easing: function (t) {
+                            return t;
+                        }
+                    });
+                });
+            }
+            if (config.auto) {
+                var next_chapter = (current_chapter + 1) % config.chapters.length;
+                map.once('moveend', () => {
+                    document.querySelectorAll('[data-scrollama-index="' + next_chapter.toString() + '"]')[0].scrollIntoView();
+                });
+            }
+        })
+        .onStepExit(response => {
+            var chapter = config.chapters.find(chap => chap.id === response.element.id);
+            response.element.classList.remove('active');
+            if (chapter.onChapterExit.length > 0) {
+                chapter.onChapterExit.forEach(setLayerOpacity);
+            }
+        });
+
+
+    if (config.auto) {
+        document.querySelectorAll('[data-scrollama-index="0"]')[0].scrollIntoView();
+    }
+});
+
+//Helper functions for insetmap
+function getInsetBounds() {
+    let bounds = map.getBounds();
+
+    let boundsJson = {
+        'type': 'FeatureCollection',
+        'features': [{
+            'type': 'Feature',
+            'properties': {},
+            'geometry': {
+                'type': 'Polygon',
+                'coordinates': [
+                    [
+                        [
+                            bounds._sw.lng,
+                            bounds._sw.lat
+                        ],
+                        [
+                            bounds._ne.lng,
+                            bounds._sw.lat
+                        ],
+                        [
+                            bounds._ne.lng,
+                            bounds._ne.lat
+                        ],
+                        [
+                            bounds._sw.lng,
+                            bounds._ne.lat
+                        ],
+                        [
+                            bounds._sw.lng,
+                            bounds._sw.lat
+                        ]
+                    ]
+                ]
+            }
+        }]
+    };
+
+    if (initLoad) {
+        addInsetLayer(boundsJson);
+        initLoad = false;
+    } else {
+        updateInsetLayer(boundsJson);
+    }
+
+}
+
+function addInsetLayer(bounds) {
+    insetMap.addSource('boundsSource', {
+        'type': 'geojson',
+        'data': bounds
+    });
+
+    insetMap.addLayer({
+        'id': 'boundsLayer',
+        'type': 'fill',
+        'source': 'boundsSource', // reference the data source
+        'layout': {},
+        'paint': {
+            'fill-color': '#fff', // blue color fill
+            'fill-opacity': 0.2
+        }
+    });
+    // // Add a black outline around the polygon.
+    insetMap.addLayer({
+        'id': 'outlineLayer',
+        'type': 'line',
+        'source': 'boundsSource',
+        'layout': {},
+        'paint': {
+            'line-color': '#000',
+            'line-width': 1
+        }
+    });
+}
+
+function updateInsetLayer(bounds) {
+    insetMap.getSource('boundsSource').setData(bounds);
+}
+    </script>
+</body>
+</html>
