@@ -16,264 +16,101 @@
 
 
 
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link href="shared/templates/storefront.css" rel="stylesheet" />
+
 <script src="shared/demo-kit.js"></script>
 
 <style>
-    .demo-container {
-      display: flex;
-      height: 100vh;
-      width: 100%;
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    }
-
-    /* Control panel */
-    #control-panel {
-      width: 320px;
-      background: #f9fafb;
-      border-right: 1px solid #e5e7eb;
-      padding: 20px;
-      overflow-y: auto;
-      flex-shrink: 0;
-    }
-
-    #control-panel h2 {
-      margin-top: 0;
-      margin-bottom: 20px;
-      color: #1f2937;
-      font-size: 18px;
-      font-weight: 600;
-    }
-
-    #control-panel h3 {
-      margin-top: 20px;
-      margin-bottom: 12px;
-      color: #4b5563;
-      font-size: 14px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .control-group {
-      margin-bottom: 20px;
-      padding-bottom: 20px;
-      border-bottom: 1px solid #e5e7eb;
-    }
-
-    .control-group:last-child {
-      border-bottom: none;
-    }
-
-    .checkbox-control {
-      display: flex;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-
-    .checkbox-control input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      margin-right: 10px;
-      cursor: pointer;
-      accent-color: #667eea;
-    }
-
-    .checkbox-control label {
-      cursor: pointer;
-      font-size: 14px;
-      color: #374151;
-      user-select: none;
-    }
-
-    /* Filter sections */
-    .filter-section {
-      margin-bottom: 8px;
-    }
-
-    .filter-section-compact {
-      max-height: 200px;
-      overflow-y: auto;
-      border: 1px solid #e5e7eb;
-      border-radius: 4px;
-      padding: 8px;
-      background: white;
-    }
-
-    /* Buttons */
-    .button-group {
-      display: flex;
-      gap: 8px;
-      margin-top: 10px;
-    }
-
-    .btn {
-      flex: 1;
-      padding: 6px 12px;
-      font-size: 12px;
-      font-weight: 500;
-      border: 1px solid #d1d5db;
-      border-radius: 4px;
-      background: white;
-      color: #374151;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn:hover {
-      background: #f3f4f6;
-      border-color: #9ca3af;
-    }
-
-    .btn-primary {
-      background: #667eea;
-      color: white;
-      border-color: #667eea;
-    }
-
-    .btn-primary:hover {
-      background: #5568d3;
-    }
-
-    /* Active filter count badge */
-    .filter-badge {
-      display: inline-block;
-      background: #667eea;
-      color: white;
-      font-size: 11px;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 10px;
-      margin-left: 8px;
-    }
-
+    /* Demo-owned: every demo positions its own #map, offset to sit beside
+       #directory-panel's 340px width -- and the matching mobile override,
+       or the map stays offset once the panel becomes a bottom sheet. */
     #map {
-      flex: 1;
-      position: relative;
-      min-width: 0;
-    }
-
-    /* Coordinates display */
-    #coords-display {
       position: absolute;
-      bottom: 20px;
-      left: 20px;
-      background: white;
-      padding: 10px 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      font-size: 13px;
-      font-weight: 600;
-      color: #374151;
-      z-index: 999;
+      top: 0;
+      bottom: 0;
+      left: 340px;
+      right: 0;
     }
 
-    #coords-display .coord-item {
-      margin-bottom: 5px;
-    }
-
-    #coords-display .coord-item:last-child {
-      margin-bottom: 0;
-    }
-
-    #coords-display .coord-label {
-      color: #6b7280;
-      font-weight: 500;
-      margin-right: 6px;
-    }
-
-    #coords-display .coord-value {
-      color: #667eea;
-      font-weight: 700;
-      font-family: monospace;
-    }
-
-    /* Mobile responsive */
     @media (max-width: 768px) {
-      body {
-        flex-direction: column;
-      }
-
-      #control-panel {
-        width: 100%;
-        height: 200px;
-        border-right: none;
-        border-bottom: 1px solid #e5e7eb;
-      }
-
-      #coords-display {
-        bottom: 10px;
-        left: 10px;
-        padding: 8px 12px;
-        font-size: 12px;
+      #map {
+        left: 0;
       }
     }
   </style>
 
-<div class="demo-container">
-  <!-- Control Panel -->
-  <div id="control-panel">
+<div id="map"></div>
+
+<div id="directory-panel">
+  <div class="directory-brand">
+    <span class="brand-mark"></span>
     <h2>加盟店フィルター</h2>
-
-    <!-- Search by Name -->
-    <div class="control-group">
-      <h3>検索</h3>
-      <input type="text" id="search-name" placeholder="加盟店名で検索..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" />
-    </div>
-
-    <!-- Category Filters -->
-    <div class="control-group">
-      <h3>カテゴリー <span id="category-badge" class="filter-badge" style="display:none;">0</span></h3>
-      <div class="filter-section-compact" id="category-filters"></div>
-      <!-- <div class="button-group">
-        <button class="btn" id="category-select-all">All</button>
-        <button class="btn" id="category-clear">Clear</button>
-      </div> -->
-    </div>
-
-    <!-- Genre Filters -->
-    <div class="control-group">
-      <h3>ジャンル <span id="genre-badge" class="filter-badge" style="display:none;">0</span></h3>
-      <div class="filter-section-compact" id="genre-filters"></div>
-      <!-- <div class="button-group">
-        <button class="btn" id="genre-select-all">All</button>
-        <button class="btn" id="genre-clear">Clear</button>
-      </div>-->
-    </div>
-
-    <!-- Brand Filters -->
-    <div class="control-group">
-      <h3>ブランド <span id="brand-badge" class="filter-badge" style="display:none;">0</span></h3>
-      <div class="filter-section-compact" id="brand-filters"></div>
-    </div>
-
-    <!-- Feature Filters -->
-    <div class="control-group">
-      <h3>特徴</h3>
-      <div class="checkbox-control">
-        <input type="checkbox" id="filter-coupon" />
-        <label for="filter-coupon">クーポンあり</label>
-      </div>
-      <div class="checkbox-control">
-        <input type="checkbox" id="filter-campaign" />
-        <label for="filter-campaign">キャンペーンあり</label>
-      </div>
-      <div class="checkbox-control">
-        <input type="checkbox" id="filter-points" />
-        <label for="filter-points">ポイントあり</label>
-      </div>
-    </div>
-
-    <!-- Apply/Reset Buttons -->
-    <!-- <div class="button-group">
-      <button class="btn btn-primary" id="apply-filters">Apply Filters</button>
-      <button class="btn" id="reset-filters">Reset All</button>
-    </div>-->
   </div>
 
-  <!-- Map Container -->
-  <div id="map"></div>
+  <!-- Search by Name -->
+  <div class="filter-group">
+    <div class="filter-group-label">検索</div>
+    <div class="search-bar">
+      <input type="text" id="search-name" placeholder="加盟店名で検索..." />
+    </div>
+  </div>
 
+  <!-- Category Filters -->
+  <div class="filter-group">
+    <div class="filter-group-label">
+      カテゴリー
+      <span id="category-badge" class="filter-count-badge">0</span>
+    </div>
+    <div class="chip-list" id="category-filters"></div>
+  </div>
+
+  <!-- Genre Filters -->
+  <div class="filter-group">
+    <div class="filter-group-label">
+      ジャンル
+      <span id="genre-badge" class="filter-count-badge">0</span>
+    </div>
+    <div class="chip-list chip-list-column" id="genre-filters"></div>
+  </div>
+
+  <!-- Brand Filters -->
+  <div class="filter-group">
+    <div class="filter-group-label">
+      ブランド
+      <span id="brand-badge" class="filter-count-badge">0</span>
+    </div>
+    <div class="chip-list chip-list-column" id="brand-filters"></div>
+  </div>
+
+  <!-- Feature Filters -->
+  <div class="filter-group">
+    <div class="filter-group-label">特徴</div>
+    <div class="toggle-row">
+      <span>クーポンあり</span>
+      <span class="switch">
+        <input type="checkbox" id="filter-coupon" />
+        <span class="switch-track"></span>
+      </span>
+    </div>
+    <div class="toggle-row">
+      <span>キャンペーンあり</span>
+      <span class="switch">
+        <input type="checkbox" id="filter-campaign" />
+        <span class="switch-track"></span>
+      </span>
+    </div>
+    <div class="toggle-row">
+      <span>ポイントあり</span>
+      <span class="switch">
+        <input type="checkbox" id="filter-points" />
+        <span class="switch-track"></span>
+      </span>
+    </div>
+  </div>
+</div>
 
   <script>
     // Filter data definitions
@@ -354,60 +191,65 @@
 
     // Create coordinates display element
     const coordsDisplay = document.createElement('div');
-    coordsDisplay.id = 'coords-display';
+    coordsDisplay.className = 'map-badge';
+    coordsDisplay.style.bottom = '20px';
+    coordsDisplay.style.left = '20px';
     coordsDisplay.innerHTML = `
-      <div class="coord-item">
-        <span class="coord-label">ズーム:</span>
-        <span class="coord-value" id="zoom-value">10.00</span>
+      <div class="map-badge-item">
+        <span class="map-badge-label">ズーム</span>
+        <span class="map-badge-value" id="zoom-value">10.00</span>
       </div>
-      <div class="coord-item">
-        <span class="coord-label">緯度:</span>
-        <span class="coord-value" id="lat-value">35.6812</span>
+      <div class="map-badge-item">
+        <span class="map-badge-label">緯度</span>
+        <span class="map-badge-value" id="lat-value">35.6812</span>
       </div>
-      <div class="coord-item">
-        <span class="coord-label">経度:</span>
-        <span class="coord-value" id="lng-value">139.7671</span>
+      <div class="map-badge-item">
+        <span class="map-badge-label">経度</span>
+        <span class="map-badge-value" id="lng-value">139.7671</span>
       </div>
     `;
     document.getElementById('map').appendChild(coordsDisplay);
 
     // Initialize filter UI
     function initializeFilterUI() {
-      // Populate category checkboxes
+      // Populate category checkboxes -- color-coded chips, one of the six
+      // fixed category colors per category (there are exactly six).
+      const CATEGORY_COLORS = ['var(--cat-a)', 'var(--cat-b)', 'var(--cat-c)', 'var(--cat-d)', 'var(--cat-e)', 'var(--cat-f)'];
       const categoryContainer = document.getElementById('category-filters');
-      Object.entries(CATEGORIES).forEach(([id, names]) => {
-        const div = document.createElement('div');
-        div.className = 'checkbox-control filter-section';
-        div.innerHTML = `
+      Object.entries(CATEGORIES).forEach(([id, names], index) => {
+        const label = document.createElement('label');
+        label.className = 'chip';
+        label.style.setProperty('--chip-color', CATEGORY_COLORS[index % CATEGORY_COLORS.length]);
+        label.innerHTML = `
           <input type="checkbox" id="cat-${id}" value="${id}" class="category-filter">
-          <label for="cat-${id}">${names.ja}</label>
+          <span class="chip-dot"></span>
+          ${names.ja}
         `;
-        categoryContainer.appendChild(div);
+        categoryContainer.appendChild(label);
       });
 
       // Populate genre checkboxes
       const genreContainer = document.getElementById('genre-filters');
       Object.entries(GENRES).forEach(([id, name]) => {
-        const div = document.createElement('div');
-        div.className = 'checkbox-control filter-section';
-        div.innerHTML = `
+        const label = document.createElement('label');
+        label.className = 'chip';
+        label.innerHTML = `
           <input type="checkbox" id="genre-${id}" value="${id}" class="genre-filter">
-          <label for="genre-${id}">${name}</label>
+          ${name}
         `;
-        genreContainer.appendChild(div);
+        genreContainer.appendChild(label);
       });
 
-      // Populate brand checkboxes - initially visible since brands are independent
+      // Populate brand checkboxes - always visible since brands are independent
       const brandContainer = document.getElementById('brand-filters');
       Object.entries(BRANDS).forEach(([id, name]) => {
-        const div = document.createElement('div');
-        div.className = 'checkbox-control filter-section';
-        div.style.display = 'flex';  // Brands are always visible
-        div.innerHTML = `
+        const label = document.createElement('label');
+        label.className = 'chip';
+        label.innerHTML = `
           <input type="checkbox" id="brand-${id}" value="${id}" class="brand-filter">
-          <label for="brand-${id}">${name}</label>
+          ${name}
         `;
-        brandContainer.appendChild(div);
+        brandContainer.appendChild(label);
       });
 
       // Add event listeners for badge updates and immediate filter application
@@ -450,7 +292,7 @@
     function updateBrandVisibility() {
       // Brands are always visible - no need to check parent selections
       document.querySelectorAll('.brand-filter').forEach(checkbox => {
-        const parentDiv = checkbox.closest('.checkbox-control');
+        const parentDiv = checkbox.closest('.chip');
         parentDiv.style.display = 'flex';
       });
 
@@ -475,7 +317,7 @@
       // Show/hide genre checkboxes
       document.querySelectorAll('.genre-filter').forEach(checkbox => {
         const genreId = checkbox.value;
-        const parentDiv = checkbox.closest('.checkbox-control');
+        const parentDiv = checkbox.closest('.chip');
 
         if (selectedCategories.size === 0) {
           // No categories selected - hide all genres
@@ -892,14 +734,20 @@
         const brandName = BRANDS[brandId] || 'なし';
 
         // Create popup content with Japanese labels
-        let popupContent = `<div style="padding: 8px;">
-          <strong>店舗名:</strong> ${properties.n}<br>
-          <strong>カテゴリー:</strong> ${categoryName}<br>
-          <strong>ジャンル:</strong> ${genreName}<br>
-          <strong>ブランド:</strong> ${brandName}<br>
-          <strong>クーポン:</strong> ${properties.cp === 1 ? 'あり' : 'なし'}<br>
-          <strong>キャンペーン:</strong> ${properties.cm === 1 ? 'あり' : 'なし'}<br>
-          <strong>ポイント:</strong> ${properties.pt === 1 ? 'あり' : 'なし'}
+        const tags = [
+          properties.cp === 1 ? '<span class="perk-badge perk-coupon">クーポン</span>' : '',
+          properties.cm === 1 ? '<span class="perk-badge perk-campaign">キャンペーン</span>' : '',
+          properties.pt === 1 ? '<span class="perk-badge perk-points">ポイント</span>' : '',
+        ].join('');
+
+        let popupContent = `<div class="store-popup">
+          <div class="store-popup-name">${properties.n}</div>
+          <div class="store-popup-meta">
+            カテゴリー: ${categoryName}<br>
+            ジャンル: ${genreName}<br>
+            ブランド: ${brandName}
+          </div>
+          ${tags ? `<div class="store-popup-tags">${tags}</div>` : ''}
         </div>`;
 
         // Ensure that if the map is zoomed out such that multiple
@@ -1029,17 +877,23 @@
         const genreName = GENRES[genreId] || `ジャンル ${genreId}`;
         const brandName = BRANDS[brandId] || 'なし';
 
+        const tags = [
+          features[0].properties.cp === 1 ? '<span class="perk-badge perk-coupon">クーポン</span>' : '',
+          features[0].properties.cm === 1 ? '<span class="perk-badge perk-campaign">キャンペーン</span>' : '',
+          features[0].properties.pt === 1 ? '<span class="perk-badge perk-points">ポイント</span>' : '',
+        ].join('');
+
         new mapboxgl.Popup()
           .setLngLat(coords)
           .setHTML(`
-            <div style="padding: 8px;">
-              <strong>店舗名:</strong> ${features[0].properties.n}<br>
-              <strong>カテゴリー:</strong> ${categoryName}<br>
-              <strong>ジャンル:</strong> ${genreName}<br>
-              <strong>ブランド:</strong> ${brandName}<br>
-              <strong>クーポン:</strong> ${features[0].properties.cp === 1 ? 'あり' : 'なし'}<br>
-              <strong>キャンペーン:</strong> ${features[0].properties.cm === 1 ? 'あり' : 'なし'}<br>
-              <strong>ポイント:</strong> ${features[0].properties.pt === 1 ? 'あり' : 'なし'}
+            <div class="store-popup">
+              <div class="store-popup-name">${features[0].properties.n}</div>
+              <div class="store-popup-meta">
+                カテゴリー: ${categoryName}<br>
+                ジャンル: ${genreName}<br>
+                ブランド: ${brandName}
+              </div>
+              ${tags ? `<div class="store-popup-tags">${tags}</div>` : ''}
             </div>
           `)
           .addTo(map);
@@ -1078,4 +932,3 @@
       }
     });
   </script>
-</div>
