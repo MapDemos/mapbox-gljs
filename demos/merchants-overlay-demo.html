@@ -197,6 +197,17 @@
       searchTerm: ''
     };
 
+    // Tracked so the custom close button can call the real Popup
+    // instance's own .remove() (keeps Mapbox's popup lifecycle/events
+    // correct, unlike removing the DOM node directly).
+    let currentMerchantPopup = null;
+    function closeMerchantPopup() {
+      if (currentMerchantPopup) {
+        currentMerchantPopup.remove();
+        currentMerchantPopup = null;
+      }
+    }
+
     // Create coordinates display element
     const coordsDisplay = document.createElement('div');
     coordsDisplay.className = 'map-badge';
@@ -803,13 +814,20 @@
         ].join('');
 
         let popupContent = `<div class="store-popup">
-          <div class="store-popup-name" style="--popup-accent: ${categoryColor(categoryId)};">${properties.n}</div>
-          <div class="store-popup-meta">
-            カテゴリー: ${categoryName}<br>
-            ジャンル: ${genreName}<br>
-            ブランド: ${brandName}
+          <div class="store-popup-name" style="--popup-accent: ${categoryColor(categoryId)};">
+            <span>${properties.n}</span>
+            <button class="store-popup-close" onclick="closeMerchantPopup()">
+              <svg viewBox="0 0 10 10"><line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </button>
           </div>
-          ${tags ? `<div class="store-popup-tags">${tags}</div>` : ''}
+          <div class="store-popup-body">
+            <div class="store-popup-meta">
+              カテゴリー: ${categoryName}<br>
+              ジャンル: ${genreName}<br>
+              ブランド: ${brandName}
+            </div>
+            ${tags ? `<div class="store-popup-tags">${tags}</div>` : ''}
+          </div>
         </div>`;
 
         // Ensure that if the map is zoomed out such that multiple
@@ -819,7 +837,8 @@
           coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
         }
 
-        new mapboxgl.Popup()
+        closeMerchantPopup();
+        currentMerchantPopup = new mapboxgl.Popup({ closeButton: false })
           .setLngLat(coordinates)
           .setHTML(popupContent)
           .addTo(map);
@@ -945,17 +964,25 @@
           features[0].properties.pt === 1 ? '<span class="perk-badge perk-points">ポイント</span>' : '',
         ].join('');
 
-        new mapboxgl.Popup()
+        closeMerchantPopup();
+        currentMerchantPopup = new mapboxgl.Popup({ closeButton: false })
           .setLngLat(coords)
           .setHTML(`
             <div class="store-popup">
-              <div class="store-popup-name" style="--popup-accent: ${categoryColor(categoryId)};">${features[0].properties.n}</div>
-              <div class="store-popup-meta">
-                カテゴリー: ${categoryName}<br>
-                ジャンル: ${genreName}<br>
-                ブランド: ${brandName}
+              <div class="store-popup-name" style="--popup-accent: ${categoryColor(categoryId)};">
+                <span>${features[0].properties.n}</span>
+                <button class="store-popup-close" onclick="closeMerchantPopup()">
+                  <svg viewBox="0 0 10 10"><line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                </button>
               </div>
-              ${tags ? `<div class="store-popup-tags">${tags}</div>` : ''}
+              <div class="store-popup-body">
+                <div class="store-popup-meta">
+                  カテゴリー: ${categoryName}<br>
+                  ジャンル: ${genreName}<br>
+                  ブランド: ${brandName}
+                </div>
+                ${tags ? `<div class="store-popup-tags">${tags}</div>` : ''}
+              </div>
             </div>
           `)
           .addTo(map);

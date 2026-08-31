@@ -171,6 +171,14 @@ map.on('load', () => {
   map.on('mouseenter', 'stores', () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', 'stores', () => { map.getCanvas().style.cursor = ''; });
 
+  let currentPopup = null;
+  function closePopup() {
+    if (currentPopup) {
+      currentPopup.remove();
+      currentPopup = null;
+    }
+  }
+
   map.on('click', 'stores', (e) => {
     const p = e.features[0].properties;
     const tags = [
@@ -179,13 +187,21 @@ map.on('load', () => {
     ].join('');
     const accent = (CATEGORIES.find(c => c.id === p.category) || {}).color;
 
-    new mapboxgl.Popup()
+    closePopup();
+    currentPopup = new mapboxgl.Popup({ closeButton: false })
       .setLngLat(e.features[0].geometry.coordinates)
       .setHTML(`
         <div class="store-popup">
-          <div class="store-popup-name" style="--popup-accent: ${accent};">${p.name}</div>
-          <div class="store-popup-meta">${p.hours}</div>
-          ${tags ? `<div class="store-popup-tags">${tags}</div>` : ''}
+          <div class="store-popup-name" style="--popup-accent: ${accent};">
+            <span>${p.name}</span>
+            <button class="store-popup-close" onclick="closePopup()">
+              <svg viewBox="0 0 10 10"><line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <div class="store-popup-body">
+            <div class="store-popup-meta">${p.hours}</div>
+            ${tags ? `<div class="store-popup-tags">${tags}</div>` : ''}
+          </div>
         </div>
       `)
       .addTo(map);

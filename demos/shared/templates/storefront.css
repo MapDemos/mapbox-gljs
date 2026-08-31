@@ -90,12 +90,26 @@
                                  .map-badge-item > .map-badge-label +
                                  .map-badge-value (DM Mono, tabular)
   - .store-popup                wrapper class to put on a mapboxgl
-                                 Popup's HTML content -- .store-popup-name
-                                 (bold badge; set style="--popup-accent:
-                                 var(--cat-a)" etc. per instance to
-                                 color-code it, same as a chip),
-                                 .store-popup-meta (muted line),
-                                 .store-popup-tags (row of .perk-badge)
+                                 Popup's HTML content
+    .store-popup-name             full-width header bar (bold, set
+                                   style="--popup-accent: var(--cat-a)"
+                                   etc. per instance to color-code it,
+                                   same as a chip) -- put a
+                                   .store-popup-close button inside it
+                                   (see below)
+    .store-popup-close            round white close button matching
+                                   store-locator.html's popup-close --
+                                   pass `closeButton: false` to the
+                                   Popup constructor and wire this
+                                   button's click to your tracked
+                                   Popup instance's own .remove()
+    .store-popup-body             padded wrapper for everything below
+                                   the header (the header removes the
+                                   popup's default padding to bleed
+                                   edge-to-edge) -- put
+                                   .store-popup-meta (muted line) and
+                                   .store-popup-tags (row of
+                                   .perk-badge) inside it
 
   What's NOT included: any real filter logic, tileset/source setup, or
   popup-building JS -- all demo-specific, not part of the visual style.
@@ -178,7 +192,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: -20px -20px 26px;
+  margin: -20px -20px 8px;
   padding: 20px 20px 24px;
   background: linear-gradient(135deg, var(--accent), var(--accent-dark));
 }
@@ -569,19 +583,63 @@ body {
   padding: 4px 2px;
 }
 
-/* Set style="--popup-accent: ..." per instance (e.g. one of --cat-a..
-   --cat-f) to color-code the title the same way a checked category chip
-   is -- falls back to plain ink when not set. */
+/* .store-popup-name is a full-width header bar (not an inline badge) --
+   set style="--popup-accent: ..." per instance (e.g. one of --cat-a..
+   --cat-f) to color-code it the same way a checked category chip is,
+   falling back to plain ink when not set. Pairs with .store-popup-close
+   for a custom close button matching store-locator.html's popup-header/
+   popup-close pattern; disable Mapbox's own default with
+   `closeButton: false` on the Popup constructor and wire this button to
+   your tracked Popup instance's own .remove() (not raw DOM removal, so
+   Mapbox's popup lifecycle/events stay correct). Needs .store-popup-body
+   for the padded content below the header, since the header itself
+   removes the popup's default padding to bleed edge-to-edge. */
+.mapboxgl-popup-content:has(.store-popup) {
+  padding: 0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
 .store-popup-name {
-  display: inline-block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 13px;
   color: #fff;
   background: var(--popup-accent, var(--ink));
-  padding: 4px 10px;
-  border-radius: 6px;
-  margin-bottom: 4px;
+  padding: 8px 8px 8px 14px;
+}
+
+.store-popup-close {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--popup-accent, var(--ink));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.store-popup-close:hover {
+  transform: scale(1.1);
+}
+
+.store-popup-close svg {
+  width: 10px;
+  height: 10px;
+}
+
+.store-popup-body {
+  padding: 10px 14px 12px;
 }
 
 .store-popup-meta {
