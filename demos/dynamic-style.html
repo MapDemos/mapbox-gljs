@@ -10,25 +10,19 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet" />
+  <link href="shared/templates/slate-console.css" rel="stylesheet" />
   <style>
-    <!--
+    /* Everything below is specific to this demo's own widgets (the
+       language switch, the triage stats grid, the layer log) -- anything
+       that matched slate-console.css's contract exactly (.console-panel/
+       .console-head/.console-title/.console-sub/.console-status) was
+       deleted here to let the shared CSS provide it instead of
+       duplicating it. */
     :root {
-        --slate-900: #12181f;
-        --slate-800: #1a222b;
-        --slate-700: #232e39;
-        --cyan: #3ec6d9;
         --lime: #a3d977;
-        --paper: #e8ecef;
-        --muted: #8b9aa8;
-        --hairline: rgba(232, 236, 239, 0.1);
     }
 
-    body {
-        margin: 0;
-        overflow: hidden;
-    }
-
-    .map {
+    #map {
         position: absolute;
         top: 0;
         bottom: 0;
@@ -37,57 +31,22 @@
 
     /* Control panel — framed as an inspector reporting on the style, not a
        generic settings box: a header rule, numeric readouts, then a live log. */
-    #panel {
-        position: absolute;
+    .console-panel {
         top: 16px;
         left: 16px;
-        z-index: 1;
         width: 320px;
-        box-sizing: border-box;
         /* Never taller than the window — the log gives up its space first. */
         max-height: calc(100vh - 32px);
         display: flex;
         flex-direction: column;
-        background: var(--slate-900);
-        border-top: 2px solid var(--cyan);
-        border-radius: 0 0 4px 4px;
-        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
-        color: var(--paper);
-        font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
         overflow: hidden;
     }
 
-    .panel-head,
+    .console-head,
     .switch-row,
     .stats,
     #status {
         flex: 0 0 auto;
-    }
-
-    .panel-head {
-        padding: 12px 14px 10px;
-    }
-
-    .panel-title {
-        font-size: 10px;
-        font-weight: 600;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        color: var(--cyan);
-        margin: 0 0 2px;
-    }
-
-    .panel-sub {
-        margin: 0;
-        font-size: 11px;
-        line-height: 1.45;
-        color: var(--muted);
-    }
-
-    .panel-sub code {
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 10px;
-        color: var(--paper);
     }
 
     /* Language switch — a two-ended track, so both states are always readable
@@ -96,10 +55,6 @@
         display: flex;
         align-items: center;
         gap: 10px;
-        padding: 10px 14px 12px;
-        border-top: 1px solid var(--hairline);
-        border-bottom: 1px solid var(--hairline);
-        background: var(--slate-800);
     }
 
     .switch {
@@ -202,7 +157,7 @@
 
     .stat-value {
         display: block;
-        font-family: 'IBM Plex Mono', monospace;
+        font-family: var(--font-mono);
         font-size: 16px;
         font-weight: 500;
         line-height: 1.1;
@@ -226,10 +181,6 @@
     }
 
     #status {
-        padding: 9px 14px;
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 10px;
-        line-height: 1.4;
         color: var(--lime);
         border-bottom: 1px solid var(--hairline);
     }
@@ -241,7 +192,7 @@
         overflow-x: hidden;
         overflow-y: auto;
         overscroll-behavior: contain;
-        font-family: 'IBM Plex Mono', monospace;
+        font-family: var(--font-mono);
         font-size: 10px;
     }
 
@@ -277,36 +228,28 @@
     /* Stay top-anchored on narrow screens rather than docking to the bottom, so the
        Mapbox attribution and the zoom controls in the bottom-right remain visible. */
     @media (max-width: 480px) {
-        #panel {
-            top: 0;
-            left: 0;
-            right: 0;
-            width: auto;
+        .console-panel {
             max-height: 62vh;
-            border-radius: 0;
-            border-top: none;
-            border-bottom: 2px solid var(--cyan);
         }
 
         #log {
             max-height: none;
         }
     }
-    -->
 </style>
 </head>
 
 <body>
-  <div id="map" class="map"></div>
+  <div id="map"></div>
 
-  <section id="panel" aria-label="Label language controls">
-    <div class="panel-head">
-      <p class="panel-title">Label language</p>
-      <p class="panel-sub">Style stays <code>mapbox://styles/mapbox/streets-v12</code>. The toggle loops every
+  <section id="panel" class="console-panel" aria-label="Label language controls">
+    <div class="console-head">
+      <p class="console-title">Label language</p>
+      <p class="console-sub">Style stays <code>mapbox://styles/mapbox/streets-v12</code>. The toggle loops every
         layer and rewrites <code>text-field</code> in place — no reload, no new tiles.</p>
     </div>
 
-    <div class="switch-row">
+    <div class="console-row switch-row">
       <span class="switch">
         <input type="checkbox" id="lang-toggle" aria-label="Switch label language to Japanese" />
         <span class="switch-track" aria-hidden="true">
@@ -336,7 +279,7 @@
       </div>
     </div>
 
-    <p id="status" role="status">Loading style…</p>
+    <p id="status" class="console-status" role="status">Loading style…</p>
 
     <div id="log" tabindex="0" aria-label="Layers touched by the last pass"></div>
   </section>
