@@ -68,7 +68,7 @@
   </div>
 
   <!-- Genre Filters -->
-  <div class="filter-group">
+  <div class="filter-group" id="genre-group" style="display: none;">
     <div class="filter-group-label">
       ジャンル
       <span id="genre-badge" class="filter-count-badge">0</span>
@@ -306,6 +306,11 @@
       document.querySelectorAll('.category-filter:checked').forEach(cb => {
         selectedCategories.add(cb.value);
       });
+
+      // Collapse the whole section (not just the chips) when there's
+      // nothing to show yet -- an empty label with no chips beneath it
+      // reads as a layout bug, not "nothing selected".
+      document.getElementById('genre-group').style.display = selectedCategories.size === 0 ? 'none' : 'block';
 
       // Get genres that should be visible
       const visibleGenres = new Set();
