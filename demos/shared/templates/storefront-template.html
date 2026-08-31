@@ -1,0 +1,231 @@
+<!--
+  Working EXAMPLE of the Storefront style pack (storefront.css, in this
+  same folder). Open this file directly to see the pattern working with
+  a handful of illustrative stores, then copy the markup below into your
+  own demo and link storefront.css from its <head> -- see the class/id
+  contract documented at the top of that CSS file for what to build.
+
+  Built fresh for merchants-overlay-demo.html's shape (a full-height
+  sidebar of grouped checkbox filters next to a full-bleed map), not
+  extracted from an existing demo. What's NOT included: any real
+  tileset/source setup or a real search-name filter -- this example
+  filters a small hardcoded GeoJSON source by category chip instead.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<link href="storefront.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map, offset to sit beside
+     #directory-panel's 340px width -- and remember the matching mobile
+     override below, or the map stays offset once the panel becomes a
+     bottom sheet. */
+  #map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 340px;
+    right: 0;
+  }
+
+  @media (max-width: 768px) {
+    #map {
+      left: 0;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="map-badge" id="map-readout" style="top: 16px; right: 16px;">
+  <div class="map-badge-item">
+    <span class="map-badge-label">Zoom</span>
+    <span class="map-badge-value" id="zoom-value">13.00</span>
+  </div>
+</div>
+
+<div id="directory-panel">
+  <div class="directory-brand">
+    <span class="brand-mark"></span>
+    <h2>Store Directory</h2>
+  </div>
+
+  <div class="search-bar">
+    <input type="search" placeholder="Search stores…" disabled />
+  </div>
+
+  <div class="filter-group">
+    <div class="filter-group-label">
+      Category
+      <span class="filter-count-badge" id="category-badge">0</span>
+    </div>
+    <div class="chip-list" id="category-chips"></div>
+  </div>
+
+  <div class="filter-group">
+    <div class="filter-group-label">Perks</div>
+    <div class="toggle-row">
+      <span>Coupon available</span>
+      <span class="switch">
+        <input type="checkbox" id="filter-coupon" />
+        <span class="switch-track"></span>
+      </span>
+    </div>
+    <div class="toggle-row">
+      <span>Loyalty points</span>
+      <span class="switch">
+        <input type="checkbox" id="filter-points" />
+        <span class="switch-track"></span>
+      </span>
+    </div>
+  </div>
+
+  <div class="filter-group">
+    <button class="btn btn-secondary" id="reset-btn" style="width: 100%;">Reset filters</button>
+  </div>
+</div>
+
+<script>
+const CATEGORIES = [
+  { id: 'dining', name: 'Dining', color: 'var(--cat-a)' },
+  { id: 'shopping', name: 'Shopping', color: 'var(--cat-b)' },
+  { id: 'grocery', name: 'Grocery', color: 'var(--cat-c)' },
+  { id: 'electronics', name: 'Electronics', color: 'var(--cat-d)' },
+  { id: 'beauty', name: 'Beauty', color: 'var(--cat-e)' },
+];
+
+const STORES = {
+  type: 'FeatureCollection',
+  features: [
+    { type: 'Feature', geometry: { type: 'Point', coordinates: [-122.4194, 37.7749] }, properties: { name: 'Cafe Meridian', category: 'dining', hours: 'Open until 9pm', coupon: true, points: false } },
+    { type: 'Feature', geometry: { type: 'Point', coordinates: [-122.4130, 37.7790] }, properties: { name: 'North Loop Outfitters', category: 'shopping', hours: 'Open until 8pm', coupon: false, points: true } },
+    { type: 'Feature', geometry: { type: 'Point', coordinates: [-122.4250, 37.7710] }, properties: { name: 'Green Market Co-op', category: 'grocery', hours: 'Open until 10pm', coupon: true, points: true } },
+    { type: 'Feature', geometry: { type: 'Point', coordinates: [-122.4165, 37.7695] }, properties: { name: 'Circuit & Byte', category: 'electronics', hours: 'Open until 7pm', coupon: false, points: false } },
+    { type: 'Feature', geometry: { type: 'Point', coordinates: [-122.4090, 37.7745] }, properties: { name: 'Petal & Bloom Beauty', category: 'beauty', hours: 'Open until 6pm', coupon: true, points: false } },
+  ],
+};
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/streets-v12',
+  center: [-122.4180, 37.7735],
+  zoom: 13,
+});
+
+map.on('zoom', () => {
+  document.getElementById('zoom-value').textContent = map.getZoom().toFixed(2);
+});
+
+const selectedCategories = new Set();
+let filterCoupon = false;
+let filterPoints = false;
+
+function buildFilter() {
+  const clauses = ['all'];
+  if (selectedCategories.size > 0) {
+    clauses.push(['in', ['get', 'category'], ['literal', Array.from(selectedCategories)]]);
+  }
+  if (filterCoupon) clauses.push(['==', ['get', 'coupon'], true]);
+  if (filterPoints) clauses.push(['==', ['get', 'points'], true]);
+  return clauses.length === 1 ? null : clauses;
+}
+
+function applyFilter() {
+  if (!map.getLayer('stores')) return;
+  map.setFilter('stores', buildFilter());
+
+  const badge = document.getElementById('category-badge');
+  badge.textContent = selectedCategories.size;
+  badge.classList.toggle('visible', selectedCategories.size > 0);
+}
+
+map.on('load', () => {
+  map.addSource('stores', { type: 'geojson', data: STORES });
+  map.addLayer({
+    id: 'stores',
+    type: 'circle',
+    source: 'stores',
+    paint: {
+      'circle-radius': 8,
+      'circle-color': ['match', ['get', 'category'],
+        'dining', '#E8483A',
+        'shopping', '#E3A008',
+        'grocery', '#2F8F6E',
+        'electronics', '#3B6FA0',
+        'beauty', '#8B5CF6',
+        '#8C817E'],
+      'circle-stroke-color': '#fff',
+      'circle-stroke-width': 2,
+    },
+  });
+
+  map.on('mouseenter', 'stores', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'stores', () => { map.getCanvas().style.cursor = ''; });
+
+  map.on('click', 'stores', (e) => {
+    const p = e.features[0].properties;
+    const tags = [
+      p.coupon === true || p.coupon === 'true' ? '<span class="perk-badge perk-coupon">Coupon</span>' : '',
+      p.points === true || p.points === 'true' ? '<span class="perk-badge perk-points">Points</span>' : '',
+    ].join('');
+
+    new mapboxgl.Popup()
+      .setLngLat(e.features[0].geometry.coordinates)
+      .setHTML(`
+        <div class="store-popup">
+          <div class="store-popup-name">${p.name}</div>
+          <div class="store-popup-meta">${p.hours}</div>
+          ${tags ? `<div class="store-popup-tags">${tags}</div>` : ''}
+        </div>
+      `)
+      .addTo(map);
+  });
+});
+
+const chipContainer = document.getElementById('category-chips');
+CATEGORIES.forEach(cat => {
+  const label = document.createElement('label');
+  label.className = 'chip';
+  label.innerHTML = `
+    <input type="checkbox" value="${cat.id}" />
+    <span class="chip-dot" style="background: ${cat.color};"></span>
+    ${cat.name}
+  `;
+  label.querySelector('input').addEventListener('change', (e) => {
+    if (e.target.checked) selectedCategories.add(cat.id);
+    else selectedCategories.delete(cat.id);
+    applyFilter();
+  });
+  chipContainer.appendChild(label);
+});
+
+document.getElementById('filter-coupon').addEventListener('change', (e) => {
+  filterCoupon = e.target.checked;
+  applyFilter();
+});
+document.getElementById('filter-points').addEventListener('change', (e) => {
+  filterPoints = e.target.checked;
+  applyFilter();
+});
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  selectedCategories.clear();
+  filterCoupon = false;
+  filterPoints = false;
+  document.querySelectorAll('#category-chips input').forEach(cb => cb.checked = false);
+  document.getElementById('filter-coupon').checked = false;
+  document.getElementById('filter-points').checked = false;
+  applyFilter();
+});
+</script>
+</body>
+</html>
