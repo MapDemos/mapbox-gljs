@@ -208,7 +208,7 @@ body {
   margin: 0;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 20px;
+  font-size: 23px;
   letter-spacing: -0.01em;
   color: #fff;
 }
@@ -242,7 +242,7 @@ body {
   background: var(--surface-sunken);
   color: var(--ink);
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: 15px;
   outline: none;
 }
 
@@ -269,7 +269,7 @@ body {
   margin-bottom: 12px;
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--ink-secondary);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -283,7 +283,7 @@ body {
   color: #fff;
   font-family: var(--font-body);
   font-weight: 700;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: normal;
   text-transform: none;
 }
@@ -334,12 +334,12 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 7px 13px;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   background: var(--surface);
   color: var(--ink-secondary);
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   user-select: none;
@@ -390,7 +390,7 @@ body {
   justify-content: space-between;
   gap: 10px;
   padding: 8px 0;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--ink);
 }
 
