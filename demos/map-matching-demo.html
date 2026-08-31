@@ -146,42 +146,6 @@
     margin-top: 6px;
   }
 
-  /* Map legend -- swatch colors are tied to the actual layer paint
-     colors set in JS below, not the panel's teal theme. */
-  .legend {
-    position: absolute;
-    bottom: 30px;
-    right: 20px;
-    background: var(--cream);
-    padding: 15px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    font-size: 12px;
-    font-family: var(--font-body);
-    color: var(--ink);
-  }
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
-  }
-  .legend-item:last-child {
-    margin-bottom: 0;
-  }
-  .legend-dot {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    border: 2px solid white;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  }
-  .legend-line {
-    width: 24px;
-    height: 4px;
-    border-radius: 2px;
-  }
-
   @media (max-width: 768px) {
     /* #setup-panel becomes a bottom sheet at this breakpoint (see
        highway-sign.css) -- the map stays full width, not split. */
@@ -189,11 +153,6 @@
       left: 0;
     }
 
-    .legend {
-      bottom: 10px;
-      right: 10px;
-      font-size: 11px;
-    }
     .profile-option {
       padding: 10px 12px;
     }
@@ -283,21 +242,6 @@
       <button class="btn btn-secondary" onclick="downloadCurrentPoints()" id="download-btn" disabled>💾 保存</button>
     </div>
     <div class="upload-hint">Point, MultiPoint, LineString, またはPolygonを含むGeoJSONファイル</div>
-  </div>
-</div>
-
-<div class="legend">
-  <div class="legend-item">
-    <div class="legend-dot" style="background: #ef4444;"></div>
-    <span>クリック地点</span>
-  </div>
-  <div class="legend-item">
-    <div class="legend-line" style="background: #ef4444; opacity: 0.5; border: 1px dashed #ef4444; height: 2px;"></div>
-    <span>選択順路</span>
-  </div>
-  <div class="legend-item">
-    <div class="legend-line" style="background: #10b981; height: 4px;"></div>
-    <span>マッチングルート</span>
   </div>
 </div>
 
