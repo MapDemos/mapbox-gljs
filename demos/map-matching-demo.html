@@ -182,13 +182,13 @@
 <div id="map"></div>
 
 <div id="setup-panel">
-  <h2>🛣️ マップマッチングデモ</h2>
+  <h2>マップマッチングデモ</h2>
   <p class="intro-text">地図上で複数の地点をクリックして、道路に沿ったルートを作成します。</p>
 
   <div class="location-status" id="status-box">
     <div class="status-header">
-      <span class="status-icon" id="status-icon">👆</span>
-      <span class="status-text" id="status-text">準備完了 - 地図をクリックして地点を追加</span>
+      <span class="status-icon" id="status-icon">•</span>
+      <span class="status-text" id="status-text">地図をクリックして地点を追加</span>
     </div>
     <div class="status-details" id="status-content"></div>
   </div>
@@ -230,16 +230,16 @@
   </div>
 
   <div class="button-group">
-    <button class="btn btn-primary" onclick="matchRoute()" id="match-btn" disabled>🛣️ ルートをマッチング</button>
-    <button class="btn btn-secondary" onclick="clearPoints()">🗑️ クリア</button>
+    <button class="btn btn-primary" onclick="matchRoute()" id="match-btn" disabled>ルートをマッチング</button>
+    <button class="btn btn-secondary" onclick="clearPoints()">クリア</button>
   </div>
 
   <div class="upload-group">
     <div class="profile-label">GeoJSONファイルアップロード</div>
     <div class="button-group">
       <input type="file" id="geojson-upload" accept=".json,.geojson" style="display: none;" onchange="handleFileUpload(event)" />
-      <button class="btn btn-primary" onclick="document.getElementById('geojson-upload').click()">📁 GeoJSONを読み込む</button>
-      <button class="btn btn-secondary" onclick="downloadCurrentPoints()" id="download-btn" disabled>💾 保存</button>
+      <button class="btn btn-primary" onclick="document.getElementById('geojson-upload').click()">GeoJSONを読み込む</button>
+      <button class="btn btn-secondary" onclick="downloadCurrentPoints()" id="download-btn" disabled>保存</button>
     </div>
     <div class="upload-hint">Point, MultiPoint, LineString, またはPolygonを含むGeoJSONファイル</div>
   </div>
@@ -893,11 +893,11 @@
     if (state === 'loading') {
       statusIcon.textContent = '⟳';
     } else if (state === 'success') {
-      statusIcon.textContent = '✅';
+      statusIcon.textContent = '✓';
     } else if (state === 'error') {
-      statusIcon.textContent = '❌';
+      statusIcon.textContent = '✗';
     } else {
-      statusIcon.textContent = '👆';
+      statusIcon.textContent = '•';
     }
 
     statusText.textContent = title;
