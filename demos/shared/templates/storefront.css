@@ -301,11 +301,32 @@ body {
   max-height: 190px;
   overflow-y: auto;
   padding: 2px;
+  /* A scrollable, size-clamped list nested inside #directory-panel's own
+     overflow-y:auto (itself inside a position:fixed ancestor) hits a
+     Chromium bug where the list's UN-clipped content height leaks into
+     the panel's scrollHeight even though the list renders correctly
+     clipped at max-height -- confirmed by bisection while migrating
+     merchants-overlay-demo.html: a 30-item column list added ~800px of
+     invisible scrollable space below the rest of the sidebar. Layout
+     containment isolates this subtree's sizing from that ancestor. */
+  contain: layout style;
 }
 
+/* Not display:flex/flex-direction:column here -- a flex column with
+   overflow-y:auto was part of what triggered the leak above; block
+   layout with each .chip forced to its own full-width row avoids it. */
 .chip-list.chip-list-column {
-  flex-direction: column;
-  flex-wrap: nowrap;
+  display: block;
+}
+
+.chip-list.chip-list-column .chip {
+  display: flex;
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.chip-list.chip-list-column .chip:last-child {
+  margin-bottom: 0;
 }
 
 .chip {
