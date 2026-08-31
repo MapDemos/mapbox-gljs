@@ -47,6 +47,14 @@
     .result-item:hover {
       background-color: var(--green-tint);
     }
+    @media (max-width: 768px) {
+      /* #setup-panel becomes a bottom sheet at this breakpoint (see
+         highway-sign.css) -- the map stays full width, not split. */
+      #map {
+        left: 0;
+      }
+    }
+
     .match-code-list {
       list-style-type: none;
       padding-left: 15px;
