@@ -123,6 +123,14 @@
       "6": { ja: "レジャー・娯楽", en: "Leisure & Entertainment" }
     };
 
+    // One of Storefront's fixed six category colors per category id (used
+    // for both the sidebar chip dots and the popup title background).
+    const CATEGORY_COLORS = ['var(--cat-a)', 'var(--cat-b)', 'var(--cat-c)', 'var(--cat-d)', 'var(--cat-e)', 'var(--cat-f)'];
+    function categoryColor(categoryId) {
+      const index = (Number(categoryId) - 1) % CATEGORY_COLORS.length;
+      return CATEGORY_COLORS[index >= 0 ? index : 0];
+    }
+
     const GENRES = {
       "11": "飲食店", "12": "カフェ", "13": "居酒屋", "14": "ファミレス",
       "21": "コンビニ", "22": "スーパー", "23": "ドラッグストア", "24": "ディスカウントストア",
@@ -214,12 +222,11 @@
     function initializeFilterUI() {
       // Populate category checkboxes -- color-coded chips, one of the six
       // fixed category colors per category (there are exactly six).
-      const CATEGORY_COLORS = ['var(--cat-a)', 'var(--cat-b)', 'var(--cat-c)', 'var(--cat-d)', 'var(--cat-e)', 'var(--cat-f)'];
       const categoryContainer = document.getElementById('category-filters');
-      Object.entries(CATEGORIES).forEach(([id, names], index) => {
+      Object.entries(CATEGORIES).forEach(([id, names]) => {
         const label = document.createElement('label');
         label.className = 'chip';
-        label.style.setProperty('--chip-color', CATEGORY_COLORS[index % CATEGORY_COLORS.length]);
+        label.style.setProperty('--chip-color', categoryColor(id));
         label.innerHTML = `
           <input type="checkbox" id="cat-${id}" value="${id}" class="category-filter">
           <span class="chip-dot"></span>
@@ -522,7 +529,7 @@
     // Initialize the map
     const map = new mapboxgl.Map({
       container: 'map',
-      style: 'mapbox://styles/kenji-shima/cmkw30aq1000101rc8mlzfj3d',
+      style: 'mapbox://styles/mapbox/light-v11',
       center: [139.7671, 35.6812], // Tokyo
       language: 'ja',
       zoom: 14,
@@ -562,6 +569,56 @@
     // Map loaded event
     map.on('load', () => {
       console.log('✅ Map loaded successfully');
+
+      // The 'merchants' layer used to be baked directly into a custom
+      // Mapbox Studio style; now that the base style is the stock
+      // light-v11, add the same tileset + layer on top of it here
+      // instead (paint copied verbatim from that style).
+      map.addSource('merchants-source', {
+        type: 'vector',
+        url: 'mapbox://kenji-shima.merchants-z16'
+      });
+
+      map.addLayer({
+        id: 'merchants',
+        type: 'circle',
+        source: 'merchants-source',
+        'source-layer': 'merchants',
+        minzoom: 13,
+        paint: {
+          'circle-color': [
+            'match', ['get', 'g'],
+            11, '#FF6B6B',
+            12, '#4ECDC4',
+            13, '#FF8E53',
+            14, '#FFA07A',
+            21, '#45B7D1',
+            22, '#5B86E5',
+            23, '#96CEB4',
+            24, '#6C5CE7',
+            31, '#FDA7DF',
+            32, '#D63031',
+            33, '#74B9FF',
+            34, '#A29BFE',
+            41, '#FDCB6E',
+            42, '#6C5CE7',
+            43, '#FAB1A0',
+            44, '#E17055',
+            45, '#00B894',
+            51, '#00CEC9',
+            52, '#55EFC4',
+            53, '#81ECEC',
+            61, '#FF6348',
+            62, '#FD79A8',
+            63, '#A0E7E5',
+            64, '#FFBE76',
+            '#667eea'
+          ],
+          'circle-opacity': 0.9,
+          'circle-stroke-color': 'hsl(0, 4%, 97%)',
+          'circle-stroke-width': 1
+        }
+      });
 
       // Add the clustered merchants tileset source
       // map.addSource('merchants-clustered', {
@@ -746,7 +803,7 @@
         ].join('');
 
         let popupContent = `<div class="store-popup">
-          <div class="store-popup-name">${properties.n}</div>
+          <div class="store-popup-name" style="--popup-accent: ${categoryColor(categoryId)};">${properties.n}</div>
           <div class="store-popup-meta">
             カテゴリー: ${categoryName}<br>
             ジャンル: ${genreName}<br>
@@ -892,7 +949,7 @@
           .setLngLat(coords)
           .setHTML(`
             <div class="store-popup">
-              <div class="store-popup-name">${features[0].properties.n}</div>
+              <div class="store-popup-name" style="--popup-accent: ${categoryColor(categoryId)};">${features[0].properties.n}</div>
               <div class="store-popup-meta">
                 カテゴリー: ${categoryName}<br>
                 ジャンル: ${genreName}<br>

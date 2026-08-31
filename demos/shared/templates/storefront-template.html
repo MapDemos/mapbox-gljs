@@ -177,12 +177,13 @@ map.on('load', () => {
       p.coupon === true || p.coupon === 'true' ? '<span class="perk-badge perk-coupon">Coupon</span>' : '',
       p.points === true || p.points === 'true' ? '<span class="perk-badge perk-points">Points</span>' : '',
     ].join('');
+    const accent = (CATEGORIES.find(c => c.id === p.category) || {}).color;
 
     new mapboxgl.Popup()
       .setLngLat(e.features[0].geometry.coordinates)
       .setHTML(`
         <div class="store-popup">
-          <div class="store-popup-name">${p.name}</div>
+          <div class="store-popup-name" style="--popup-accent: ${accent};">${p.name}</div>
           <div class="store-popup-meta">${p.hours}</div>
           ${tags ? `<div class="store-popup-tags">${tags}</div>` : ''}
         </div>

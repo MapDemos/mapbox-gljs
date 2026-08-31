@@ -91,7 +91,10 @@
                                  .map-badge-value (DM Mono, tabular)
   - .store-popup                wrapper class to put on a mapboxgl
                                  Popup's HTML content -- .store-popup-name
-                                 (bold), .store-popup-meta (muted line),
+                                 (bold badge; set style="--popup-accent:
+                                 var(--cat-a)" etc. per instance to
+                                 color-code it, same as a chip),
+                                 .store-popup-meta (muted line),
                                  .store-popup-tags (row of .perk-badge)
 
   What's NOT included: any real filter logic, tileset/source setup, or
@@ -566,11 +569,18 @@ body {
   padding: 4px 2px;
 }
 
+/* Set style="--popup-accent: ..." per instance (e.g. one of --cat-a..
+   --cat-f) to color-code the title the same way a checked category chip
+   is -- falls back to plain ink when not set. */
 .store-popup-name {
+  display: inline-block;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 14px;
-  color: var(--ink);
+  font-size: 13px;
+  color: #fff;
+  background: var(--popup-accent, var(--ink));
+  padding: 4px 10px;
+  border-radius: 6px;
   margin-bottom: 4px;
 }
 
