@@ -1236,6 +1236,12 @@ a:visited {
 };
 
 var initLoad = true;
+// Tracks which onStepEnter call is the most recent one, independent of the
+// DOM's .active class — scrollama's enter/exit events don't always fire in
+// a clean order on fast or reversed scroll, which can leave more than one
+// step's .active class set at once. Comparing against this counter instead
+// guarantees only the latest requested transition ever drives the camera.
+var activeChapterRequestId = 0;
 var layerTypes = {
     'fill': ['fill-opacity'],
     'line': ['line-opacity'],
@@ -1490,9 +1496,12 @@ map.on('load', function () {
             // If the user scrolls past this step before its animation chain
             // finishes, a newer onStepEnter call takes over — bail out of this
             // stale chain instead of letting it fire flyTo/opacity changes for
-            // a step that's no longer active.
+            // a step that's no longer current. Uses a counter rather than the
+            // .active class, since scrollama can leave more than one step
+            // marked .active at once on fast/reversed scroll.
+            var requestId = ++activeChapterRequestId;
             var isStale = function () {
-                return !response.element.classList.contains('active');
+                return requestId !== activeChapterRequestId;
             };
 
             // Fly to the next chapter as one continuous motion: zoom out to a
