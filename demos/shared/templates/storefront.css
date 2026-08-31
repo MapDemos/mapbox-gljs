@@ -31,6 +31,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
+  Signature touch: everything reads as a price tag / receipt rather than
+  a generic admin-panel filter sidebar -- the header is a coral awning
+  band with a scalloped bottom edge (a repeating radial-gradient cutout,
+  the same CSS trick real scalloped-edge UIs use), perk badges are
+  die-cut into an actual tag shape with a little punch-hole, and a
+  checked category chip fills with ITS OWN category color (not a generic
+  black/accent fill) so the color-coding stays visible through the whole
+  interaction, not just before you click.
+
   Class/id contract (see storefront-template.html in this same folder for
   a full working example):
 
@@ -44,31 +53,38 @@
                                  way Highway Sign's contract requires --
                                  easy to forget, since the panel's own
                                  media query can't reach into your CSS.
-    .directory-brand              header row: a .brand-mark (small solid
-                                   accent square) + <h2> title
+    .directory-brand              coral awning header band (bleeds to the
+                                   panel's edges, scalloped bottom edge) --
+                                   a .brand-mark (small white tag glyph)
+                                   + white <h2> title
     .search-bar                   pill input wrapper -- put a
                                    <input type="search"> inside; the
                                    magnifying-glass icon is drawn by this
                                    class's ::before, no markup needed
-  - .filter-group                one bordered section (search, a
-                                  checkbox group, feature toggles, ...)
+  - .filter-group                one section, divided by a dashed
+                                  "receipt tear" rule (search, a checkbox
+                                  group, feature toggles, ...)
     .filter-group-label            small-caps section header, optional
                                     .filter-count-badge pill (set its
                                     text and toggle .visible yourself)
   - .chip-list                  flex-wrap row/column of .chip toggles
     .chip                         label wrapping a hidden checkbox --
-                                   add .chip-dot (span, set its
-                                   background to one of --cat-a..--cat-f)
-                                   for color-coded categories; checked
-                                   state fills with the accent
+                                   set `style="--chip-color: var(--cat-a)"`
+                                   (etc.) on the label itself and add a
+                                   .chip-dot span for the color-coded
+                                   dot; checking it fills the WHOLE chip
+                                   with that same --chip-color rather
+                                   than a generic dark fill
   - .toggle-row                 one boolean feature filter -- label text
                                  + a .switch (hidden checkbox + styled
                                  track) on the right
-  - .perk-badge (+.perk-coupon/  small solid pill tags for merchant
-    .perk-campaign/.perk-points)  perks -- use standalone or inside a
-                                   popup's markup
-  - .btn, .btn-primary,         pill-shaped buttons (border-radius:999px)
-    .btn-secondary
+  - .perk-badge (+.perk-coupon/  merchant perk tags, die-cut into an
+    .perk-campaign/.perk-points)  actual price-tag shape (clip-path
+                                   notch + punch-hole) -- use standalone
+                                   or inside a popup's markup
+  - .btn, .btn-primary,         chunky pill buttons with a pressed-shadow
+    .btn-secondary                 that flattens on :active, like a real
+                                    button rather than a flat swap
   - .map-badge                  floating rounded white card for an
                                  overlay readout (e.g. zoom/lat/lng) --
                                  .map-badge-item > .map-badge-label +
@@ -146,7 +162,7 @@ body {
   bottom: 0;
   width: 340px;
   max-width: 85vw;
-  background: var(--surface);
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface) 60%, var(--bg) 100%);
   box-shadow: 2px 0 16px rgba(32, 26, 24, 0.06);
   padding: 20px 20px 24px;
   overflow-y: auto;
@@ -155,26 +171,46 @@ body {
 }
 
 .directory-brand {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 18px;
+  margin: -20px -20px 26px;
+  padding: 20px 20px 24px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+}
+
+/* Scalloped awning edge -- a row of half-circle "cutouts" painted in the
+   panel's own surface color, the standard CSS trick for a scalloped
+   border (a repeating radial gradient, not an image). */
+.directory-brand::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -11px;
+  height: 12px;
+  background-image: radial-gradient(circle at 11px 0, transparent 11px, var(--surface) 11.5px);
+  background-size: 22px 12px;
+  background-repeat: repeat-x;
 }
 
 .brand-mark {
   flex: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  background: var(--accent);
+  width: 20px;
+  height: 20px;
+  background-color: #fff;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M12 2 L21 11 L13.5 18.5 A2 2 0 0 1 10.5 18.5 L3 11 Z'/%3E%3Ccircle cx='8.5' cy='7.5' r='1.5' fill='%23000' stroke='none'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M12 2 L21 11 L13.5 18.5 A2 2 0 0 1 10.5 18.5 L3 11 Z'/%3E%3Ccircle cx='8.5' cy='7.5' r='1.5' fill='%23000' stroke='none'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 .directory-brand h2 {
   margin: 0;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 19px;
-  color: var(--ink);
+  font-size: 20px;
+  letter-spacing: -0.01em;
+  color: #fff;
 }
 
 /* ---- Search ---- */
@@ -219,7 +255,7 @@ body {
 
 .filter-group {
   padding: 16px 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px dashed var(--border-strong);
 }
 
 .filter-group:last-child {
@@ -273,6 +309,7 @@ body {
 }
 
 .chip {
+  --chip-color: var(--ink);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -285,12 +322,14 @@ body {
   font-weight: 500;
   cursor: pointer;
   user-select: none;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .chip:hover {
-  border-color: var(--accent);
+  border-color: var(--chip-color);
   color: var(--ink);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(32, 26, 24, 0.10);
 }
 
 .chip input {
@@ -306,12 +345,15 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--ink-faint);
+  background: var(--chip-color);
 }
 
+/* Checked state fills with the chip's OWN category color (via
+   --chip-color, set inline per chip) rather than a generic dark fill --
+   the color-coding stays legible through the whole interaction. */
 .chip:has(input:checked) {
-  background: var(--ink);
-  border-color: var(--ink);
+  background: var(--chip-color);
+  border-color: var(--chip-color);
   color: #fff;
 }
 
@@ -382,14 +424,30 @@ body {
 
 /* ---- Perk badges ---- */
 
+/* Die-cut into an actual price-tag shape: a pointed left edge (clip-path)
+   plus a small punch-hole near the point (radial-gradient cutout). */
 .perk-badge {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  padding: 3px 10px;
-  border-radius: 999px;
+  padding: 3px 10px 3px 17px;
+  margin-left: 4px;
   font-size: 11px;
   font-weight: 700;
   color: #fff;
+  clip-path: polygon(9px 0, 100% 0, 100% 100%, 9px 100%, 0 50%);
+}
+
+.perk-badge::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 5px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  transform: translateY(-50%);
 }
 
 .perk-coupon { background: var(--perk-coupon); }
@@ -408,7 +466,8 @@ body {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  box-shadow: 0 2px 0 var(--border-strong);
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.08s ease, box-shadow 0.08s ease;
 }
 
 .btn:hover {
@@ -416,15 +475,27 @@ body {
   color: var(--ink);
 }
 
+.btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 var(--border-strong);
+}
+
 .btn-primary {
   background: var(--accent);
-  border-color: var(--accent);
+  border-color: var(--accent-dark);
   color: #fff;
+  box-shadow: 0 3px 0 var(--accent-dark);
 }
 
 .btn-primary:hover {
   background: var(--accent-dark);
   border-color: var(--accent-dark);
+  color: #fff;
+}
+
+.btn-primary:active {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 var(--accent-dark);
 }
 
 .btn-secondary {
@@ -438,6 +509,7 @@ body {
   position: absolute;
   background: var(--surface);
   border-radius: 12px;
+  border-left: 3px solid var(--accent);
   padding: 10px 14px;
   box-shadow: 0 4px 18px rgba(32, 26, 24, 0.14);
   font-size: 12px;

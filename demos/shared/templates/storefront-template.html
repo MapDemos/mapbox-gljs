@@ -195,9 +195,10 @@ const chipContainer = document.getElementById('category-chips');
 CATEGORIES.forEach(cat => {
   const label = document.createElement('label');
   label.className = 'chip';
+  label.style.setProperty('--chip-color', cat.color);
   label.innerHTML = `
     <input type="checkbox" value="${cat.id}" />
-    <span class="chip-dot" style="background: ${cat.color};"></span>
+    <span class="chip-dot"></span>
     ${cat.name}
   `;
   label.querySelector('input').addEventListener('change', (e) => {
