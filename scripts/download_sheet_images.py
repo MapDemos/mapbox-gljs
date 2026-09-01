@@ -48,9 +48,12 @@ from pathlib import Path
 import requests
 
 # Keep this in sync with the sheetId/id fields in demos/connecting-worlds.html.
-# Rows 00 and 40 (the opening/ending hero) are intentionally omitted — they
-# don't take a photo.
+# Rows 00/40 (the opening/ending hero) map here too even though the hero
+# layout has no image slot in the UI today — the sheet has started adding
+# links for them anyway (e.g. row 40's Jurin AI logo), so download and save
+# them for whenever hero images are supported, rather than silently skipping.
 SHEET_ID_TO_CHAPTER_SLUG = {
+    "00": "opening",
     "01": "genzo-kageyama",
     "02": "meiji-jingu-1947",
     "03": "kuroyon",
@@ -90,6 +93,7 @@ SHEET_ID_TO_CHAPTER_SLUG = {
     "37": "milano-cortina-2026",
     "38": "jurin-ai",
     "39": "forged-in-japan",
+    "40": "ending",
 }
 
 DRIVE_LINK_RE = re.compile(r"https://drive\.google\.com/file/d/([a-zA-Z0-9_-]+)")
