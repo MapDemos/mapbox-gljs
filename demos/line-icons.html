@@ -1,0 +1,225 @@
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+  <script src="shared/demo-kit.js"></script>
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+    #buffer-control {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 1;
+      background: white;
+      padding: 10px 14px;
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      font: 13px/1.4 sans-serif;
+    }
+    #buffer-control label { display: block; margin-bottom: 4px; }
+    #buffer-control input[type="range"] { width: 200px; vertical-align: middle; }
+    #buffer-control select { margin-top: 10px; width: 100%; font: inherit; }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+  <div id="buffer-control">
+    <label for="buffer-slider">source buffer: <span id="buffer-value">0</span></label>
+    <input id="buffer-slider" type="range" min="0" max="512" step="8" value="0" />
+    <label for="line-join-select">line-join</label>
+    <select id="line-join-select">
+      <option value="bevel">bevel</option>
+      <option value="round" selected>round</option>
+      <option value="miter">miter</option>
+      <option value="none">none</option>
+    </select>
+  </div>
+  <script>
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/light-v11',
+      center: [139.767, 35.681],
+      zoom: 13
+    });
+
+    // Sample line data carrying the `width` and `linePattern` properties
+    // that the layer's paint expressions read per-feature.
+    const lineData = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: { featureType: 'line', width: 6, linePattern: 'arrow' },
+          geometry: {
+            type: 'LineString',
+            coordinates: [[139.760, 35.678], [139.770, 35.684], [139.780, 35.678]]
+          }
+        },
+        {
+          type: 'Feature',
+          properties: { featureType: 'line', width: 8, linePattern: 'dash' },
+          geometry: {
+            type: 'LineString',
+            coordinates: [[139.755, 35.686], [139.767, 35.690], [139.779, 35.686]]
+          }
+        },
+        {
+          type: 'Feature',
+          properties: { featureType: 'area', width: 7, linePattern: 'dot' },
+          geometry: {
+            type: 'LineString',
+            coordinates: [[139.758, 35.670], [139.767, 35.666], [139.776, 35.670]]
+          }
+        }
+      ]
+    };
+
+    // Inlined rather than fetched from assets/images/line105.svg: some
+    // dev servers (e.g. VS Code Live Server) inject a live-reload
+    // <script> into every response, which corrupts SVG XML in transit.
+    // Mapbox GL JS's addImage/loadImage also can't decode SVGs directly,
+    // so this rasterizes the markup onto a canvas first.
+    const line105Svg = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M 0 47 L 10.667 37 L 21.333 27 L 32 17 L 42.667 27 L 53.333 37 L 64 47" fill="none" stroke="#000" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M 0 27 L 10.667 17 L 21.333 27 L 32 37 L 42.667 47 L 53.333 37 L 64 27" fill="none" stroke="#000" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M 0 27 L 10.667 37 L 21.333 47 L 32 37 L 42.667 27 L 53.333 17 L 64 27" fill="none" stroke="#000" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    function loadSvgAsImageData(svgMarkup, size) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, size, size);
+          resolve(ctx.getImageData(0, 0, size, size));
+        };
+        img.onerror = reject;
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgMarkup);
+      });
+    }
+
+    const sourceId = 'line-icons-source';
+    const layerId = 'feature-group-main-lines-outline';
+    const lineJoinSelect = document.getElementById('line-join-select');
+
+    // `buffer` is a GeoJSON source construction option, so it can't be
+    // changed on an existing source -- the layer and source are removed
+    // and re-added with the new value.
+    function addLineLayer(buffer) {
+      map.addSource(sourceId, {
+        type: 'geojson',
+        buffer: buffer,
+        data: lineData
+      });
+
+      map.addLayer({
+        id: layerId,
+        type: 'line',
+        source: sourceId,
+        filter: [
+          'all',
+          ['in', ['get', 'featureType'], ['literal', ['line', 'area']]],
+          [
+            'any',
+            ['!', ['has', 'minZoom']],
+            ['>=', ['zoom'], ['get', 'minZoom']]
+          ],
+          ['has', 'linePattern'],
+          ['!=', ['get', 'linePattern'], 'none']
+        ],
+        layout: { 'line-join': lineJoinSelect.value, 'line-cap': 'square' },
+        paint: {
+          'line-width': [
+            'interpolate',
+            ['exponential', 2],
+            ['zoom'],
+            0, ['*', 1, ['*', ['get', 'width'], 2]],
+            0.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            1, ['*', 1, ['*', ['get', 'width'], 2]],
+            1.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            2, ['*', 1, ['*', ['get', 'width'], 2]],
+            2.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            3, ['*', 1, ['*', ['get', 'width'], 2]],
+            3.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            4, ['*', 1, ['*', ['get', 'width'], 2]],
+            4.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            5, ['*', 1, ['*', ['get', 'width'], 2]],
+            5.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            6, ['*', 1, ['*', ['get', 'width'], 2]],
+            6.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            7, ['*', 1, ['*', ['get', 'width'], 2]],
+            7.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            8, ['*', 1, ['*', ['get', 'width'], 2]],
+            8.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            9, ['*', 1, ['*', ['get', 'width'], 2]],
+            9.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            10, ['*', 1, ['*', ['get', 'width'], 2]],
+            10.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            11, ['*', 1, ['*', ['get', 'width'], 2]],
+            11.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            12, ['*', 1, ['*', ['get', 'width'], 2]],
+            12.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            13, ['*', 1, ['*', ['get', 'width'], 2]],
+            13.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            14, ['*', 1, ['*', ['get', 'width'], 2]],
+            14.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            15, ['*', 1, ['*', ['get', 'width'], 2]],
+            15.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            16, ['*', 1, ['*', ['get', 'width'], 2]],
+            16.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            17, ['*', 1, ['*', ['get', 'width'], 2]],
+            17.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            18, ['*', 1, ['*', ['get', 'width'], 2]],
+            18.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            19, ['*', 1, ['*', ['get', 'width'], 2]],
+            19.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            20, ['*', 1, ['*', ['get', 'width'], 2]],
+            20.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            21, ['*', 1, ['*', ['get', 'width'], 2]],
+            21.9999, ['*', 1, ['*', ['get', 'width'], 4]],
+            22, ['*', 1, ['*', ['get', 'width'], 2]]
+          ],
+          'line-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'faded'], false],
+            0.2,
+            1
+          ],
+          'line-pattern': 'line105'
+        }
+      });
+    }
+
+    const bufferSlider = document.getElementById('buffer-slider');
+    const bufferValueLabel = document.getElementById('buffer-value');
+
+    bufferSlider.addEventListener('input', () => {
+      const buffer = Number(bufferSlider.value);
+      bufferValueLabel.textContent = buffer;
+
+      if (map.getLayer(layerId)) map.removeLayer(layerId);
+      if (map.getSource(sourceId)) map.removeSource(sourceId);
+      addLineLayer(buffer);
+    });
+
+    lineJoinSelect.addEventListener('change', () => {
+      if (map.getLayer(layerId)) {
+        map.setLayoutProperty(layerId, 'line-join', lineJoinSelect.value);
+      }
+    });
+
+    map.on('load', () => {
+      loadSvgAsImageData(line105Svg, 64).then((image) => {
+        map.addImage('line105', image);
+        addLineLayer(Number(bufferSlider.value));
+      });
+    });
+  </script>
+</body>
+
+</html>

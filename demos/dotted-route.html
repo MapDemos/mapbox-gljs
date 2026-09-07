@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Dotted route line</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.19.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.19.0/mapbox-gl.js"></script>
+    <script src="shared/demo-kit.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        #panel {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            z-index: 1;
+            background: rgba(255, 255, 255, 0.94);
+            padding: 12px 14px;
+            border-radius: 8px;
+            box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+            width: 190px;
+        }
+
+        #panel label {
+            display: block;
+            margin: 10px 0 2px;
+            color: #333;
+        }
+
+        #panel input[type=range] {
+            width: 100%;
+        }
+
+        #panel .val {
+            float: right;
+            color: #666;
+            font-variant-numeric: tabular-nums;
+        }
+
+        #panel h4 {
+            margin: 0;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #666;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <div id="panel">
+        <h4>Route style</h4>
+        <label>Line width <span class="val" id="wv"></span></label>
+        <input type="range" id="w" min="2" max="30" step="1">
+        <label>Dot size <span class="val" id="dv"></span></label>
+        <input type="range" id="d" min="2" max="24" step="1">
+        <label>Dot spacing <span class="val" id="sv"></span></label>
+        <input type="range" id="s" min="8" max="80" step="2">
+    </div>
+
+    <script>
+        // ---- Style constants: tweak these ----------------------------------
+        const LINE_COLOR = '#7ec8f0';   // light blue casing
+        const LINE_WIDTH = 12;          // px
+        const DOT_COLOR = '#000000';    // dot fill
+        const DOT_RING_COLOR = '#ffffff'; // thin ring so dots read on the blue
+        // --------------------------------------------------------------------
+
+        // Dot size and spacing scale with zoom so the dots keep a roughly
+        // constant on-the-ground size/gap instead of shrinking together as
+        // you zoom out. The interpolation range reuses the sliders' own
+        // min/max (so the zoom curve never produces a value the sliders
+        // couldn't already reach) mapped across the map's minZoom/maxZoom.
+        const ZOOM_RANGE = [15, 22]; // matches the map's minZoom/maxZoom below
+        const DIAMETER_RANGE = [2, 24];
+        const SPACING_RANGE = [8, 80];
+
+        function lerp(zoom, zoomRange, valueRange) {
+            const t = Math.max(0, Math.min(1, (zoom - zoomRange[0]) / (zoomRange[1] - zoomRange[0])));
+            return valueRange[0] + (valueRange[1] - valueRange[0]) * t;
+        }
+
+        // The dot icon is drawn at high resolution and scaled down via icon-size,
+        // so it stays crisp on retina and at large sizes.
+        const ICON_PX = 128;
+        const ICON_ID = 'route-dot';
+
+        const map = (window.map = new mapboxgl.Map({
+            container: 'map',
+            center: [13.38879, 52.5191],
+            zoom: 16.9,
+            pitch: 30,
+            bearing: 50,
+            style: 'mapbox://styles/mapbox/standard',
+            minZoom: 15,
+            maxZoom: 22
+        }));
+
+        map.on('error', (e) => console.error('mapbox error:', e && e.error ? e.error : e));
+
+        /**
+         * Draw a black dot with a thin light ring into an RGBA buffer.
+         * Rendered on a canvas so there is no base64 blob and no async decode.
+         */
+        function buildDotIcon(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, size, size);
+
+            const c = size / 2;
+            const outer = size * 0.46;
+            const inner = size * 0.34;
+
+            ctx.fillStyle = DOT_RING_COLOR;
+            ctx.beginPath();
+            ctx.arc(c, c, outer, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = DOT_COLOR;
+            ctx.beginPath();
+            ctx.arc(c, c, inner, 0, Math.PI * 2);
+            ctx.fill();
+
+            const imageData = ctx.getImageData(0, 0, size, size);
+            return {
+                width: size,
+                height: size,
+                data: new Uint8Array(imageData.data)
+            };
+        }
+
+        const ROUTE = {
+            'type': 'Feature',
+            'properties': {},
+            'geometry': {
+                'coordinates': [
+                    [13.390297, 52.518188],
+                    [13.39042, 52.518201],
+                    [13.390322, 52.518754],
+                    [13.388698, 52.518654],
+                    [13.388707, 52.518714],
+                    [13.3887, 52.518762],
+                    [13.388707, 52.518824],
+                    [13.388574, 52.519737],
+                    [13.388518, 52.519735],
+                    [13.388459, 52.519845],
+                    [13.388546, 52.519848],
+                    [13.388638, 52.51987],
+                    [13.389079, 52.519895],
+                    [13.38907, 52.519935]
+                ],
+                'type': 'LineString'
+            }
+        };
+
+        map.on('style.load', () => {
+            if (!map.hasImage(ICON_ID)) {
+                // pixelRatio 2 means the 128px bitmap represents a 64px icon,
+                // giving icon-size room to scale without softening.
+                map.addImage(ICON_ID, buildDotIcon(ICON_PX), { pixelRatio: 2 });
+            }
+
+            map.addSource('route-data', {
+                type: 'geojson',
+                lineMetrics: true,
+                buffer: 512,
+                data: ROUTE
+            });
+
+            // Layer 1: the light blue line.
+            map.addLayer({
+                id: 'route-casing',
+                type: 'line',
+                source: 'route-data',
+                slot: 'middle',
+                layout: {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                paint: {
+                    'line-color': LINE_COLOR,
+                    'line-width': LINE_WIDTH,
+                    'line-opacity': 1
+                }
+            });
+
+            // Layer 2: black dots marching along the same geometry.
+            // symbol-placement 'line' spaces icons by screen distance, so dot size
+            // and dot spacing are independent of the line width.
+            map.addLayer({
+                id: 'route-dots',
+                type: 'symbol',
+                source: 'route-data',
+                slot: 'middle',
+                layout: {
+                    'symbol-placement': 'line',
+                    'symbol-spacing': [
+                        'interpolate', ['linear'], ['zoom'],
+                        ZOOM_RANGE[0], SPACING_RANGE[0],
+                        ZOOM_RANGE[1], SPACING_RANGE[1]
+                    ],
+                    'icon-image': ICON_ID,
+                    'icon-size': [
+                        'interpolate', ['linear'], ['zoom'],
+                        ZOOM_RANGE[0], DIAMETER_RANGE[0] / (ICON_PX / 2),
+                        ZOOM_RANGE[1], DIAMETER_RANGE[1] / (ICON_PX / 2)
+                    ],
+                    'icon-allow-overlap': true,
+                    'icon-ignore-placement': true,
+                    'icon-padding': 0,
+                    // Keep dots flat on the map and unrotated as the map pitches/rotates.
+                    'icon-rotation-alignment': 'map',
+                    'icon-pitch-alignment': 'map'
+                }
+            });
+
+            wireControls();
+        });
+
+        function wireControls() {
+            // Reflect the zoom-interpolated values at the map's current zoom
+            // rather than the flat DOT_DIAMETER/DOT_SPACING constants, since
+            // 'icon-size' and 'symbol-spacing' are now zoom expressions.
+            const zoom = map.getZoom();
+            const ctl = {
+                w: { el: document.getElementById('w'), out: document.getElementById('wv'), init: LINE_WIDTH },
+                d: { el: document.getElementById('d'), out: document.getElementById('dv'), init: Math.round(lerp(zoom, ZOOM_RANGE, DIAMETER_RANGE)) },
+                s: { el: document.getElementById('s'), out: document.getElementById('sv'), init: Math.round(lerp(zoom, ZOOM_RANGE, SPACING_RANGE)) }
+            };
+
+            Object.values(ctl).forEach((c) => {
+                c.el.value = c.init;
+                c.out.textContent = c.init + ' px';
+            });
+
+            ctl.w.el.addEventListener('input', (e) => {
+                const v = +e.target.value;
+                ctl.w.out.textContent = v + ' px';
+                map.setPaintProperty('route-casing', 'line-width', v);
+            });
+
+            ctl.d.el.addEventListener('input', (e) => {
+                const v = +e.target.value;
+                ctl.d.out.textContent = v + ' px';
+                map.setLayoutProperty('route-dots', 'icon-size', v / (ICON_PX / 2));
+            });
+
+            ctl.s.el.addEventListener('input', (e) => {
+                const v = +e.target.value;
+                ctl.s.out.textContent = v + ' px';
+                map.setLayoutProperty('route-dots', 'symbol-spacing', v);
+            });
+        }
+
+        map.on('click', () => {
+            const c = map.getCenter();
+            console.log(`center: ${c.lng.toFixed(6)}, ${c.lat.toFixed(6)} | zoom: ${map.getZoom().toFixed(2)} | bearing: ${map.getBearing().toFixed(1)} | pitch: ${map.getPitch().toFixed(1)}`);
+        });
+    </script>
+
+</body>
+
+</html>
