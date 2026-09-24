@@ -6,6 +6,7 @@
   <link rel="icon" href="data:;base64,iVBORw0KGgo=" />
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
   <script src="shared/demo-kit.js"></script>
   <style>
     body { margin: 0; padding: 0; }
@@ -79,6 +80,112 @@
         }
       ]
     };
+
+    // Test line for the alternating-icon experiment (Option 2: line layer,
+    // `line-pattern` per chunk). Sits south of the original sample lines so
+    // both approaches can be compared on the same map.
+    const option2LineCoords = [[139.758, 35.652], [139.767, 35.648], [139.776, 35.652]];
+
+    // `line-pattern` only accepts one image per feature, so alternating two
+    // icons on a line layer means splitting the line into short chunks and
+    // giving each chunk its own single-icon pattern. The tile repeats in
+    // fixed SCREEN pixels regardless of zoom, so a chunk length fixed in
+    // real-world meters would hold more tile repeats at high zoom and fewer
+    // at low zoom (icons multiplying in or clipping out). To keep ~1 tile
+    // repeat per chunk at any zoom, chunk length is recomputed from the
+    // current zoom's meters-per-pixel every time zoom changes meaningfully.
+    //
+    // `cafe`/`campsite` are maki icons already baked into light-v11's own
+    // sprite sheet -- the style loads them into the map's image manager on
+    // `load` like any other style asset, so they're referenced directly by
+    // name below with no `addImage`/sprite-fetching needed.
+    //
+    // The chunk's target length and the layer's `line-width` must track the
+    // same pixel value: `line-pattern` tiles a square-ish icon roughly once
+    // per `line-width` worth of screen pixels, not per the icon's own
+    // native sprite size. One shared constant keeps that invariant from
+    // drifting apart later.
+    const option2LineWidthPx = 20;
+    let option2LastChunkedZoom = null;
+
+    // Measured from the map's own current projection rather than a
+    // hardcoded Web Mercator constant: GL JS's zoom levels are calibrated
+    // to 512px tiles, not the 256px tiles most "meters per pixel" formulas
+    // on the web assume, and getting that constant wrong silently doubles
+    // (or halves) every computed chunk length.
+    function metersPerPixelAt(lng, lat) {
+      const p = map.project([lng, lat]);
+      const a = map.unproject(p);
+      const b = map.unproject([p.x + 1, p.y]);
+      return turf.distance([a.lng, a.lat], [b.lng, b.lat], { units: 'kilometers' }) * 1000;
+    }
+
+    function buildOption2ChunkedData() {
+      const midLat = option2LineCoords[Math.floor(option2LineCoords.length / 2)][1];
+      const midLng = option2LineCoords[Math.floor(option2LineCoords.length / 2)][0];
+      const metersPerPixel = metersPerPixelAt(midLng, midLat);
+      const chunkLengthKm = (option2LineWidthPx * metersPerPixel) / 1000;
+
+      const chunked = turf.lineChunk(
+        turf.lineString(option2LineCoords),
+        chunkLengthKm,
+        { units: 'kilometers' }
+      );
+      chunked.features.forEach((feature, i) => {
+        feature.properties.iconType = i % 2 === 0 ? 'cafe' : 'campsite';
+      });
+      return chunked;
+    }
+
+    const option2SourceId = 'option2-source';
+    const option2LayerId = 'option2-line';
+
+    // `buffer` is a GeoJSON source construction option, so it can't be
+    // changed on an existing source -- the layer and source are removed
+    // and re-added with the new value, same as the base demo's `addLineLayer`.
+    function addOption2LineLayer(buffer) {
+      if (map.getLayer(option2LayerId)) map.removeLayer(option2LayerId);
+      if (map.getSource(option2SourceId)) map.removeSource(option2SourceId);
+
+      map.addSource(option2SourceId, {
+        type: 'geojson',
+        buffer: buffer,
+        data: buildOption2ChunkedData()
+      });
+
+      map.addLayer({
+        id: option2LayerId,
+        type: 'line',
+        source: option2SourceId,
+        layout: { 'line-cap': 'butt', 'line-join': lineJoinSelect.value },
+        paint: {
+          'line-width': option2LineWidthPx,
+          // `iconType` is already 'cafe' | 'campsite' -- the same strings
+          // as the sprite image names -- so it doubles as the pattern name.
+          'line-pattern': ['get', 'iconType']
+        }
+      });
+    }
+
+    function initOption2Layer(initialBuffer) {
+      option2LastChunkedZoom = map.getZoom();
+      addOption2LineLayer(initialBuffer);
+
+      // Rebuilding on every 'zoom' tick would re-chunk every animation
+      // frame during a zoom gesture; only recompute once zoom has drifted
+      // far enough that the tile-repeat drift would actually be visible.
+      // 0.05 (rather than a coarser step) keeps a mid-gesture chunk length
+      // within a few percent of the true target the whole time, instead of
+      // drifting up to ~19% before the next rebuild fires.
+      const rechunk = () => {
+        const zoom = map.getZoom();
+        if (Math.abs(zoom - option2LastChunkedZoom) < 0.05) return;
+        option2LastChunkedZoom = zoom;
+        map.getSource(option2SourceId).setData(buildOption2ChunkedData());
+      };
+      map.on('zoom', rechunk);
+      map.on('zoomend', rechunk);
+    }
 
     // Inlined rather than fetched from assets/images/line105.svg: some
     // dev servers (e.g. VS Code Live Server) inject a live-reload
@@ -202,14 +309,20 @@
       const buffer = Number(bufferSlider.value);
       bufferValueLabel.textContent = buffer;
 
-      if (map.getLayer(layerId)) map.removeLayer(layerId);
-      if (map.getSource(sourceId)) map.removeSource(sourceId);
-      addLineLayer(buffer);
+      if (map.getLayer(layerId)) {
+        map.removeLayer(layerId);
+        map.removeSource(sourceId);
+        addLineLayer(buffer);
+      }
+      if (map.getLayer(option2LayerId)) addOption2LineLayer(buffer);
     });
 
     lineJoinSelect.addEventListener('change', () => {
       if (map.getLayer(layerId)) {
         map.setLayoutProperty(layerId, 'line-join', lineJoinSelect.value);
+      }
+      if (map.getLayer(option2LayerId)) {
+        map.setLayoutProperty(option2LayerId, 'line-join', lineJoinSelect.value);
       }
     });
 
@@ -218,6 +331,8 @@
         map.addImage('line105', image);
         addLineLayer(Number(bufferSlider.value));
       });
+
+      initOption2Layer(Number(bufferSlider.value));
     });
   </script>
 </body>
