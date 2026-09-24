@@ -124,17 +124,30 @@
       const midLat = option2LineCoords[Math.floor(option2LineCoords.length / 2)][1];
       const midLng = option2LineCoords[Math.floor(option2LineCoords.length / 2)][0];
       const metersPerPixel = metersPerPixelAt(midLng, midLat);
-      const chunkLengthKm = (option2LineWidthPx * metersPerPixel) / 1000;
+      const targetChunkLengthKm = (option2LineWidthPx * metersPerPixel) / 1000;
 
-      const chunked = turf.lineChunk(
-        turf.lineString(option2LineCoords),
-        chunkLengthKm,
-        { units: 'kilometers' }
-      );
-      chunked.features.forEach((feature, i) => {
-        feature.properties.iconType = i % 2 === 0 ? 'cafe' : 'campsite';
-      });
-      return chunked;
+      const line = turf.lineString(option2LineCoords);
+      const totalLengthKm = turf.length(line, { units: 'kilometers' });
+
+      // `turf.lineChunk` walks the line in fixed-length steps and leaves
+      // whatever is left over as a final, often much shorter, chunk --
+      // which can render as an icon clipped down to a sliver (line-pattern
+      // clips a too-short chunk rather than shrinking the icon to fit).
+      // Picking the chunk COUNT first, then dividing the line evenly by
+      // that count, means every chunk is the same length and none of them
+      // can end up shorter than the target width.
+      const chunkCount = Math.max(1, Math.round(totalLengthKm / targetChunkLengthKm));
+      const chunkLengthKm = totalLengthKm / chunkCount;
+
+      const features = [];
+      for (let i = 0; i < chunkCount; i++) {
+        const start = i * chunkLengthKm;
+        const end = i === chunkCount - 1 ? totalLengthKm : (i + 1) * chunkLengthKm;
+        const chunk = turf.lineSliceAlong(line, start, end, { units: 'kilometers' });
+        chunk.properties.iconType = i % 2 === 0 ? 'cafe' : 'campsite';
+        features.push(chunk);
+      }
+      return { type: 'FeatureCollection', features };
     }
 
     const option2SourceId = 'option2-source';
