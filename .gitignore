@@ -9,3 +9,9 @@ docs/
 demos/autopilot-map.html
 
 .claude/
+
+# Demo generator (AI chat -> HTML demo tool) — separate repo planned later
+generator/
+lambda/function/
+lambda/template.yaml
+lambda/local-server.cjs
