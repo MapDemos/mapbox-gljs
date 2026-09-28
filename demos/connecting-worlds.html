@@ -1563,6 +1563,12 @@ map.on('load', function () {
                     bearing = 0 + (target.bearing - 0) * pIn;
                 }
 
+                // GL JS's globe far-plane math returns NaN for pitch ≈ 1e-7–1e-5°
+                // (Math.acos of a dot product that rounds to just over 1), which
+                // makes jumpTo throw and kills this rAF loop for good — every later
+                // flight starts from the same broken camera. Snap tiny pitch to 0.
+                if (pitch < 0.001) { pitch = 0; }
+
                 map.jumpTo({ center: [lng, lat], zoom: zoom, pitch: pitch, bearing: bearing });
 
                 if (progress < 1) {
