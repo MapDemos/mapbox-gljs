@@ -14,7 +14,7 @@
     - raster   (temperature): Color scale + Color steps, hover value popup,
                               gradient legend that follows the scale
     - particle (wind):        Show / Count / Speed / Color for the particles
-    - vector   (river flood): no data controls, no time bar, risk legend
+    - vector   (river flood): no data controls, a clock-only time bar, risk legend
   Projection and the legend style are always available.
 
   The language switcher does two things, both shown below:
@@ -284,11 +284,11 @@ const I18N = {
   },
   ja: {
     title: '気象コンソール',
-    secData: 'データ', secColor: '色', secParticles: '風のパーティクル', secDisplay: '表示',
+    secData: 'データ', secColor: '色', secParticles: '風の粒子', secDisplay: '表示',
     tileset: 'タイルセット', temp39: '気温 0〜39時間', temp78: '気温 40〜78時間',
     wind39: '風 0〜39時間', flood: '洪水の危険度（河川）',
     colorScale: 'カラースケール', colorSteps: '色の段階数', scaleDefault: '気温（標準）',
-    showParticles: 'パーティクルを表示', particleCount: '数', particleSpeed: '速度', particleColor: 'パーティクルの色',
+    showParticles: '粒子を表示', particleCount: '数', particleSpeed: '速度', particleColor: '粒子の色',
     projection: '投影法',
     legendStyle: '凡例のスタイル', legendGradient: 'グラデーション', legendLevels: '危険度（気象庁）',
     legendTempTitle: '気温（°C）',
@@ -478,7 +478,7 @@ function applyColor() {
 /* ------------------------------------------------------------- state -- */
 // kind 'raster'   = colored raster layer (hover value, color scale)
 //      'particle' = animated wind particles
-//      'vector'   = line layer, no bands / time bar
+//      'vector'   = line layer, no bands (the time bar shows a clock only)
 const TILESETS = {
   t39:   { id: 'mapbox.weather-jp-temperature-0-39',  kind: 'raster',   layer: 'temperature', unit: '°C' },
   t78:   { id: 'mapbox.weather-jp-temperature-40-78', kind: 'raster',   layer: 'temperature', unit: '°C' },
@@ -509,8 +509,7 @@ let loadStart = 0;
 /* -------------------------------------------------------------- time -- */
 // Bands are Unix-seconds strings. Show them in JST, in the UI language's
 // own date/time conventions.
-function formatBand(band) {
-  const d = new Date(Number(band) * 1000);
+function formatJST(d) {
   const tz = 'Asia/Tokyo';
   return {
     date: new Intl.DateTimeFormat(LOCALES[lang], { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d),
@@ -518,14 +517,36 @@ function formatBand(band) {
   };
 }
 
+// A tileset may name a band something other than a Unix time
+function formatBand(band) {
+  if (isNaN(Number(band))) return { date: '', time: '' };
+  return formatJST(new Date(Number(band) * 1000));
+}
+
+let staticTime = null;   // a Date for the clock when there is no band list to scrub (vector data)
+
 function renderClock() {
-  if (!bands.length) { els.date.textContent = '--'; els.time.textContent = '--:--'; return; }
-  const f = formatBand(bands[Number(els.slider.value)]);
+  let f = null;
+  if (staticTime) f = formatJST(staticTime);
+  else if (bands.length) f = formatBand(bands[Number(els.slider.value)]);
+  if (!f) { els.date.textContent = '--'; els.time.textContent = '--:--'; return; }
   els.date.textContent = f.date;
   els.time.textContent = f.time;
-  const first = formatBand(bands[0]), last = formatBand(bands[bands.length - 1]);
-  els.tickStart.textContent = first.date + ' ' + first.time;
-  els.tickEnd.textContent = last.date + ' ' + last.time;
+  if (bands.length > 1) {
+    const first = formatBand(bands[0]), last = formatBand(bands[bands.length - 1]);
+    els.tickStart.textContent = first.date + ' ' + first.time;
+    els.tickEnd.textContent = last.date + ' ' + last.time;
+  }
+}
+
+// Vector tilesets carry their data time in the TileJSON description ("... :: yyyyMMddHHmmss", UTC)
+async function fetchDescriptionTime(tilesetId) {
+  const r = await fetch('https://api.mapbox.com/v4/' + tilesetId + '.json?access_token=' + mapboxgl.accessToken);
+  if (!r.ok) return null;
+  const m = /::\s*(\d{14})/.exec((await r.json()).description || '');
+  if (!m) return null;
+  const d = m[1];
+  return new Date(Date.UTC(+d.slice(0, 4), +d.slice(4, 6) - 1, +d.slice(6, 8), +d.slice(8, 10), +d.slice(10, 12), +d.slice(12, 14)));
 }
 
 function setBand(i) {
@@ -597,8 +618,10 @@ function updateLegend() {
 const map = new mapboxgl.Map({
   container: 'map',
   style: 'mapbox://styles/kenji-shima/clnxv0r9k003b01rff933dq05',
+  projection: 'mercator',
   center: [137, 38.4],
-  zoom: 4.6
+  zoom: 4.6,
+  customAttribution: '<a href="https://www.jma.go.jp/jma/indexe.html" target="_blank" rel="noopener">Japan Meteorological Agency</a>'
 });
 map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
 
@@ -640,6 +663,7 @@ function labelAnchor() {
 
 const popup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, className: 'wc-popup' });
 let onData = null;
+let chosenProjection = 'mercator';
 
 function loadTileset(key) {
   stopPlay();
@@ -647,6 +671,7 @@ function loadTileset(key) {
   els.slider.disabled = true;
   els.play.disabled = true;
   bands = [];
+  staticTime = null;
   renderClock();
   setStatus('statusLoading');
   popup.remove();
@@ -657,7 +682,7 @@ function loadTileset(key) {
   // Show only the controls that apply to this tileset type
   document.getElementById('color-section').classList.toggle('hidden', current.kind !== 'raster');
   document.getElementById('particle-section').classList.toggle('hidden', current.kind !== 'particle');
-  els.timebar.classList.toggle('hidden', current.kind === 'vector');
+  els.timebar.classList.toggle('is-clock', current.kind === 'vector');   // vector data: clock only, nothing to scrub
   updateLegend();
 
   loadStart = performance.now();
@@ -724,7 +749,12 @@ function loadTileset(key) {
     map.off('sourcedata', onData);
     onData = null;
     els.load.textContent = Math.round(performance.now() - loadStart) + ' ms';
-    if (isVector) { setStatus('statusReady'); return; }   // no bands, no time bar
+    if (isVector) {   // no bands: show when the data is from instead
+      setStatus('statusReady');
+      const cfg = current;
+      fetchDescriptionTime(cfg.id).then(d => { if (current === cfg && d) { staticTime = d; renderClock(); } }).catch(() => {});
+      return;
+    }
     const rl = (map.getSource('wx').rasterLayers || []).find(l => l.fields.name === layerName);
     bands = (rl && rl.fields.bands) || [];
     if (!bands.length) { setStatus('statusError'); return; }
@@ -745,7 +775,10 @@ map.on('zoom', () => { els.zoom.textContent = map.getZoom().toFixed(1); syncZoom
 map.on('style.load', () => {
   els.zoom.textContent = map.getZoom().toFixed(1);
   syncZoomSelect();
-  document.getElementById('projection-select').value = map.getProjection().name;  // the style sets its own
+  // Mercator unless the user picked another; it overrides the projection a style defines for itself
+  // (this basemap is equirectangular) and survives a basemap change
+  map.setProjection(chosenProjection);
+  document.getElementById('projection-select').value = chosenProjection;
   originalLabels = null;
   setLabelLanguage(lang);
   loadTileset(document.getElementById('tileset-select').value);
@@ -779,7 +812,7 @@ document.getElementById('tileset-select').addEventListener('change', (e) => load
 scaleSelect.addEventListener('change', (e) => { scaleName = e.target.value; applyColor(); });
 document.getElementById('steps-select').addEventListener('change', (e) => { colorSteps = Number(e.target.value); applyColor(); });
 
-document.getElementById('projection-select').addEventListener('change', (e) => map.setProjection(e.target.value));
+document.getElementById('projection-select').addEventListener('change', (e) => { chosenProjection = e.target.value; map.setProjection(chosenProjection); });
 
 document.getElementById('legend-select').addEventListener('change', updateLegend);
 document.getElementById('risk-select').addEventListener('change', updateLegend);

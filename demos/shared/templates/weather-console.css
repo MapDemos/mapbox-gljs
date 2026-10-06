@@ -97,6 +97,8 @@
                                   .wc-clock-time, .wc-clock-zone)
       input.wc-range             the scrubber
       .wc-ticks                  start / end time labels under it
+    .wc-timebar.is-clock         clock only: hides Play, the scrubber and the
+                                  ticks, for single-frame / vector tilesets
 
   Map readout:
   - .wc-popup                  hover readout: pass className: 'wc-popup' to a
@@ -742,6 +744,7 @@ body {
 
 .wc-dock-top {
   display: flex;
+  flex-wrap: wrap;   /* on a narrow map the legend drops under the badge instead of squeezing */
   align-items: flex-end;
   justify-content: space-between;
   gap: 10px;
@@ -754,7 +757,7 @@ body {
 
 /* Wraps the legend card(s) so they right-align beside the badge */
 .wc-dock-legends {
-  flex: 1;
+  flex: 1 1 350px;   /* the danger-level card needs its 350px to fit its labels */
   min-width: 0;
   display: flex;
   justify-content: flex-end;
@@ -908,6 +911,15 @@ body {
   font-size: 0.8rem;
 }
 
+/* Safety net: rows are a fixed 24px to line up with the meter, so a label that
+   is too long for the card is cut off rather than wrapping over its neighbour */
+.wc-risk-row > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .wc-swatch {
   flex-shrink: 0;
   width: 24px;
@@ -966,6 +978,15 @@ body {
 .wc-time-main {
   flex: 1;
   min-width: 0;
+}
+
+/* Clock-only state: a tileset with no time steps to scrub (a single frame, or
+   vector data) still shows when its data is from, without Play or the slider.
+   Add .is-clock to .wc-timebar. */
+.wc-timebar.is-clock .wc-btn,
+.wc-timebar.is-clock .wc-range,
+.wc-timebar.is-clock .wc-ticks {
+  display: none;
 }
 
 .wc-clock {
@@ -1135,6 +1156,11 @@ body {
     align-items: stretch;
   }
 
+  /* Stacked, so the 350px basis would become a HEIGHT: size to the content */
+  .wc-dock-legends {
+    flex: 0 0 auto;
+  }
+
   /* The map area is short on a phone: drop the readout badge */
   .wc-badge {
     display: none;
@@ -1143,6 +1169,15 @@ body {
   .wc-legend,
   .wc-risk {
     width: 100%;
+  }
+
+  /* Phone widths: pull the labels closer to the meter so they fit */
+  .wc-risk-body {
+    gap: 16px;
+  }
+
+  .wc-risk-row {
+    font-size: 0.75rem;
   }
 
   .wc-timebar {
