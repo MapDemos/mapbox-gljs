@@ -171,6 +171,11 @@ h1 {
   transition: transform .5s ease-in-out;
 }
 
+.mapboxgl-ctrl-attrib,
+.mapboxgl-ctrl-attrib a {
+  color: #000;
+}
+
 .mapboxgl-popup {
   padding-bottom: 10px;
   opacity: 0.8;
@@ -803,54 +808,6 @@ const tilesets = {
         mapstyle: 'mapbox://styles/mapbox/satellite-v9',
         maplayer_above: 'satellite',
     },
-    linear_precipitation_band: {
-        value: 'mapbox://kenji-shima.lpbs-20250810120000',
-        label: 'linear precipitation band【線状降水帯】',
-        type: 'raster-array',
-        mapstyle: 'mapbox://styles/kenji-shima/cmfurpm8w00j101r86qp530c8',
-        maplayer_above: 'road-exit-shield',
-        colorscale: 'LinearPrecipitationBand',
-    },
-    linear_precipitation_band_z8: {
-        value: 'mapbox://kenji-shima.lpbs-20250810120000-z8',
-        label: 'linear precipitation band【線状降水帯】(Zoom 8)',
-        type: 'raster-array',
-        mapstyle: 'mapbox://styles/kenji-shima/cmfurpm8w00j101r86qp530c8',
-        maplayer_above: 'road-exit-shield',
-        colorscale: 'LinearPrecipitationBand',
-    },
-    linear_precipitation_band_z7: {
-        value: 'mapbox://kenji-shima.lpbs-20250810120000-z7',
-        label: 'linear precipitation band【線状降水帯】(Zoom 7)',
-        type: 'raster-array',
-        mapstyle: 'mapbox://styles/kenji-shima/cmfurpm8w00j101r86qp530c8',
-        maplayer_above: 'road-exit-shield',
-        colorscale: 'LinearPrecipitationBand',
-    },
-    linear_precipitation_band_z6: {
-        value: 'mapbox://kenji-shima.lpbs-20250810120000-z6',
-        label: 'linear precipitation band【線状降水帯】(Zoom 6)',
-        type: 'raster-array',
-        mapstyle: 'mapbox://styles/kenji-shima/cmfurpm8w00j101r86qp530c8',
-        maplayer_above: 'road-exit-shield',
-        colorscale: 'LinearPrecipitationBand',
-    },
-    linear_precipitation_band_z5: {
-        value: 'mapbox://kenji-shima.lpbs-20250810120000-z5',
-        label: 'linear precipitation band【線状降水帯】(Zoom 5)',
-        type: 'raster-array',
-        mapstyle: 'mapbox://styles/kenji-shima/cmfurpm8w00j101r86qp530c8',
-        maplayer_above: 'road-exit-shield',
-        colorscale: 'LinearPrecipitationBand',
-    },
-    linear_precipitation_band_z4: {
-        value: 'mapbox://kenji-shima.lpbs-20250810120000-z4',
-        label: 'linear precipitation band【線状降水帯】(Zoom 4)',
-        type: 'raster-array',
-        mapstyle: 'mapbox://styles/kenji-shima/cmfurpm8w00j101r86qp530c8',
-        maplayer_above: 'road-exit-shield',
-        colorscale: 'LinearPrecipitationBand',
-    },
 
     // // wind_39_z6: {
     // //     value: "mapbox://kenji-shima.202402190000-wind-z6",
@@ -1037,7 +994,8 @@ let map = new mapboxgl.Map({
     //maxZoom: 12,
     scrollZoom: true,
     projection: currentprojection,
-    language: 'ja'
+    language: 'ja',
+    customAttribution: '<a href="https://www.jma.go.jp/jma/indexe.html" target="_blank" rel="noopener">Japan Meteorological Agency</a>'
 });
 
 map.on('style.load', () => {
@@ -1052,8 +1010,10 @@ map.on('style.load', () => {
     //     'star-intensity': 0.6 // Background star brightness (default 0.35 at low zoooms )
     // })
 
-    let popup = null;
-    map.on('mousemove', async (e) => {
+});
+
+let popup = null;
+map.on('mousemove', async (e) => {
 
         if (tilesettype === 'raster-array') {
             if (!popup) {
@@ -1094,8 +1054,6 @@ map.on('style.load', () => {
                 popup.remove();
             }
         }
-
-    });
 
 });
 
@@ -1341,15 +1299,6 @@ const rainScale = () => {
     return domain.map((v, i) => [v, range[i]]).flat();
 };
 
-const lpbScale = () => {
-    const domain = [0, 1];
-    const range = [
-        'rgba(0, 0, 0, 0.0)',
-        'rgba(183, 0, 16, 0.8)',
-    ];
-    return domain.map((v, i) => [v, range[i]]).flat();
-};
-
 const COLORSCALES = {
     'Turbo': d3.interpolateTurbo,
     'Spectral': x => d3.interpolateSpectral(1 - x),
@@ -1389,10 +1338,6 @@ const COLORSCALES = {
     'KikikuruDosha': {
         manual: true,
         value: kikikuruDoshaScale()
-    },
-    'LinearPrecipitationBand': {
-        manual: true,
-        value: lpbScale()
     }
 };
 
@@ -1441,8 +1386,11 @@ function updateLegendBar(colorRange) {
     const increment = oneTwoFive(colorRange);
     const [minValue, maxValue] = colorRange;
     let legendVals = [];
-    for (let i = minValue + increment; i <= maxValue; i += increment) {
-        legendVals.push(i);
+    // A flat range (e.g. alert's [0, 0]) gives increment 0, which would loop forever
+    if (increment > 0) {
+        for (let i = minValue + increment; i <= maxValue; i += increment) {
+            legendVals.push(i);
+        }
     }
     let colors = null;
     if (colorscaletype.manual) {
@@ -1514,9 +1462,14 @@ function showAllOptions() {
             addParticles();
             document.getElementById('raster-array-coloring-options').style.display = 'none';
             document.getElementById('legend').style.display = 'none';
-            document.getElementById('map-overlay-bottom').style.display = 'none';
             document.getElementById('kikikuru-legend').style.display = 'none';
-            setTimeFromTileJson();
+            if (bandlist.length > 1) {
+                // The slider (initTimeSlider) already shows the active band's time
+                document.getElementById('map-overlay-bottom').style.display = 'block';
+            } else {
+                document.getElementById('map-overlay-bottom').style.display = 'none';
+                setTimeFromTileJson();
+            }
         });
 
     } else {
@@ -1653,36 +1606,6 @@ function initTimeSlider(val) {
     }
 }
 
-const baseDate = new Date(Date.UTC(1990, 0, 1));
-function convertTimeValue(timeValue) {
-    // Check if timeValue is a string (band name) rather than a numeric time value
-    if (typeof timeValue === 'string' && isNaN(Number(timeValue))) {
-        return '  '; // Return two spaces so split(' ') produces valid array
-    }
-
-    const millisecondsInDay = 24 * 60 * 60 * 1000;
-    const totalMilliseconds = Math.round(timeValue * millisecondsInDay);
-    const date = new Date(baseDate.getTime() + totalMilliseconds);
-    const options = {
-        timeZone: 'Asia/Tokyo',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false, // Use 24-hour format
-    };
-    const formatter = new Intl.DateTimeFormat('ja-JP', options);
-    const parts = formatter.formatToParts(date);
-    const dateString = `${parts.find(p => p.type === 'year').value}/` +
-        `${parts.find(p => p.type === 'month').value}/` +
-        `${parts.find(p => p.type === 'day').value} ` +
-        `${parts.find(p => p.type === 'hour').value}:` +
-        `${parts.find(p => p.type === 'minute').value}`;
-
-    return dateString;
-}
-
 async function getCurrentBands() {
     const tilejson = await getTilejson();
 
@@ -1723,6 +1646,9 @@ async function getCurrentBands() {
 
     if (currentLayer === 'wind' || currentLayer === 'winds' || currentLayer === '10winds' || currentLayer.includes('wind_vector')) {
         particlelayerid = currentLayer;
+        // Wind tilesets are hourly forecasts, so expose their bands to the time slider
+        const windLayer = tilejson.raster_layers.find(l => l.fields.name === currentLayer);
+        bandlist = (windLayer && windLayer.fields.bands) || [];
         return tilejson;
     }
 
@@ -1766,7 +1692,11 @@ async function getTilejson() {
 async function changeBand(index) {
     lastBandIndex = index;
     initTimeSlider(lastBandIndex);
-    map.setPaintProperty(currentLayer, 'raster-array-band', bandlist[lastBandIndex]);
+    if (tilesettype === 'raster-array-particle') {
+        map.setPaintProperty('particlelayer', 'raster-particle-array-band', bandlist[lastBandIndex]);
+    } else {
+        map.setPaintProperty(currentLayer, 'raster-array-band', bandlist[lastBandIndex]);
+    }
 }
 window.changeBand = changeBand;
 
@@ -1947,9 +1877,8 @@ const addCircleLayer = () => {
             'circle-color': 'rgba(255, 0, 0, 1)',
             'circle-stroke-width': 1,
             'circle-stroke-color': 'rgba(0, 0, 0, 1)'
-        },
-        layerAbove
-    });
+        }
+    }, layerAbove);
 };
 
 const addFillLayer = () => {
@@ -1971,9 +1900,8 @@ const addFillLayer = () => {
         paint: {
             'fill-color': 'rgba(255, 0, 0, 0.5)',
             'fill-outline-color': 'rgba(0, 0, 0, 1)'
-        },
-        layerAbove
-    });
+        }
+    }, layerAbove);
 };
 
 const addLineLayer = () => {
@@ -1996,8 +1924,7 @@ const addLineLayer = () => {
             'line-color': 'rgba(255, 0, 0, 1)',
             'line-width': 2
         }
-        , layerAbove
-    });
+    }, layerAbove);
 };
 
 const addFloodLayer = () => {
@@ -2066,7 +1993,7 @@ const addFloodLayer = () => {
             ],
             'line-opacity': 1.0,
         },
-    });
+    }, layerAbove);
 };
 
 const addRasterLayer = () => {
@@ -2091,6 +2018,31 @@ const addRasterLayer = () => {
     map.addLayer(layer_def, layerAbove);
 };
 
+// bandlist comes from a separate TileJSON fetch (getTilejson), so a tileset publishing a new frame
+// in between leaves it out of step with the source ("Invalid band"). Once the source has loaded,
+// take the bands from it instead and apply the first one.
+let bandSyncHandler = null;
+const syncBandWithSource = (layer) => {
+    if (bandSyncHandler) {
+        map.off('sourcedata', bandSyncHandler);
+    }
+    bandSyncHandler = (e) => {
+        if (e.sourceId !== 'rastersource' || !e.isSourceLoaded) return;
+        map.off('sourcedata', bandSyncHandler);
+        bandSyncHandler = null;
+        const rasterLayer = (map.getSource('rastersource').rasterLayers || []).find(l => l.fields.name === layer);
+        const bands = rasterLayer && rasterLayer.fields.bands;
+        if (!bands || !bands.length || !map.getLayer(layer)) return;
+        if (bands.join() !== bandlist.join()) {
+            bandlist = bands;
+            lastBandIndex = Math.min(lastBandIndex, bands.length - 1);
+            initTimeSlider(lastBandIndex);
+        }
+        map.setPaintProperty(layer, 'raster-array-band', bands[0]);
+    };
+    map.on('sourcedata', bandSyncHandler);
+};
+
 const addRasterArrayLayer = (layer) => {
     // console.log('Adding raster array source:', tileset + tilesetsuffix);
     map.addSource('rastersource', {
@@ -2111,7 +2063,6 @@ const addRasterArrayLayer = (layer) => {
             'raster-resampling': tilesetresampling,
             'raster-color-range-transition': { duration: 0 },
             'raster-opacity': 1.0,
-            'raster-array-band': bandlist[0],
             'raster-emissive-strength': 1.0,
             'raster-fade-duration': 0
         },
@@ -2120,6 +2071,7 @@ const addRasterArrayLayer = (layer) => {
     };
     console.log('Adding layer with definition:', layer_def);
     map.addLayer(layer_def, layerAbove);
+    syncBandWithSource(layer);
     const element = document.getElementById(layer);
     updateLegendBar(layerVals.color_range);
 
@@ -2156,12 +2108,15 @@ const addParticles = () => {
                 'raster-particle-max-speed': 10,
                 'raster-particle-fade-opacity-factor': 0.90,
                 'raster-particle-reset-rate-factor': 0.4,
-                'raster-resampling': 'bilinear',
             },
             'minzoom': 0,
             'maxzoom': 22,
         };
-        map.addLayer(particlelayer, layerAbove);
+        // No beforeId: the layer sits in the 'top' slot, and a beforeId from another slot is rejected
+        map.addLayer(particlelayer);
+        if (tilesettype === 'raster-array-particle' && lastBandIndex > 0 && bandlist[lastBandIndex]) {
+            map.setPaintProperty('particlelayer', 'raster-particle-array-band', bandlist[lastBandIndex]);
+        }
         let particleCount = 1000;
         document.getElementById('particle-count-slider').value = particleCount;
         setParticleCount(particleCount);
@@ -2188,7 +2143,9 @@ function showWind(elem) {
 document.showWind = showWind;
 
 let autoFlag = false;
+let autoTimer = null;
 const autoUpdate = () => {
+    autoTimer = null;
     if (!autoFlag) return;
     const slider = document.getElementById('slider');
     let index = slider.value;
@@ -2205,7 +2162,7 @@ const autoUpdate = () => {
 
     slider.dispatchEvent(inputEvent);
 
-    setTimeout(autoUpdate, 1000);
+    autoTimer = setTimeout(autoUpdate, 1000);
 };
 
 function play() {
@@ -2217,6 +2174,8 @@ function play() {
         auto.style.backgroundColor = '#f44336';
     } else {
         autoFlag = false;
+        clearTimeout(autoTimer);
+        autoTimer = null;
         auto.innerHTML = 'Play';
         auto.style.backgroundColor = '#4CAF50';
     }
