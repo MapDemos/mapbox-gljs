@@ -1,0 +1,1155 @@
+/*
+  Weather Console -- a style pack forked from highway-sign.css for
+  layer-explorer / time-series demos (weather tilesets, forecasts, any
+  raster-array or vector data you step through time). Built for
+  demos/jwl-nowcast.html's shape: a left sidebar full of dropdowns and
+  toggles, one bottom dock holding a time bar and a legend, and a
+  language switcher (EN / 日本語 / 한국어).
+
+  Fork notes: same palette (route teal, reflective cream, caution amber),
+  fonts (Overpass, Public Sans, IBM Plex Mono) and sidebar-header sheen as
+  Highway Sign -- but every selector is scoped under a `wc-` class or
+  `#wc-panel`, there are NO bare `button` / `select` / `a` rules (those
+  are what made the original demo's overlays collide with each other),
+  and none of Highway Sign's navigation-HUD pieces are carried over.
+  highway-sign.css itself is untouched; the two packs can live side by
+  side, but don't load both on one page.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/weather-console.css" rel="stylesheet" />
+  plus the fonts it expects (Overpass, Public Sans, IBM Plex Mono, and
+  Noto Sans JP / KR as CJK fallbacks -- Overpass and Public Sans have no
+  Japanese or Korean glyphs):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Overpass:wght@700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Noto+Sans+JP:wght@400;700&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet" />
+
+  Layout contract -- nothing here is positioned independently, so
+  nothing can overlap by accident:
+  - #wc-panel                  fixed left sidebar, 360px wide (the
+                                --wc-panel-w variable). Give your own #map
+                                rule `left: 360px`. Under 768px it becomes
+                                a bottom sheet of height --wc-sheet-h
+                                (42dvh); your #map rule must then use
+                                `left: 0; bottom: var(--wc-sheet-h)` so the
+                                Mapbox logo and attribution stay visible
+                                above the sheet (they are a ToS
+                                requirement, so nothing may cover them).
+  - .wc-dock                   ONE fixed container for everything that
+                                floats over the map at the bottom: the
+                                legend stacks above the time bar inside
+                                it. On desktop it sits beside the sidebar
+                                with bottom clearance for the logo and
+                                attribution; on mobile it moves to the TOP
+                                of the screen (the sheet owns the bottom),
+                                leaving 48px on the right for a top-right
+                                NavigationControl, and hides .wc-badge.
+                                Add a .wc-badge as a sibling for the
+                                zoom/status readout (see below).
+
+  Sidebar:
+  - #wc-panel > .wc-header     teal header band (bleeds to the panel
+                                edges, one-time sheen sweep)
+      .wc-title                  <h1> in the band
+      .wc-lang                   language switcher -- a segmented
+                                  radiogroup of <button role="radio"
+                                  data-lang="en|ja|ko" aria-checked>.
+                                  Toggle aria-checked yourself.
+  - .wc-body                   padding wrapper under the header
+    .wc-section                  one titled group of controls, divided by a
+                                  hairline; .wc-section-label is its
+                                  small-caps heading
+    .wc-field                    label + control wrapper
+      .wc-field > label          uppercase field label (see CJK note)
+      .wc-field > select/input[type=text]  bordered field
+    .wc-toggle                   one boolean row: label text + a .wc-switch
+                                  (hidden checkbox + styled track)
+    .wc-range-row                label + value readout (.wc-range-value,
+                                  mono) above an <input class="wc-range"
+                                  type="range">
+    .wc-color                    <input type="color" class="wc-color"> -- for
+                                  things like a particle layer's color
+    .wc-btn, .wc-btn-primary,    pressed-shadow buttons (same feel as
+    .wc-btn-secondary             Highway Sign's .btn)
+    .wc-status (+ .loading /     bordered status card -- .wc-status-icon
+     .success / .error)           (+.spinning) and .wc-status-text
+
+  Dock:
+  - .wc-legend                 card. Variant 1, gradient: .wc-legend-title,
+                                a .wc-legend-bar whose background you set
+                                with `--wc-gradient`, and .wc-legend-ticks
+                                (spans positioned by --pos %). Hide with .hidden.
+  - .wc-risk                   the JMA danger-level legend, kept faithful to
+                                jwl-nowcast.html: a white card with a title
+                                (.wc-risk-title, e.g. "Inundation danger
+                                level") and a .wc-risk-body holding
+                                .wc-meter -- the inverted-trapezoid meter,
+                                five .wc-meter-level.l5 ... .l1 blocks
+                                (l5 = black, imminent disaster, on top; l1 =
+                                white, stay informed, at the bottom) plus a
+                                .wc-meter-axis vertical label -- beside
+                                .wc-risk-rows, five .wc-risk-row each with a
+                                .wc-swatch.l5 ... .l1 and a label. Add
+                                .is-flood to the card for the flood variant,
+                                where the lowest level is cyan.
+  - .wc-timebar                Play/Stop button + .wc-time-main (capped at
+                                --wc-timebar-max, 900px, left-aligned):
+      .wc-clock                  big mono readout (.wc-clock-date,
+                                  .wc-clock-time, .wc-clock-zone)
+      input.wc-range             the scrubber
+      .wc-ticks                  start / end time labels under it
+
+  Map readout:
+  - .wc-popup                  hover readout: pass className: 'wc-popup' to a
+                                mapboxgl.Popup (dark card, amber mono value)
+  - .wc-badge                  small rounded card for zoom, status, etc.
+                                (.wc-badge-item > .wc-badge-label +
+                                .wc-badge-value). Placed in normal flow
+                                inside .wc-dock's top row.
+
+  Language / CJK:
+  - Uppercase and letter-spacing are dropped under :lang(ja) and
+    :lang(ko) (they don't exist there and look wrong), and the display and
+    body stacks fall back to Noto / system CJK faces. Set <html lang> when
+    the user switches language -- the :lang() rules depend on it.
+
+  Themes: the default palette is Blueprint. Set `data-theme` on <html> to
+  teal, graphite, forest, mapbox or ink to swap it. The template accepts
+  ?theme=<name> in its URL so you can preview them.
+
+  What's NOT included: any data logic, the i18n dictionary (the template
+  has a small working one), and a light/dark switch -- the sidebar is
+  always the light cream surface.
+*/
+
+:root {
+  /* Default palette: Blueprint. "teal" is the historical name of the pack's
+     PRIMARY color (header band, buttons, switches, section headings) --
+     the themes below swap it, whatever hue it is. */
+  --wc-teal: #1D4F91;
+  --wc-teal-dark: #123461;
+  --wc-teal-tint: #E2EAF5;
+  --wc-teal-hover: #2A62AD;
+  --wc-cream: #F4F6FA;
+  --wc-asphalt: #0E1A2B;
+  --wc-amber: #FFB81C;
+  --wc-red: #C8102E;
+  --wc-ink: #1B2433;
+  --wc-muted: #5B5B57;
+  --wc-line: rgba(29, 79, 145, 0.22);
+
+  --wc-panel-w: 360px;
+  --wc-sheet-h: 42dvh;
+  --wc-gap: 16px;
+  /* The time bar stops growing here, so the slider doesn't stretch across
+     a 1900px-wide map. The legend stays right-aligned beside it. */
+  --wc-timebar-max: 900px;
+  /* Room under the dock for the Mapbox logo (bottom-left of the map area)
+     and the attribution (bottom-right) -- never cover them. */
+  --wc-logo-clearance: 44px;
+
+  --wc-font-display: 'Overpass', 'Hiragino Sans', 'Noto Sans JP', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  --wc-font-body: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  --wc-font-mono: 'IBM Plex Mono', 'Monaco', 'Courier New', monospace;
+}
+
+/* ---------------------------------------------------------------- themes
+   Set data-theme on <html> to swap the palette (no attribute = blueprint).
+   Each theme overrides the same eight variables (plus optional --wc-play-*
+   for the Play button when the primary is too dark to show on the time bar):
+     --wc-teal / -dark / -tint / -hover   primary: header, buttons, switches
+     --wc-cream                           sidebar and card surface
+     --wc-asphalt                         the dark time bar and popup
+     --wc-amber                           accent: markers, clock, scrubber
+     --wc-ink / --wc-line                 text and hairlines
+   The danger-level legend and the data colors never change with the theme. */
+
+:root[data-theme="teal"] {
+  --wc-teal: #0E6B6B;
+  --wc-teal-dark: #0A4C4C;
+  --wc-teal-tint: #E3ECEC;
+  --wc-teal-hover: #107A7A;
+  --wc-cream: #F6F3EA;
+  --wc-asphalt: #1C1D1F;
+  --wc-amber: #F2A900;
+  --wc-ink: #2A2A28;
+  --wc-line: rgba(14, 107, 107, 0.22);
+}
+
+:root[data-theme="graphite"] {
+  --wc-teal: #2F3640;
+  --wc-teal-dark: #1E232A;
+  --wc-teal-tint: #E7E8EA;
+  --wc-teal-hover: #444E5A;
+  --wc-cream: #F4F4F2;
+  --wc-asphalt: #15181C;
+  --wc-amber: #FF6A2B;
+  --wc-ink: #22262B;
+  --wc-line: rgba(47, 54, 64, 0.22);
+  --wc-play-bg: #FF6A2B;
+  --wc-play-fg: #1B1D20;
+  --wc-play-shadow: #B8481A;
+  --wc-play-hover: #FF8250;
+}
+
+:root[data-theme="forest"] {
+  --wc-teal: #1F5A43;
+  --wc-teal-dark: #143D2D;
+  --wc-teal-tint: #E3EDE7;
+  --wc-teal-hover: #2A7355;
+  --wc-cream: #F5F5EE;
+  --wc-asphalt: #14211B;
+  --wc-amber: #D9A21B;
+  --wc-ink: #222A25;
+  --wc-line: rgba(31, 90, 67, 0.22);
+}
+
+:root[data-theme="mapbox"] {
+  --wc-teal: #4264FB;
+  --wc-teal-dark: #2B43C2;
+  --wc-teal-tint: #E6EBFF;
+  --wc-teal-hover: #5576FF;
+  --wc-cream: #F6F8FF;
+  --wc-asphalt: #0B1030;
+  --wc-amber: #FFC83D;
+  --wc-ink: #1A1F36;
+  --wc-line: rgba(66, 100, 251, 0.22);
+}
+
+:root[data-theme="ink"] {
+  --wc-teal: #14181F;
+  --wc-teal-dark: #0A0D12;
+  --wc-teal-tint: #E9EAEC;
+  --wc-teal-hover: #2A303B;
+  --wc-cream: #FBFBFA;
+  --wc-asphalt: #0A0D12;
+  --wc-amber: #B8F23A;
+  --wc-ink: #1C1F24;
+  --wc-line: rgba(20, 24, 31, 0.2);
+  --wc-play-bg: #B8F23A;
+  --wc-play-fg: #0A0D12;
+  --wc-play-shadow: #7FA524;
+  --wc-play-hover: #C9F863;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--wc-font-body);
+  color: var(--wc-ink);
+}
+
+/* Uppercase / tracking switch: CJK has neither convention. Driven by the
+   <html lang> attribute, so set it whenever the language changes. */
+:root {
+  --wc-case: uppercase;
+  --wc-tracking: 0.05em;
+}
+
+:root:lang(ja),
+:root:lang(ko) {
+  --wc-case: none;
+  --wc-tracking: normal;
+}
+
+.wc-hidden,
+.hidden {
+  display: none !important;
+}
+
+/* ---------------------------------------------------------------- panel */
+
+#wc-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--wc-panel-w);
+  max-width: 85vw;
+  box-sizing: border-box;
+  background: var(--wc-cream);
+  border-right: 1px solid var(--wc-line);
+  z-index: 1400;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+#wc-panel :focus-visible,
+.wc-dock :focus-visible {
+  outline: 2px solid var(--wc-amber);
+  outline-offset: 2px;
+}
+
+.wc-header {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 24px 16px;
+  background: var(--wc-teal);
+  color: var(--wc-cream);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .wc-header::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -60%;
+    width: 40%;
+    height: 200%;
+    background: linear-gradient(115deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+    transform: rotate(8deg);
+    animation: wc-sheen 1.1s ease-out 0.15s 1;
+    pointer-events: none;
+  }
+}
+
+@keyframes wc-sheen {
+  from { left: -60%; }
+  to { left: 130%; }
+}
+
+.wc-title {
+  margin: 0;
+  font-family: var(--wc-font-display);
+  font-weight: 800;
+  font-size: 18px;
+  line-height: 1.25;
+  text-transform: var(--wc-case);
+  letter-spacing: 0.06em;
+}
+
+:lang(ja) .wc-title,
+:lang(ko) .wc-title {
+  letter-spacing: 0.02em;
+}
+
+/* Segmented language switcher, sits inside the teal band */
+.wc-lang {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.wc-lang button {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  padding: 5px 9px;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--wc-cream);
+  font-family: var(--wc-font-display);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.wc-lang button:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.wc-lang button[aria-checked="true"] {
+  background: var(--wc-cream);
+  color: var(--wc-teal-dark);
+}
+
+.wc-body {
+  padding: 18px 24px 28px;
+}
+
+.wc-section {
+  padding: 14px 0 6px;
+  border-top: 1px solid var(--wc-line);
+}
+
+.wc-section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.wc-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  color: var(--wc-teal-dark);
+  font-family: var(--wc-font-display);
+  font-weight: 800;
+  font-size: 14px;
+  text-transform: var(--wc-case);
+  letter-spacing: 0.08em;
+}
+
+/* Amber marker square: the one bold touch that separates a section heading
+   from the (smaller, muted) field labels beneath it */
+.wc-section-label::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: var(--wc-amber);
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+:lang(ja) .wc-section-label,
+:lang(ko) .wc-section-label {
+  letter-spacing: 0.02em;
+}
+
+/* ---------------------------------------------------------------- fields */
+
+.wc-field {
+  margin-bottom: 14px;
+}
+
+.wc-field > label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--wc-muted);
+  font-family: var(--wc-font-display);
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: var(--wc-case);
+  letter-spacing: var(--wc-tracking);
+}
+
+.wc-field > select,
+.wc-field > input[type="text"] {
+  width: 100%;
+  padding: 10px;
+  border: 2px solid var(--wc-line);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--wc-ink);
+  font-family: var(--wc-font-body);
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.wc-field > select:focus,
+.wc-field > input[type="text"]:focus {
+  outline: none;
+  border-color: var(--wc-teal);
+}
+
+.wc-field > select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Toggle row: label text + switch */
+.wc-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.wc-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 42px;
+  height: 24px;
+}
+
+.wc-switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.wc-switch-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: #C9C7BC;
+  transition: background 0.15s ease;
+  pointer-events: none;
+}
+
+.wc-switch-track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s ease;
+}
+
+.wc-switch input:checked + .wc-switch-track {
+  background: var(--wc-teal);
+}
+
+.wc-switch input:checked + .wc-switch-track::after {
+  transform: translateX(18px);
+}
+
+.wc-switch input:focus-visible + .wc-switch-track {
+  outline: 2px solid var(--wc-amber);
+  outline-offset: 2px;
+}
+
+/* Range slider (shared by the sidebar controls and the time bar) */
+.wc-range-row {
+  margin-bottom: 14px;
+}
+
+.wc-range-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.wc-range-head label {
+  color: var(--wc-muted);
+  font-family: var(--wc-font-display);
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: var(--wc-case);
+  letter-spacing: var(--wc-tracking);
+}
+
+.wc-range-value {
+  font-family: var(--wc-font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wc-ink);
+}
+
+.wc-range {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.wc-range::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--wc-teal-tint);
+  border: 1px solid var(--wc-line);
+}
+
+.wc-range::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--wc-teal-tint);
+  border: 1px solid var(--wc-line);
+}
+
+.wc-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -8px;
+  border-radius: 50%;
+  background: var(--wc-teal);
+  border: 3px solid var(--wc-cream);
+  box-shadow: 0 0 0 1px var(--wc-teal-dark), 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.wc-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--wc-teal);
+  border: 3px solid var(--wc-cream);
+  box-shadow: 0 0 0 1px var(--wc-teal-dark), 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.wc-range:focus-visible {
+  outline: 2px solid var(--wc-amber);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.wc-range:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wc-color {
+  display: block;
+  width: 100%;
+  height: 36px;
+  padding: 2px;
+  border: 2px solid var(--wc-line);
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+/* --------------------------------------------------------------- buttons */
+
+.wc-btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 5px;
+  font-family: var(--wc-font-display);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: var(--wc-case);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease;
+}
+
+.wc-btn-primary {
+  background: var(--wc-teal);
+  color: var(--wc-cream);
+  box-shadow: 0 3px 0 var(--wc-teal-dark);
+}
+
+.wc-btn-primary:hover {
+  background: var(--wc-teal-hover);
+}
+
+.wc-btn-primary:active {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 var(--wc-teal-dark);
+}
+
+.wc-btn-primary.is-active {
+  background: var(--wc-red);
+  box-shadow: 0 3px 0 #8E0B21;
+}
+
+.wc-btn-secondary {
+  background: var(--wc-cream);
+  color: var(--wc-teal-dark);
+  border: 2px solid var(--wc-teal);
+}
+
+.wc-btn-secondary:hover {
+  background: var(--wc-teal-tint);
+}
+
+.wc-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* ---------------------------------------------------------------- status */
+
+.wc-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 2px solid var(--wc-line);
+  border-radius: 4px;
+  background: #F0EFE8;
+  font-size: 13px;
+}
+
+.wc-status.loading {
+  border-color: #00539B;
+  background: #E8F0F8;
+}
+
+.wc-status.success {
+  border-color: var(--wc-teal);
+  background: var(--wc-teal-tint);
+}
+
+.wc-status.error {
+  border-color: var(--wc-red);
+  background: #FBE9EB;
+}
+
+.wc-status-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.wc-status-icon.spinning {
+  animation: wc-spin 1s linear infinite;
+}
+
+@keyframes wc-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.wc-status-text {
+  flex: 1;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ dock */
+
+/* One container for everything floating at the bottom of the map: legend
+   above, time bar below. The legend is right-aligned inside it. */
+.wc-dock {
+  position: fixed;
+  left: calc(var(--wc-panel-w) + var(--wc-gap));
+  right: var(--wc-gap);
+  bottom: var(--wc-logo-clearance);
+  z-index: 1300;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.wc-dock > * {
+  pointer-events: auto;
+}
+
+.wc-dock-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.wc-dock-top > * {
+  pointer-events: auto;
+}
+
+/* Wraps the legend card(s) so they right-align beside the badge */
+.wc-dock-legends {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.wc-legend {
+  margin-left: auto;
+  width: min(100%, 460px);
+  box-sizing: border-box;
+  padding: 10px 14px 12px;
+  background: var(--wc-cream);
+  border: 1px solid var(--wc-line);
+  border-left: 4px solid var(--wc-teal);
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.wc-legend-title {
+  margin-bottom: 8px;
+  color: var(--wc-teal-dark);
+  font-family: var(--wc-font-display);
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: var(--wc-case);
+  letter-spacing: var(--wc-tracking);
+}
+
+.wc-legend-bar {
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  background: var(--wc-gradient, linear-gradient(to right, #fff, #000));
+}
+
+.wc-legend-ticks {
+  position: relative;
+  height: 16px;
+  margin-top: 4px;
+  font-family: var(--wc-font-mono);
+  font-size: 11px;
+  color: var(--wc-muted);
+}
+
+/* Each tick is placed by value, not spread evenly: set `--pos` on the span
+   to its percentage along the bar (the template computes it from the same
+   range the gradient uses). */
+.wc-legend-ticks span {
+  position: absolute;
+  top: 0;
+  left: var(--pos, 0%);
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+/* JMA danger-level legend -- same geometry and colors as the one in
+   jwl-nowcast.html (350px card, 60x120 trapezoid meter beside five 24px rows) */
+.wc-risk {
+  --wc-risk-5: #231815;
+  --wc-risk-4: #6c2484;
+  --wc-risk-3: #d71920;
+  --wc-risk-2: #fff100;
+  --wc-risk-1: #ffffff;
+  width: 350px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  color: #333;
+  opacity: 0.9;
+}
+
+.wc-risk.is-flood {
+  --wc-risk-1: #00FFFF;
+}
+
+.wc-risk-title {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  text-align: left;
+}
+
+.wc-risk-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 40px;
+}
+
+.wc-meter {
+  position: relative;
+  flex-shrink: 0;
+  width: 60px;
+  height: 120px;
+  display: flex;
+  flex-direction: column;
+  clip-path: polygon(0 0, 100% 0, 85% 100%, 15% 100%);
+}
+
+.wc-meter-level {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: #fff;
+}
+
+.wc-meter-level.l5 { background: var(--wc-risk-5); }
+.wc-meter-level.l4 { background: var(--wc-risk-4); }
+.wc-meter-level.l3 { background: var(--wc-risk-3); }
+.wc-meter-level.l2 { background: var(--wc-risk-2); color: #555; }
+.wc-meter-level.l1 {
+  background: var(--wc-risk-1);
+  border-top: 1px solid #ccc;
+  color: #000;
+}
+
+.wc-meter-axis {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  color: gray;
+  font-size: 0.8rem;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  pointer-events: none;
+}
+
+/* jwl-nowcast.html spaces its Japanese label out; Latin text reads better tighter */
+:root:lang(ja) .wc-meter-axis,
+:root:lang(ko) .wc-meter-axis {
+  letter-spacing: 0.5em;
+}
+
+.wc-risk-rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.wc-risk-row {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  font-size: 0.8rem;
+}
+
+.wc-swatch {
+  flex-shrink: 0;
+  width: 24px;
+  height: 14px;
+  margin-right: 12px;
+}
+
+.wc-swatch.l5 { background: var(--wc-risk-5); }
+.wc-swatch.l4 { background: var(--wc-risk-4); }
+.wc-swatch.l3 { background: var(--wc-risk-3); }
+.wc-swatch.l2 { background: var(--wc-risk-2); }
+.wc-swatch.l1 { background: var(--wc-risk-1); border: 1px solid #333; }
+
+.wc-timebar {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--wc-timebar-max);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px 10px 12px;
+  background: var(--wc-asphalt);
+  color: var(--wc-cream);
+  border-radius: 6px;
+  border-left: 4px solid var(--wc-amber);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+
+.wc-timebar .wc-btn {
+  flex-shrink: 0;
+  min-width: 76px;
+}
+
+/* The Play button sits on the dark bar, so a dark primary would vanish: themes
+   can set --wc-play-bg / -fg / -shadow / -hover (default: the primary color) */
+.wc-timebar .wc-btn-primary {
+  background: var(--wc-play-bg, var(--wc-teal));
+  color: var(--wc-play-fg, var(--wc-cream));
+  box-shadow: 0 3px 0 var(--wc-play-shadow, var(--wc-teal-dark));
+}
+
+.wc-timebar .wc-btn-primary:hover {
+  background: var(--wc-play-hover, var(--wc-teal-hover));
+}
+
+.wc-timebar .wc-btn-primary:active {
+  box-shadow: 0 0 0 var(--wc-play-shadow, var(--wc-teal-dark));
+}
+
+.wc-timebar .wc-btn-primary.is-active {
+  background: var(--wc-red);
+  color: var(--wc-cream);
+  box-shadow: 0 3px 0 #8E0B21;
+}
+
+.wc-time-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.wc-clock {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 2px;
+  font-family: var(--wc-font-mono);
+  font-weight: 600;
+}
+
+.wc-clock-date {
+  font-size: 13px;
+  color: rgba(246, 243, 234, 0.75);
+}
+
+.wc-clock-time {
+  font-size: 22px;
+  color: var(--wc-amber);
+}
+
+.wc-clock-zone {
+  font-size: 11px;
+  color: rgba(246, 243, 234, 0.6);
+}
+
+.wc-timebar .wc-range::-webkit-slider-runnable-track {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.wc-timebar .wc-range::-moz-range-track {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.wc-timebar .wc-range::-webkit-slider-thumb {
+  background: var(--wc-amber);
+  border-color: var(--wc-asphalt);
+  box-shadow: 0 0 0 1px var(--wc-amber);
+}
+
+.wc-timebar .wc-range::-moz-range-thumb {
+  background: var(--wc-amber);
+  border-color: var(--wc-asphalt);
+  box-shadow: 0 0 0 1px var(--wc-amber);
+}
+
+.wc-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  font-family: var(--wc-font-mono);
+  font-size: 11px;
+  color: rgba(246, 243, 234, 0.65);
+}
+
+/* ----------------------------------------------------------------- popup */
+
+/* Hover readout: pass `className: 'wc-popup'` to the mapboxgl.Popup */
+.wc-popup .mapboxgl-popup-content {
+  padding: 6px 10px;
+  background: var(--wc-asphalt);
+  color: var(--wc-amber);
+  border-left: 3px solid var(--wc-amber);
+  border-radius: 4px;
+  font-family: var(--wc-font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.wc-popup.mapboxgl-popup-anchor-top .mapboxgl-popup-tip,
+.wc-popup.mapboxgl-popup-anchor-top-left .mapboxgl-popup-tip,
+.wc-popup.mapboxgl-popup-anchor-top-right .mapboxgl-popup-tip {
+  border-bottom-color: var(--wc-asphalt);
+}
+
+.wc-popup.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip,
+.wc-popup.mapboxgl-popup-anchor-bottom-left .mapboxgl-popup-tip,
+.wc-popup.mapboxgl-popup-anchor-bottom-right .mapboxgl-popup-tip {
+  border-top-color: var(--wc-asphalt);
+}
+
+.wc-popup.mapboxgl-popup-anchor-left .mapboxgl-popup-tip {
+  border-right-color: var(--wc-asphalt);
+}
+
+.wc-popup.mapboxgl-popup-anchor-right .mapboxgl-popup-tip {
+  border-left-color: var(--wc-asphalt);
+}
+
+/* ----------------------------------------------------------------- badge */
+
+.wc-badge {
+  display: flex;
+  gap: 14px;
+  padding: 6px 12px;
+  background: var(--wc-cream);
+  border: 1px solid var(--wc-line);
+  border-radius: 4px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
+}
+
+.wc-badge-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.wc-badge-label {
+  color: var(--wc-teal-dark);
+  font-family: var(--wc-font-display);
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: var(--wc-case);
+  letter-spacing: var(--wc-tracking);
+}
+
+.wc-badge-value {
+  font-family: var(--wc-font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- mobile */
+
+@media (max-width: 768px) {
+  #wc-panel {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 100%;
+    height: var(--wc-sheet-h);
+    border-right: 0;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.25);
+    overscroll-behavior: contain;
+  }
+
+  .wc-header {
+    padding: 14px 16px 12px;
+  }
+
+  .wc-title {
+    font-size: 16px;
+  }
+
+  .wc-body {
+    padding: 14px 16px 20px;
+  }
+
+  /* The sheet owns the bottom, so the dock moves to the top of the map.
+     It leaves 48px on the right for a top-right NavigationControl. */
+  .wc-dock {
+    left: var(--wc-gap);
+    right: calc(var(--wc-gap) + 48px);
+    top: var(--wc-gap);
+    bottom: auto;
+    flex-direction: column-reverse;
+  }
+
+  .wc-dock-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* The map area is short on a phone: drop the readout badge */
+  .wc-badge {
+    display: none;
+  }
+
+  .wc-legend,
+  .wc-risk {
+    width: 100%;
+  }
+
+  .wc-timebar {
+    gap: 10px;
+  }
+
+  .wc-clock-time {
+    font-size: 18px;
+  }
+}

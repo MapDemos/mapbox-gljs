@@ -1,0 +1,845 @@
+<!--
+  Working EXAMPLE of the Weather Console style pack (weather-console.css, in
+  this same folder). Open this file directly to see the pattern working
+  with real Mapbox Japan Weather Layers tilesets, then copy the markup
+  below into your own demo and link weather-console.css from its <head> --
+  see the class/id contract documented at the top of that CSS file for
+  what to build.
+
+  Forked from Highway Sign for layer-explorer / time-series demos: a left
+  sidebar of dropdowns and toggles, ONE bottom dock holding the legend and
+  a time bar (so they can never overlap), and an EN / 日本語 / 한국어
+  language switcher. The sidebar shows only the controls that make sense
+  for the selected tileset's type:
+    - raster   (temperature): Color scale + Color steps, hover value popup,
+                              gradient legend that follows the scale
+    - particle (wind):        Show / Count / Speed / Color for the particles
+    - vector   (river flood): no data controls, no time bar, risk legend
+  Projection and the legend style are always available.
+
+  The language switcher does two things, both shown below:
+    1. UI text -- a small dictionary (I18N) plus data-i18n attributes,
+       and <html lang> (the pack's CSS keys off it for CJK typography).
+    2. Basemap labels -- setLabelLanguage(code) below. This basemap is a
+       classic style with name_ja / name_en already baked into its label
+       expressions, so map.setLanguage() does nothing here; the helper
+       rewrites those lookups instead. (On the Mapbox Standard style use
+       map.setLanguage(code) -- not setConfigProperty('basemap','language'),
+       which Standard has no such key for.)
+  The Japanese and Korean strings are illustrative translations, not
+  reviewed by a native speaker -- have one check them before shipping.
+
+  The "Danger level (JMA)" legend is jwl-nowcast.html's real component
+  (trapezoid meter + five level rows, in three types: inundation,
+  landslide, flood). Here it is wired only to the tileset type -- the flood
+  tileset forces the flood variant -- while the other types are picked by
+  hand; a real demo would pick the type from the tileset it is showing.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Weather Console</title>
+<link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Noto+Sans+JP:wght@400;700&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.18.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/d3@7.8.5/dist/d3.min.js"></script>
+<link href="weather-console.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map, offset to sit beside
+     #wc-panel. On mobile the panel becomes a bottom sheet, so the map must
+     stop above it -- that keeps the Mapbox logo and attribution visible. */
+  #map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--wc-panel-w);
+    right: 0;
+  }
+  @media (max-width: 768px) {
+    #map { left: 0; bottom: var(--wc-sheet-h); }
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<!-- autocomplete="off" on every control: otherwise the browser restores old values (slider position,
+     selects) after a refresh, out of step with what the map is actually showing -->
+<aside id="wc-panel">
+  <header class="wc-header">
+    <h1 class="wc-title" data-i18n="title">Weather Console</h1>
+    <div class="wc-lang" role="radiogroup" aria-label="Language" id="lang-switch">
+      <button type="button" role="radio" aria-checked="true" data-lang="en">EN</button>
+      <button type="button" role="radio" aria-checked="false" data-lang="ja">日本語</button>
+      <button type="button" role="radio" aria-checked="false" data-lang="ko">한국어</button>
+    </div>
+  </header>
+
+  <div class="wc-body">
+    <section class="wc-section">
+      <h2 class="wc-section-label" data-i18n="secData">Data</h2>
+      <div class="wc-field">
+        <label for="tileset-select" data-i18n="tileset">Tileset</label>
+        <select autocomplete="off" id="tileset-select">
+          <option value="t39" data-i18n="temp39">Temperature, 0-39 h</option>
+          <option value="t78" data-i18n="temp78">Temperature, 40-78 h</option>
+          <option value="w39" data-i18n="wind39">Wind, 0-39 h</option>
+          <option value="flood" data-i18n="flood">River flood risk</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- Raster tilesets only -->
+    <section class="wc-section" id="color-section">
+      <h2 class="wc-section-label" data-i18n="secColor">Color</h2>
+      <div class="wc-field">
+        <label for="scale-select" data-i18n="colorScale">Color scale</label>
+        <select autocomplete="off" id="scale-select"></select>
+      </div>
+      <div class="wc-field">
+        <label for="steps-select" data-i18n="colorSteps">Color steps</label>
+        <select autocomplete="off" id="steps-select">
+          <option value="256">256</option>
+          <option value="128">128</option>
+          <option value="64">64</option>
+          <option value="32">32</option>
+          <option value="16" selected>16</option>
+          <option value="8">8</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- Particle (wind) tilesets only -->
+    <section class="wc-section hidden" id="particle-section">
+      <h2 class="wc-section-label" data-i18n="secParticles">Wind particles</h2>
+
+      <label class="wc-toggle">
+        <span data-i18n="showParticles">Show particles</span>
+        <span class="wc-switch">
+          <input autocomplete="off" type="checkbox" id="show-particles" checked />
+          <span class="wc-switch-track"></span>
+        </span>
+      </label>
+
+      <div class="wc-range-row">
+        <div class="wc-range-head">
+          <label for="particle-count" data-i18n="particleCount">Count</label>
+          <span class="wc-range-value" id="particle-count-value">1500</span>
+        </div>
+        <input autocomplete="off" type="range" class="wc-range" id="particle-count" min="1" max="30000" step="1" value="1500" />
+      </div>
+
+      <div class="wc-range-row">
+        <div class="wc-range-head">
+          <label for="particle-speed" data-i18n="particleSpeed">Speed</label>
+          <span class="wc-range-value" id="particle-speed-value">0.08</span>
+        </div>
+        <input autocomplete="off" type="range" class="wc-range" id="particle-speed" min="0.01" max="1" step="0.01" value="0.08" />
+      </div>
+
+      <div class="wc-field">
+        <label for="particle-color" data-i18n="particleColor">Particle color</label>
+        <input autocomplete="off" type="color" class="wc-color" id="particle-color" value="#0A4C4C" />
+      </div>
+    </section>
+
+    <section class="wc-section">
+      <h2 class="wc-section-label" data-i18n="secDisplay">Display</h2>
+
+      <div class="wc-field">
+        <label for="projection-select" data-i18n="projection">Projection</label>
+        <select autocomplete="off" id="projection-select">
+          <option value="mercator">Mercator</option>
+          <option value="globe">Globe</option>
+          <option value="albers">Albers</option>
+          <option value="equalEarth">Equal Earth</option>
+          <option value="equirectangular">Equirectangular</option>
+          <option value="naturalEarth">Natural Earth</option>
+          <option value="lambertConformalConic">Lambert Conformal Conic</option>
+          <option value="winkelTripel">Winkel Tripel</option>
+        </select>
+      </div>
+
+      <div class="wc-field">
+        <label for="zoom-select" data-i18n="zoomLevel">Zoom level</label>
+        <select autocomplete="off" id="zoom-select"></select>
+      </div>
+
+      <div class="wc-field">
+        <label for="legend-select" data-i18n="legendStyle">Legend style</label>
+        <select autocomplete="off" id="legend-select">
+          <option value="gradient" data-i18n="legendGradient">Gradient</option>
+          <option value="levels" data-i18n="legendLevels">Danger level (JMA)</option>
+        </select>
+      </div>
+
+      <div class="wc-field">
+        <label for="risk-select" data-i18n="riskType">Risk type</label>
+        <select autocomplete="off" id="risk-select">
+          <option value="Inundation" data-i18n="riskInundation">Inundation</option>
+          <option value="Landslide" data-i18n="riskLandslide">Landslide</option>
+          <option value="Flood" data-i18n="riskFlood">Flood</option>
+        </select>
+      </div>
+
+      <div class="wc-status loading" id="status">
+        <span class="wc-status-icon spinning" id="status-icon">&#8635;</span>
+        <span class="wc-status-text" id="status-text" data-i18n="statusLoading">Loading data&hellip;</span>
+      </div>
+    </section>
+  </div>
+</aside>
+
+<!-- One dock for everything floating at the bottom of the map. -->
+<div class="wc-dock">
+  <div class="wc-dock-top">
+    <div class="wc-badge">
+      <div class="wc-badge-item">
+        <span class="wc-badge-label" data-i18n="zoom">Zoom</span>
+        <span class="wc-badge-value" id="zoom-value">--</span>
+      </div>
+      <div class="wc-badge-item">
+        <span class="wc-badge-label" data-i18n="loadTime">Load time</span>
+        <span class="wc-badge-value" id="load-value">--</span>
+      </div>
+    </div>
+
+    <div class="wc-dock-legends">
+      <div class="wc-legend" id="legend-gradient">
+        <div class="wc-legend-title" data-i18n="legendTempTitle">Temperature (&deg;C)</div>
+        <div class="wc-legend-bar" id="legend-bar"></div>
+        <div class="wc-legend-ticks" id="legend-ticks"></div>
+      </div>
+
+      <div class="wc-risk hidden" id="legend-levels">
+        <div class="wc-risk-title" id="risk-title" data-i18n="riskTitleInundation">Inundation danger level</div>
+        <div class="wc-risk-body">
+          <div class="wc-meter">
+            <div class="wc-meter-level l5" data-i18n="high">High</div>
+            <div class="wc-meter-level l4"></div>
+            <div class="wc-meter-level l3"></div>
+            <div class="wc-meter-level l2"></div>
+            <div class="wc-meter-level l1" data-i18n="low">Low</div>
+            <div class="wc-meter-axis" data-i18n="axis">Danger</div>
+          </div>
+          <div class="wc-risk-rows">
+            <div class="wc-risk-row"><span class="wc-swatch l5"></span><span data-i18n="lvl5">Imminent disaster (Alert Level 5)</span></div>
+            <div class="wc-risk-row"><span class="wc-swatch l4"></span><span data-i18n="lvl4">Dangerous (Level 4)</span></div>
+            <div class="wc-risk-row"><span class="wc-swatch l3"></span><span data-i18n="lvl3">Warning (Level 3)</span></div>
+            <div class="wc-risk-row"><span class="wc-swatch l2"></span><span data-i18n="lvl2">Caution (Level 2)</span></div>
+            <div class="wc-risk-row"><span class="wc-swatch l1"></span><span data-i18n="lvl1">Stay informed</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wc-timebar" id="timebar">
+    <button type="button" class="wc-btn wc-btn-primary" id="play-btn" disabled data-i18n="play">Play</button>
+    <div class="wc-time-main">
+      <div class="wc-clock">
+        <span class="wc-clock-date" id="clock-date">--</span>
+        <span class="wc-clock-time" id="clock-time">--:--</span>
+        <span class="wc-clock-zone">JST</span>
+      </div>
+      <input autocomplete="off" type="range" class="wc-range" id="slider" min="0" max="0" step="1" value="0" disabled
+             aria-label="Forecast time" />
+      <div class="wc-ticks"><span id="tick-start"></span><span id="tick-end"></span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ------------------------------------------------------------- theme -- */
+// Preview a palette with ?theme=teal|graphite|forest|mapbox|ink (default: blueprint)
+const themeParam = new URLSearchParams(location.search).get('theme');
+if (themeParam) document.documentElement.dataset.theme = themeParam;
+
+/* ------------------------------------------------------------- i18n -- */
+const I18N = {
+  en: {
+    title: 'Weather Console',
+    secData: 'Data', secColor: 'Color', secParticles: 'Wind particles', secDisplay: 'Display',
+    tileset: 'Tileset', temp39: 'Temperature, 0-39 h', temp78: 'Temperature, 40-78 h',
+    wind39: 'Wind, 0-39 h', flood: 'River flood risk',
+    colorScale: 'Color scale', colorSteps: 'Color steps', scaleDefault: 'Temperature (default)',
+    showParticles: 'Show particles', particleCount: 'Count', particleSpeed: 'Speed', particleColor: 'Particle color',
+    projection: 'Projection',
+    legendStyle: 'Legend style', legendGradient: 'Gradient', legendLevels: 'Danger level (JMA)',
+    legendTempTitle: 'Temperature (°C)',
+    zoomLevel: 'Zoom level', riskType: 'Risk type',
+    riskInundation: 'Inundation', riskLandslide: 'Landslide', riskFlood: 'Flood',
+    riskTitleInundation: 'Inundation danger level', riskTitleLandslide: 'Landslide danger level', riskTitleFlood: 'Flood danger level',
+    high: 'High', low: 'Low', axis: 'Danger',
+    lvl5: 'Imminent disaster (Alert Level 5)', lvl4: 'Dangerous (Level 4)', lvl3: 'Warning (Level 3)',
+    lvl2: 'Caution (Level 2)', lvl1: 'Stay informed',
+    zoom: 'Zoom', loadTime: 'Load time',
+    play: 'Play', stop: 'Stop',
+    statusLoading: 'Loading data…', statusReady: 'Data ready', statusError: 'Could not load data'
+  },
+  ja: {
+    title: '気象コンソール',
+    secData: 'データ', secColor: '色', secParticles: '風のパーティクル', secDisplay: '表示',
+    tileset: 'タイルセット', temp39: '気温 0〜39時間', temp78: '気温 40〜78時間',
+    wind39: '風 0〜39時間', flood: '洪水の危険度（河川）',
+    colorScale: 'カラースケール', colorSteps: '色の段階数', scaleDefault: '気温（標準）',
+    showParticles: 'パーティクルを表示', particleCount: '数', particleSpeed: '速度', particleColor: 'パーティクルの色',
+    projection: '投影法',
+    legendStyle: '凡例のスタイル', legendGradient: 'グラデーション', legendLevels: '危険度（気象庁）',
+    legendTempTitle: '気温（°C）',
+    zoomLevel: 'ズームレベル', riskType: '災害の種類',
+    riskInundation: '浸水害', riskLandslide: '土砂災害', riskFlood: '洪水',
+    riskTitleInundation: '浸水害の危険度', riskTitleLandslide: '土砂災害の危険度', riskTitleFlood: '洪水の危険度',
+    high: '高', low: '低', axis: '危険度',
+    lvl5: '災害切迫【警戒レベル５相当】', lvl4: '危険【警戒レベル４相当】', lvl3: '警戒【警戒レベル３相当】',
+    lvl2: '注意【警戒レベル２相当】', lvl1: '今後の情報等に留意',
+    zoom: 'ズーム', loadTime: '読み込み時間',
+    play: '再生', stop: '停止',
+    statusLoading: 'データを読み込み中…', statusReady: 'データの準備完了', statusError: 'データを読み込めませんでした'
+  },
+  ko: {
+    title: '기상 콘솔',
+    secData: '데이터', secColor: '색상', secParticles: '바람 파티클', secDisplay: '표시',
+    tileset: '타일셋', temp39: '기온 0~39시간', temp78: '기온 40~78시간',
+    wind39: '바람 0~39시간', flood: '하천 홍수 위험도',
+    colorScale: '색상 스케일', colorSteps: '색상 단계', scaleDefault: '기온 (기본)',
+    showParticles: '파티클 표시', particleCount: '개수', particleSpeed: '속도', particleColor: '파티클 색상',
+    projection: '투영법',
+    legendStyle: '범례 스타일', legendGradient: '그라데이션', legendLevels: '위험도 (기상청)',
+    legendTempTitle: '기온 (°C)',
+    zoomLevel: '줌 레벨', riskType: '재해 유형',
+    riskInundation: '침수', riskLandslide: '산사태', riskFlood: '홍수',
+    riskTitleInundation: '침수 위험도', riskTitleLandslide: '산사태 위험도', riskTitleFlood: '홍수 위험도',
+    high: '높음', low: '낮음', axis: '위험도',
+    lvl5: '재해 임박 (경계 레벨 5 상당)', lvl4: '위험 (경계 레벨 4 상당)', lvl3: '경계 (경계 레벨 3 상당)',
+    lvl2: '주의 (경계 레벨 2 상당)', lvl1: '향후 정보에 유의',
+    zoom: '줌', loadTime: '로딩 시간',
+    play: '재생', stop: '정지',
+    statusLoading: '데이터 불러오는 중…', statusReady: '데이터 준비 완료', statusError: '데이터를 불러오지 못했습니다'
+  }
+};
+const LOCALES = { en: 'en-US', ja: 'ja-JP', ko: 'ko-KR' };
+
+let lang = 'en';
+try { const saved = localStorage.getItem('wc-lang'); if (I18N[saved]) lang = saved; } catch (e) {}
+const t = (key) => (I18N[lang] && I18N[lang][key]) || I18N.en[key] || key;
+
+/* ---------------------------------------------------- color scales -- */
+// A scale is one of: `manual` (a hand-tuned stop list, drawn as a smooth
+// gradient), `fn` (a d3 interpolator, quantized into N flat steps -- that is
+// what the "Color steps" control changes), or `steps` (fixed JMA value/color
+// pairs). One definition drives both the map's raster-color expression and
+// the legend, so they can't drift apart.
+const RANGE = [-10, 35];
+const SCALES = {
+  Default: { manual: [
+    [-10, '#2b3a8f'], [0, '#3fa7d6'], [10, '#7bd389'],
+    [20, '#f3e04a'], [30, '#e8743b'], [35, '#b3202a'] ] },
+  Turbo: { fn: d3.interpolateTurbo },
+  Spectral: { fn: x => d3.interpolateSpectral(1 - x) },
+  Magma: { fn: d3.interpolateMagma },
+  Plasma: { fn: d3.interpolatePlasma },
+  Inferno: { fn: d3.interpolateInferno },
+  Greys: { fn: x => d3.interpolateGreys(1 - x) },
+  Viridis: { fn: d3.interpolateViridis },
+  Cividis: { fn: d3.interpolateCividis },
+  Warm: { fn: d3.interpolateWarm },
+  Cool: { fn: d3.interpolateCool },
+  Cubehelix: { fn: d3.interpolateCubehelixDefault },
+
+  // JMA scales, copied from jwl-nowcast.html. `steps` = [value, color] pairs
+  // drawn as a step expression with a transparent base: values below the
+  // first stop are not painted, and each color holds until the next stop.
+  // They are tuned to their own tilesets' units (rain mm/h, snow depth cm,
+  // risk-level indices), so on the temperature tiles here they are only a
+  // demonstration -- in a real demo, pick each tileset's matching scale.
+  JMASediment: { steps: [
+      [0, 'rgba(0, 0, 0, 1.0)'], [1, 'rgba(0, 0, 0, 1.0)'], [2, 'rgba(0, 0, 0, 1.0)'], [3, 'rgba(0, 0, 0, 1.0)'],
+      [4, 'rgba(242, 231, 0, 1.0)'], [5, 'rgba(255, 40, 0, 1.0)'], [6, 'rgba(170, 0, 170, 1.0)'], [7, 'rgba(12, 0, 12, 1.0)'],
+      [8, 'rgba(0, 0, 0, 1.0)'], [9, 'rgba(0, 0, 0, 1.0)'], [10, 'rgba(0, 0, 0, 1.0)']
+  ] },
+  Rain: { steps: [
+      [2, 'rgba(102, 255, 255, 0.7)'], [3, 'rgba(68, 238, 255, 0.7)'], [4, 'rgba(34, 221, 255, 0.71)'], [5, 'rgba(0, 204, 255, 0.71)'],
+      [6, 'rgba(10, 184, 255, 0.71)'], [7, 'rgba(20, 163, 255, 0.71)'], [8, 'rgba(31, 143, 255, 0.72)'], [9, 'rgba(41, 122, 255, 0.72)'],
+      [10, 'rgba(51, 102, 255, 0.72)'], [11, 'rgba(71, 112, 230, 0.72)'], [12, 'rgba(92, 122, 204, 0.73)'], [13, 'rgba(112, 133, 178, 0.73)'],
+      [14, 'rgba(133, 143, 153, 0.73)'], [15, 'rgba(153, 153, 128, 0.73)'], [16, 'rgba(173, 163, 102, 0.74)'], [17, 'rgba(194, 173, 76, 0.74)'],
+      [18, 'rgba(214, 184, 51, 0.74)'], [19, 'rgba(235, 194, 26, 0.74)'], [20, 'rgba(255, 204, 0, 0.75)'], [21, 'rgba(255, 199, 0, 0.75)'],
+      [22, 'rgba(255, 194, 0, 0.75)'], [23, 'rgba(255, 189, 0, 0.75)'], [24, 'rgba(255, 184, 0, 0.76)'], [25, 'rgba(255, 178, 0, 0.76)'],
+      [26, 'rgba(255, 173, 0, 0.76)'], [27, 'rgba(255, 168, 0, 0.76)'], [28, 'rgba(255, 163, 0, 0.77)'], [29, 'rgba(255, 158, 0, 0.77)'],
+      [30, 'rgba(255, 153, 0, 0.77)'], [31, 'rgba(255, 145, 0, 0.77)'], [32, 'rgba(255, 138, 0, 0.78)'], [33, 'rgba(255, 130, 0, 0.78)'],
+      [34, 'rgba(255, 122, 0, 0.78)'], [35, 'rgba(255, 115, 0, 0.78)'], [36, 'rgba(255, 107, 0, 0.79)'], [37, 'rgba(255, 99, 0, 0.79)'],
+      [38, 'rgba(255, 92, 0, 0.79)'], [39, 'rgba(255, 84, 0, 0.79)'], [40, 'rgba(255, 76, 0, 0.8)'], [41, 'rgba(255, 69, 0, 0.8)'],
+      [42, 'rgba(255, 61, 0, 0.8)'], [43, 'rgba(255, 54, 0, 0.81)'], [44, 'rgba(255, 46, 0, 0.81)'], [45, 'rgba(255, 38, 0, 0.81)'],
+      [46, 'rgba(255, 31, 0, 0.81)'], [47, 'rgba(255, 23, 0, 0.82)'], [48, 'rgba(255, 15, 0, 0.82)'], [49, 'rgba(255, 8, 0, 0.82)'],
+      [50, 'rgba(255, 0, 0, 0.82)'], [51, 'rgba(253, 0, 1, 0.83)'], [52, 'rgba(250, 0, 1, 0.83)'], [53, 'rgba(248, 0, 2, 0.83)'],
+      [54, 'rgba(245, 0, 2, 0.83)'], [55, 'rgba(243, 0, 3, 0.84)'], [56, 'rgba(241, 0, 3, 0.84)'], [57, 'rgba(238, 0, 4, 0.84)'],
+      [58, 'rgba(236, 0, 4, 0.84)'], [59, 'rgba(233, 0, 5, 0.85)'], [60, 'rgba(231, 0, 5, 0.85)'], [61, 'rgba(229, 0, 6, 0.85)'],
+      [62, 'rgba(226, 0, 6, 0.85)'], [63, 'rgba(224, 0, 7, 0.86)'], [64, 'rgba(221, 0, 7, 0.86)'], [65, 'rgba(219, 0, 8, 0.86)'],
+      [66, 'rgba(217, 0, 9, 0.86)'], [67, 'rgba(214, 0, 9, 0.87)'], [68, 'rgba(212, 0, 10, 0.87)'], [69, 'rgba(209, 0, 10, 0.87)'],
+      [70, 'rgba(207, 0, 11, 0.87)'], [71, 'rgba(205, 0, 11, 0.88)'], [72, 'rgba(202, 0, 12, 0.88)'], [73, 'rgba(200, 0, 12, 0.88)'],
+      [74, 'rgba(197, 0, 13, 0.88)'], [75, 'rgba(195, 0, 13, 0.89)'], [76, 'rgba(193, 0, 14, 0.89)'], [77, 'rgba(190, 0, 14, 0.89)'],
+      [78, 'rgba(188, 0, 15, 0.89)'], [79, 'rgba(185, 0, 15, 0.9)'], [80, 'rgba(183, 0, 16, 0.9)']
+  ] },
+  Snow: { steps: [
+      [1.5, 'rgba(160, 210, 255, 0.9)'], [4.5, 'rgba(33, 140, 255, 0.9)'], [19.5, 'rgba(0, 65, 255, 0.9)'], [49.5, 'rgba(250, 245, 0, 0.9)'],
+      [90.5, 'rgba(255, 153, 0, 0.9)'], [149.5, 'rgba(255, 40, 0, 0.9)'], [199.5, 'rgba(180, 0, 104, 0.9)']
+  ] },
+  Vector: { steps: [
+      [0, 'rgba(50, 54, 54, 0)'], [1, 'rgba(102, 255, 255, 0.0)'], [4, 'rgba(0, 204, 255, 0.0)'], [8, 'rgba(0, 153, 255, 0.8)'],
+      [12, 'rgba(51, 102, 255, 0.8)'], [16, 'rgba(51, 255, 0, 0.8)'], [24, 'rgba(51, 204, 0, 0.8)'], [32, 'rgba(25, 153, 0, 0.8)'],
+      [40, 'rgba(255, 255, 0, 0.8)'], [48, 'rgba(255, 204, 0, 0.8)'], [56, 'rgba(255, 153, 0, 0.8)'], [64, 'rgba(255, 80, 102, 0.8)'],
+      [80, 'rgba(255, 0, 0, 0.8)'], [200, 'rgba(183, 0, 16, 0.8)']
+  ] },
+  KikikuruShinsui: { steps: [
+      [1.5, 'rgba(242, 231, 0, 1)'], [2.5, 'rgba(255, 40, 0, 1)'], [3.5, 'rgba(170, 0, 170, 1)'], [4.5, 'rgba(12, 0, 12, 1)']
+  ] },
+  KikikuruDosha: { steps: [
+      [3.5, 'rgba(242, 231, 0, 1)'], [4.5, 'rgba(255, 40, 0, 1)'], [5.5, 'rgba(170, 0, 170, 1)'], [6.5, 'rgba(12, 0, 12, 1)']
+  ] }
+};
+let scaleName = 'Default';
+let colorSteps = 16;
+
+const scaleSelect = document.getElementById('scale-select');
+Object.keys(SCALES).forEach(name => {
+  const o = document.createElement('option');
+  o.value = name;
+  if (name === 'Default') o.dataset.i18n = 'scaleDefault'; else o.textContent = name;
+  scaleSelect.appendChild(o);
+});
+
+const rgbOpaque = (c) => c.replace(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*[\d.]+\)/, 'rgb($1,$2,$3)');
+
+// Returns the mapbox raster-color expression, the matching CSS gradient, the
+// value domain the legend bar spans, and its title (null = the temperature title)
+function buildColor() {
+  const [lo, hi] = RANGE;
+  const sc = SCALES[scaleName];
+  if (sc.manual) {
+    return {
+      expr: ['interpolate', ['linear'], ['raster-value']].concat(sc.manual.flat()),
+      css: 'linear-gradient(to right, ' + sc.manual.map(([v, c]) => c + ' ' + pct(v, RANGE)).join(', ') + ')',
+      domain: RANGE, title: null
+    };
+  }
+  if (sc.steps) {
+    // The last color holds past its stop; give it one more interval on the legend
+    const first = sc.steps[0][0], last = sc.steps[sc.steps.length - 1][0];
+    const end = last + (last - sc.steps[sc.steps.length - 2][0]);
+    const domain = [first, end];
+    const bounds = sc.steps.map(([v]) => v).concat(end);
+    return {
+      expr: ['step', ['raster-value'], 'rgba(0, 0, 0, 0)'].concat(sc.steps.flat()),
+      css: 'linear-gradient(to right, ' + sc.steps.map(([, c], i) =>
+        rgbOpaque(c) + ' ' + pct(bounds[i], domain) + ', ' + rgbOpaque(c) + ' ' + pct(bounds[i + 1], domain)).join(', ') + ')',
+      domain, title: scaleName
+    };
+  }
+  const n = colorSteps;
+  const colors = d3.quantize(sc.fn, n);
+  const expr = ['step', ['raster-value'], colors[0]];
+  colors.slice(1).forEach((c, i) => expr.push(lo + (hi - lo) * (i + 1) / n, c));
+  const css = 'linear-gradient(to right, ' + colors.map((c, i) =>
+    c + ' ' + (i / n * 100).toFixed(2) + '%, ' + c + ' ' + ((i + 1) / n * 100).toFixed(2) + '%').join(', ') + ')';
+  return { expr, css, domain: RANGE, title: null };
+}
+
+function pct(v, domain) { return ((v - domain[0]) / (domain[1] - domain[0]) * 100).toFixed(2) + '%'; }
+
+// 1-2-5 tick values across a domain, at most `max` of them
+function niceTicks(lo, hi, max) {
+  const raw = (hi - lo) / max;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 5, 10].map(m => m * mag).find(x => x >= raw);
+  const ticks = [];
+  for (let k = Math.ceil(lo / step); k * step <= hi + 1e-9; k++) ticks.push(+(k * step).toFixed(6));
+  return ticks;
+}
+
+function applyColor() {
+  const { expr, css, domain, title } = buildColor();
+  const sc = SCALES[scaleName];
+  document.getElementById('legend-bar').style.setProperty('--wc-gradient', css);
+  document.getElementById('legend-ticks').innerHTML = niceTicks(domain[0], domain[1], 6)
+    .map(v => '<span style="--pos:' + pct(v, domain) + '">' + v + '</span>').join('');
+  // Temperature scales use the translated title; the JMA scales show their own name
+  const titleEl = document.querySelector('#legend-gradient .wc-legend-title');
+  if (title) { titleEl.removeAttribute('data-i18n'); titleEl.textContent = title; }
+  else { titleEl.dataset.i18n = 'legendTempTitle'; titleEl.textContent = t('legendTempTitle'); }
+  document.getElementById('steps-select').disabled = !sc.fn;  // steps only apply to the d3 ramps
+  if (map.getLayer('wx') && current.kind === 'raster') map.setPaintProperty('wx', 'raster-color', expr);
+}
+
+/* ------------------------------------------------------------- state -- */
+// kind 'raster'   = colored raster layer (hover value, color scale)
+//      'particle' = animated wind particles
+//      'vector'   = line layer, no bands / time bar
+const TILESETS = {
+  t39:   { id: 'mapbox.weather-jp-temperature-0-39',  kind: 'raster',   layer: 'temperature', unit: '°C' },
+  t78:   { id: 'mapbox.weather-jp-temperature-40-78', kind: 'raster',   layer: 'temperature', unit: '°C' },
+  w39:   { id: 'mapbox.weather-jp-wind-0-39',         kind: 'particle', layer: 'winds' },
+  flood: { id: 'mapbox.weather-jp-river-flood',       kind: 'vector',   layer: 'river_flood' }
+};
+let current = TILESETS.t39;
+const els = {
+  slider: document.getElementById('slider'),
+  play: document.getElementById('play-btn'),
+  timebar: document.getElementById('timebar'),
+  date: document.getElementById('clock-date'),
+  time: document.getElementById('clock-time'),
+  tickStart: document.getElementById('tick-start'),
+  tickEnd: document.getElementById('tick-end'),
+  status: document.getElementById('status'),
+  statusIcon: document.getElementById('status-icon'),
+  statusText: document.getElementById('status-text'),
+  zoom: document.getElementById('zoom-value'),
+  load: document.getElementById('load-value')
+};
+let bands = [];
+let playing = false;
+let playTimer = null;
+let statusKey = 'statusLoading';
+let loadStart = 0;
+
+/* -------------------------------------------------------------- time -- */
+// Bands are Unix-seconds strings. Show them in JST, in the UI language's
+// own date/time conventions.
+function formatBand(band) {
+  const d = new Date(Number(band) * 1000);
+  const tz = 'Asia/Tokyo';
+  return {
+    date: new Intl.DateTimeFormat(LOCALES[lang], { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d),
+    time: new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(d)
+  };
+}
+
+function renderClock() {
+  if (!bands.length) { els.date.textContent = '--'; els.time.textContent = '--:--'; return; }
+  const f = formatBand(bands[Number(els.slider.value)]);
+  els.date.textContent = f.date;
+  els.time.textContent = f.time;
+  const first = formatBand(bands[0]), last = formatBand(bands[bands.length - 1]);
+  els.tickStart.textContent = first.date + ' ' + first.time;
+  els.tickEnd.textContent = last.date + ' ' + last.time;
+}
+
+function setBand(i) {
+  els.slider.value = i;
+  renderClock();
+  if (!map.getLayer('wx')) return;
+  // The particle layer has its own band property
+  map.setPaintProperty('wx', current.kind === 'particle' ? 'raster-particle-array-band' : 'raster-array-band', bands[i]);
+}
+
+els.slider.addEventListener('input', () => setBand(Number(els.slider.value)));
+
+/* -------------------------------------------------------------- play -- */
+function renderPlay() {
+  els.play.textContent = playing ? t('stop') : t('play');
+  els.play.classList.toggle('is-active', playing);
+}
+function tick() {
+  playTimer = null;
+  if (!playing) return;
+  setBand((Number(els.slider.value) + 1) % bands.length);
+  playTimer = setTimeout(tick, 800);
+}
+function stopPlay() {
+  playing = false;
+  clearTimeout(playTimer);   // never leave a pending tick: Stop then Play would start two loops
+  playTimer = null;
+  renderPlay();
+}
+els.play.addEventListener('click', () => {
+  if (playing) { stopPlay(); return; }
+  playing = true;
+  renderPlay();
+  tick();
+});
+
+/* ------------------------------------------------------------ status -- */
+function setStatus(key) {
+  statusKey = key;
+  const cls = key === 'statusReady' ? 'success' : key === 'statusError' ? 'error' : 'loading';
+  els.status.className = 'wc-status ' + cls;
+  els.statusIcon.className = 'wc-status-icon' + (cls === 'loading' ? ' spinning' : '');
+  els.statusIcon.innerHTML = cls === 'loading' ? '&#8635;' : cls === 'success' ? '&#10003;' : '&#9888;';
+  els.statusText.textContent = t(key);
+}
+
+/* ------------------------------------------------------------ legend -- */
+// The gradient describes raster tilesets only. The vector (flood) tileset
+// forces the flood variant of the danger-level card; particles have no legend.
+function updateLegend() {
+  const legendSel = document.getElementById('legend-select');
+  const riskSel = document.getElementById('risk-select');
+  legendSel.disabled = current.kind !== 'raster';
+  const style = current.kind === 'vector' ? 'levels' : current.kind === 'particle' ? 'none' : legendSel.value;
+  if (current.kind === 'vector') riskSel.value = 'Flood';
+  riskSel.disabled = current.kind === 'vector' || style !== 'levels';
+
+  const card = document.getElementById('legend-levels');
+  card.classList.toggle('is-flood', riskSel.value === 'Flood');   // the flood variant's lowest level is cyan
+  const title = document.getElementById('risk-title');
+  title.dataset.i18n = 'riskTitle' + riskSel.value;
+  title.textContent = t(title.dataset.i18n);
+
+  document.getElementById('legend-gradient').classList.toggle('hidden', style !== 'gradient');
+  card.classList.toggle('hidden', style !== 'levels');
+}
+
+/* --------------------------------------------------------------- map -- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/kenji-shima/clnxv0r9k003b01rff933dq05',
+  center: [137, 38.4],
+  zoom: 4.6
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+/* ----------------------------------------------- basemap label language -- */
+// Snapshot each label layer's original text-field once, then rewrite every
+// ['get', 'name_xx'] lookup in it for the chosen language, falling back to
+// name_en (and, as the style already does, to plain name) when a place has
+// no name in that language.
+const NAME_KEY = /^name_[a-z]{2}(_[A-Za-z]+)?$/;
+let originalLabels = null;
+
+function rewriteNames(expr, code) {
+  if (!Array.isArray(expr)) return expr;
+  if (expr[0] === 'get' && typeof expr[1] === 'string' && NAME_KEY.test(expr[1])) {
+    return code === 'en' ? ['get', 'name_en'] : ['coalesce', ['get', 'name_' + code], ['get', 'name_en']];
+  }
+  return expr.map(e => rewriteNames(e, code));
+}
+
+function setLabelLanguage(code) {
+  if (!originalLabels) {   // first call after a style load
+    originalLabels = {};
+    map.getStyle().layers.forEach(l => {
+      const tf = l.type === 'symbol' && l.layout && l.layout['text-field'];
+      if (Array.isArray(tf) && JSON.stringify(tf).includes('"name_')) originalLabels[l.id] = tf;
+    });
+  }
+  Object.entries(originalLabels).forEach(([id, tf]) => {
+    if (map.getLayer(id)) map.setLayoutProperty(id, 'text-field', rewriteNames(tf, code));
+  });
+}
+
+// This style has no slots, so data layers go under its first label layer and
+// every label stays on top. (With a Standard-based style use `slot` instead.)
+function labelAnchor() {
+  const l = map.getStyle().layers.find(layer => layer.type === 'symbol');
+  return l && l.id;
+}
+
+const popup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, className: 'wc-popup' });
+let onData = null;
+
+function loadTileset(key) {
+  stopPlay();
+  current = TILESETS[key];
+  els.slider.disabled = true;
+  els.play.disabled = true;
+  bands = [];
+  renderClock();
+  setStatus('statusLoading');
+  popup.remove();
+  if (onData) { map.off('sourcedata', onData); onData = null; }  // a switch before the last load finished
+  if (map.getLayer('wx')) map.removeLayer('wx');
+  if (map.getSource('wx')) map.removeSource('wx');
+
+  // Show only the controls that apply to this tileset type
+  document.getElementById('color-section').classList.toggle('hidden', current.kind !== 'raster');
+  document.getElementById('particle-section').classList.toggle('hidden', current.kind !== 'particle');
+  els.timebar.classList.toggle('hidden', current.kind === 'vector');
+  updateLegend();
+
+  loadStart = performance.now();
+  const isVector = current.kind === 'vector';
+  map.addSource('wx', isVector
+    ? { type: 'vector', url: 'mapbox://' + current.id }
+    : { type: 'raster-array', url: 'mapbox://' + current.id, tileSize: 512 });
+
+  if (current.kind === 'particle') {
+    map.addLayer({
+      id: 'wx',
+      type: 'raster-particle',
+      source: 'wx',
+      'source-layer': current.layer,
+      layout: { visibility: document.getElementById('show-particles').checked ? 'visible' : 'none' },
+      paint: {
+        'raster-particle-count': Number(document.getElementById('particle-count').value),
+        'raster-particle-speed-factor': Number(document.getElementById('particle-speed').value),
+        'raster-particle-max-speed': 10,
+        'raster-particle-fade-opacity-factor': 0.9,
+        'raster-particle-reset-rate-factor': 0.4,
+        'raster-particle-color': document.getElementById('particle-color').value
+      }
+    });   // no beforeId: particles sit on top of everything
+  } else if (isVector) {
+    // Colored by risk level; TYPE 1 and 2 are the two JMA flood products
+    map.addLayer({
+      id: 'wx',
+      type: 'line',
+      source: 'wx',
+      'source-layer': current.layer,
+      paint: {
+        'line-color': ['case',
+          ['==', ['get', 'TYPE'], '1'],
+          ['interpolate', ['linear'], ['to-number', ['get', 'FLOODRISK']], 1, '#cccc00', 2, '#ff0000', 3, '#800080', 4, '#000000'],
+          ['==', ['get', 'TYPE'], '2'],
+          ['interpolate', ['linear'], ['to-number', ['get', 'FLOODFCST']], 2, '#cccc00', 3, '#ff0000', 4, '#800080', 5, '#000000'],
+          '#ADD8E6'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 0, 1, 10, 4, 15, 8]
+      }
+    }, labelAnchor());
+  } else {
+    map.addLayer({
+      id: 'wx',
+      type: 'raster',
+      source: 'wx',
+      'source-layer': current.layer,
+      paint: {
+        'raster-color-range': RANGE,
+        'raster-color': buildColor().expr,
+        'raster-opacity': 0.75,
+        'raster-fade-duration': 0
+      }
+    }, labelAnchor());
+    applyColor();
+  }
+
+  // Take the band list from the source itself once it has loaded, not from a
+  // separate TileJSON fetch: a tileset can publish a new frame between the
+  // two, leaving the page asking for a band the source doesn't have.
+  const layerName = current.layer;
+  onData = (e) => {
+    if (e.sourceId !== 'wx' || !e.isSourceLoaded) return;
+    map.off('sourcedata', onData);
+    onData = null;
+    els.load.textContent = Math.round(performance.now() - loadStart) + ' ms';
+    if (isVector) { setStatus('statusReady'); return; }   // no bands, no time bar
+    const rl = (map.getSource('wx').rasterLayers || []).find(l => l.fields.name === layerName);
+    bands = (rl && rl.fields.bands) || [];
+    if (!bands.length) { setStatus('statusError'); return; }
+    els.slider.max = bands.length - 1;
+    els.slider.disabled = false;
+    els.play.disabled = false;
+    setBand(0);
+    setStatus('statusReady');
+  };
+  map.on('sourcedata', onData);
+}
+
+map.on('error', (e) => {
+  if (e && e.sourceId === 'wx') setStatus('statusError');
+});
+map.on('zoom', () => { els.zoom.textContent = map.getZoom().toFixed(1); syncZoomSelect(); });
+
+map.on('style.load', () => {
+  els.zoom.textContent = map.getZoom().toFixed(1);
+  syncZoomSelect();
+  document.getElementById('projection-select').value = map.getProjection().name;  // the style sets its own
+  originalLabels = null;
+  setLabelLanguage(lang);
+  loadTileset(document.getElementById('tileset-select').value);
+});
+
+/* ------------------------------------------------- hover value popup -- */
+let hoverBusy = false;   // one query in flight at a time
+map.on('mousemove', async (e) => {
+  if (current.kind !== 'raster' || !map.getLayer('wx') || !bands.length || hoverBusy) return;
+  hoverBusy = true;
+  try {
+    const band = bands[Number(els.slider.value)];
+    const r = await map.queryRasterValue('wx', e.lngLat, { layerName: current.layer, bands: [band] });
+    const v = r && r[current.layer] && r[current.layer][band];
+    if (v && Number.isFinite(v[0])) {
+      popup.setLngLat(e.lngLat).setHTML(v[0].toFixed(1) + ' ' + current.unit).addTo(map);
+    } else {
+      popup.remove();
+    }
+  } catch (err) {
+    popup.remove();
+  } finally {
+    hoverBusy = false;
+  }
+});
+map.getCanvas().addEventListener('mouseleave', () => popup.remove());
+
+/* ---------------------------------------------------------- controls -- */
+document.getElementById('tileset-select').addEventListener('change', (e) => loadTileset(e.target.value));
+
+scaleSelect.addEventListener('change', (e) => { scaleName = e.target.value; applyColor(); });
+document.getElementById('steps-select').addEventListener('change', (e) => { colorSteps = Number(e.target.value); applyColor(); });
+
+document.getElementById('projection-select').addEventListener('change', (e) => map.setProjection(e.target.value));
+
+document.getElementById('legend-select').addEventListener('change', updateLegend);
+document.getElementById('risk-select').addEventListener('change', updateLegend);
+
+// Zoom selector: sets an exact whole-number zoom. It follows the map back when
+// the user zooms by hand and shows a dash while the zoom isn't a whole number.
+const zoomSelect = document.getElementById('zoom-select');
+zoomSelect.innerHTML = '<option value="" disabled hidden>&ndash;</option>' +
+  Array.from({ length: 12 }, (_, z) => '<option value="' + z + '">' + z + '</option>').join('');
+zoomSelect.addEventListener('change', (e) => map.setZoom(Number(e.target.value)));
+function syncZoomSelect() {
+  const z = map.getZoom();
+  zoomSelect.value = Math.abs(z - Math.round(z)) < 0.05 && Math.round(z) <= 11 ? String(Math.round(z)) : '';
+}
+
+document.getElementById('show-particles').addEventListener('change', (e) => {
+  if (map.getLayer('wx') && current.kind === 'particle') {
+    map.setLayoutProperty('wx', 'visibility', e.target.checked ? 'visible' : 'none');
+  }
+});
+document.getElementById('particle-count').addEventListener('input', (e) => {
+  document.getElementById('particle-count-value').textContent = e.target.value;
+  if (map.getLayer('wx') && current.kind === 'particle') map.setPaintProperty('wx', 'raster-particle-count', Number(e.target.value));
+});
+document.getElementById('particle-speed').addEventListener('input', (e) => {
+  document.getElementById('particle-speed-value').textContent = e.target.value;
+  if (map.getLayer('wx') && current.kind === 'particle') map.setPaintProperty('wx', 'raster-particle-speed-factor', Number(e.target.value));
+});
+document.getElementById('particle-color').addEventListener('input', (e) => {
+  if (map.getLayer('wx') && current.kind === 'particle') map.setPaintProperty('wx', 'raster-particle-color', e.target.value);
+});
+
+/* -------------------------------------------------------- language -- */
+function applyLang(code) {
+  lang = code;
+  document.documentElement.lang = code;
+  try { localStorage.setItem('wc-lang', code); } catch (e) {}
+
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('#lang-switch button').forEach(b =>
+    b.setAttribute('aria-checked', String(b.dataset.lang === code)));
+  document.title = t('title');
+
+  renderPlay();
+  renderClock();
+  setStatus(statusKey);
+  if (map.isStyleLoaded()) setLabelLanguage(code);
+}
+
+document.getElementById('lang-switch').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-lang]');
+  if (b) applyLang(b.dataset.lang);
+});
+
+// Default the particle color to the theme's dark primary so it fits the palette
+const themeDark = getComputedStyle(document.documentElement).getPropertyValue('--wc-teal-dark').trim();
+if (/^#[0-9a-f]{6}$/i.test(themeDark)) document.getElementById('particle-color').value = themeDark;
+
+applyLang(lang);
+applyColor();
+</script>
+</body>
+</html>
