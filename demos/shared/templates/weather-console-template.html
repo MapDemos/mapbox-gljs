@@ -211,9 +211,9 @@
 
     <div class="wc-dock-legends">
       <div class="wc-legend" id="legend-gradient">
-        <div class="wc-legend-title" data-i18n="legendTempTitle">Temperature (&deg;C)</div>
-        <div class="wc-legend-bar" id="legend-bar"></div>
-        <div class="wc-legend-ticks" id="legend-ticks"></div>
+        <div class="wc-legend-bar" id="legend-bar">
+          <div class="wc-legend-ticks" id="legend-ticks"></div>
+        </div>
       </div>
 
       <div class="wc-risk hidden" id="legend-levels">
@@ -271,7 +271,6 @@ const I18N = {
     showParticles: 'Show particles', particleCount: 'Count', particleSpeed: 'Speed', particleColor: 'Particle color',
     projection: 'Projection',
     legendStyle: 'Legend style', legendGradient: 'Gradient', legendLevels: 'Danger level (JMA)',
-    legendTempTitle: 'Temperature (°C)',
     zoomLevel: 'Zoom level', riskType: 'Risk type',
     riskInundation: 'Inundation', riskLandslide: 'Landslide', riskFlood: 'Flood',
     riskTitleInundation: 'Inundation danger level', riskTitleLandslide: 'Landslide danger level', riskTitleFlood: 'Flood danger level',
@@ -291,7 +290,6 @@ const I18N = {
     showParticles: '粒子を表示', particleCount: '数', particleSpeed: '速度', particleColor: '粒子の色',
     projection: '投影法',
     legendStyle: '凡例のスタイル', legendGradient: 'グラデーション', legendLevels: '危険度（気象庁）',
-    legendTempTitle: '気温（°C）',
     zoomLevel: 'ズームレベル', riskType: '災害の種類',
     riskInundation: '浸水害', riskLandslide: '土砂災害', riskFlood: '洪水',
     riskTitleInundation: '浸水害の危険度', riskTitleLandslide: '土砂災害の危険度', riskTitleFlood: '洪水の危険度',
@@ -311,7 +309,6 @@ const I18N = {
     showParticles: '파티클 표시', particleCount: '개수', particleSpeed: '속도', particleColor: '파티클 색상',
     projection: '투영법',
     legendStyle: '범례 스타일', legendGradient: '그라데이션', legendLevels: '위험도 (기상청)',
-    legendTempTitle: '기온 (°C)',
     zoomLevel: '줌 레벨', riskType: '재해 유형',
     riskInundation: '침수', riskLandslide: '산사태', riskFlood: '홍수',
     riskTitleInundation: '침수 위험도', riskTitleLandslide: '산사태 위험도', riskTitleFlood: '홍수 위험도',
@@ -462,15 +459,13 @@ function niceTicks(lo, hi, max) {
 }
 
 function applyColor() {
-  const { expr, css, domain, title } = buildColor();
+  const { expr, css, domain } = buildColor();
   const sc = SCALES[scaleName];
   document.getElementById('legend-bar').style.setProperty('--wc-gradient', css);
-  document.getElementById('legend-ticks').innerHTML = niceTicks(domain[0], domain[1], 6)
+  // Values sit inside the bar, so skip any that would hang over its ends
+  document.getElementById('legend-ticks').innerHTML = niceTicks(domain[0], domain[1], 8)
+    .filter(v => { const f = (v - domain[0]) / (domain[1] - domain[0]); return f > 0.04 && f < 0.96; })
     .map(v => '<span style="--pos:' + pct(v, domain) + '">' + v + '</span>').join('');
-  // Temperature scales use the translated title; the JMA scales show their own name
-  const titleEl = document.querySelector('#legend-gradient .wc-legend-title');
-  if (title) { titleEl.removeAttribute('data-i18n'); titleEl.textContent = title; }
-  else { titleEl.dataset.i18n = 'legendTempTitle'; titleEl.textContent = t('legendTempTitle'); }
   document.getElementById('steps-select').disabled = !sc.fn;  // steps only apply to the d3 ramps
   if (map.getLayer('wx') && current.kind === 'raster') map.setPaintProperty('wx', 'raster-color', expr);
 }
@@ -486,6 +481,9 @@ const TILESETS = {
   flood: { id: 'mapbox.weather-jp-river-flood',       kind: 'vector',   layer: 'river_flood' }
 };
 let current = TILESETS.t39;
+// The selection lives here, not in the dropdown: a browser can restore an old
+// form value after the script has run, and the page must not open on that.
+let selectedKey = 't39';
 const els = {
   slider: document.getElementById('slider'),
   play: document.getElementById('play-btn'),
@@ -781,7 +779,8 @@ map.on('style.load', () => {
   document.getElementById('projection-select').value = chosenProjection;
   originalLabels = null;
   setLabelLanguage(lang);
-  loadTileset(document.getElementById('tileset-select').value);
+  syncControls();
+  loadTileset(selectedKey);
 });
 
 /* ------------------------------------------------- hover value popup -- */
@@ -807,7 +806,7 @@ map.on('mousemove', async (e) => {
 map.getCanvas().addEventListener('mouseleave', () => popup.remove());
 
 /* ---------------------------------------------------------- controls -- */
-document.getElementById('tileset-select').addEventListener('change', (e) => loadTileset(e.target.value));
+document.getElementById('tileset-select').addEventListener('change', (e) => { selectedKey = e.target.value; loadTileset(selectedKey); });
 
 scaleSelect.addEventListener('change', (e) => { scaleName = e.target.value; applyColor(); });
 document.getElementById('steps-select').addEventListener('change', (e) => { colorSteps = Number(e.target.value); applyColor(); });
@@ -816,6 +815,15 @@ document.getElementById('projection-select').addEventListener('change', (e) => {
 
 document.getElementById('legend-select').addEventListener('change', updateLegend);
 document.getElementById('risk-select').addEventListener('change', updateLegend);
+
+// Put every control back in step with the page's state (see selectedKey above)
+function syncControls() {
+  document.getElementById('tileset-select').value = selectedKey;
+  scaleSelect.value = scaleName;
+  document.getElementById('steps-select').value = String(colorSteps);
+  document.getElementById('particle-count-value').textContent = document.getElementById('particle-count').value;
+  document.getElementById('particle-speed-value').textContent = document.getElementById('particle-speed').value;
+}
 
 // Zoom selector: sets an exact whole-number zoom. It follows the map back when
 // the user zooms by hand and shows a dash while the zoom isn't a whole number.

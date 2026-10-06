@@ -74,10 +74,12 @@
      .success / .error)           (+.spinning) and .wc-status-text
 
   Dock:
-  - .wc-legend                 card. Variant 1, gradient: .wc-legend-title,
-                                a .wc-legend-bar whose background you set
-                                with `--wc-gradient`, and .wc-legend-ticks
-                                (spans positioned by --pos %). Hide with .hidden.
+  - .wc-legend                 the gradient legend, as in the original demo: a
+                                single .wc-legend-bar (30px) whose background
+                                you set with `--wc-gradient`, holding a
+                                .wc-legend-ticks layer of value labels
+                                (spans positioned by --pos %) INSIDE the bar.
+                                No title. Hide with .hidden.
   - .wc-risk                   the JMA danger-level legend, kept faithful to
                                 jwl-nowcast.html: a white card with a title
                                 (.wc-risk-title, e.g. "Inundation danger
@@ -767,7 +769,7 @@ body {
   margin-left: auto;
   width: min(100%, 460px);
   box-sizing: border-box;
-  padding: 10px 14px 12px;
+  padding: 12px;
   background: var(--wc-cream);
   border: 1px solid var(--wc-line);
   border-left: 4px solid var(--wc-teal);
@@ -775,40 +777,34 @@ body {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
-.wc-legend-title {
-  margin-bottom: 8px;
-  color: var(--wc-teal-dark);
-  font-family: var(--wc-font-display);
-  font-weight: 700;
-  font-size: 12px;
-  text-transform: var(--wc-case);
-  letter-spacing: var(--wc-tracking);
-}
-
+/* Same as the original legend: a single 30px bar with its values drawn inside it
+   (no title, no separate tick row), so the card only costs one bar of height */
 .wc-legend-bar {
-  height: 14px;
+  position: relative;
+  height: 30px;
   border-radius: 3px;
-  border: 1px solid rgba(0, 0, 0, 0.25);
+  border: 1px solid #999;
   background: var(--wc-gradient, linear-gradient(to right, #fff, #000));
 }
 
 .wc-legend-ticks {
-  position: relative;
-  height: 16px;
-  margin-top: 4px;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
   font-family: var(--wc-font-mono);
-  font-size: 11px;
-  color: var(--wc-muted);
+  font-size: 12px;
+  color: #fff;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
 }
 
-/* Each tick is placed by value, not spread evenly: set `--pos` on the span
-   to its percentage along the bar (the template computes it from the same
+/* Each value is placed by its position, not spread evenly: set `--pos` on the
+   span to its percentage along the bar (the demo computes it from the same
    range the gradient uses). */
 .wc-legend-ticks span {
   position: absolute;
-  top: 0;
+  top: 50%;
   left: var(--pos, 0%);
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   white-space: nowrap;
 }
 

@@ -171,9 +171,9 @@
 
     <div class="wc-dock-legends">
       <div class="wc-legend" id="legend-gradient">
-        <div class="wc-legend-title" id="legend-title"></div>
-        <div class="wc-legend-bar" id="legend-bar"></div>
-        <div class="wc-legend-ticks" id="legend-ticks"></div>
+        <div class="wc-legend-bar" id="legend-bar">
+          <div class="wc-legend-ticks" id="legend-ticks"></div>
+        </div>
       </div>
 
       <div class="wc-risk hidden" id="legend-levels">
@@ -420,9 +420,10 @@ function applyColor() {
   const { expr, css, domain } = buildColor();
   const sc = SCALES[scaleName];
   document.getElementById('legend-bar').style.setProperty('--wc-gradient', css);
-  document.getElementById('legend-ticks').innerHTML = niceTicks(domain[0], domain[1], 6)
+  // Values sit inside the bar, so skip any that would hang over its ends
+  document.getElementById('legend-ticks').innerHTML = niceTicks(domain[0], domain[1], 8)
+    .filter(v => { const f = (v - domain[0]) / (domain[1] - domain[0]); return f > 0.04 && f < 0.96; })
     .map(v => '<span style="--pos:' + pct(v, domain) + '">' + v + '</span>').join('');
-  document.getElementById('legend-title').textContent = scaleName;
   document.getElementById('steps-select').disabled = !sc.fn;  // steps only apply to the d3 ramps
   if (rasterReady && map.getLayer('wx') && current.kind === 'raster') {
     map.setPaintProperty('wx', 'raster-color', expr);
@@ -457,6 +458,9 @@ const TILESETS = {
 };
 const firstTileset = Object.keys(TILESETS)[0];
 let current = TILESETS[firstTileset];
+// The selection lives here, not in the dropdown: a browser can restore an old
+// form value after the script has run, and the page must not open on that.
+let selectedKey = firstTileset;
 
 const tilesetSelect = document.getElementById('tileset-select');
 Object.keys(TILESETS).forEach(key => {
@@ -797,13 +801,14 @@ map.on('style.load', () => {
   styleReady = true;
   els.zoom.textContent = map.getZoom().toFixed(1);
   syncZoomSelect();
+  syncControls();
   // Every basemap opens on the chosen projection (Mercator unless the user picked another),
   // overriding the projection some styles define for themselves
   map.setProjection(chosenProjection);
   document.getElementById('projection-select').value = chosenProjection;
   originalLabels = null;
   setLabelLanguage(lang);
-  loadTileset(tilesetSelect.value);
+  loadTileset(selectedKey);
 });
 
 /* ------------------------------------------------- hover value popup -- */
@@ -830,12 +835,20 @@ map.on('mousemove', async (e) => {
 map.getCanvas().addEventListener('mouseleave', () => popup.remove());
 
 /* ---------------------------------------------------------- controls -- */
-tilesetSelect.addEventListener('change', (e) => selectTileset(e.target.value));
+tilesetSelect.addEventListener('change', (e) => { selectedKey = e.target.value; selectTileset(selectedKey); });
 
 scaleSelect.addEventListener('change', (e) => { scaleName = e.target.value; applyColor(); });
 document.getElementById('steps-select').addEventListener('change', (e) => { colorSteps = Number(e.target.value); applyColor(); });
 
 document.getElementById('projection-select').addEventListener('change', (e) => { chosenProjection = e.target.value; map.setProjection(chosenProjection); });
+
+// Put every control back in step with the page's state (see selectedKey above)
+function syncControls() {
+  tilesetSelect.value = selectedKey;
+  document.getElementById('steps-select').value = String(colorSteps);
+  document.getElementById('particle-count-value').textContent = document.getElementById('particle-count').value;
+  document.getElementById('particle-speed-value').textContent = document.getElementById('particle-speed').value;
+}
 
 // Zoom selector: sets an exact whole-number zoom. It follows the map back when
 // the user zooms by hand and shows a dash while the zoom isn't a whole number.
