@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Point-to-Point As-the-Crow-Flies Distance</title>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.26.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.26.0/mapbox-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="shared/demo-kit.js"></script>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+  #map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+  }
+
+  .panel {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 10;
+    width: 290px;
+    max-width: calc(100% - 24px);
+    background: rgba(255, 255, 255, 0.97);
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    padding: 16px;
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1a1a1a;
+  }
+
+  .panel h1 {
+    font-size: 15px;
+    margin: 0 0 8px;
+    font-weight: 600;
+  }
+
+  .panel p.hint {
+    margin: 0 0 12px;
+    color: #555;
+  }
+
+  .coord-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .coord-row .label {
+    color: #555;
+    flex-shrink: 0;
+  }
+
+  .coord-row .value {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    word-break: break-all;
+  }
+
+  .distance-block {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e0e0e0;
+  }
+
+  .distance-value {
+    font-size: 20px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    margin: 2px 0;
+  }
+
+  .distance-sub {
+    color: #555;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .reset-btn {
+    margin-top: 14px;
+    width: 100%;
+    background: #1a73e8;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .reset-btn:hover {
+    background: #1663c7;
+  }
+
+  .reset-btn:disabled {
+    background: #9fb8dd;
+    cursor: not-allowed;
+  }
+
+  .reset-btn:focus-visible,
+  .mapboxgl-ctrl button:focus-visible {
+    outline: 2px solid #1a73e8;
+    outline-offset: 2px;
+  }
+
+  .marker-start, .marker-end {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.25);
+  }
+  .marker-start { background: #1a9850; }
+  .marker-end { background: #d73027; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="panel">
+  <h1>As-the-Crow-Flies Distance</h1>
+  <p class="hint" id="hint">Click the map to set a start point.</p>
+
+  <div id="coords" hidden>
+    <div class="coord-row">
+      <span class="label">Start</span>
+      <span class="value" id="startCoord">—</span>
+    </div>
+    <div class="coord-row">
+      <span class="label">End</span>
+      <span class="value" id="endCoord">—</span>
+    </div>
+  </div>
+
+  <div class="distance-block" id="distanceBlock" hidden>
+    <div class="distance-value" id="distanceKm">—</div>
+    <div class="distance-sub" id="distanceMi">—</div>
+  </div>
+
+  <button type="button" class="reset-btn" id="resetBtn" disabled>Reset</button>
+</div>
+
+<script>
+(() => {
+  const map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/standard',
+    center: [10, 20],
+    zoom: 1.6
+  });
+
+  map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+  map.on('style.load', () => {
+    map.setLanguage('en');
+  });
+
+  const SOURCE_ID = 'measure-line';
+  const LAYER_ID = 'measure-line-layer';
+
+  let startLngLat = null;
+  let endLngLat = null;
+  let startMarker = null;
+  let endMarker = null;
+
+  const hintEl = document.getElementById('hint');
+  const coordsEl = document.getElementById('coords');
+  const startCoordEl = document.getElementById('startCoord');
+  const endCoordEl = document.getElementById('endCoord');
+  const distanceBlockEl = document.getElementById('distanceBlock');
+  const distanceKmEl = document.getElementById('distanceKm');
+  const distanceMiEl = document.getElementById('distanceMi');
+  const resetBtn = document.getElementById('resetBtn');
+
+  const numberFmt = (unit, maxFrac) => new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: maxFrac,
+    minimumFractionDigits: 0
+  });
+
+  const kmFmt = numberFmt('km', 2);
+  const miFmt = numberFmt('mi', 2);
+  const coordFmt = new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 5,
+    minimumFractionDigits: 5
+  });
+
+  function formatCoord(lngLat) {
+    return `${coordFmt.format(lngLat.lat)}, ${coordFmt.format(lngLat.lng)}`;
+  }
+
+  function emptyLineGeoJSON() {
+    return {
+      type: 'FeatureCollection',
+      features: []
+    };
+  }
+
+  function ensureLineLayer() {
+    if (!map.getSource(SOURCE_ID)) {
+      map.addSource(SOURCE_ID, {
+        type: 'geojson',
+        data: emptyLineGeoJSON()
+      });
+      map.addLayer({
+        id: LAYER_ID,
+        type: 'line',
+        source: SOURCE_ID,
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
+        paint: {
+          'line-color': '#1a73e8',
+          'line-width': 2.5,
+          'line-dasharray': [2, 1.5]
+        }
+      });
+    }
+  }
+
+  function setLine(start, end) {
+    ensureLineLayer();
+    const data = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [start.lng, start.lat],
+              [end.lng, end.lat]
+            ]
+          },
+          properties: {}
+        }
+      ]
+    };
+    map.getSource(SOURCE_ID).setData(data);
+  }
+
+  function clearLine() {
+    if (map.getSource(SOURCE_ID)) {
+      map.getSource(SOURCE_ID).setData(emptyLineGeoJSON());
+    }
+  }
+
+  function makeMarkerEl(kind) {
+    const el = document.createElement('div');
+    el.className = kind === 'start' ? 'marker-start' : 'marker-end';
+    return el;
+  }
+
+  function resetAll() {
+    startLngLat = null;
+    endLngLat = null;
+
+    if (startMarker) {
+      startMarker.remove();
+      startMarker = null;
+    }
+    if (endMarker) {
+      endMarker.remove();
+      endMarker = null;
+    }
+
+    clearLine();
+
+    hintEl.hidden = false;
+    hintEl.textContent = 'Click the map to set a start point.';
+    coordsEl.hidden = true;
+    distanceBlockEl.hidden = true;
+    resetBtn.disabled = true;
+  }
+
+  function updateInfoForStart() {
+    coordsEl.hidden = false;
+    startCoordEl.textContent = formatCoord(startLngLat);
+    endCoordEl.textContent = '—';
+    hintEl.textContent = 'Click the map to set an end point.';
+    distanceBlockEl.hidden = true;
+    resetBtn.disabled = false;
+  }
+
+  function updateInfoForEnd() {
+    endCoordEl.textContent = formatCoord(endLngLat);
+    hintEl.hidden = true;
+
+    const from = turf.point([startLngLat.lng, startLngLat.lat]);
+    const to = turf.point([endLngLat.lng, endLngLat.lat]);
+    const km = turf.distance(from, to, { units: 'kilometers' });
+    const mi = turf.distance(from, to, { units: 'miles' });
+
+    distanceBlockEl.hidden = false;
+    distanceKmEl.textContent = `${kmFmt.format(km)} km`;
+    distanceMiEl.textContent = `${miFmt.format(mi)} mi`;
+  }
+
+  map.on('click', (e) => {
+    if (!startLngLat) {
+      // first click: set start
+      startLngLat = e.lngLat;
+      startMarker = new mapboxgl.Marker({ element: makeMarkerEl('start') })
+        .setLngLat(startLngLat)
+        .addTo(map);
+      updateInfoForStart();
+    } else if (!endLngLat) {
+      // second click: set end, draw line, compute distance
+      endLngLat = e.lngLat;
+      endMarker = new mapboxgl.Marker({ element: makeMarkerEl('end') })
+        .setLngLat(endLngLat)
+        .addTo(map);
+      setLine(startLngLat, endLngLat);
+      updateInfoForEnd();
+    } else {
+      // third click: start a new measurement
+      resetAll();
+      startLngLat = e.lngLat;
+      startMarker = new mapboxgl.Marker({ element: makeMarkerEl('start') })
+        .setLngLat(startLngLat)
+        .addTo(map);
+      updateInfoForStart();
+    }
+  });
+
+  resetBtn.addEventListener('click', () => {
+    resetAll();
+  });
+})();
+</script>
+</body>
+</html>
