@@ -810,17 +810,5 @@
     ],
     "tagsVerified": false,
     "description": "Demonstrates excluding road types/areas from Directions API routes."
-  },
-  {
-    "slug": "point-to-point-as-the-crow-flies-distance-with-turf",
-    "title": "Point-to-Point As-the-Crow-Flies Distance with Turf",
-    "type": "local",
-    "url": "point-to-point-as-the-crow-flies-distance-with-turf.html",
-    "tags": [
-      "Turf"
-    ],
-    "description": "Click two points on the map to drop markers and draw a line between them, instantly measuring the straight-line distance in kilometers and miles.",
-    "tagsVerified": false,
-    "source": "demo-generator"
   }
 ]
