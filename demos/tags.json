@@ -102,6 +102,12 @@
     "description": "Multi-band raster data such as weather time steps"
   },
   {
+    "name": "Turf",
+    "kind": "product",
+    "hue": 285,
+    "description": "Turf.js, the geospatial library Mapbox created: distances, buffers, areas and other geometry calculations"
+  },
+  {
     "name": "3D",
     "kind": "feature",
     "hue": 270,

@@ -5,6 +5,7 @@
     "type": "local",
     "url": "airport-demo.html",
     "tags": [
+      "Turf",
       "Aviation"
     ],
     "description": "Pick a Japan airport from a dropdown to fly the map there and highlight its outline, with an option to show or hide airport outlines."
@@ -26,6 +27,7 @@
     "type": "local",
     "url": "airport-osm-demo.html",
     "tags": [
+      "Turf",
       "Aviation"
     ],
     "description": "Shows Japan's civilian and military airports on the map, with a dropdown to fly to and highlight any airport."
@@ -85,6 +87,7 @@
     "url": "deliveries.html",
     "tags": [
       "Isochrone API",
+      "Turf",
       "Logistics"
     ],
     "description": "Pick a travel time and mode, and Mapbox's Isochrone API draws a reachable area around each delivery center — delivery points then get colored by which center can reach them in time."
@@ -95,7 +98,8 @@
     "type": "local",
     "url": "details-search.html",
     "tags": [
-      "Search Box API"
+      "Search Box API",
+      "Turf"
     ],
     "description": "Browse places by category using Mapbox's Search Box API, then pull richer details for a selected place via the Mapbox Details API."
   },
@@ -106,6 +110,7 @@
     "url": "dhl-demo.html",
     "tags": [
       "Directions API",
+      "Turf",
       "Animation",
       "Data visualization",
       "Logistics"
@@ -228,6 +233,7 @@
     "url": "indoor.html",
     "tags": [
       "Indoor Map Tiles",
+      "Turf",
       "Retail"
     ],
     "description": "Shows an indoor venue map with a floor switcher and indoor place search, using indoor mapping data from Mapxus, a Mapbox partner, layered on top of a Mapbox base map."
@@ -282,7 +288,8 @@
     "type": "local",
     "url": "map-matching-demo.html",
     "tags": [
-      "Map Matching API"
+      "Map Matching API",
+      "Turf"
     ],
     "description": "Click points on the map, or upload your own location data, and Mapbox's Map Matching API snaps them onto the nearest road for the travel mode you choose."
   },
@@ -313,6 +320,7 @@
     "tags": [
       "Directions API",
       "Tilequery API",
+      "Turf",
       "3D",
       "Animation"
     ],
@@ -335,7 +343,8 @@
     "type": "local",
     "url": "navigation-trace-demo.html",
     "tags": [
-      "Map Matching API"
+      "Map Matching API",
+      "Turf"
     ],
     "description": "Load a sample or your own GPS trace and compare the raw points against a device-matched version; re-run any stretch through Mapbox's Map Matching API to clean it up."
   },
@@ -360,6 +369,7 @@
     "type": "local",
     "url": "notam-demo.html",
     "tags": [
+      "Turf",
       "Aviation"
     ],
     "description": "Plots example flight routes and airspace notice (NOTAM) zones near Singapore, and flags which routes come too close to a zone based on an adjustable distance threshold."
@@ -372,6 +382,7 @@
     "tags": [
       "Indoor Map Tiles",
       "Search Box API",
+      "Turf",
       "3D"
     ],
     "description": "Switch between a 3D outdoor view and a floor-by-floor indoor map using Mapbox's Indoor Map Tiles, with room selection and a location search box."
@@ -381,7 +392,9 @@
     "title": "POI Map Builder - Mapbox GL JS",
     "type": "local",
     "url": "poi-map-builder.html",
-    "tags": [],
+    "tags": [
+      "Turf"
+    ],
     "description": "Build a custom point-of-interest map by clicking the map or entering coordinates, style the markers, add a title and legend, and export the result as an image or a reusable config file."
   },
   {
@@ -410,6 +423,7 @@
     "tags": [
       "Isochrone API",
       "MTS",
+      "Turf",
       "Data visualization"
     ],
     "description": "Plots points across Japan, color-coded and filterable by type, and uses Mapbox's Isochrone API to find only the points reachable within a driving time you choose."
@@ -423,6 +437,7 @@
       "Directions API",
       "Map Matching API",
       "Matrix API",
+      "Turf",
       "Logistics"
     ],
     "description": "Generates a driving route, simulates a vehicle going off-route, and uses Mapbox's Matrix API to rank the best ways to get back on track."
@@ -433,7 +448,8 @@
     "type": "local",
     "url": "rivers.html",
     "tags": [
-      "MTS"
+      "MTS",
+      "Turf"
     ],
     "description": "Shows Japan's rivers as colored lines on the map, automatically labeling each visible segment with its river code — an example of displaying a large custom dataset as a hosted tileset."
   },
@@ -450,7 +466,9 @@
     "title": "Singapore Disaster Response",
     "type": "local",
     "url": "singapore-disaster.html",
-    "tags": [],
+    "tags": [
+      "Turf"
+    ],
     "description": "A mock disaster-response dashboard for Singapore — click a hazard zone or shelter to see example walking routes between them, with the fastest one highlighted."
   },
   {
@@ -481,6 +499,7 @@
     "tags": [
       "Directions API",
       "Search Box API",
+      "Turf",
       "Retail"
     ],
     "description": "A store finder — search an address using Mapbox's Search Box API, filter by brand or amenities, and get walking or driving directions to the nearest location with the Directions API."
@@ -524,6 +543,7 @@
     "tags": [
       "Search Box API",
       "Geocoding API",
+      "Turf",
       "3D",
       "Animation",
       "Travel"
@@ -538,6 +558,7 @@
     "tags": [
       "Directions API",
       "Map Matching API",
+      "Turf",
       "Animation"
     ],
     "description": "A turn-by-turn navigation experience — get a route from Mapbox's Directions API, and watch your position smoothly snap to the road using Map Matching as you move."
