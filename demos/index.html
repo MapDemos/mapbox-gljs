@@ -102,18 +102,15 @@
 <div class="floating-tooltip" id="tooltip"></div>
 
 <script>
-// Fixed hue-per-tag color scheme, ported from the approved design mock
-// (design-mapbox-demos/ListViewAllTags.dc.html) so a given tag always
-// renders in the same color everywhere on the page.
-const TAG_HUES = {
-  'Japan Weather Layers': 20, 'Raster Tiles API': 158, 'Directions API': 295,
-  'Map Matching API': 73, 'Isochrone API': 348,
-  'Search Box API': 125, 'Geocoding API': 263, 'Indoor Map Tiles': 40,
-  'Mapbox Boundaries': 178, 'Tilequery API': 315, 'Optimization API': 93,
-  'Matrix API': 230, 'Vector Tiles API': 8, 'Mapbox Movement Data': 145,
-  'MTS': 200, 'Feedback API': 55, 'Raster Array Tiles': 245,
-};
-const TAG_ORDER = Object.keys(TAG_HUES);
+// The tag list lives in tags.json ({name, kind, hue, description}, in chip
+// order); the demo generator's Deploy reads the same file for the tags it may
+// assign. Only tags listed there get a filter chip, so a typo in demos.json
+// shows on its row in the brand color but never becomes a chip. A hue gives a
+// tag the same color everywhere on the page (scheme from the design mock
+// design-mapbox-demos/ListViewAllTags.dc.html).
+const TAG_HUES = {};
+const TAG_ORDER = [];
+const TAG_DESCRIPTIONS = {};
 const BRAND_ACCENT = 'oklch(0.66 0.19 264)';
 const BRAND_TINT = 'oklch(0.66 0.19 264 / 0.16)';
 const accentFor = (tag) => TAG_HUES[tag] === undefined ? BRAND_ACCENT : `oklch(0.74 0.15 ${TAG_HUES[tag]})`;
@@ -147,8 +144,7 @@ function render() {
   const bySearch = DATA.filter(matchesQuery);
   const filtered = bySearch.filter(matchesTags);
 
-  // Chips: "All" plus every tag that appears in the data, in the fixed
-  // taxonomy order. Multi-select is AND: selecting more tags narrows
+  // Chips: "All" plus every tag in tags.json, in its order. Multi-select is AND: selecting more tags narrows
   // results to demos that have every selected tag. A chip's count answers
   // "how many demos would match if this tag were added to the current
   // selection" (given the search text) -- for an already-selected chip
@@ -160,7 +156,8 @@ function render() {
         : bySearch.filter((d) => [...selectedTags, key].every((t) => d.tags.includes(t))).length;
       const selected = key === null ? selectedTags.size === 0 : selectedTags.has(key);
       const accent = key === null ? BRAND_ACCENT : accentFor(key);
-      return `<button class="chip${selected ? ' chip-selected' : ''}" style="--chip-accent:${accent}" data-tag="${key === null ? '' : escapeHtml(key)}">${escapeHtml(label)}<span class="chip-count">${count}</span></button>`;
+      const title = key !== null && TAG_DESCRIPTIONS[key] ? ` title="${escapeHtml(TAG_DESCRIPTIONS[key])}"` : '';
+      return `<button class="chip${selected ? ' chip-selected' : ''}" style="--chip-accent:${accent}" data-tag="${key === null ? '' : escapeHtml(key)}"${title}>${escapeHtml(label)}<span class="chip-count">${count}</span></button>`;
     })
     .join('');
   document.getElementById('chips').innerHTML = chipsHtml;
@@ -243,9 +240,22 @@ document.getElementById('list-container').addEventListener('mouseleave', () => {
   tooltip.style.opacity = '0';
 });
 
+// Without tags.json the list still works, just with no chips.
+const tagsLoaded = fetch('./tags.json')
+  .then((r) => r.json())
+  .then((tags) => {
+    for (const tag of tags) {
+      TAG_ORDER.push(tag.name);
+      if (Number.isFinite(tag.hue)) TAG_HUES[tag.name] = tag.hue;
+      if (tag.description) TAG_DESCRIPTIONS[tag.name] = tag.description;
+    }
+  })
+  .catch((err) => console.error('Could not load tags.json', err));
+
 fetch('./demos.json')
   .then((r) => r.json())
-  .then((data) => {
+  .then(async (data) => {
+    await tagsLoaded;
     DATA = data;
     render();
   })

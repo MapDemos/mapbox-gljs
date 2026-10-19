@@ -4,7 +4,9 @@
     "title": "Airport Explorer",
     "type": "local",
     "url": "airport-demo.html",
-    "tags": [],
+    "tags": [
+      "Aviation"
+    ],
     "description": "Pick a Japan airport from a dropdown to fly the map there and highlight its outline, with an option to show or hide airport outlines."
   },
   {
@@ -12,7 +14,10 @@
     "title": "Airport Layer Filter",
     "type": "local",
     "url": "airport-layer-filter-demo.html",
-    "tags": [],
+    "tags": [
+      "Data visualization",
+      "Aviation"
+    ],
     "description": "Filters airport locations shown as colored circles by importance, with an option to toggle an airport-runway layer on the base map."
   },
   {
@@ -20,7 +25,9 @@
     "title": "Japan Airports OSM",
     "type": "local",
     "url": "airport-osm-demo.html",
-    "tags": [],
+    "tags": [
+      "Aviation"
+    ],
     "description": "Shows Japan's civilian and military airports on the map, with a dropdown to fly to and highlight any airport."
   },
   {
@@ -28,7 +35,9 @@
     "title": "Building Heatmap",
     "type": "local",
     "url": "building-heatmap.html",
-    "tags": [],
+    "tags": [
+      "Data visualization"
+    ],
     "description": "A side-by-side map comparison showing buildings colored and filtered by height, useful for visually comparing two states of the same data."
   },
   {
@@ -46,7 +55,9 @@
     "title": "Cell Coverage Map",
     "type": "local",
     "url": "cell-coverage.html",
-    "tags": [],
+    "tags": [
+      "Data visualization"
+    ],
     "description": "Shows a custom map style with a cell-coverage legend and a frame-rate meter; the search and click-to-query features shown in the code are not currently active."
   },
   {
@@ -73,7 +84,8 @@
     "type": "local",
     "url": "deliveries.html",
     "tags": [
-      "Isochrone API"
+      "Isochrone API",
+      "Logistics"
     ],
     "description": "Pick a travel time and mode, and Mapbox's Isochrone API draws a reachable area around each delivery center — delivery points then get colored by which center can reach them in time."
   },
@@ -94,9 +106,11 @@
     "url": "dhl-demo.html",
     "tags": [
       "Directions API",
-      "Map Matching API"
+      "Animation",
+      "Data visualization",
+      "Logistics"
     ],
-    "description": "Tracks delivery vehicles along their route with live ETAs using Mapbox's Directions API, and shows how Map Matching snaps noisy GPS points back onto the road so vehicles never appear to drift off it."
+    "description": "Tracks delivery vehicles along their route with live ETAs using Mapbox's Directions API, keeping each vehicle snapped to its route so it never appears to drift off the road."
   },
   {
     "slug": "directions-comparison",
@@ -105,7 +119,8 @@
     "url": "directions-comparison.html",
     "tags": [
       "Directions API",
-      "Geocoding API"
+      "Geocoding API",
+      "Logistics"
     ],
     "description": "Compares driving routes from Mapbox's Directions API against Google's routing side by side, with options to avoid certain road types and see traffic congestion colored on the route."
   },
@@ -143,7 +158,12 @@
     "title": "Flight Map",
     "type": "local",
     "url": "flight-map-demo.html",
-    "tags": [],
+    "tags": [
+      "3D",
+      "Animation",
+      "Time slider",
+      "Aviation"
+    ],
     "description": "Animates a 3D airplane flying from San Francisco to London, with a scrubber to move through the flight and a camera that can orbit or chase the plane."
   },
   {
@@ -173,7 +193,9 @@
     "type": "local",
     "url": "indoor-airport-brazil.html",
     "tags": [
-      "Indoor Map Tiles"
+      "Indoor Map Tiles",
+      "Animation",
+      "Aviation"
     ],
     "description": "An auto-playing camera tour through 11 Brazilian airports, showing indoor floor plans using Mapbox's Indoor Map Tiles, with a day/night lighting picker."
   },
@@ -183,7 +205,8 @@
     "type": "local",
     "url": "indoor-airport-gps.html",
     "tags": [
-      "Indoor Map Tiles"
+      "Indoor Map Tiles",
+      "Aviation"
     ],
     "description": "Shows indoor floor plans at six airports using Mapbox's Indoor Map Tiles, and tracks your real GPS position on the floor plan; click any feature to see its details."
   },
@@ -193,7 +216,8 @@
     "type": "local",
     "url": "indoor-airports.html",
     "tags": [
-      "Indoor Map Tiles"
+      "Indoor Map Tiles",
+      "Aviation"
     ],
     "description": "Search a list of airports and fly to its indoor floor plan, shown using Mapbox's Indoor Map Tiles."
   },
@@ -203,7 +227,8 @@
     "type": "local",
     "url": "indoor.html",
     "tags": [
-      "Indoor Map Tiles"
+      "Indoor Map Tiles",
+      "Retail"
     ],
     "description": "Shows an indoor venue map with a floor switcher and indoor place search, using indoor mapping data from Mapxus, a Mapbox partner, layered on top of a Mapbox base map."
   },
@@ -214,7 +239,11 @@
     "url": "jwl-nowcast.html",
     "tags": [
       "Japan Weather Layers",
-      "Raster Array Tiles"
+      "Raster Array Tiles",
+      "Animation",
+      "Data visualization",
+      "Time slider",
+      "Weather"
     ],
     "description": "Switch between Mapbox's Japan Weather Layers — current precipitation, rain and snow forecasts, wind, flood, landslide, and alert risk — and play through a timeline of conditions."
   },
@@ -232,7 +261,8 @@
     "type": "local",
     "url": "logistics-checkout.html",
     "tags": [
-      "Search Box API"
+      "Search Box API",
+      "Logistics"
     ],
     "description": "A 3-step delivery checkout — an address is entered with Mapbox's address autofill, confirmed by dragging a pin to the exact drop-off point, then a handoff card with a map image is generated for the driver using Mapbox's Static Images API."
   },
@@ -241,7 +271,9 @@
     "title": "Lottery",
     "type": "local",
     "url": "lottery.html",
-    "tags": [],
+    "tags": [
+      "Animation"
+    ],
     "description": "A spinning 3D globe animation that reveals a prize tier from a lottery draw, with confetti and emoji celebration effects."
   },
   {
@@ -267,7 +299,10 @@
     "title": "Merchants Tileset Overlay",
     "type": "local",
     "url": "merchants-overlay-demo.html",
-    "tags": [],
+    "tags": [
+      "Data visualization",
+      "Retail"
+    ],
     "description": "A merchant locator for Tokyo — filter by category, brand, coupons, or campaigns, or search by name, to narrow down the merchant points shown on the map."
   },
   {
@@ -276,9 +311,12 @@
     "type": "local",
     "url": "mpl-3d.html",
     "tags": [
-      "Tilequery API"
+      "Directions API",
+      "Tilequery API",
+      "3D",
+      "Animation"
     ],
-    "description": "Click to set a start and end point, and a 3D character walks the route between them; Mapbox's Tilequery API is used to scatter nearby 3D models — animals and plants — along the way."
+    "description": "Click to set a start and end point, and a 3D character walks the route between them; Mapbox's Tilequery API finds nearby places along the way, shown as points you can filter by type."
   },
   {
     "slug": "naurt-data",
@@ -308,7 +346,11 @@
     "url": "nea.html",
     "tags": [
       "Raster Array Tiles",
-      "MTS"
+      "MTS",
+      "Animation",
+      "Data visualization",
+      "Time slider",
+      "Weather"
     ],
     "description": "Shows Singapore's national weather data — rainfall, radar, satellite imagery, lightning, and fire hotspots — as layered map tiles, with a timeline and different map projections to switch between."
   },
@@ -317,7 +359,9 @@
     "title": "NOTAM Proximity",
     "type": "local",
     "url": "notam-demo.html",
-    "tags": [],
+    "tags": [
+      "Aviation"
+    ],
     "description": "Plots example flight routes and airspace notice (NOTAM) zones near Singapore, and flags which routes come too close to a zone based on an adjustable distance threshold."
   },
   {
@@ -327,7 +371,8 @@
     "url": "osaka-indoor.html",
     "tags": [
       "Indoor Map Tiles",
-      "Search Box API"
+      "Search Box API",
+      "3D"
     ],
     "description": "Switch between a 3D outdoor view and a floor-by-floor indoor map using Mapbox's Indoor Map Tiles, with room selection and a location search box."
   },
@@ -349,7 +394,11 @@
       "Japan Weather Layers",
       "Search Box API",
       "Tilequery API",
-      "Raster Array Tiles"
+      "Raster Array Tiles",
+      "Animation",
+      "Data visualization",
+      "Time slider",
+      "Weather"
     ],
     "description": "Plays back current and forecasted rain across Japan on a timeline; search for a destination and get a driving route with an ETA, plus a comparison of rain right now versus rain when you'd arrive."
   },
@@ -360,7 +409,8 @@
     "url": "random-points.html",
     "tags": [
       "Isochrone API",
-      "MTS"
+      "MTS",
+      "Data visualization"
     ],
     "description": "Plots points across Japan, color-coded and filterable by type, and uses Mapbox's Isochrone API to find only the points reachable within a driving time you choose."
   },
@@ -372,7 +422,8 @@
     "tags": [
       "Directions API",
       "Map Matching API",
-      "Matrix API"
+      "Matrix API",
+      "Logistics"
     ],
     "description": "Generates a driving route, simulates a vehicle going off-route, and uses Mapbox's Matrix API to rank the best ways to get back on track."
   },
@@ -417,7 +468,9 @@
     "title": "Store Location Comparison - Mapbox vs Google",
     "type": "local",
     "url": "store-location-comparison.html",
-    "tags": [],
+    "tags": [
+      "Retail"
+    ],
     "description": "Compares Mapbox and Google Maps side by side with synchronized camera movement — pick a store and both maps center on it and show its brand icon."
   },
   {
@@ -427,7 +480,8 @@
     "url": "store-locator.html",
     "tags": [
       "Directions API",
-      "Search Box API"
+      "Search Box API",
+      "Retail"
     ],
     "description": "A store finder — search an address using Mapbox's Search Box API, filter by brand or amenities, and get walking or driving directions to the nearest location with the Directions API."
   },
@@ -436,7 +490,9 @@
     "title": "Storytelling",
     "type": "local",
     "url": "storytelling.html",
-    "tags": [],
+    "tags": [
+      "Animation"
+    ],
     "description": "A scroll-driven story map that flies through chapters of Mapbox's company history as you scroll, with a small overview map that highlights each chapter's location."
   },
   {
@@ -444,7 +500,9 @@
     "title": "Streets Extruded",
     "type": "local",
     "url": "streets-extruded.html",
-    "tags": [],
+    "tags": [
+      "3D"
+    ],
     "description": "A 3D view of downtown Singapore's buildings extruded to their real height, with sliders to change their color and transparency live."
   },
   {
@@ -453,7 +511,8 @@
     "type": "local",
     "url": "tap-payment.html",
     "tags": [
-      "Directions API"
+      "Directions API",
+      "Retail"
     ],
     "description": "A transaction history view for a Japanese e-money card, showing nearby shops and a walking route to one of them using Mapbox's Directions API."
   },
@@ -464,7 +523,10 @@
     "url": "travel-highlights-demo.html",
     "tags": [
       "Search Box API",
-      "Geocoding API"
+      "Geocoding API",
+      "3D",
+      "Animation",
+      "Travel"
     ],
     "description": "A year-in-review trip map — animated plane, train, car, and ship icons travel leg to leg around the world, with city search powered by Mapbox's Search Box API, editable stops, and the ability to record the animation as a video."
   },
@@ -475,7 +537,8 @@
     "url": "turn-by-turn-demo.html",
     "tags": [
       "Directions API",
-      "Map Matching API"
+      "Map Matching API",
+      "Animation"
     ],
     "description": "A turn-by-turn navigation experience — get a route from Mapbox's Directions API, and watch your position smoothly snap to the road using Map Matching as you move."
   },
@@ -488,7 +551,12 @@
       "Geocoding API",
       "Tilequery API",
       "Raster Array Tiles",
-      "Japan Weather Layers"
+      "Japan Weather Layers",
+      "3D",
+      "Animation",
+      "Data visualization",
+      "Time slider",
+      "Weather"
     ],
     "description": "Shows current and forecasted rain across Japan on a timeline, with Mapbox's Tilequery API used to look up the exact rain intensity at any point you click, and place names shown for wherever you search."
   },
@@ -498,7 +566,11 @@
     "type": "local",
     "url": "wind-bom.html",
     "tags": [
-      "Raster Array Tiles"
+      "Raster Array Tiles",
+      "Animation",
+      "Data visualization",
+      "Time slider",
+      "Weather"
     ],
     "description": "An animated wind visualization over Australia — a color-coded speed heatmap plus moving particles that follow the wind, with controls for opacity, color scale, and particle behavior."
   },
@@ -508,7 +580,8 @@
     "type": "local",
     "url": "zenrin-osm-comparison.html",
     "tags": [
-      "Directions API"
+      "Directions API",
+      "Logistics"
     ],
     "description": "Compares driving routes from Mapbox's Directions API on two different road datasets — OpenStreetMap and Zenrin — side by side, with presets for common road issues and the option to avoid certain road types on each map."
   },

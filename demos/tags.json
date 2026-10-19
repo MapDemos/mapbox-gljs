@@ -1,0 +1,158 @@
+[
+  {
+    "name": "Japan Weather Layers",
+    "kind": "product",
+    "hue": 20,
+    "description": "Mapbox Japan weather data: rain, wind and warnings"
+  },
+  {
+    "name": "Raster Tiles API",
+    "kind": "product",
+    "hue": 158,
+    "description": "Mapbox raster map tiles"
+  },
+  {
+    "name": "Directions API",
+    "kind": "product",
+    "hue": 295,
+    "description": "Routes and turn-by-turn directions"
+  },
+  {
+    "name": "Map Matching API",
+    "kind": "product",
+    "hue": 73,
+    "description": "Snapping GPS traces to roads"
+  },
+  {
+    "name": "Isochrone API",
+    "kind": "product",
+    "hue": 348,
+    "description": "Areas reachable within a travel time"
+  },
+  {
+    "name": "Search Box API",
+    "kind": "product",
+    "hue": 125,
+    "description": "Place and address search with suggestions"
+  },
+  {
+    "name": "Geocoding API",
+    "kind": "product",
+    "hue": 263,
+    "description": "Turning addresses into coordinates and back"
+  },
+  {
+    "name": "Indoor Map Tiles",
+    "kind": "product",
+    "hue": 40,
+    "description": "Indoor floor plans"
+  },
+  {
+    "name": "Mapbox Boundaries",
+    "kind": "product",
+    "hue": 178,
+    "description": "Administrative and postal boundaries"
+  },
+  {
+    "name": "Tilequery API",
+    "kind": "product",
+    "hue": 315,
+    "description": "Finding map features near a point"
+  },
+  {
+    "name": "Optimization API",
+    "kind": "product",
+    "hue": 93,
+    "description": "Best order and route for multiple stops"
+  },
+  {
+    "name": "Matrix API",
+    "kind": "product",
+    "hue": 230,
+    "description": "Travel times between many places"
+  },
+  {
+    "name": "Vector Tiles API",
+    "kind": "product",
+    "hue": 8,
+    "description": "Mapbox vector map tiles"
+  },
+  {
+    "name": "Mapbox Movement Data",
+    "kind": "product",
+    "hue": 145,
+    "description": "Aggregated activity and movement data"
+  },
+  {
+    "name": "MTS",
+    "kind": "product",
+    "hue": 200,
+    "description": "Mapbox Tiling Service: the demo's own data turned into tilesets"
+  },
+  {
+    "name": "Feedback API",
+    "kind": "product",
+    "hue": 55,
+    "description": "Reporting map data issues to Mapbox"
+  },
+  {
+    "name": "Raster Array Tiles",
+    "kind": "product",
+    "hue": 245,
+    "description": "Multi-band raster data such as weather time steps"
+  },
+  {
+    "name": "3D",
+    "kind": "feature",
+    "hue": 270,
+    "description": "3D buildings, models or terrain"
+  },
+  {
+    "name": "Animation",
+    "kind": "feature",
+    "hue": 110,
+    "description": "Things move on their own or on play: vehicles, a route drawing itself, a camera tour"
+  },
+  {
+    "name": "Data visualization",
+    "kind": "feature",
+    "hue": 335,
+    "description": "Colors, sizes or heights driven by data, such as a choropleth or heatmap"
+  },
+  {
+    "name": "Time slider",
+    "kind": "feature",
+    "hue": 190,
+    "description": "A slider that steps through time"
+  },
+  {
+    "name": "Logistics",
+    "kind": "industry",
+    "hue": 60,
+    "description": "Delivery, fleets, routing and shipping"
+  },
+  {
+    "name": "Retail",
+    "kind": "industry",
+    "hue": 15,
+    "description": "Stores, shopping and merchants"
+  },
+  {
+    "name": "Travel",
+    "kind": "industry",
+    "hue": 165,
+    "description": "Trip planning and tourism"
+  },
+  {
+    "name": "Weather",
+    "kind": "industry",
+    "hue": 215,
+    "description": "Weather data and forecasts"
+  },
+  {
+    "name": "Aviation",
+    "kind": "industry",
+    "hue": 250,
+    "description": "Airports, flights and airspace"
+  }
+]
