@@ -1,0 +1,691 @@
+/*
+  Bottom Sheet -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a calm, native-feeling, mobile-first map
+  app shell -- full-screen map under a draggable sheet with peek / half /
+  full snap points, grouped-list greys, one fresh mint accent, Figtree
+  throughout -- deliberately distinct from every other style pack in this
+  folder: Arena, Editorial Paper, Highway Sign, Slate Console, Storefront,
+  Tarmac Glass, Vintage Chart, Weather Console, Riso Zine, Swiss Grid, Neon
+  HUD, Pastel Bento, Blueprint, Story Scroll, Retro OS, Aurora Command, Deco
+  Voyage and Washi Seasons). It is generic app chrome: it does not imitate
+  any existing maps app's branding or iconography.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/bottom-sheet.css" rel="stylesheet" />
+  plus the Google Font it expects (Figtree, used for everything; distances
+  and counts use tabular-nums):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;800&display=swap" rel="stylesheet" />
+
+  Signature touch: the sheet is a real draggable surface. JS (see the
+  template) moves it with transform: translateY and writes the number of
+  pixels it currently covers to the CSS variable --sheet-offset on <html>;
+  this file lifts the Mapbox logo and attribution (.mapboxgl-ctrl-bottom-
+  left / -right) by that amount, so they always ride just above the sheet
+  edge and are never covered. A 36x5 grab handle, 20px top radius, a soft
+  upward shadow and a 280ms spring-like ease complete the native feel.
+  Above 768px the same markup becomes a fixed, non-draggable 380px card on
+  the left that stops 56px above the bottom edge (logo stays visible).
+
+  Class/id contract (see bottom-sheet-template.html in this same folder for
+  a full working example):
+
+  - #map                      full-screen map container (every demo defines
+                               its own, per convention -- not included here)
+  - .sheet                    the sheet (<section>); data-snap="peek|half|
+                               full" is set by JS. Phone: fixed bottom, full
+                               height minus 88px, moved by translateY.
+                               Desktop: floating left card
+    .sheet-head                 drag zone (touch-action: none) -- handle +
+                                 header. Only this area starts a drag, so the
+                                 list below still scrolls natively
+      .sheet-handle               <button> with the 36x5 .sheet-handle-bar;
+                                   click / Enter cycles the snap points.
+                                   Hidden on desktop
+      .search-field               rounded grey field wrapping an inline icon
+        .search-input               and the text <input> (16px: no iOS zoom)
+      .segmented                  3-up segmented control; each .segment is a
+                                   <button aria-pressed="true|false">
+      .detail-bar                 detail-view header row (replaces search +
+                                   segmented):
+        .back-btn                   round chevron button
+        .detail-title               truncated one-line title (<h2>)
+    .sheet-body                 scrolling content; JS sets --sheet-y on
+                                 .sheet so the last row can scroll clear of
+                                 the off-screen part of the sheet
+      .group-label                small caps-less section header, count on
+                                   the right (two <span>s)
+      .place-list                 <ul> of <li><button.place-row>:
+        .place-row                  grid: icon | text | distance;
+                                     .is-selected = last opened row
+        .row-icon                   44px round icon; add .cat-cafe /
+                                     .cat-bakery / .cat-park for colour
+        .row-name / .row-meta       bold name / one-line grey meta
+        .row-dist                   right-aligned, tabular-nums
+      .empty-state                muted centred "nothing found" paragraph
+      .detail                     the detail view container:
+        .detail-sub                 small grey line under the header
+        .chips > .chip              tag pills
+        .actions                    2-column button row holding .btn
+          .btn-primary                mint fill (e.g. Directions)
+          .btn-secondary              grey fill; [aria-pressed="true"] turns
+                                       mint-tinted (e.g. Save toggle)
+        .hours                      grouped card with a small .hours-bar SVG
+                                     (.hours-head holds label + status)
+        .info-group > .info-row     grey grouped list; label + value spans
+  - .toast                    transient dark pill at the top centre; add
+                               .is-visible to show it (aria-live region)
+  - .status-note (+.loading/  same pill style for load / error messages
+    .success/.error)
+  - --sheet-offset            px the sheet covers; 0 on desktop. Consumed
+                               here to lift the bottom map controls
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --sheet: #FFFFFF;
+  --grouped: #F2F2F5;
+  --separator: #E3E3E8;
+  --handle: #D1D1D8;
+  --ink: #111114;
+  --ink-secondary: #6B6B76;
+  --accent: #00A86B;
+  --accent-deep: #007A4D;
+  --accent-soft: #E3F6EE;
+  --accent-ink: #FFFFFF;
+  --cat-cafe: #E4572E;
+  --cat-bakery: #E39A00;
+  --cat-park: #00A86B;
+  --success: #00A86B;
+  --error: #C62828;
+  --sheet-shadow: 0 -8px 32px rgba(17, 17, 20, 0.16);
+  --sheet-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --sheet-offset: 0px;
+
+  --font-body: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-num: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--grouped);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-text-size-adjust: 100%;
+}
+
+button, input {
+  font-family: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Keep the Mapbox logo and attribution just above the sheet at any snap */
+.mapboxgl-ctrl-bottom-left,
+.mapboxgl-ctrl-bottom-right {
+  bottom: var(--sheet-offset);
+  transition: bottom 280ms var(--sheet-ease);
+}
+
+body.sheet-dragging .mapboxgl-ctrl-bottom-left,
+body.sheet-dragging .mapboxgl-ctrl-bottom-right {
+  transition: none;
+}
+
+/* ---- The sheet (phone: draggable bottom sheet) ---- */
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 88px);
+  height: calc(100dvh - 88px);
+  background: var(--sheet);
+  border-radius: 20px 20px 0 0;
+  box-shadow: var(--sheet-shadow);
+  transform: translateY(calc(100% - 132px));
+  transition: transform 280ms var(--sheet-ease);
+  will-change: transform;
+}
+
+.sheet.is-dragging {
+  transition: none;
+}
+
+.sheet-head {
+  flex: none;
+  padding: 0 16px 18px;
+  border-bottom: 1px solid var(--separator);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sheet-head.is-detail {
+  padding-bottom: 10px;
+}
+
+.sheet-handle {
+  display: block;
+  width: 100%;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: grab;
+}
+
+.sheet-handle-bar {
+  display: block;
+  width: 36px;
+  height: 5px;
+  margin: 0 auto;
+  border-radius: 3px;
+  background: var(--handle);
+  transition: background 0.15s ease;
+}
+
+.sheet-handle:hover .sheet-handle-bar {
+  background: var(--ink-secondary);
+}
+
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px;
+  background: var(--grouped);
+  border-radius: 12px;
+  color: var(--ink-secondary);
+}
+
+.search-field svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 500;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.search-input::placeholder {
+  color: var(--ink-secondary);
+  font-weight: 400;
+}
+
+.search-field:focus-within {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  height: 34px;
+  margin-top: 10px;
+  padding: 2px;
+  background: var(--grouped);
+  border-radius: 10px;
+  box-sizing: border-box;
+}
+
+.segment {
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.segment[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.detail-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+}
+
+.back-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--grouped);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.back-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.detail-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(var(--sheet-y, 0px) + 16px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ---- List ---- */
+.group-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 6px;
+  color: var(--ink-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.group-label span:last-child {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.place-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.place-list li {
+  position: relative;
+}
+
+.place-list li::after {
+  content: '';
+  position: absolute;
+  left: 72px;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--separator);
+}
+
+.place-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 16px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.place-row:active,
+.place-row.is-selected {
+  background: var(--accent-soft);
+}
+
+.row-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--ink-secondary);
+  color: #fff;
+}
+
+.row-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.row-icon.cat-cafe { background: var(--cat-cafe); }
+.row-icon.cat-bakery { background: var(--cat-bakery); }
+.row-icon.cat-park { background: var(--cat-park); }
+
+.row-text {
+  min-width: 0;
+}
+
+.row-name,
+.row-meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-name {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.row-meta {
+  margin-top: 2px;
+  color: var(--ink-secondary);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.row-dist {
+  color: var(--ink-secondary);
+  font-family: var(--font-num);
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.empty-state {
+  margin: 0;
+  padding: 40px 32px;
+  color: var(--ink-secondary);
+  font-size: 15px;
+  text-align: center;
+}
+
+/* ---- Detail ---- */
+.detail-sub {
+  margin: 0;
+  padding: 14px 16px 0;
+  color: var(--ink-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px 4px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 15px;
+  background: var(--grouped);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 14px 16px 4px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 12px;
+  border: 1.5px solid transparent;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.btn-primary:active {
+  background: var(--accent-deep);
+}
+
+.btn-secondary {
+  background: var(--grouped);
+  color: var(--ink);
+}
+
+.btn-secondary[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-deep);
+}
+
+.btn-secondary[aria-pressed="true"] svg {
+  fill: currentColor;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.hours,
+.info-group {
+  margin: 14px 16px 0;
+  background: var(--grouped);
+  border-radius: 14px;
+}
+
+.hours {
+  padding: 14px 16px 10px;
+}
+
+.hours-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.hours-head span:last-child {
+  color: var(--accent-deep);
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.hours-bar {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 8px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 16px;
+  font-size: 15px;
+}
+
+.info-row + .info-row {
+  border-top: 1px solid var(--separator);
+}
+
+.info-row span:first-child {
+  color: var(--ink-secondary);
+}
+
+.info-row span:last-child {
+  font-family: var(--font-num);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ---- Toast + status pill ---- */
+.toast,
+.status-note {
+  position: fixed;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  z-index: 8;
+  max-width: calc(100% - 112px);
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.toast {
+  opacity: 0;
+  transform: translate(-50%, -8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.status-note.loading::before {
+  content: '';
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  margin-right: 8px;
+  vertical-align: -1px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: sheet-spin 0.8s linear infinite;
+}
+
+.status-note.success { background: var(--success); }
+.status-note.error { background: var(--error); }
+
+@keyframes sheet-spin {
+  to { transform: rotate(360deg); }
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Phone: no zoom buttons (pinch instead) so the lifted attribution never meets them */
+@media (max-width: 768px) {
+  .mapboxgl-ctrl-zoom-in,
+  .mapboxgl-ctrl-zoom-out {
+    display: none !important;
+  }
+}
+
+/* ---- Desktop: the sheet becomes a floating, non-draggable left card ---- */
+@media (min-width: 769px) {
+  .sheet {
+    top: 16px;
+    left: 16px;
+    right: auto;
+    bottom: auto;
+    width: 380px;
+    height: auto;
+    max-height: calc(100vh - 72px);
+    max-height: calc(100dvh - 72px);
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(17, 17, 20, 0.18);
+    transform: none !important;
+    transition: none;
+  }
+
+  .sheet-head {
+    padding-top: 16px;
+    touch-action: auto;
+  }
+
+  .sheet-handle {
+    display: none;
+  }
+
+  .sheet-body {
+    padding-bottom: 12px;
+  }
+
+  .toast,
+  .status-note {
+    left: calc(396px + (100% - 396px) / 2);
+    max-width: calc(100% - 520px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .mapboxgl-ctrl-bottom-left,
+  .mapboxgl-ctrl-bottom-right,
+  .toast {
+    transition: none;
+  }
+
+  .status-note.loading::before {
+    animation: none;
+  }
+}

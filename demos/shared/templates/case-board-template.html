@@ -1,0 +1,283 @@
+<!--
+  Working EXAMPLE of the Case Board style pack (case-board.css, in this same
+  folder). Open this file directly to see the pattern working with seven
+  fictional "evidence" locations around Marseille's Vieux-Port and Le Panier,
+  then copy the markup and script into your own demo and link case-board.css
+  from its <head> -- see the class/id contract documented at the top of that
+  CSS file for what to build.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (a detective's corkboard around a pinned city map).
+  The case, names and clues are illustrative placeholders, not real
+  content -- swap in your own.
+
+  Gotchas: Mapbox Standard config keys used (theme, lightPreset,
+  showPointOfInterestLabels, showTransitLabels) are all documented at
+  docs.mapbox.com/map-styles/standard/api/. The red yarn is a line layer
+  with lineMetrics + the line-trim-offset paint property for its reveal.
+
+  What's NOT included: real data, routing, search, or a build step. Cards
+  are generated from the SPOTS array below; polaroid pictures are CSS
+  drawings, not photos.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Case No. 0427 - The Vanishing Canvas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Libre+Franklin:wght@400;600;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="case-board.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: the map fills the white frame, inset by its padding. */
+  #map {
+    position: absolute;
+    inset: 10px;
+  }
+</style>
+</head>
+<body>
+<header class="case-folder" id="folder">
+  <div class="folder-tab">Case No. 0427</div>
+  <div class="folder-body">
+    <div>
+      <h1>The Vanishing Canvas</h1>
+      <p class="folder-sub">One painting, seven clues, one very quiet night in Marseille. Pin every clue to close the case.</p>
+    </div>
+    <div class="case-tools">
+      <div class="chips" id="chips" role="group" aria-label="Filter by suspect"></div>
+      <button class="btn btn-primary" id="connect">Connect the clues</button>
+      <button class="btn btn-secondary hidden" id="reset">Reopen case</button>
+    </div>
+  </div>
+  <div class="stamp stamp-confidential">Confidential</div>
+  <div class="stamp stamp-solved" aria-hidden="true">Solved</div>
+</header>
+
+<main class="board">
+  <div class="map-frame">
+    <span class="pin pin-tl"></span><span class="pin pin-tr"></span>
+    <span class="map-tape">Exhibit A - Vieux-Port &amp; Le Panier</span>
+    <div id="map"></div>
+  </div>
+  <div class="cards" id="cards">
+    <div class="sticky-note status-note loading" id="status-note" role="status">Loading the map</div>
+  </div>
+</main>
+
+<script>
+const WHO = { curator: 'The Curator', courier: 'The Courier', magpie: 'The Magpie' };
+
+// kind: index card or polaroid; ph: polaroid picture class; links: other spot ids
+const SPOTS = [
+  { id: 1, kind: 'index', short: 'Ledger', place: 'Vieux-Port quay', name: 'Dock 9 ledger', tilt: -1.8,
+    text: 'A crate was signed out at 04:10. The signature is a doodle of a cat.',
+    lngLat: [5.3698, 43.2951], links: [2, 4], who: ['courier'] },
+  { id: 2, kind: 'polaroid', ph: 'ph-ticket', short: 'Stub', place: 'Le Panier', name: 'Torn ticket stub', tilt: 1.6,
+    text: 'Half a stub for a gallery preview, dropped on the old steps.',
+    lngLat: [5.3672, 43.2991], links: [1, 3], who: ['curator', 'magpie'] },
+  { id: 3, kind: 'polaroid', ph: 'ph-steps', short: 'Wax', place: 'La Major', name: 'Candle wax trail', tilt: -1.2,
+    text: 'Fresh wax drips lead up the cathedral steps and then simply stop.',
+    lngLat: [5.3600, 43.2998], links: [2, 5], who: ['magpie'] },
+  { id: 4, kind: 'index', short: 'Rope', place: 'Fort Saint-Jean', name: 'Rope and chalk', tilt: 2,
+    text: 'A coil of rope and a chalk arrow pointing, rudely, at the sea.',
+    lngLat: [5.3606, 43.2906], links: [1, 6], who: ['courier'] },
+  { id: 5, kind: 'polaroid', ph: 'ph-frame', short: 'Frame', place: 'Palais Longchamp', name: 'The empty frame', tilt: 1.4,
+    text: 'The frame was found here, neatly hung, with a polite note inside.',
+    lngLat: [5.3947, 43.3047], links: [3, 7], who: ['curator'] },
+  { id: 6, kind: 'index', short: 'Postcard', place: 'Notre-Dame de la Garde', name: 'Postcard, no stamp', tilt: -2,
+    text: 'Wish you were here, reads the card. Signed with a tiny magpie.',
+    lngLat: [5.3714, 43.2840], links: [4, 7], who: ['courier', 'magpie'] },
+  { id: 7, kind: 'polaroid', ph: 'ph-smear', short: 'Smear', place: 'Vallon des Auffes', name: 'A smear of blue', tilt: -1.5,
+    text: 'Wet paint on a harbour wall. The missing canvas is hiding in plain sight.',
+    lngLat: [5.3530, 43.2865], links: [5, 6], who: ['magpie', 'curator'] },
+];
+const byId = Object.fromEntries(SPOTS.map((s) => [s.id, s]));
+const BOUNDS = [[5.349, 43.281], [5.398, 43.308]];
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  bounds: BOUNDS,
+  fitBoundsOptions: { padding: 40 },
+  config: { basemap: { theme: 'monochrome', lightPreset: 'day', showPointOfInterestLabels: false, showTransitLabels: false } },
+});
+
+// Yarn: a quadratic curve per link with a slight perpendicular sag.
+const edges = [];
+SPOTS.forEach((s) => s.links.forEach((l) => { if (s.id < l) edges.push([s.id, l]); }));
+
+function yarn([a, b], i) {
+  const p = byId[a].lngLat, q = byId[b].lngLat;
+  const dx = q[0] - p[0], dy = q[1] - p[1], len = Math.hypot(dx, dy);
+  const k = (0.1 + ((i * 37) % 7) / 50) * (i % 2 ? 1 : -1);
+  const c = [(p[0] + q[0]) / 2 - dy * k, (p[1] + q[1]) / 2 + dx * k];
+  const pts = [];
+  for (let t = 0; t <= 1.001; t += 1 / 20) {
+    pts.push([0, 1].map((n) => (1 - t) * (1 - t) * p[n] + 2 * (1 - t) * t * c[n] + t * t * q[n]));
+  }
+  return { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: pts } };
+}
+
+const visited = new Set();
+const markers = {};
+let who = 'all', trim = 0, trimTarget = 0, raf = 0;
+
+map.on('style.load', () => {
+  map.addSource('yarn', { type: 'geojson', lineMetrics: true,
+    data: { type: 'FeatureCollection', features: edges.map(yarn) } });
+  map.addSource('spots', { type: 'geojson',
+    data: { type: 'FeatureCollection', features: SPOTS.map((s) => ({
+      type: 'Feature', properties: { id: s.id, who: s.who.join(',') },
+      geometry: { type: 'Point', coordinates: s.lngLat } })) } });
+  map.addLayer({ id: 'yarn-shadow', type: 'line', source: 'yarn', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-width': 5, 'line-color': 'rgba(0,0,0,0.4)', 'line-blur': 3,
+      'line-translate': [2, 3], 'line-trim-offset': [0, 1] } });
+  map.addLayer({ id: 'yarn-line', type: 'line', source: 'yarn', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-width': 3, 'line-color': '#B3001B', 'line-emissive-strength': 1,
+      'line-trim-offset': [0, 1] } });
+  map.addLayer({ id: 'spot-dots', type: 'circle', source: 'spots', slot: 'top',
+    paint: { 'circle-radius': 6, 'circle-color': 'rgba(179,0,27,0.3)', 'circle-stroke-color': '#B3001B',
+      'circle-stroke-width': 2, 'circle-emissive-strength': 1 } });
+  setStatus('The wall is bare. Pick a card to pin the first clue.', '');
+  applyFilter();
+});
+
+map.on('error', (e) => setStatus('Map error: ' + ((e.error && e.error.message) || 'unknown'), 'error'));
+
+const statusEl = document.getElementById('status-note');
+function setStatus(text, cls) {
+  statusEl.className = 'sticky-note status-note ' + cls;
+  statusEl.innerHTML = '';
+  statusEl.append(text);
+  const p = document.createElement('span');
+  p.className = 'progress';
+  p.textContent = 'Clues pinned: ' + visited.size + ' / ' + SPOTS.length;
+  statusEl.append(p);
+}
+
+// Cards
+const cardsEl = document.getElementById('cards');
+SPOTS.forEach((s) => {
+  const card = document.createElement('button');
+  card.className = 'card ' + (s.kind === 'index' ? 'index-card' : 'polaroid');
+  card.style.setProperty('--tilt', s.tilt + 'deg');
+  card.dataset.id = s.id;
+  card.innerHTML =
+    '<span class="pin"></span>' +
+    (s.kind === 'polaroid' ? '<span class="polaroid-img ' + s.ph + '"></span>' : '') +
+    '<span class="card-kicker">No. ' + s.id + ' - ' + s.place + '</span>' +
+    '<span class="card-title">' + s.name + '</span>' +
+    '<span class="card-text">' + s.text + '</span>' +
+    '<span class="card-links">Linked: ' + s.links.map((l) => byId[l].short).join(', ') + '</span>';
+  card.addEventListener('click', () => visit(s.id));
+  cardsEl.insertBefore(card, statusEl);
+});
+
+function visit(id) {
+  const s = byId[id];
+  document.querySelector('.card[data-id="' + id + '"]').classList.add('pinned');
+  if (!markers[id]) {
+    const el = document.createElement('div');
+    el.className = 'case-marker';
+    el.innerHTML = '<span class="pin-drop"><span class="pin-ball"></span><span class="pin-needle"></span></span>';
+    el.addEventListener('click', () => visit(id));
+    markers[id] = new mapboxgl.Marker({ element: el, anchor: 'bottom' }).setLngLat(s.lngLat).addTo(map);
+  }
+  visited.add(id);
+  Object.entries(markers).forEach(([k, m]) => m.getElement().classList.toggle('is-active', Number(k) === id));
+  if (map.getLayer('spot-dots')) map.setFilter('spot-dots', ['!', ['in', ['get', 'id'], ['literal', [...visited]]]]);
+
+  const cam = { center: s.lngLat, zoom: Math.max(map.getZoom(), 15.2) };
+  if (reduce.matches) map.jumpTo(cam); else map.flyTo({ ...cam, duration: 1600, essential: true });
+
+  if (visited.size === SPOTS.length) {
+    document.getElementById('folder').classList.add('solved');
+    document.getElementById('reset').classList.remove('hidden');
+    setStatus('Case closed. The Magpie left the canvas in plain sight.', 'success');
+  } else {
+    setStatus('Pinned: ' + s.name + '.', '');
+  }
+  applyFilter();
+}
+
+// Suspect filter: dim cards, markers and map dots that do not involve the suspect.
+const chipsEl = document.getElementById('chips');
+[['all', 'All'], ...Object.entries(WHO)].forEach(([key, label]) => {
+  const chip = document.createElement('button');
+  chip.className = 'chip' + (key === 'all' ? ' is-active' : '');
+  chip.textContent = label;
+  chip.setAttribute('aria-pressed', key === 'all');
+  chip.addEventListener('click', () => {
+    who = key;
+    chipsEl.querySelectorAll('.chip').forEach((c) => {
+      c.classList.toggle('is-active', c === chip);
+      c.setAttribute('aria-pressed', c === chip);
+    });
+    applyFilter();
+  });
+  chipsEl.appendChild(chip);
+});
+
+function applyFilter() {
+  SPOTS.forEach((s) => {
+    const dim = who !== 'all' && !s.who.includes(who);
+    document.querySelector('.card[data-id="' + s.id + '"]').classList.toggle('dim', dim);
+    if (markers[s.id]) markers[s.id].getElement().classList.toggle('dim', dim);
+  });
+  if (map.getLayer('spot-dots')) {
+    map.setPaintProperty('spot-dots', 'circle-opacity', who === 'all' ? 1 : ['case', ['in', who, ['get', 'who']], 1, 0.15]);
+    map.setPaintProperty('spot-dots', 'circle-stroke-opacity', who === 'all' ? 1 : ['case', ['in', who, ['get', 'who']], 1, 0.15]);
+  }
+}
+
+// Yarn reveal: animate line-trim-offset [p, 1] (everything after p is hidden).
+function setTrim(p) {
+  trim = p;
+  const v = [Math.min(p, 1), 1];
+  ['yarn-line', 'yarn-shadow'].forEach((id) => map.getLayer(id) && map.setPaintProperty(id, 'line-trim-offset', v));
+}
+
+function animateYarn(target) {
+  cancelAnimationFrame(raf);
+  trimTarget = target;
+  const from = trim, start = performance.now(), dur = reduce.matches ? 0 : 1400;
+  (function tick(now) {
+    const t = dur ? Math.min((now - start) / dur, 1) : 1;
+    setTrim(from + (target - from) * t);
+    if (t < 1) raf = requestAnimationFrame(tick);
+  })(start);
+}
+
+const connectBtn = document.getElementById('connect');
+connectBtn.addEventListener('click', () => {
+  const on = trimTarget < 1;
+  animateYarn(on ? 1 : 0);
+  if (on) map.fitBounds(BOUNDS, { padding: 60, duration: reduce.matches ? 0 : 1400 });
+  connectBtn.textContent = on ? 'Cut the yarn' : 'Connect the clues';
+  if (on) setStatus('Red yarn strung between every linked clue.', '');
+});
+
+document.getElementById('reset').addEventListener('click', () => {
+  visited.clear();
+  Object.values(markers).forEach((m) => m.remove());
+  Object.keys(markers).forEach((k) => delete markers[k]);
+  document.querySelectorAll('.card').forEach((c) => c.classList.remove('pinned'));
+  document.getElementById('folder').classList.remove('solved');
+  document.getElementById('reset').classList.add('hidden');
+  if (map.getLayer('spot-dots')) map.setFilter('spot-dots', null);
+  animateYarn(0);
+  connectBtn.textContent = 'Connect the clues';
+  map.fitBounds(BOUNDS, { padding: 40, duration: reduce.matches ? 0 : 1200 });
+  setStatus('Case reopened. The wall is bare again.', '');
+});
+</script>
+</body>
+</html>

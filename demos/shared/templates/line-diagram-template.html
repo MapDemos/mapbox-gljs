@@ -1,0 +1,393 @@
+<!--
+  Working EXAMPLE of the Line Diagram style pack (line-diagram.css, in this
+  same folder). Open this file directly to see the pattern working with a
+  fictional twelve-station "Coral Line" drawn along Paseo de la Reforma in
+  Mexico City, then copy the markup and script into your own demo and link
+  line-diagram.css from its <head> -- see the class/id contract documented
+  at the top of that CSS file for what to build.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (the modernist strip map above train doors: one thick
+  coral line, white ticks, interchange double circles, names at 45 degrees).
+  The line, its interchanges, step-free flags and departure times are
+  illustrative placeholders, not a real service; stations sit at public
+  places only approximately -- swap in your own.
+
+  The numbered train moves along the strip AND the geographic line in sync
+  (dwelling 1.5s at each station). Clicking a station on either one selects
+  it. "Direction" flips the strip order and the train's travel.
+
+  What's NOT included: real transit data (GTFS), routing along streets (the
+  line joins station points with straight segments), live times, or a build
+  step. Departure times are generated from the clock.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Coral Line</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Martian+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="line-diagram.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: the map fills the area under the strip. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="line-app">
+  <header class="line-head">
+    <span class="line-badge" aria-hidden="true">7</span>
+    <h1 class="line-title">Coral Line <span class="dir" id="dir-label"></span></h1>
+    <div class="line-controls">
+      <button class="btn btn-secondary" id="play" aria-pressed="true">Pause</button>
+      <button class="btn btn-primary" id="flip">Direction &#8644;</button>
+    </div>
+  </header>
+
+  <section class="strip" aria-label="Line diagram">
+    <div class="strip-scroll" id="strip-scroll">
+      <div class="strip-track" id="strip-track">
+        <div class="strip-line"></div>
+        <div class="strip-train" id="strip-train" aria-hidden="true">7</div>
+        <ol class="strip-items" id="strip-items"></ol>
+      </div>
+    </div>
+  </section>
+
+  <main class="map-wrap">
+    <div id="map"></div>
+    <div class="status-note loading" id="status-note">Loading map</div>
+    <div class="map-overlay">
+      <aside class="station-card hidden" id="station-card" aria-live="polite">
+        <button class="card-close" id="card-close" aria-label="Close station card">&times;</button>
+        <h2 class="station-name" id="st-name"></h2>
+        <p class="station-sub" id="st-sub"></p>
+        <div class="badges" id="st-badges"></div>
+        <div id="st-access"></div>
+        <div class="station-min"><strong id="st-min"></strong><span id="st-min-cap"></span></div>
+      </aside>
+      <aside class="depart-card" id="depart-card">
+        <h2 class="depart-title">Next train <span id="dep-at"></span></h2>
+        <div id="dep-rows"></div>
+        <p class="depart-status" id="dep-status"></p>
+      </aside>
+    </div>
+  </main>
+</div>
+
+<script>
+const LINES = {
+  teal:    { n: '2', name: 'Teal Line',    color: '#00A19A' },
+  violet:  { n: '4', name: 'Violet Line',  color: '#6E3FD8' },
+  mustard: { n: '9', name: 'Mustard Line', color: '#F2B705', light: true },
+};
+// Canonical order: Zocalo (east) -> Observatorio (west). Interchanges are fictional.
+const STATIONS = [
+  { name: 'Zócalo', full: 'Zócalo, Plaza de la Constitución', c: [-99.1332, 19.4326], x: ['teal'], sf: true },
+  { name: 'Bellas Artes', full: 'Palacio de Bellas Artes', c: [-99.1413, 19.4352], x: ['teal', 'violet'], sf: true },
+  { name: 'Alameda', full: 'Alameda Central', c: [-99.1450, 19.4361], x: ['mustard'], sf: false },
+  { name: 'Revolución', full: 'Monumento a la Revolución', c: [-99.1548, 19.4364], x: ['violet'], sf: true },
+  { name: 'Cuauhtémoc', full: 'Glorieta Cuauhtémoc', c: [-99.1590, 19.4290], x: [], sf: true },
+  { name: 'Ángel', full: 'Ángel de la Independencia', c: [-99.1677, 19.4270], x: ['mustard'], sf: true },
+  { name: 'Diana', full: 'Fuente de la Diana Cazadora', c: [-99.1717, 19.4263], x: [], sf: false },
+  { name: 'Chapultepec', full: 'Bosque de Chapultepec', c: [-99.1800, 19.4235], x: [], sf: true },
+  { name: 'Antropología', full: 'Museo Nacional de Antropología', c: [-99.1862, 19.4261], x: ['teal'], sf: true },
+  { name: 'Auditorio', full: 'Auditorio Nacional', c: [-99.1927, 19.4252], x: [], sf: false },
+  { name: 'Parque Lira', full: 'Parque Lira', c: [-99.1893, 19.4115], x: [], sf: true },
+  { name: 'Observatorio', full: 'Observatorio', c: [-99.2003, 19.3984], x: ['violet', 'mustard'], sf: true },
+];
+const CORAL = '#FF5F45', INK = '#1A1A1A';
+const DWELL = 1500, M_PER_MIN = 450, PHONE = '(max-width: 640px)';
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const $ = (id) => document.getElementById(id);
+
+let dir = 'west';          // 'west' = Zocalo -> Observatorio
+let seq = STATIONS.map((_, i) => i);
+let selected = -1;         // canonical index, -1 = none
+let playing = !reduceMotion.matches;
+const train = { seg: 0, mode: 'dwell', clock: 0 };
+
+const meters = (a, b) => {
+  const r = Math.PI / 180, dy = (b[1] - a[1]) * r, dx = (b[0] - a[0]) * r * Math.cos(a[1] * r);
+  return Math.hypot(dx, dy) * 6371000;
+};
+const segMeters = (k) => meters(STATIONS[seq[k]].c, STATIONS[seq[k + 1]].c);
+const minutesTo = (k) => { // minutes from the origin of the current direction
+  let m = 0;
+  for (let i = 0; i < k; i++) m += segMeters(i) / M_PER_MIN + 0.5;
+  return Math.round(m);
+};
+const ease = (p) => (p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2);
+const hhmm = (min) => new Date(Date.now() + min * 60000)
+  .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+/* ---------- Map ---------- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [-99.165, 19.42],
+  zoom: 12,
+  config: { basemap: { theme: 'faded', lightPreset: 'day', showTransitLabels: false, showPointOfInterestLabels: false, showPlaceLabels: false } },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');
+
+const fc = (features) => ({ type: 'FeatureCollection', features });
+const pt = (c, props) => ({ type: 'Feature', properties: props || {}, geometry: { type: 'Point', coordinates: c } });
+const zoomW = (a, b) => ['interpolate', ['linear'], ['zoom'], 10, a, 16, b];
+
+map.on('style.load', () => {
+  map.addSource('line', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: STATIONS.map((s) => s.c) } } });
+  map.addSource('stations', { type: 'geojson', data: fc(STATIONS.map((s, i) => pt(s.c, { idx: i, name: s.name, ic: s.x.length }))) });
+  ['selected', 'current', 'train'].forEach((id) => map.addSource(id, { type: 'geojson', data: fc([]) }));
+
+  map.addLayer({ id: 'line-casing', type: 'line', source: 'line', slot: 'middle',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#FFFFFF', 'line-width': zoomW(7, 20), 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'line-coral', type: 'line', source: 'line', slot: 'middle',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': CORAL, 'line-width': zoomW(4, 11), 'line-emissive-strength': 1 } });
+
+  const R = zoomW(4, 9);
+  const circle = (id, filter, color, radius, stroke, strokeW, dx) => map.addLayer({ id, type: 'circle', source: 'stations', slot: 'top', filter,
+    paint: { 'circle-radius': radius, 'circle-color': color, 'circle-stroke-color': INK, 'circle-stroke-width': strokeW,
+      'circle-translate': [dx, 0], 'circle-emissive-strength': 1, 'circle-stroke-opacity': stroke } });
+  const single = ['==', ['get', 'ic'], 0], multi = ['>', ['get', 'ic'], 0];
+  circle('stn-single', single, '#FFFFFF', R, 1, 3, 0);
+  // Interchanges: two black discs, then two white discs on top = joined double circle
+  const Rb = zoomW(6.5, 12);
+  circle('ic-black-a', multi, INK, Rb, 0, 0, -4);
+  circle('ic-black-b', multi, INK, Rb, 0, 0, 4);
+  circle('ic-white-a', multi, '#FFFFFF', R, 0, 0, -4);
+  circle('ic-white-b', multi, '#FFFFFF', R, 0, 0, 4);
+
+  const ring = (id, src, color, w) => map.addLayer({ id, type: 'circle', source: src, slot: 'top',
+    paint: { 'circle-radius': zoomW(11, 19), 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': color, 'circle-stroke-width': w, 'circle-emissive-strength': 1 } });
+  ring('ring-selected', 'selected', INK, 3);
+  ring('ring-current', 'current', CORAL, 4);
+
+  map.addLayer({ id: 'stn-labels', type: 'symbol', source: 'stations', slot: 'top', minzoom: 11,
+    layout: { 'text-field': ['get', 'name'], 'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'], 'text-size': 12.5,
+      'text-variable-anchor': ['top', 'bottom', 'right', 'left'], 'text-radial-offset': 1.3,
+      'text-allow-overlap': false, 'symbol-sort-key': ['get', 'idx'] },
+    paint: { 'text-color': INK, 'text-halo-color': '#FFFFFF', 'text-halo-width': 2, 'text-emissive-strength': 1 } });
+  map.addLayer({ id: 'stn-hit', type: 'circle', source: 'stations', slot: 'top',
+    paint: { 'circle-radius': 16, 'circle-color': 'rgba(0,0,0,0)' } });
+
+  map.addLayer({ id: 'train-dot', type: 'circle', source: 'train', slot: 'top',
+    paint: { 'circle-radius': 11, 'circle-color': CORAL, 'circle-stroke-color': INK, 'circle-stroke-width': 3, 'circle-emissive-strength': 1 } });
+  map.addLayer({ id: 'train-num', type: 'symbol', source: 'train', slot: 'top',
+    layout: { 'text-field': '7', 'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'], 'text-size': 12, 'text-allow-overlap': true, 'text-ignore-placement': true },
+    paint: { 'text-color': INK, 'text-emissive-strength': 1 } });
+
+  map.on('click', 'stn-hit', (e) => select(e.features[0].properties.idx, { scroll: true }));
+  map.on('mouseenter', 'stn-hit', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'stn-hit', () => { map.getCanvas().style.cursor = ''; });
+
+  const b = new mapboxgl.LngLatBounds();
+  STATIONS.forEach((s) => b.extend(s.c));
+  map.resize();
+  map.fitBounds(b, { padding: padding(false), duration: 0 });
+  $('status-note').classList.add('hidden');
+  syncMapState();
+});
+
+map.on('error', (e) => {
+  const n = $('status-note');
+  n.className = 'status-note error';
+  n.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+// Keep focus points clear of the floating cards.
+function padding(card) {
+  const phone = window.matchMedia(PHONE).matches;
+  if (phone) return { top: card ? 210 : 80, bottom: 30, left: 40, right: 40 };
+  return { top: 40, bottom: 72, left: card ? 340 : 72, right: 336 }; // right clears the 280px Next-train card
+}
+
+function setSource(id, features) {
+  const s = map.getSource(id);
+  if (s) s.setData(fc(features));
+}
+
+function syncMapState() {
+  setSource('selected', selected >= 0 ? [pt(STATIONS[selected].c)] : []);
+  setSource('current', train.mode === 'dwell' ? [pt(STATIONS[seq[train.seg]].c)] : []);
+}
+
+/* ---------- Strip ---------- */
+const scroller = $('strip-scroll'), itemsEl = $('strip-items'), trainEl = $('strip-train');
+let centers = [];
+
+function buildStrip() {
+  itemsEl.innerHTML = '';
+  seq.forEach((idx, k) => {
+    const s = STATIONS[idx];
+    const li = document.createElement('li');
+    const chips = s.x.map((x) => '<i class="stn-chip" style="--c:' + LINES[x].color + '"></i>').join('');
+    li.innerHTML = '<button class="stn' + (s.x.length ? ' is-interchange' : '') + '" data-idx="' + idx + '" style="--n:' + s.x.length + '" ' +
+      'aria-label="' + s.full + ', ' + minutesTo(k) + ' minutes from ' + STATIONS[seq[0]].name + '">' +
+      '<span class="stn-dot">' + chips + '</span><span class="stn-name">' + s.name + '</span>' +
+      '<span class="stn-min">' + minutesTo(k) + '</span></button>';
+    li.firstChild.addEventListener('click', () => select(idx, { scroll: true }));
+    itemsEl.appendChild(li);
+  });
+  measure();
+  markStrip();
+}
+
+function measure() {
+  centers = [...itemsEl.children].map((li) => li.offsetLeft + li.offsetWidth / 2);
+}
+
+function markStrip() {
+  itemsEl.querySelectorAll('.stn').forEach((b) => {
+    const idx = Number(b.dataset.idx);
+    b.classList.toggle('is-selected', idx === selected);
+    b.classList.toggle('is-train', train.mode === 'dwell' && idx === seq[train.seg]);
+  });
+}
+
+function scrollToStation(idx, force) {
+  const li = itemsEl.children[seq.indexOf(idx)];
+  const left = li.offsetLeft + li.offsetWidth / 2 - scroller.clientWidth / 2;
+  const visible = li.offsetLeft > scroller.scrollLeft && li.offsetLeft + li.offsetWidth < scroller.scrollLeft + scroller.clientWidth;
+  if (force || !visible) scroller.scrollTo({ left, behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+}
+
+/* ---------- Cards ---------- */
+function renderStation() {
+  $('station-card').classList.toggle('hidden', selected < 0);
+  if (selected < 0) return;
+  const s = STATIONS[selected], k = seq.indexOf(selected);
+  $('st-name').textContent = s.name;
+  $('st-sub').textContent = s.full;
+  $('st-badges').innerHTML = s.x.length
+    ? s.x.map((x) => '<span class="line-chip' + (LINES[x].light ? ' on-light' : '') + '" style="--c:' + LINES[x].color + '"><b>' + LINES[x].n + '</b>' + LINES[x].name + '</span>').join('')
+    : '<span class="line-chip"><b style="--c:' + CORAL + ';color:' + INK + '">7</b>Coral Line only</span>';
+  $('st-access').innerHTML = '<span class="stepfree' + (s.sf ? '' : ' no') + '">' +
+    '<svg viewBox="0 0 20 20" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<circle cx="9" cy="3.6" r="1.6" fill="#fff" stroke="none"/><path d="M9 6.5v5h4l2 4M9 9h4M7.2 9.2a4.6 4.6 0 1 0 5.6 6.6"/></svg>' +
+    (s.sf ? 'Step-free access' : 'Stairs only') + '</span>';
+  $('st-min').textContent = minutesTo(k);
+  $('st-min-cap').textContent = k === 0 ? 'terminus, start of line' : 'min from ' + STATIONS[seq[0]].name;
+}
+
+function renderDepartures() {
+  const idx = selected >= 0 ? selected : seq[0];
+  const k = seq.indexOf(idx), last = k === seq.length - 1;
+  const destIdx = last ? seq[0] : seq[seq.length - 1];
+  const plat = (dir === 'west') !== last ? 1 : 2;
+  const base = (idx * 2) % 5 + 1;
+  $('dep-at').textContent = STATIONS[idx].name;
+  $('dep-rows').innerHTML = [0, 1, 2].map((n) => {
+    const m = base + n * 6;
+    return '<div class="depart-row' + (n === 0 ? ' is-next' : ' is-later') + '"><span class="depart-time">' + hhmm(m) + '</span>' +
+      '<span class="depart-dest">' + STATIONS[destIdx].name + '</span><span class="depart-plat">P' + plat + '</span>' +
+      '<span class="depart-in">' + m + ' min</span></div>';
+  }).join('');
+  const here = STATIONS[seq[train.seg]].name;
+  $('dep-status').textContent = train.mode === 'dwell'
+    ? 'Train 07 stopped at ' + here
+    : 'Train 07 to ' + STATIONS[seq[train.seg + 1]].name;
+}
+
+function renderDirection() {
+  const west = dir === 'west';
+  $('dir-label').textContent = '· ' + (west ? 'Westbound' : 'Eastbound') + ' to ' + STATIONS[seq[seq.length - 1]].name;
+}
+
+/* ---------- Selection ---------- */
+function select(idx, opts) {
+  selected = idx;
+  renderStation();
+  renderDepartures();
+  markStrip();
+  syncMapState();
+  if (idx < 0) return;
+  const cam = { center: STATIONS[idx].c, zoom: 14.6, padding: padding(true) };
+  if (reduceMotion.matches) map.jumpTo(cam);
+  else map.flyTo({ ...cam, duration: 1400, essential: true });
+  if (opts && opts.scroll) scrollToStation(idx, true);
+}
+
+$('card-close').addEventListener('click', () => select(-1));
+
+$('flip').addEventListener('click', () => {
+  const from = seq[train.seg];
+  dir = dir === 'west' ? 'east' : 'west';
+  seq.reverse();
+  Object.assign(train, { seg: Math.min(seq.indexOf(from), seq.length - 2), mode: 'dwell', clock: 0 });
+  renderDirection();
+  buildStrip();
+  renderStation();
+  renderDepartures();
+  syncMapState();
+  setTrain(0);
+  scrollToStation(seq[train.seg], true);
+});
+
+$('play').addEventListener('click', () => {
+  playing = !playing;
+  $('play').textContent = playing ? 'Pause' : 'Play';
+  $('play').setAttribute('aria-pressed', String(playing));
+});
+
+/* ---------- Train animation ---------- */
+function setTrain(p) {
+  const a = train.seg, e = train.mode === 'move' ? ease(p) : 0;
+  const x = centers[a] + ((centers[a + 1] !== undefined ? centers[a + 1] : centers[a]) - centers[a]) * e;
+  trainEl.style.transform = 'translate(' + (x - 15) + 'px, -50%)';
+  const A = STATIONS[seq[a]].c, B = STATIONS[seq[Math.min(a + 1, seq.length - 1)]].c;
+  setSource('train', [pt([A[0] + (B[0] - A[0]) * e, A[1] + (B[1] - A[1]) * e])]);
+}
+
+function setMode(mode) {
+  train.mode = mode;
+  train.clock = 0;
+  markStrip();
+  syncMapState();
+  renderDepartures();
+  if (mode === 'dwell') scrollToStation(seq[train.seg], false);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(now - last, 100);
+  last = now;
+  if (playing) {
+    train.clock += dt;
+    if (train.mode === 'dwell') {
+      if (train.clock >= DWELL) {
+        if (train.seg >= seq.length - 1) { train.seg = 0; setMode('dwell'); }
+        else setMode('move');
+      }
+    } else if (train.clock >= segMeters(train.seg) * 2.2) {
+      train.seg++;
+      setMode('dwell');
+    }
+  }
+  const dur = train.mode === 'move' ? segMeters(train.seg) * 2.2 : 1;
+  setTrain(train.mode === 'move' ? Math.min(train.clock / dur, 1) : 0);
+  requestAnimationFrame(frame);
+}
+
+window.addEventListener('resize', measure);
+$('play').textContent = playing ? 'Pause' : 'Play';
+$('play').setAttribute('aria-pressed', String(playing));
+renderDirection();
+buildStrip();
+renderDepartures();
+setInterval(renderDepartures, 30000);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

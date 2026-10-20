@@ -1,0 +1,644 @@
+/*
+  Amber Terminal -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: an amber-phosphor CRT text terminal with
+  ncurses-style windows, drawn in a double-line box-drawing frame, with a
+  status bar on top and a command line with a blinking block cursor at the
+  bottom), deliberately distinct from every other pack in this folder:
+  Arena is a dark stadium scoreboard, Editorial Paper is warm paper and
+  serif headlines, Highway Sign is cream/green MUTCD signage, Slate Console
+  is a cool-grey ops console, Storefront is a light retail locator, Tarmac
+  Glass is dark blur-glass + amber, Vintage Chart is navy/parchment/brass,
+  Weather Console is a dense forecast dashboard, Riso Zine is two-colour
+  misregistered print, Swiss Grid is white/black/red typographic grid, Neon
+  HUD is glowing sci-fi overlays, Pastel Bento is soft rounded tiles,
+  Blueprint is white-on-blue drafting lines, Story Scroll is a scrolling
+  narrative, Retro OS is a desktop-window UI, Aurora Command is a
+  gradient-glow control room, Deco Voyage is gold-on-black Art Deco, Washi
+  Seasons is quiet Japanese paper and seasonal colour, Raw Web is
+  unstyled-browser brutalism, Case Board is a pinned investigation board,
+  Line Diagram is a transit-map schematic, Aero Gadgets is glossy
+  early-2000s skeuomorphism, Chat Concierge is a messaging-thread UI,
+  Chronicle is a newspaper front page, Broadcast is a TV news lower-third
+  look, Bottom Sheet is a mobile draggable-sheet app, Trailhead is rugged
+  outdoor-gear tags and contours, and Field Journal is a naturalist's
+  notebook with pressed specimens.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/amber-terminal.css" rel="stylesheet" />
+  plus the Google Fonts it expects (VT323 for headings and readouts;
+  Anonymous Pro for body text, tables and the command line):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=Anonymous+Pro:wght@400;700&display=swap" rel="stylesheet" />
+
+  Signature touch: a typed command line -- scrollback log above a
+  "prompt>" row whose block cursor blinks after the typed text -- plus
+  ncurses windows with double-line borders and a title cut into the frame
+  ("[ EVENTS ]"), phosphor glow via text-shadow, and faint scanlines laid
+  over the page (<= 6% opacity, pointer-events none) so the map stays
+  readable. The vignette is on the page chrome only; the windows are opaque.
+
+  Layout: .app is a 3-row grid: .statusbar, .main, .cmdline. .main is a
+  two-column grid on desktop (EVENTS window on the left; MAP window over
+  the HISTOGRAM window on the right). On phones .main scrolls inside itself
+  and the windows stack with the map first (~45dvh); the command line stays
+  at the bottom. #map lives INSIDE .win-map's .win-body, so the Mapbox logo
+  and attribution sit in the map's own corners and are never covered. If
+  you add a raster-dem source (terrain), GL JS hides the logo; the rule
+  near the bottom of this file forces it back.
+
+  Class/id contract (see amber-terminal-template.html in this same folder
+  for a full working example):
+
+  - .app                      page grid, 100dvh, never scrolls
+  - .statusbar                top bar; holds .sb-item cells (.sb-label +
+                               .sb-val), .sb-brand, .sb-spacer;
+                               add data-opt to hide a cell on phones
+  - .main                     window area (grid on desktop, scroll stack
+                               on phones)
+  - .win                      ncurses window: double border, dark panel;
+                               .win-title is the label cut into the top
+                               edge; .win-body is the content box
+    .win-events / .win-map /    the three windows (grid placement)
+    .win-hist
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .tbl                      scrolling event table: .tbl-head (header row)
+                               and .tbl-body holding .row (role=button),
+                               cells .c-time .c-mag .c-dep .c-place;
+                               .row.sel is the selected row (reverse
+                               video); .row.new marks the newest events
+  - #hist                     inline SVG histogram; SVG classes .hb (bar
+                               block), .hb-dim, .ha (axis text), .hl
+                               (axis line), .hn (count text)
+  - .sel-box                  inner child of the selected-event marker
+                               (corner brackets); never style the marker
+                               root itself
+  - .cmdline                  bottom block: .log (scrollback) + .cmdrow
+    .ln                         log line (a <div>, or a <button> when it
+                                carries a clickable command hint);
+                                .ln.echo is the echoed command, .ln.err is
+                                an error, .ln.dim is muted
+    .prompt, .field             prompt label and the typing field:
+                                .typed (mirror of the input), .cursor
+                                (blinking block) and the real, invisible
+                                <input id="cmd-input"> overlaid on top
+  - .hint                     inline clickable command hint (button)
+  - body.bright               "extra-bright phosphor" mode (bumps colour
+                               and glow)
+  - .status-note (+.loading/  small status line
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --black: #0B0700;
+  --panel: #100A02;
+  --water: #140C00;
+  --amber: #FFB000;
+  --amber-dim: #8A5A00;
+  --amber-bright: #FFD27A;
+  --fg: var(--amber);
+  --line: var(--amber-dim);
+  --glow: 0 0 6px rgba(255, 176, 0, 0.55), 0 0 14px rgba(255, 176, 0, 0.18);
+  --success: #FFD27A;
+  --error: #FF7A33;
+
+  --font-heading: 'VT323', 'Courier New', monospace;
+  --font-body: 'Anonymous Pro', 'Courier New', monospace;
+  --font-label: var(--font-heading);
+}
+
+body.bright {
+  --fg: var(--amber-bright);
+  --line: #C98A10;
+  --glow: 0 0 5px rgba(255, 210, 122, 0.85), 0 0 18px rgba(255, 176, 0, 0.45);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--black);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-shadow: var(--glow);
+}
+
+button, input {
+  font-family: inherit;
+  text-shadow: inherit;
+}
+
+::selection {
+  background: var(--amber);
+  color: var(--black);
+}
+
+:focus-visible {
+  outline: 2px dashed var(--amber-bright);
+  outline-offset: 2px;
+}
+
+/* Page grid. The radial vignette is on the chrome only (windows are opaque). */
+.app {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100dvh;
+  background:
+    radial-gradient(ellipse at 50% 45%, rgba(255, 176, 0, 0.07) 0%, rgba(11, 7, 0, 0) 55%),
+    radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.75) 100%),
+    var(--black);
+}
+
+/* CRT scanlines: faint, over everything, never intercepting input. */
+.app::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0.06;
+  background: repeating-linear-gradient(to bottom, #000 0 1px, transparent 1px 3px);
+}
+
+/* ---- Status bar ---- */
+.statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 22px;
+  padding: 6px 14px;
+  border-bottom: 3px double var(--line);
+  font-family: var(--font-heading);
+  font-size: 21px;
+  line-height: 1.1;
+}
+
+.sb-brand {
+  color: var(--black);
+  background: var(--fg);
+  padding: 0 8px;
+  text-shadow: none;
+  letter-spacing: 0.04em;
+}
+
+.sb-label {
+  color: var(--amber-dim);
+  margin-right: 6px;
+}
+
+body.bright .sb-label {
+  color: #C98A10;
+}
+
+.sb-val {
+  color: var(--fg);
+}
+
+.sb-spacer {
+  flex: 1 1 0;
+}
+
+/* ---- Windows ---- */
+.main {
+  display: grid;
+  grid-template-columns: 370px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) 168px;
+  gap: 16px 14px;
+  padding: 18px 14px 12px;
+  min-height: 0;
+}
+
+.win {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border: 3px double var(--line);
+  background: var(--panel);
+}
+
+.win-title {
+  position: absolute;
+  top: -0.62em;
+  left: 14px;
+  z-index: 3;
+  padding: 0 8px;
+  background: var(--black);
+  font-family: var(--font-heading);
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+}
+
+.win-title::before {
+  content: '\2524 ';
+  color: var(--line);
+}
+
+.win-title::after {
+  content: ' \251C';
+  color: var(--line);
+}
+
+.win-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.win-events {
+  grid-column: 1;
+  grid-row: 1 / 3;
+}
+
+.win-map {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.win-hist {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+/* ---- Events table ---- */
+.tbl {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding-top: 8px;
+}
+
+.tbl-head,
+.row {
+  display: grid;
+  grid-template-columns: 74px 44px 40px minmax(0, 1fr);
+  gap: 0 6px;
+  padding: 1px 10px 1px 14px;
+  text-align: left;
+}
+
+.tbl-head {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  color: var(--amber-dim);
+  border-bottom: 1px dashed var(--line);
+  letter-spacing: 0.05em;
+}
+
+body.bright .tbl-head {
+  color: #C98A10;
+}
+
+.tbl-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--amber-dim) transparent;
+}
+
+.row {
+  position: relative;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: rgba(255, 176, 0, 0.12);
+}
+
+.row.sel {
+  background: var(--fg);
+  color: var(--black);
+  text-shadow: none;
+  font-weight: 700;
+}
+
+.row.sel::before {
+  content: '>';
+  position: absolute;
+  left: 3px;
+}
+
+.row.new .c-time::after {
+  content: '*';
+  color: var(--amber-bright);
+}
+
+.row.sel.new .c-time::after {
+  color: var(--black);
+}
+
+.c-mag {
+  text-align: right;
+}
+
+.c-dep {
+  text-align: right;
+}
+
+.c-place {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tbl-empty {
+  padding: 14px;
+  color: var(--amber-dim);
+}
+
+/* ---- Histogram ---- */
+.win-hist .win-body {
+  padding: 12px 12px 6px;
+}
+
+#hist {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.hb {
+  fill: var(--fg);
+}
+
+.hb-dim {
+  fill: var(--amber-dim);
+}
+
+.ha,
+.hn {
+  fill: var(--fg);
+  font-family: var(--font-heading);
+  font-size: 15px;
+  text-shadow: none;
+}
+
+.ha {
+  fill: var(--amber-dim);
+}
+
+.hl {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+/* ---- Selected-event marker (inner child only) ---- */
+.sel-box {
+  width: 40px;
+  height: 40px;
+  border: 2px solid var(--amber-bright);
+  box-shadow: 0 0 10px rgba(255, 210, 122, 0.7), inset 0 0 8px rgba(255, 210, 122, 0.35);
+  pointer-events: none;
+}
+
+/* ---- Command line ---- */
+.cmdline {
+  position: relative;
+  border-top: 3px double var(--line);
+  padding: 6px 14px 10px;
+  background: rgba(11, 7, 0, 0.9);
+}
+
+.log {
+  height: 128px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--amber-dim) transparent;
+  overscroll-behavior: contain;
+}
+
+.ln {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1.35;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+button.ln,
+.hint {
+  cursor: pointer;
+  text-decoration: underline dotted var(--amber-dim);
+  text-underline-offset: 3px;
+}
+
+button.ln:hover,
+.hint:hover {
+  background: rgba(255, 176, 0, 0.16);
+  text-decoration-color: var(--fg);
+}
+
+.ln.echo {
+  color: var(--amber-bright);
+}
+
+.ln.err {
+  color: var(--error);
+}
+
+.ln.dim {
+  color: var(--amber-dim);
+}
+
+.cmdrow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 6px 0 0;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+  font-size: 17px;
+  cursor: text;
+}
+
+.prompt {
+  flex: none;
+  font-family: var(--font-heading);
+  font-size: 23px;
+  color: var(--amber-bright);
+}
+
+.field {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.typed {
+  white-space: pre;
+  overflow: hidden;
+}
+
+.cursor {
+  flex: none;
+  width: 0.62em;
+  height: 1.05em;
+  margin-left: 1px;
+  background: var(--fg);
+  box-shadow: var(--glow);
+  transform: translateY(0.18em);
+  animation: blink 1.05s steps(1) infinite;
+}
+
+.field:not(:focus-within) .cursor {
+  background: transparent;
+  outline: 1px solid var(--fg);
+  outline-offset: -1px;
+  animation: none;
+}
+
+#cmd-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  border: 0;
+  background: transparent;
+  font-size: 16px;
+  color: transparent;
+}
+
+@keyframes blink {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0; }
+}
+
+/* ---- Status note ---- */
+.status-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--amber-dim);
+}
+
+.status-note::before {
+  content: '[ ]';
+}
+
+.status-note.loading::before {
+  content: '[.]';
+}
+
+.status-note.success {
+  color: var(--success);
+}
+
+.status-note.success::before {
+  content: '[x]';
+}
+
+.status-note.error {
+  color: var(--error);
+}
+
+.status-note.error::before {
+  content: '[!]';
+}
+
+/* ---- Map controls, in the terminal's colours ---- */
+.mapboxgl-ctrl-attrib {
+  background: rgba(11, 7, 0, 0.85) !important;
+  color: var(--amber-dim) !important;
+  text-shadow: none;
+}
+
+.mapboxgl-ctrl-attrib a {
+  color: var(--amber) !important;
+}
+
+/* GL JS hides the Mapbox logo when a raster-dem (terrain) source is added;
+   force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+/* ---- Phones: windows stack, map first, command line at the bottom ---- */
+@media (max-width: 720px) {
+  .statusbar {
+    padding: 5px 16px;
+    font-size: 18px;
+    gap: 0 14px;
+  }
+
+  .statusbar [data-opt] {
+    display: none;
+  }
+
+  .main {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 18px 16px 12px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .win {
+    flex: none;
+  }
+
+  .win-map {
+    order: -1;
+    height: 45dvh;
+    min-height: 240px;
+  }
+
+  .win-events {
+    height: 280px;
+  }
+
+  .win-hist {
+    height: 170px;
+  }
+
+  .cmdline {
+    padding: 6px 16px 10px;
+  }
+
+  .log {
+    height: 84px;
+  }
+
+  .cmdrow {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor {
+    animation: none;
+  }
+}
+
+.hidden {
+  display: none !important;
+}

@@ -1,0 +1,1236 @@
+/*
+  Fleet Ops -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a clean, LIGHT enterprise SaaS
+  operations dashboard for a delivery fleet -- the most "production app"
+  look in the folder: cool-grey canvas, white 8px-radius cards with 1px
+  hairlines, one brand blue, status colours that are always paired with a
+  text label, Geist for the UI and Geist Mono for IDs, numbers and times),
+  deliberately distinct from every other pack in this folder: Arena is a
+  dark stadium scoreboard, Editorial Paper is warm paper and serif
+  headlines, Highway Sign is cream/green MUTCD signage, Slate Console is a
+  cool-grey ops console, Storefront is a light retail locator, Tarmac Glass
+  is dark blur-glass + amber, Vintage Chart is navy/parchment/brass,
+  Weather Console is a dense forecast dashboard, Riso Zine is two-colour
+  misregistered print, Swiss Grid is white/black/red typographic grid, Neon
+  HUD is glowing sci-fi overlays, Pastel Bento is soft rounded tiles,
+  Blueprint is white-on-blue drafting lines, Story Scroll is a scrolling
+  narrative, Retro OS is a desktop-window UI, Aurora Command is a
+  gradient-glow control room, Deco Voyage is gold-on-black Art Deco, Washi
+  Seasons is quiet Japanese paper and seasonal colour, Raw Web is a
+  1996 hand-coded HTML homepage, Case Board is a detective's corkboard with
+  pushpins and red yarn, Line Diagram is a modernist transit strip map,
+  Aero Gadgets is glossy mid-2000s aero glass with sidebar gadgets, Chat
+  Concierge is a warm conversational assistant with speech bubbles,
+  Chronicle is a museum-grade plum timeline explorer, Broadcast is a
+  sports-TV graphics package of slanted plates and a ticker, Bottom Sheet
+  is a native-feeling draggable-sheet mobile app, Trailhead is rugged
+  outdoor-gear tags over topographic contours, and Field Journal is a
+  naturalist's notebook on a wooden desk. The product ("Meridian
+  Fleet") is fictional and the chrome is generic SaaS: it does not imitate
+  any real product's branding or iconography.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/fleet-ops.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Geist for UI and headings, Geist Mono
+  for IDs, numbers and timestamps):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  Signature touch: a true APP SHELL -- a slim icon rail with CSS tooltips,
+  a top bar, KPI cards that each carry an inline-SVG sparkline, a
+  collapsible alerts drawer, and status pills (dot + label, never colour
+  alone). On a phone (<= 760px) the SAME rail markup becomes a bottom tab
+  bar that sits in normal flow BELOW the scrolling content, so the map's
+  logo and attribution are never covered.
+
+  Layout: .app is a grid (rail | topbar over main), 100dvh, no page scroll
+  on desktop. .main stacks .kpis, .work (map card ~65% + vehicles card) and
+  the .alerts drawer. The map lives inside .map-card > .map-wrap, which
+  ends above the card edge, so the Mapbox logo (bottom-left) and
+  attribution (bottom-right) stay inside the card. On phones .app is
+  rail-last: topbar, scrolling .main, tab bar.
+
+  Class/id contract (see fleet-ops-template.html in this same folder for a
+  full working example):
+
+  - .app                      page shell grid (100dvh)
+  - .rail                     left icon rail (<nav>); bottom tab bar on phones
+    .rail-logo                  brand mark (hidden on phones)
+    .rail-btn                   nav button (inline SVG + .nav-label);
+                                 data-tip="..." is the desktop tooltip;
+                                 add .active for the current section
+    .nav-label                  tab caption, phones only
+    .rail-spacer                pushes the last buttons down
+    .rail-end                   hidden on phones (tab bar shows 5 tabs)
+  - .topbar                   top bar (<header>)
+    .ws-switch                  workspace switcher button
+    .date-range                 date-range button
+    .search                     search field wrapper (svg + input +
+                                 .kbd hint)
+    .avatar                     initials circle
+  - .main                     scrolling-on-phone content column
+  - .kpis > .kpi              4 KPI cards; .kpi-label, .kpi-value (+ small
+                               unit), .kpi-delta (+.up/.down/.flat),
+                               .spark (inline SVG: .spark-line,
+                               .spark-area, .spark-dot)
+  - .work                     map card + vehicles card row
+  - .card                     generic white card (1px hairline, 8px radius)
+    .card-head                  card header row; .card-title, .card-sub
+  - .map-card                 the map card (.card); holds .map-head and
+                               .map-wrap
+    .map-head                   header: title, live clock, status chips
+    .chips > .chip              status filter chips (+.active); .dot is the
+                                 coloured dot, .count the number;
+                                 data-status="all|ontime|risk|late|idle"
+    .map-wrap                   positioned map area (min-height set per
+                                 breakpoint); holds #map
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .map-legend               compact legend chip over the map's top-left
+  - .veh-card                 vehicles card (.card)
+    .veh-tools                  search row (.search.search-sm)
+    .veh-list                   scrolling list; .veh-head (column titles)
+                                 and .veh-row (+.hover/.selected)
+    .veh-id, .veh-driver, .veh-eta   cells; .veh-driver small = route name
+    .pill (+.ontime/.risk/.late/.idle)  status pill (dot + text)
+    .bar > i                    progress bar (set --p: 0-100 on .bar)
+    .veh-empty                  "no vehicles match" line
+  - .alerts                   collapsible bottom drawer (<section>);
+                               .alerts.collapsed hides the body
+    .alerts-head                toggle button (aria-expanded) with
+                                 .alerts-count badge and a chevron
+    .alerts-body > .alert       rows: .alert-ico, .alert-text, .alert-veh,
+                                 .alert-time (+ .sev-late/.sev-risk/
+                                 .sev-idle/.sev-info on .alert)
+  - .fo-tip                   className for a mapboxgl.Popup used as a hover
+                               card; .tip-id, .tip-row inside its content
+  - .status-note (+.loading/.error)   small toast over the map's top-right
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --canvas: #F6F7F9;
+  --card: #FFFFFF;
+  --line: #E5E7EB;
+  --line-strong: #D0D5DD;
+  --ink: #0B1220;
+  --ink-2: #5B6475;
+  --brand: #2F5BEA;
+  --brand-ink: #1F43BD;
+  --brand-tint: #EEF2FE;
+  --ontime: #12A150;
+  --risk: #E08A00;
+  --late: #D92D20;
+  --idle: #98A2B3;
+  /* darker text-safe variants + soft pill backgrounds */
+  --ontime-ink: #0B7A3E;
+  --risk-ink: #9A5B00;
+  --late-ink: #B42318;
+  --idle-ink: #5B6475;
+  --ontime-bg: #E7F6EE;
+  --risk-bg: #FDF1DC;
+  --late-bg: #FDECEA;
+  --idle-bg: #F0F2F5;
+  --radius: 8px;
+  --rail-w: 56px;
+  --topbar-h: 56px;
+  --shadow: 0 1px 2px rgba(11, 18, 32, 0.04);
+
+  --font-ui: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-heading: var(--font-ui);
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+/* ---------- Shell ---------- */
+.app {
+  display: grid;
+  grid-template-columns: var(--rail-w) minmax(0, 1fr);
+  grid-template-rows: var(--topbar-h) minmax(0, 1fr);
+  grid-template-areas: "rail top" "rail main";
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.rail {
+  grid-area: rail;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 0;
+  background: var(--card);
+  border-right: 1px solid var(--line);
+  z-index: 5;
+}
+
+.rail-logo {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  background: var(--brand);
+  color: #fff;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: -0.02em;
+}
+
+.rail-spacer {
+  flex: 1;
+}
+
+.rail-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-2);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.rail-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.rail-btn:hover {
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+.rail-btn.active {
+  background: var(--brand-tint);
+  color: var(--brand);
+}
+
+.nav-label {
+  display: none;
+}
+
+/* CSS tooltip, desktop only */
+.rail-btn[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-4px, -50%);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.rail-btn[data-tip]:hover::after,
+.rail-btn[data-tip]:focus-visible::after {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+/* ---------- Top bar ---------- */
+.topbar {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 0 16px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+
+.ws-switch,
+.date-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.12s ease;
+}
+
+.ws-switch:hover,
+.date-range:hover {
+  background: var(--canvas);
+}
+
+.ws-switch .ws-mark {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.ws-switch svg,
+.date-range svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--ink-2);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.date-range {
+  color: var(--ink-2);
+}
+
+.topbar-spacer {
+  flex: 1;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 280px;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--canvas);
+}
+
+.search:focus-within {
+  border-color: var(--brand);
+  background: var(--card);
+  box-shadow: 0 0 0 3px var(--brand-tint);
+}
+
+.search svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--ink-2);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+}
+
+.search input::placeholder {
+  color: var(--idle);
+}
+
+.kbd {
+  flex: none;
+  padding: 1px 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--brand-tint);
+  color: var(--brand-ink);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* ---------- Main ---------- */
+.main {
+  grid-area: main;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  min-height: 0;
+  padding: 16px;
+}
+
+.card {
+  min-width: 0;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* KPI cards */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kpi {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  grid-template-areas: "label label" "value spark" "delta spark";
+  align-items: end;
+  column-gap: 8px;
+  padding: 12px 16px;
+}
+
+.kpi-label {
+  grid-area: label;
+  margin-bottom: 4px;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.kpi-value {
+  grid-area: value;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-value small {
+  margin-left: 3px;
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.kpi-delta {
+  grid-area: delta;
+  margin-top: 2px;
+  color: var(--ink-2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.kpi-delta b {
+  font-weight: 500;
+}
+
+.kpi-delta.up b { color: var(--ontime-ink); }
+.kpi-delta.down b { color: var(--late-ink); }
+
+.spark {
+  grid-area: spark;
+  align-self: center;
+  width: 100%;
+  height: 40px;
+  overflow: visible;
+}
+
+.spark-line {
+  fill: none;
+  stroke: var(--brand);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.spark-area {
+  fill: var(--brand);
+  opacity: 0.1;
+}
+
+.spark-dot {
+  fill: var(--brand);
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.kpi[data-tone="ok"] .spark-line { stroke: var(--ontime); }
+.kpi[data-tone="ok"] .spark-area,
+.kpi[data-tone="ok"] .spark-dot { fill: var(--ontime); }
+.kpi[data-tone="warn"] .spark-line { stroke: var(--risk); }
+.kpi[data-tone="warn"] .spark-area,
+.kpi[data-tone="warn"] .spark-dot { fill: var(--risk); }
+
+/* Work row: map card + vehicles card */
+.work {
+  display: grid;
+  grid-template-columns: minmax(0, 13fr) minmax(340px, 7fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px 10px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.card-title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.card-sub {
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.map-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.map-head {
+  flex: none;
+}
+
+.map-head .chips {
+  margin-left: auto;
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.chip:hover {
+  background: var(--canvas);
+}
+
+.chip.active {
+  border-color: var(--brand);
+  background: var(--brand-tint);
+  color: var(--brand-ink);
+}
+
+.chip .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-2);
+}
+
+.chip[data-status="ontime"] .dot { background: var(--ontime); }
+.chip[data-status="risk"] .dot { background: var(--risk); }
+.chip[data-status="late"] .dot { background: var(--late); }
+.chip[data-status="idle"] .dot { background: var(--idle); }
+
+.chip .count {
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.map-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.map-legend {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--ink-2);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.map-legend i {
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+  background: #9DB8F5;
+}
+
+.map-legend i.done {
+  background: var(--brand);
+}
+
+/* Vehicles card */
+.veh-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.veh-tools {
+  flex: none;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.search-sm {
+  width: 100%;
+}
+
+.veh-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.veh-head,
+.veh-row {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr) 82px 48px 52px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px 0 16px;
+}
+
+.veh-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 28px;
+  border-bottom: 1px solid var(--line);
+  background: var(--canvas);
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.veh-row {
+  position: relative;
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+  text-align: left;
+  transition: background 0.1s ease;
+}
+
+.veh-row:hover,
+.veh-row.hover {
+  background: var(--canvas);
+}
+
+.veh-row.selected {
+  background: var(--brand-tint);
+}
+
+.veh-row.selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--brand);
+}
+
+.veh-id {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.veh-driver {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.veh-driver small {
+  display: block;
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+}
+
+.veh-eta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.veh-eta small {
+  display: block;
+  overflow: hidden;
+  color: var(--ink-2);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.veh-empty {
+  padding: 24px 16px;
+  color: var(--ink-2);
+  text-align: center;
+}
+
+/* Status pill: dot + text, never colour alone */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  justify-self: start;
+  height: 22px;
+  padding: 0 8px 0 7px;
+  border-radius: 11px;
+  background: var(--idle-bg);
+  color: var(--idle-ink);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.pill::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--idle);
+}
+
+.pill.ontime { background: var(--ontime-bg); color: var(--ontime-ink); }
+.pill.ontime::before { background: var(--ontime); }
+.pill.risk { background: var(--risk-bg); color: var(--risk-ink); }
+.pill.risk::before { background: var(--risk); }
+.pill.late { background: var(--late-bg); color: var(--late-ink); }
+.pill.late::before { background: var(--late); }
+
+.bar {
+  --p: 0;
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.bar > i {
+  display: block;
+  width: calc(var(--p) * 1%);
+  height: 100%;
+  border-radius: 3px;
+  background: var(--brand);
+}
+
+.veh-row[data-status="idle"] .bar > i {
+  background: var(--idle);
+}
+
+/* ---------- Alerts drawer ---------- */
+.alerts {
+  overflow: hidden;
+}
+
+.alerts-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 40px;
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-weight: 600;
+}
+
+.alerts-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--late);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.alerts-head .hint {
+  margin-left: auto;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.alerts-head svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--ink-2);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.18s ease;
+}
+
+.alerts.collapsed .alerts-head svg {
+  transform: rotate(180deg);
+}
+
+.alerts-body {
+  max-height: 120px;
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+}
+
+.alerts.collapsed .alerts-body {
+  display: none;
+}
+
+.alert {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto 48px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+  text-align: left;
+}
+
+.alert:last-child {
+  border-bottom: 0;
+}
+
+.alert:hover {
+  background: var(--canvas);
+}
+
+.alert-ico {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--idle);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.alert.sev-late .alert-ico { stroke: var(--late); }
+.alert.sev-risk .alert-ico { stroke: var(--risk); }
+.alert.sev-info .alert-ico { stroke: var(--brand); }
+
+.alert-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alert-text b {
+  font-weight: 500;
+}
+
+.alert-veh {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--idle-bg);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.alert-time {
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: right;
+}
+
+/* ---------- Map overlays ---------- */
+.status-note {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.status-note.loading { color: var(--ink-2); }
+.status-note.error { border-color: var(--late); color: var(--late-ink); }
+
+/* Hover card (mapboxgl.Popup with className 'fo-tip') */
+.fo-tip .mapboxgl-popup-content {
+  min-width: 190px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 20px rgba(11, 18, 32, 0.14);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.fo-tip .mapboxgl-popup-tip {
+  border-top-color: var(--card);
+  border-bottom-color: var(--card);
+}
+
+.tip-id {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.tip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 1px 0;
+  color: var(--ink-2);
+}
+
+.tip-row b {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Mapbox controls re-skinned to match */
+.mapboxgl-ctrl-group {
+  border-radius: 6px !important;
+  box-shadow: 0 1px 2px rgba(11, 18, 32, 0.12) !important;
+}
+
+/* A raster-dem (terrain) source makes GL JS hide the Mapbox logo (the DEM
+   TileJSON has mapbox_logo:false). Force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+/* ---------- Tablet ---------- */
+@media (max-width: 1100px) {
+  .work {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 0.62fr);
+  }
+
+  .search {
+    width: 200px;
+  }
+
+  /* narrow vehicles card: drop the Trip column so the driver stays readable */
+  .veh-head,
+  .veh-row {
+    grid-template-columns: 56px minmax(0, 1fr) 78px 44px;
+  }
+
+  .veh-head > :nth-child(5),
+  .veh-row > :nth-child(5) {
+    display: none;
+  }
+
+  .kpi {
+    grid-template-columns: minmax(0, 1fr) 64px;
+  }
+
+  .map-head .card-sub {
+    display: none;
+  }
+}
+
+/* ---------- Phone: rail becomes a bottom tab bar, content scrolls ---------- */
+@media (max-width: 760px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: var(--topbar-h) minmax(0, 1fr) auto;
+    grid-template-areas: "top" "main" "rail";
+  }
+
+  .rail {
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: stretch;
+    gap: 0;
+    padding: 4px 8px calc(4px + env(safe-area-inset-bottom));
+    border-right: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .rail-logo,
+  .rail-spacer {
+    display: none;
+  }
+
+  .rail-btn {
+    flex: 1;
+    width: auto;
+    height: 48px;
+    gap: 2px;
+    align-content: center;
+    grid-template-rows: auto auto;
+    place-items: center;
+  }
+
+  .rail-btn.rail-end {
+    display: none;
+  }
+
+  .rail-btn[data-tip]::after {
+    display: none;
+  }
+
+  .nav-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 500;
+  }
+
+  .topbar {
+    gap: 8px;
+    padding: 0 16px;
+  }
+
+  .topbar .date-range,
+  .topbar .search,
+  .topbar .ws-switch .ws-caret {
+    display: none;
+  }
+
+  .main {
+    display: block;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 16px;
+  }
+
+  .main > * + * {
+    margin-top: 12px;
+  }
+
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .kpi {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "label" "value" "spark" "delta";
+    padding: 10px 12px;
+  }
+
+  .kpi-value {
+    font-size: 22px;
+  }
+
+  .spark {
+    height: 28px;
+    margin-top: 4px;
+  }
+
+  .work {
+    display: block;
+  }
+
+  .work > * + * {
+    margin-top: 12px;
+  }
+
+  .map-card {
+    overflow: hidden;
+  }
+
+  .map-head {
+    flex-wrap: wrap;
+  }
+
+  .map-head .chips {
+    flex: 1 0 100%;
+    margin-left: 0;
+  }
+
+  .map-wrap {
+    flex: none;
+    height: 50dvh;
+    min-height: 260px;
+  }
+
+  .veh-card {
+    overflow: visible;
+  }
+
+  .veh-list {
+    overflow: visible;
+  }
+
+  .veh-head,
+  .veh-row {
+    grid-template-columns: 54px minmax(0, 1fr) 76px 44px 36px;
+    gap: 6px;
+    padding: 0 12px;
+  }
+
+  .veh-head > :nth-child(5),
+  .veh-row > :nth-child(5) {
+    display: block;
+  }
+
+  .veh-row {
+    min-height: 52px;
+  }
+
+  .alert {
+    grid-template-columns: 20px minmax(0, 1fr) 44px;
+    padding: 0 12px;
+  }
+
+  .alert-veh {
+    display: none;
+  }
+
+  .alerts-head .hint {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-btn,
+  .rail-btn[data-tip]::after,
+  .chip,
+  .veh-row,
+  .alerts-head svg {
+    transition: none;
+  }
+}

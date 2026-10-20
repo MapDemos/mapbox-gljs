@@ -1,0 +1,570 @@
+/*
+  Data Notebook -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a computational notebook for a data
+  analyst -- off-white page, white cells with hairline borders, an indigo
+  active-cell bar, monospace code with syntax colours, grey output areas --
+  deliberately distinct from every other style pack in this folder: Arena,
+  Editorial Paper, Highway Sign, Slate Console, Storefront, Tarmac Glass,
+  Vintage Chart, Weather Console, Riso Zine, Swiss Grid, Neon HUD, Pastel
+  Bento, Blueprint, Story Scroll, Retro OS, Aurora Command, Deco Voyage,
+  Washi Seasons, Raw Web, Case Board, Line Diagram, Aero Gadgets, Chat
+  Concierge, Chronicle, Broadcast, Bottom Sheet, Trailhead and Field
+  Journal. Slate Console and Blueprint are dark/technical; this one is a
+  light, single-column document of stacked cells where the map is just
+  one more figure in the output).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/data-notebook.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Fira Code for code and execution
+  counts, Source Sans 3 for markdown text and UI):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  Signature touch: execution. Each code cell carries an "In [n]:" prompt
+  that flips to "[*]:" while the kernel is busy (pulsing status dot in the
+  toolbar, stale outputs dimmed), then every output cell gets its own
+  "Out [n]:" prompt with a run timestamp -- and inline parameters sit in the
+  code as editable tokens (number inputs / selects styled like literals).
+
+  Class/id contract (see data-notebook-template.html in this same folder
+  for a full working example):
+
+  - .nb-toolbar               sticky top bar (brand, notebook file name,
+                               run button, kernel status)
+    .nb-brand / .nb-file        product name / file name
+    .kernel (+.idle/.busy)      kernel status pill; contains .kernel-dot
+  - .nb                       single centred column (max 980px) of cells
+  - .cell                     one cell: .gutter (prompt) + .cell-body
+    .cell.active                the focused cell -- indigo left bar
+    .cell.dirty                 a code cell edited since its last run
+                                 (shows a "modified" hint via .dirty-hint)
+    .cell.is-stale              dims a cell's content while re-running
+    .gutter .prompt             "In [3]:" / "Out [3]:" in Fira Code
+    .gutter .prompt.busy        "[*]:" style while executing
+  - .cell-md                  markdown cell (h1/h2/p/code/blockquote)
+  - .cell-code                code cell: .code (pre block) with .l lines
+                               (CSS line numbers) and token spans
+    .tok-kw .tok-str .tok-num   keyword / string / number tokens
+    .tok-com .tok-fn            comment / function-name tokens
+    .param-num, .param-select   inline editable parameters (inputs/selects
+                                 styled like code literals)
+    .dirty-hint                 small "modified" marker in the cell corner
+  - .cell-out                 output cell on a grey (#F4F4F0) area
+    .out-head                   figure label line + .out-meta (timestamp)
+    .out-frame                  white-edged figure frame (hold #map, svg)
+    .legend, .legend-ramp       figure legend (colour ramp + size note)
+    .chart                      inline-SVG chart host; svg classes
+                                 .ax-grid .ax-text .bar-cap .bar-val
+                                 .bar-label .bar-num
+  - .nb-table                 results table (inside .table-wrap for
+                               horizontal scroll); tr.sel = selected row;
+                               .ratio-bar / .ratio-fill availability bar
+  - .cb-tip                   class for mapboxgl.Popup -- styled like a
+                               notebook text output (monospace, grey)
+  - .btn, .btn-run, .btn-ghost  buttons (run = green play button)
+  - .status-note (+.loading/.success/.error)  inline status line
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --page: #FAFAF7;
+  --cell: #FFFFFF;
+  --cell-border: #E4E4DE;
+  --output: #F4F4F0;
+  --ink: #1F2937;
+  --ink-muted: #6B7280;
+  --ink-faint: #9CA3AF;
+  --accent: #4F46E5;
+  --accent-soft: #EEF2FF;
+  --run: #16A34A;
+  --busy: #D97706;
+  --error: #B91C1C;
+  --tok-kw: #7C3AED;
+  --tok-str: #0F766E;
+  --tok-num: #B45309;
+  --tok-com: #9CA3AF;
+  --tok-fn: #1D4ED8;
+
+  --font-code: 'Fira Code', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-ui: 'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-padding-top: 64px; }
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select { font-family: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---- Toolbar ---- */
+.nb-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 24px;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid var(--cell-border);
+}
+
+.nb-brand {
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.nb-file {
+  min-width: 0;
+  flex: 1;
+  font-family: var(--font-code);
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kernel {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 10px;
+  border: 1px solid var(--cell-border);
+  border-radius: 999px;
+  background: var(--page);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.kernel-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--run);
+}
+
+.kernel.busy .kernel-dot {
+  background: var(--busy);
+  animation: nb-pulse 0.7s ease-in-out infinite alternate;
+}
+
+@keyframes nb-pulse {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0.35; transform: scale(0.7); }
+}
+
+/* ---- Buttons ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--cell-border);
+  border-radius: 6px;
+  background: var(--cell);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.btn:hover { background: var(--output); }
+
+.btn-run {
+  border-color: var(--run);
+  background: var(--run);
+  color: #fff;
+}
+
+.btn-run:hover { background: #15803D; border-color: #15803D; }
+
+.btn-run svg { width: 11px; height: 11px; fill: currentColor; }
+
+.btn-ghost { border-color: transparent; background: transparent; color: var(--ink-muted); }
+
+.btn:disabled { opacity: 0.5; cursor: progress; }
+
+/* ---- Notebook column ---- */
+.nb {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px 24px 64px;
+}
+
+.cell {
+  position: relative;
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  background: var(--cell);
+  border: 1px solid var(--cell-border);
+  border-radius: 4px;
+  transition: opacity 0.15s ease;
+}
+
+.cell::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: -1px;
+  bottom: -1px;
+  width: 4px;
+  border-radius: 4px 0 0 4px;
+  background: transparent;
+}
+
+.cell.active::before { background: var(--accent); }
+.cell.active { border-color: #C7C9EE; }
+
+.gutter {
+  padding: 12px 10px 0 14px;
+  text-align: right;
+  font-family: var(--font-code);
+  font-size: 12.5px;
+  line-height: 22px;
+  color: var(--ink-faint);
+  user-select: none;
+}
+
+.prompt { white-space: nowrap; }
+.cell-code .prompt { color: var(--accent); }
+.prompt.busy { color: var(--busy); }
+
+.cell-body { min-width: 0; padding: 12px 16px 14px 4px; }
+
+.cell.is-stale .cell-body > :not(.dirty-hint) { opacity: 0.5; transition: opacity 0.15s ease; }
+
+/* ---- Markdown cell ---- */
+.cell-md .cell-body { padding-top: 14px; padding-bottom: 8px; }
+
+.cell-md h1 {
+  margin: 0 0 6px;
+  font-size: 30px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.cell-md p { margin: 0 0 10px; color: #374151; }
+
+.cell-md code {
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--output);
+  font-family: var(--font-code);
+  font-size: 0.86em;
+}
+
+.cell-md .meta {
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+
+/* ---- Code cell ---- */
+.code {
+  margin: 0;
+  padding: 2px 0;
+  overflow-x: auto;
+  counter-reset: ln;
+  white-space: normal;
+  font-family: var(--font-code);
+  font-size: 13.5px;
+  line-height: 26px;
+  color: var(--ink);
+  tab-size: 4;
+}
+
+.code .l {
+  display: block;
+  white-space: pre;
+  min-width: max-content;
+}
+
+.code .l::before {
+  counter-increment: ln;
+  content: counter(ln);
+  display: inline-block;
+  width: 2.2ch;
+  margin-right: 1.6ch;
+  text-align: right;
+  color: #D1D5DB;
+}
+
+.tok-kw { color: var(--tok-kw); font-weight: 500; }
+.tok-str { color: var(--tok-str); }
+.tok-num { color: var(--tok-num); }
+.tok-com { color: var(--tok-com); font-style: italic; }
+.tok-fn { color: var(--tok-fn); }
+
+/* Inline parameters: editable tokens inside the code */
+.param-num,
+.param-select {
+  display: inline-block;
+  height: 24px;
+  margin: 0 1px;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-bottom: 1px dashed currentColor;
+  border-radius: 3px;
+  background: rgba(79, 70, 229, 0.07);
+  font: inherit;
+  line-height: 22px;
+  vertical-align: baseline;
+  cursor: pointer;
+}
+
+.param-num {
+  width: 4.6ch;
+  color: var(--tok-num);
+  text-align: right;
+  -moz-appearance: textfield;
+}
+
+.param-num::-webkit-outer-spin-button,
+.param-num::-webkit-inner-spin-button { opacity: 1; height: 18px; }
+
+.param-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 18px;
+  color: var(--tok-str);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236B7280' stroke-width='1.4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 5px center;
+  background-color: rgba(79, 70, 229, 0.07);
+}
+
+.param-num:hover, .param-select:hover { border-color: #C7C9EE; }
+.param-num:focus-visible, .param-select:focus-visible { outline-offset: 0; background-color: var(--accent-soft); }
+
+.cell-code .actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.cell-code .actions kbd {
+  padding: 0 5px;
+  border: 1px solid var(--cell-border);
+  border-radius: 3px;
+  background: var(--page);
+  font-family: var(--font-code);
+  font-size: 11.5px;
+}
+
+.dirty-hint {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--busy);
+}
+
+.dirty-hint::before { content: '\25CF\00a0'; }
+
+/* ---- Output cells ---- */
+.cell-out { background: var(--cell); border-color: var(--cell-border); }
+.cell-out .cell-body { padding-right: 16px; }
+
+.out-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+
+.out-head strong { color: var(--ink); font-weight: 600; }
+
+.out-meta {
+  font-family: var(--font-code);
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.out-frame {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid var(--cell-border);
+  border-radius: 3px;
+  background: var(--output);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 20px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.legend-item { display: inline-flex; align-items: center; gap: 8px; }
+
+.legend-ramp {
+  width: 110px;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #B91C1C, #F59E0B 45%, #16A34A);
+}
+
+.legend-dots { display: inline-flex; align-items: center; gap: 4px; }
+.legend-dots i { display: block; border-radius: 50%; background: #9CA3AF; border: 1.5px solid #fff; box-shadow: 0 0 0 1px #9CA3AF; }
+
+.chart { width: 100%; padding: 10px 4px 2px; background: var(--output); border: 1px solid var(--cell-border); border-radius: 3px; }
+.chart svg { display: block; width: 100%; }
+
+.ax-grid { stroke: #E4E4DE; stroke-width: 1; }
+.ax-text { font-family: var(--font-code); font-size: 11px; fill: var(--ink-faint); }
+.bar-cap { fill: #D6D6CE; }
+.bar-val { fill: var(--accent); }
+.bar-label { font-family: var(--font-ui); font-size: 13px; fill: var(--ink); }
+.bar-num { font-family: var(--font-code); font-size: 11.5px; fill: var(--ink-muted); }
+
+.empty-note { padding: 18px 12px; font-size: 14px; color: var(--ink-muted); text-align: center; }
+
+/* ---- Results table ---- */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--cell-border);
+  border-radius: 3px;
+  background: var(--output);
+}
+
+.nb-table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.nb-table th {
+  position: sticky;
+  top: 0;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--cell-border);
+  background: #ECECE6;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.nb-table th.num, .nb-table td.num { text-align: right; }
+.nb-table th[aria-sort]::after { content: ' \2193'; color: var(--accent); }
+.nb-table th[aria-sort='ascending']::after { content: ' \2191'; }
+
+.nb-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid #E8E8E2;
+  white-space: nowrap;
+}
+
+.nb-table td.num, .nb-table td.idx { font-family: var(--font-code); font-size: 13px; }
+.nb-table td.idx { color: var(--ink-faint); }
+
+.nb-table tbody tr { cursor: pointer; }
+.nb-table tbody tr:hover { background: #EBEBE5; }
+.nb-table tbody tr.sel { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+
+.ratio-bar {
+  display: inline-block;
+  width: 44px;
+  height: 6px;
+  margin-left: 8px;
+  border-radius: 3px;
+  background: #DEDED6;
+  vertical-align: middle;
+}
+
+.ratio-fill { display: block; height: 100%; border-radius: 3px; background: var(--run); }
+
+/* ---- Map popup styled as a text output ---- */
+.mapboxgl-popup.cb-tip .mapboxgl-popup-content {
+  padding: 8px 10px;
+  border: 1px solid var(--cell-border);
+  border-radius: 3px;
+  background: var(--output);
+  box-shadow: 0 2px 8px rgba(31, 41, 55, 0.14);
+  font-family: var(--font-code);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--ink);
+  pointer-events: none;
+}
+
+.mapboxgl-popup.cb-tip .mapboxgl-popup-tip { display: none; }
+.cb-tip .k { color: var(--tok-kw); }
+.cb-tip .s { color: var(--tok-str); }
+.cb-tip .n { color: var(--tok-num); }
+.cb-tip .c { color: var(--tok-com); }
+
+/* ---- Status note ---- */
+.status-note {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--ink-muted);
+}
+
+.status-note.success { color: var(--run); }
+.status-note.error { color: var(--error); }
+.status-note.loading::before { content: '\2026'; font-family: var(--font-code); }
+
+.hidden { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kernel.busy .kernel-dot { animation: none; }
+}
+
+@media (max-width: 640px) {
+  .nb-toolbar { padding: 8px 16px; gap: 10px; }
+  .nb-file { display: none; }
+  .kernel { margin-left: auto; }
+  .nb { padding: 16px 16px 48px; gap: 12px; }
+
+  .cell { grid-template-columns: minmax(0, 1fr); }
+  .gutter { padding: 10px 14px 0; text-align: left; }
+  .cell-body { padding: 0 14px 14px; }
+  .cell-md h1 { font-size: 24px; }
+  .dirty-hint { top: 8px; }
+  .code { font-size: 12.5px; }
+}

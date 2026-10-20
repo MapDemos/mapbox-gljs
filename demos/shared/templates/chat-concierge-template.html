@@ -1,0 +1,311 @@
+<!--
+  Working EXAMPLE of the Chat Concierge style pack (chat-concierge.css, in
+  this same folder). Open this file directly to see the pattern working with
+  a fictional assistant, "Pip", recommending sixteen places across Buenos
+  Aires in four categories, then copy the markup and script into your own
+  demo and link chat-concierge.css from its <head> -- see the class/id
+  contract documented at the top of that CSS file for what to build.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (a warm conversational map assistant: cream, tomato,
+  bottle green, sage bubbles with one squared tail corner). Cafes and
+  restaurants are fictional; museums and parks are public landmarks. All
+  copy is an illustrative placeholder -- swap in your own places.
+
+  Gotcha: the map container must start at the chat column's edge (left:
+  400px, and a 42dvh strip on phones) so the chat never covers the Mapbox
+  logo or attribution. Markers: style an INNER .pin child, never the
+  mapboxgl.Marker root element.
+
+  What's NOT included: a real language model or search -- replies come from
+  simple keyword matching on the PLACES array below, which is where you
+  would call your own backend, plus geocoding, routing and a build step.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ask Pip - Buenos Aires</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="chat-concierge.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: the map starts where the chat column ends. */
+  #map {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 400px;
+    right: 0;
+  }
+
+  @media (max-width: 760px) {
+    #map {
+      left: 0;
+      bottom: auto;
+      height: 42vh;
+      height: 42dvh;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="status-note loading" id="status-note">Loading map</div>
+
+<main class="chat" aria-label="Chat with Pip">
+  <header class="chat-head">
+    <div class="avatar" aria-hidden="true"><span class="online-dot"></span></div>
+    <div>
+      <div class="chat-name">Pip</div>
+      <div class="chat-status">online &middot; your Buenos Aires guide</div>
+    </div>
+  </header>
+
+  <div class="thread" id="thread" role="log" aria-live="polite"></div>
+
+  <div class="quick-replies" id="chips"></div>
+
+  <form class="composer" id="composer" autocomplete="off">
+    <input id="input" type="text" placeholder="Ask for caf&eacute;, museo, parque..." aria-label="Message Pip" />
+    <button class="send" id="send" type="submit" aria-label="Send">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </button>
+  </form>
+</main>
+
+<script>
+const GLYPHS = {
+  coffee: '<path d="M5 9h11v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4zM16 10h2a2 2 0 0 1 0 4h-2M8 4v2M12 4v2"/>',
+  food: '<path d="M12 3c3 4 5 6 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 .3 1.5 1 2 2 2 0-3 0-5 1-8z"/>',
+  museum: '<path d="M3 9l9-5 9 5zM5 11v7M10 11v7M14 11v7M19 11v7M3 20h18"/>',
+  park: '<path d="M12 3l5 8h-3l4 6H6l4-6H7zM12 17v4"/>',
+};
+const CAT_LABEL = { coffee: 'Coffee', food: 'Parrilla', museum: 'Museum', park: 'Park' };
+
+const PLACES = [
+  { id: 1, cat: 'coffee', name: 'Café Tintero', note: 'Tiny Palermo Soho corner, famous for its medialunas.', ll: [-58.4285, -34.5884] },
+  { id: 2, cat: 'coffee', name: 'Molino Sur', note: 'Slow-roast beans and mate lattes beside San Telmo’s cobbles.', ll: [-58.3715, -34.6218] },
+  { id: 3, cat: 'coffee', name: 'La Pausa Tostadores', note: 'Quiet Recoleta roaster with a leafy back patio.', ll: [-58.3960, -34.5905] },
+  { id: 4, cat: 'coffee', name: 'Brújula Café', note: 'Dockside flat whites with a view of the cranes.', ll: [-58.3640, -34.6075] },
+  { id: 5, cat: 'food', name: 'Don Ciriaco', note: 'Old-school parrilla: bife de chorizo and a crackling provoleta.', ll: [-58.3698, -34.6178] },
+  { id: 6, cat: 'food', name: 'Brasas del Sur', note: 'Wood-fire grill steps from the painted houses of La Boca.', ll: [-58.3632, -34.6350] },
+  { id: 7, cat: 'food', name: 'El Fogón de Lila', note: 'Family-run asado with a long shaded terrace.', ll: [-58.4310, -34.5810] },
+  { id: 8, cat: 'food', name: 'Humo & Sal', note: 'Smoky ribs and a short, honest Malbec list.', ll: [-58.3905, -34.5930] },
+  { id: 9, cat: 'museum', name: 'MALBA', note: 'Latin American modern art in a glass-and-concrete cube.', ll: [-58.4039, -34.5776] },
+  { id: 10, cat: 'museum', name: 'Museo Nacional de Bellas Artes', note: 'Free entry, and a deep collection from Goya to Xul Solar.', ll: [-58.3925, -34.5837] },
+  { id: 11, cat: 'museum', name: 'MAMBA', note: 'Modern art in a restored San Telmo warehouse.', ll: [-58.3724, -34.6226] },
+  { id: 12, cat: 'museum', name: 'Fundación PROA', note: 'Bold exhibitions with a rooftop view over the Riachuelo.', ll: [-58.3645, -34.6384] },
+  { id: 13, cat: 'park', name: 'Bosques de Palermo', note: 'Wide lawns, a rose garden and a little lake for rowing.', ll: [-58.4190, -34.5700] },
+  { id: 14, cat: 'park', name: 'Jardín Japonés', note: 'Koi ponds and stone lanterns, a calm pocket in the city.', ll: [-58.4093, -34.5755] },
+  { id: 15, cat: 'park', name: 'Reserva Ecológica Costanera Sur', note: 'Marshland trails and birdsong beside the river.', ll: [-58.3500, -34.6120] },
+  { id: 16, cat: 'park', name: 'Plaza Francia', note: 'Shady lawn and the weekend craft fair, right by Recoleta.', ll: [-58.3893, -34.5882] },
+];
+
+const REPLIES = {
+  coffee: 'Good call, a cafecito it is. Here are my favourites around town:',
+  food: 'Hungry? These grills know what they are doing:',
+  museum: 'Lovely, a bit of culture. These are worth your afternoon:',
+  park: 'Fresh air coming right up. Here are some lovely places to sit:',
+  surprise: 'Ooh, a mystery. One of each, picked just for you:',
+};
+const KEYWORDS = [
+  ['coffee', ['coffee', 'cafe', 'cafecito', 'espresso', 'latte', 'tea', 'medialuna']],
+  ['food', ['parrilla', 'food', 'eat', 'hungry', 'asado', 'steak', 'comer', 'restaurant', 'dinner', 'lunch', 'cena']],
+  ['museum', ['museum', 'museo', 'art', 'arte', 'gallery', 'galeria', 'culture']],
+  ['park', ['park', 'parque', 'plaza', 'green', 'sit', 'jardin', 'garden', 'relax', 'bosque']],
+  ['surprise', ['surprise', 'sorpresa', 'random', 'anything', 'whatever', 'dealer']],
+];
+const CHIPS = [
+  ['Coffee nearby ☕', 'coffee'], ['Museums 🏛', 'museum'],
+  ['A park to sit in 🌳', 'park'], ['Surprise me', 'surprise'],
+];
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const threadEl = document.getElementById('thread');
+const inputEl = document.getElementById('input');
+const sendEl = document.getElementById('send');
+let busy = false;
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [-58.397, -34.603],
+  zoom: 11.6,
+  config: { basemap: { lightPreset: 'day', showPointOfInterestLabels: false } },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+map.on('load', () => document.getElementById('status-note').classList.add('hidden'));
+map.on('error', (e) => {
+  const note = document.getElementById('status-note');
+  note.className = 'status-note error';
+  note.textContent = 'Map error: ' + (e.error && e.error.message || 'unknown');
+});
+
+/* ---------- Chat helpers ---------- */
+
+const clock = () => new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const scrollDown = () => { threadEl.scrollTop = threadEl.scrollHeight; };
+
+function addMessage(who, html, wide) {
+  const row = document.createElement('div');
+  row.className = 'msg msg-' + who + (wide ? ' wide' : '');
+  row.innerHTML =
+    '<div class="msg-meta">' + (who === 'pip' ? '<strong>Pip</strong> &middot; ' : '') +
+    '<span class="stamp">' + clock() + '</span></div><div class="bubble">' + html + '</div>';
+  threadEl.appendChild(row);
+  scrollDown();
+  return row;
+}
+
+function showTyping() {
+  const row = document.createElement('div');
+  row.className = 'msg msg-pip';
+  row.innerHTML = '<div class="typing" aria-label="Pip is typing"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>';
+  threadEl.appendChild(row);
+  scrollDown();
+  return row;
+}
+
+function cardHtml(p) {
+  return '<article class="place-card" data-id="' + p.id + '">' +
+    '<span class="place-cat" data-cat="' + p.cat + '">' + CAT_LABEL[p.cat] + '</span>' +
+    '<h3 class="place-name">' + p.name + '</h3>' +
+    '<p class="place-note">' + p.note + '</p>' +
+    '<button class="btn-show" type="button">Show on map</button></article>';
+}
+
+/* ---------- Map markers ---------- */
+
+let markers = []; // { id, marker, el }
+let popup = null;
+
+function clearMarkers() {
+  markers.forEach((m) => m.marker.remove());
+  markers = [];
+  if (popup) popup.remove();
+}
+
+function dropMarkers(list) {
+  clearMarkers();
+  list.forEach((p, i) => {
+    const el = document.createElement('div'); // marker root: leave unstyled
+    const pin = document.createElement('div');
+    pin.className = 'pin';
+    pin.dataset.cat = p.cat;
+    pin.style.setProperty('--delay', (reduceMotion.matches ? 0 : i * 90) + 'ms');
+    pin.innerHTML = '<span class="pin-glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + GLYPHS[p.cat] + '</svg></span>';
+    el.appendChild(pin);
+    el.addEventListener('click', (e) => { e.stopPropagation(); selectPlace(p.id, true); });
+    const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' }).setLngLat(p.ll).addTo(map);
+    markers.push({ id: p.id, marker, pin });
+  });
+  fitTo(list);
+}
+
+function fitTo(list) {
+  const b = new mapboxgl.LngLatBounds();
+  list.forEach((p) => b.extend(p.ll));
+  // The map container already excludes the chat column, so plain padding is enough.
+  map.fitBounds(b, { padding: 70, maxZoom: 15.2, duration: reduceMotion.matches ? 0 : 1400 });
+}
+
+function selectPlace(id, fromMarker) {
+  const p = PLACES.find((x) => x.id === id);
+  document.querySelectorAll('.place-card').forEach((c) => c.classList.toggle('is-active', Number(c.dataset.id) === id));
+  markers.forEach((m) => m.pin.classList.toggle('is-active', m.id === id));
+
+  if (fromMarker) {
+    const cards = document.querySelectorAll('.place-card[data-id="' + id + '"]');
+    const card = cards[cards.length - 1]; // newest reply
+    if (card) card.scrollIntoView({ block: 'nearest', inline: 'center', behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+  }
+
+  if (popup) popup.remove();
+  popup = new mapboxgl.Popup({ offset: [0, -38], closeButton: false, maxWidth: '240px', className: 'chat-popup' })
+    .setLngLat(p.ll)
+    .setHTML('<span class="pop-cat" data-cat="' + p.cat + '">' + CAT_LABEL[p.cat] + '</span>' +
+      '<div class="pop-name">' + p.name + '</div><p class="pop-note">' + p.note + '</p>')
+    .addTo(map);
+
+  const camera = { center: p.ll, zoom: Math.max(map.getZoom(), 14.2) };
+  if (reduceMotion.matches) map.jumpTo(camera);
+  else map.flyTo({ ...camera, duration: 900, essential: true });
+}
+
+/* ---------- Conversation ---------- */
+
+function detect(text) {
+  const words = text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^a-z]+/);
+  for (const [key, list] of KEYWORDS) if (words.some((w) => list.includes(w))) return key;
+  return null;
+}
+
+function pick(key) {
+  if (key !== 'surprise') return PLACES.filter((p) => p.cat === key).slice(0, 4);
+  return ['coffee', 'food', 'museum', 'park'].map((c) => {
+    const pool = PLACES.filter((p) => p.cat === c);
+    return pool[Math.floor(Math.random() * pool.length)];
+  });
+}
+
+function ask(text, key) {
+  text = text.trim();
+  if (!text || busy) return;
+  busy = true;
+  sendEl.disabled = true;
+  addMessage('user', text.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]));
+  const typing = showTyping();
+  const found = key || detect(text);
+
+  setTimeout(() => {
+    typing.remove();
+    if (!found) {
+      addMessage('pip', '<p>Hmm, I did not quite catch that. I know <em>caf&eacute;s</em>, <em>parrillas</em>, <em>museos</em> and <em>parques</em>. Tap one below, or tell me what you fancy.</p>');
+    } else {
+      const list = pick(found);
+      const row = addMessage('pip', '<p>' + REPLIES[found] + '</p><div class="carousel">' + list.map(cardHtml).join('') + '</div>', true);
+      row.querySelectorAll('.place-card').forEach((card) => {
+        card.addEventListener('click', () => {
+          if (!markers.some((m) => m.id === Number(card.dataset.id))) dropMarkers(list);
+          selectPlace(Number(card.dataset.id), false);
+        });
+      });
+      dropMarkers(list);
+    }
+    busy = false;
+    sendEl.disabled = false;
+  }, 700);
+}
+
+document.getElementById('composer').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const text = inputEl.value;
+  inputEl.value = '';
+  ask(text);
+});
+
+const chipsEl = document.getElementById('chips');
+CHIPS.forEach(([label, key]) => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'chip';
+  b.textContent = label;
+  b.addEventListener('click', () => ask(label, key));
+  chipsEl.appendChild(b);
+});
+
+// Scripted opener
+setTimeout(() => {
+  addMessage('pip',
+    '<span class="greeting">Hola, I’m <em>Pip.</em></span>' +
+    '<p>Your pocket guide to Buenos Aires. Tell me what you are in the mood for, or tap a suggestion below, and I will pin the best spots on the map.</p>');
+}, 250);
+</script>
+</body>
+</html>

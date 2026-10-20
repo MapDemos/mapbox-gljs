@@ -1,0 +1,341 @@
+<!--
+  Working EXAMPLE of the E-Ink style pack (e-ink.css, in this same folder).
+  Open this file directly to see the pattern working: a generic e-paper
+  reader called "Folio" showing a walking travel guide, "A Morning Walk in
+  Kraków's Old Town". The left page is the guide text with a drop cap and
+  numbered references [1]-[8]; the right page is the map, recoloured to
+  pure greyscale (light-v11, restyled in JS) with the real walking route
+  (Mapbox Directions, walking profile, simplified) as a black dashed line
+  and numbered square markers. Turn pages with the side buttons, the
+  pager, arrow keys, a swipe on the text page, or by tapping a [n]
+  reference or a map marker; every turn flashes the screen (the e-ink
+  refresh) and the map jumps (jumpTo, no animation). "Aa" cycles three
+  reading sizes. Copy the markup into your own demo and link e-ink.css from
+  its <head> -- see the class/id contract at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief at the user's request for something distinct from
+  every other pack in this folder. The places are real; "Folio", the guide
+  text, battery level and timings are illustrative placeholders.
+
+  What's NOT included: live routing, search, offline tiles, or a hard-coded
+  access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>E-Ink</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=Bitter:wght@400;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="e-ink.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map { position: absolute; inset: 0; }
+  /* e-ink: controls stay flat, no soft shadows */
+  .mapboxgl-ctrl-group { box-shadow: none !important; border: 1px solid #1C1C1C; border-radius: 0 !important; }
+</style>
+</head>
+<body>
+<div class="desk">
+  <div class="device">
+    <button class="device-btn prev" id="side-prev" aria-label="Previous page"></button>
+    <button class="device-btn next" id="side-next" aria-label="Next page"></button>
+
+    <div class="screen" id="screen" data-size="m">
+      <div class="eink-flash" id="flash"></div>
+
+      <header class="statusbar">
+        <div class="sb-left"><span>Folio</span><span id="clock">9:41</span></div>
+        <div class="sb-chapter" id="chapter">Ch. 3 &middot; 12%</div>
+        <div class="sb-right">
+          <button class="aa-btn" id="aa-btn" aria-expanded="false" aria-controls="aa-menu">Aa</button>
+          <svg class="battery" viewBox="0 0 26 12" role="img" aria-label="Battery 78%">
+            <rect x="0.75" y="0.75" width="21.5" height="10.5" fill="none" stroke="#1C1C1C" stroke-width="1.5"/>
+            <rect x="23" y="3.5" width="2.5" height="5" fill="#1C1C1C"/>
+            <rect x="3" y="3" width="13" height="6" fill="#1C1C1C"/>
+          </svg>
+        </div>
+        <div class="aa-menu hidden" id="aa-menu" role="group" aria-label="Text size">
+          <button class="aa-opt" data-size="s" aria-pressed="false" aria-label="Small text">A</button>
+          <button class="aa-opt" data-size="m" aria-pressed="true" aria-label="Medium text">A</button>
+          <button class="aa-opt" data-size="l" aria-pressed="false" aria-label="Large text">A</button>
+        </div>
+      </header>
+      <div class="progress" aria-hidden="true"><i id="progress"></i></div>
+
+      <main class="spread">
+        <article class="page-text" id="page-text" aria-live="polite">
+          <p class="running-head">Chapter 3</p>
+          <h1 class="chapter-title">A Morning Walk in Krak&oacute;w&rsquo;s Old Town</h1>
+          <h2 class="stop-title"><span class="num" id="st-num">1</span><span id="st-name"></span></h2>
+          <p class="walk-note" id="st-note"></p>
+          <p class="passage" id="st-text"></p>
+          <p class="refs-title">References</p>
+          <ol class="refs" id="refs"></ol>
+          <p class="folio" id="folio"></p>
+        </article>
+        <section class="page-map" aria-label="Map page">
+          <div id="map"></div>
+        </section>
+      </main>
+
+      <footer class="pager">
+        <button class="pg-btn" id="prev" aria-label="Previous page">&lsaquo;</button>
+        <div class="dots" id="dots"></div>
+        <button class="pg-btn" id="next" aria-label="Next page">&rsaquo;</button>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<script>
+// Walking route [lng, lat]: Mapbox Directions (walking), simplified.
+const ROUTE = [
+  [19.93565, 50.06126], [19.93551, 50.06131], [19.93549, 50.06135], [19.93577, 50.0614],
+  [19.93601, 50.06151], [19.93714, 50.06178], [19.93735, 50.0617], [19.93745, 50.06182],
+  [19.93735, 50.0617], [19.93757, 50.06162], [19.93769, 50.0616], [19.93833, 50.06164],
+  [19.93855, 50.06162], [19.93888, 50.06201], [19.93926, 50.06202], [19.93957, 50.06194],
+  [19.93933, 50.062], [19.93923, 50.06209], [19.93811, 50.06243], [19.93861, 50.06309],
+  [19.93865, 50.06309], [19.9387, 50.06314], [19.93868, 50.06318], [19.9387, 50.06322],
+  [19.93925, 50.06397], [19.93986, 50.06474], [19.93994, 50.06475], [19.93994, 50.06478],
+  [19.94037, 50.06481], [19.9406, 50.06485], [19.94071, 50.06486], [19.94111, 50.06482],
+  [19.94071, 50.06486], [19.9406, 50.06485], [19.94037, 50.06481], [19.93994, 50.06478],
+  [19.93993, 50.0648], [19.93984, 50.0648], [19.93977, 50.06482], [19.93937, 50.065], [19.93925,
+  50.06509], [19.93945, 50.06549], [19.93995, 50.06547], [19.94009, 50.06549], [19.94123,
+  50.06517], [19.94132, 50.06517], [19.94147, 50.06513], [19.9416, 50.06542], [19.94147,
+  50.06513], [19.94132, 50.06517], [19.94123, 50.06517], [19.94009, 50.06549], [19.93995,
+  50.06547], [19.93891, 50.06553], [19.93883, 50.06542], [19.93883, 50.06537], [19.93877,
+  50.06534], [19.9381, 50.06433], [19.93798, 50.06436], [19.93759, 50.0638], [19.9368,
+  50.06279], [19.93615, 50.06211], [19.93548, 50.06138], [19.93551, 50.06131], [19.93523,
+  50.06101], [19.93491, 50.06063], [19.93467, 50.06039], [19.93436, 50.0599], [19.93435,
+  50.05985], [19.93452, 50.0594], [19.93457, 50.05922], [19.93477, 50.05864], [19.93516,
+  50.05875], [19.93477, 50.05864], [19.93585, 50.05558], [19.93596, 50.05559], [19.9361,
+  50.05558], [19.93671, 50.05548], [19.93667, 50.05538], [19.93652, 50.0554], [19.9365,
+  50.05535], [19.93501, 50.05501], [19.93489, 50.05497], [19.93483, 50.05489], [19.93481,
+  50.05482], [19.93483, 50.05474], [19.93489, 50.05456], [19.93498, 50.0544], [19.93513,
+  50.05426], [19.93546, 50.05419], [19.93575, 50.05391], [19.93559, 50.05379], [19.93546,
+  50.05368], [19.9354, 50.05357], [19.93535, 50.05344], [19.93531, 50.05338], [19.93515,
+  50.05326], [19.93504, 50.05316], [19.93526, 50.05306], [19.93509, 50.05289], [19.93521,
+  50.05283], [19.9353, 50.0528], [19.93538, 50.05289], [19.93595, 50.05334], [19.93606,
+  50.0534], [19.9383, 50.05404], [19.93843, 50.05389], [19.93892, 50.05407], [19.93906,
+  50.05394], [19.9392, 50.05395], [19.93939, 50.05405], [19.93993, 50.05354], [19.94017,
+  50.05325], [19.94088, 50.05246], [19.94115, 50.05223], [19.94139, 50.05206], [19.94142,
+  50.05208], [19.94152, 50.05208], [19.94158, 50.05206], [19.94161, 50.0521], [19.94177,
+  50.05204], [19.94193, 50.05217], [19.94223, 50.0525], [19.94228, 50.05256], [19.94227,
+  50.05265], [19.94278, 50.05247], [19.94324, 50.05215], [19.94391, 50.05256], [19.944,
+  50.0526], [19.94621, 50.05314], [19.94625, 50.05305], [19.94641, 50.05275], [19.94691,
+  50.0517], [19.94699, 50.0515]
+];
+// Stops, snapped to the walking network; "min" = walk from the previous stop.
+const STOPS = [
+  { name: 'Main Market Square', coord: [19.93565, 50.06126], min: 0,  km: 0,
+    text: 'Begin where the town begins. Laid out in 1257, the Rynek is among the largest medieval squares in Europe, and at this hour it belongs to pigeons, flower sellers and the first coffee drinkers. Stand by the corner and let the whole rectangle settle around you.' },
+  { name: 'Cloth Hall', coord: [19.93745, 50.06182], min: 2, km: 0.18,
+    text: 'The Sukiennice has been the trading heart of the square for seven centuries. Beneath its Renaissance arcades the stalls sell amber, wool and carved wood. Walk the length of the hall once, slowly, before the crowds arrive.' },
+  { name: 'St. Mary’s Basilica', coord: [19.93957, 50.06194], min: 3, km: 0.2,
+    text: 'Two unequal brick towers rise over the square. From the taller one a bugler plays a broken melody every hour, stopping mid-phrase in memory of a medieval watchman. Inside, a gilded wooden altarpiece took twelve years to carve.' },
+  { name: 'Floriańska Gate', coord: [19.94111, 50.06483], min: 6, km: 0.5,
+    text: 'Follow Floriańska Street north, past painters hanging their work on the old wall. The gate at its end, built around 1300, is the last of the great city gates still standing, and once opened the Royal Road to the castle.' },
+  { name: 'Barbican', coord: [19.9416, 50.06542], min: 4, km: 0.38,
+    text: 'Just beyond the gate stands a round brick fortress with seven turrets and walls three metres thick. Finished in 1499, it is one of the few surviving barbicans in Europe. Pause on the bridge and look back along the street.' },
+  { name: 'Planty Park', coord: [19.93516, 50.05875], min: 13, km: 1.12,
+    text: 'The old moat and walls were replaced in the early nineteenth century by a green ring around the Old Town. Follow the Planty south beneath the chestnuts; it is the quietest half hour of the walk, and the best place to rest your eyes.' },
+  { name: 'Wawel Castle', coord: [19.93558, 50.05408], min: 9, km: 0.72,
+    text: 'On a limestone hill above the Vistula sits the former seat of Polish kings. The courtyard is arcaded in the Renaissance manner, the cathedral holds centuries of coronations, and from the terrace you can see the river bend away.' },
+  { name: 'Kazimierz', coord: [19.94699, 50.0515], min: 16, km: 1.45,
+    text: 'Cross to the old Jewish quarter and end at a café table on Szeroka Street. Synagogues, courtyards and quiet galleries sit side by side here. Order something warm; the walk is done, and the page is yours.' },
+];
+const N = STOPS.length;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+
+// ---------- map ----------
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  center: STOPS[0].coord,
+  zoom: 15.6,
+  attributionControl: true,
+  dragRotate: false,
+  fadeDuration: 0,
+});
+map.touchZoomRotate.disableRotation();
+
+// 8x8 stippled pattern for parks (dither instead of green)
+function addParkPattern() {
+  const s = 8, data = new Uint8Array(s * s * 4);
+  for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) {
+    const dot = (x % 4 === 1 && y % 4 === 1) || (x % 4 === 3 && y % 4 === 3);
+    const v = dot ? 0x8E : 0xE4, i = (y * s + x) * 4;
+    data[i] = data[i + 1] = data[i + 2] = v; data[i + 3] = 255;
+  }
+  if (!map.hasImage('park-dither')) map.addImage('park-dither', { width: s, height: s, data });
+}
+
+// Recolour the basemap to pure greyscale. Guarded: unknown layers/props no-op.
+function greyscale() {
+  addParkPattern();
+  const set = (fn, id, prop, val) => { try { map[fn](id, prop, val); } catch (e) { /* skip */ } };
+  for (const l of map.getStyle().layers) {
+    const id = l.id;
+    if (l.type === 'background') set('setPaintProperty', id, 'background-color', '#EDEDE8');
+    else if (l.type === 'fill') {
+      if (/water/.test(id)) set('setPaintProperty', id, 'fill-color', '#BDBDB8');
+      else if (/park|national|grass|wood|pitch|green|landuse/.test(id)) {
+        set('setPaintProperty', id, 'fill-pattern', 'park-dither');
+      } else if (/building/.test(id)) set('setPaintProperty', id, 'fill-color', '#D4D4CF');
+      else set('setPaintProperty', id, 'fill-color', '#E4E4DF');
+    } else if (l.type === 'fill-extrusion') set('setPaintProperty', id, 'fill-extrusion-color', '#D4D4CF');
+    else if (l.type === 'line') {
+      if (/water/.test(id)) set('setPaintProperty', id, 'line-color', '#8E8E8A');
+      else if (/case|bridge-casing|tunnel-casing/.test(id)) set('setPaintProperty', id, 'line-color', '#8E8E8A');
+      else if (/admin|boundary/.test(id)) set('setPaintProperty', id, 'line-color', '#5E5E5B');
+      else if (/road|bridge|tunnel|path|street|link|motorway|trunk|pedestrian/.test(id)) set('setPaintProperty', id, 'line-color', '#FFFFFF');
+      else set('setPaintProperty', id, 'line-color', '#BDBDB8');
+    } else if (l.type === 'symbol') {
+      set('setPaintProperty', id, 'text-color', '#1C1C1C');
+      set('setPaintProperty', id, 'text-halo-color', '#EDEDE8');
+      set('setPaintProperty', id, 'icon-color', '#5E5E5B');
+      set('setPaintProperty', id, 'icon-halo-color', '#EDEDE8');
+    } else if (l.type === 'hillshade' || l.type === 'raster') set('setLayoutProperty', id, 'visibility', 'none');
+  }
+}
+
+// nearest route vertex index for each stop, walking forward along the line
+const STOP_IDX = (() => {
+  let from = 0;
+  return STOPS.map((s) => {
+    let best = from, bd = Infinity;
+    for (let i = from; i < ROUTE.length; i++) {
+      const d = (ROUTE[i][0] - s.coord[0]) ** 2 + (ROUTE[i][1] - s.coord[1]) ** 2;
+      if (d < bd) { bd = d; best = i; }
+    }
+    return (from = best);
+  });
+})();
+
+const markers = [];
+let page = -1;
+
+map.on('load', () => {
+  greyscale();
+  const firstSymbol = map.getStyle().layers.find((l) => l.type === 'symbol')?.id;
+  map.addSource('route', { type: 'geojson', data: lineData(ROUTE) });
+  map.addSource('done', { type: 'geojson', data: lineData(ROUTE.slice(0, 2)) });
+  map.addLayer({ id: 'route-dash', type: 'line', source: 'route',
+    layout: { 'line-join': 'round', 'line-cap': 'butt' },
+    paint: { 'line-color': '#1C1C1C', 'line-width': 3, 'line-dasharray': [2, 1.6] } }, firstSymbol);
+  map.addLayer({ id: 'route-done', type: 'line', source: 'done',
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: { 'line-color': '#1C1C1C', 'line-width': 5 } }, firstSymbol);
+
+  STOPS.forEach((s, i) => {
+    const el = document.createElement('div');          // root: no position/transform of ours
+    const pin = document.createElement('div');
+    pin.className = 'pin'; pin.textContent = i + 1;
+    pin.setAttribute('role', 'button'); pin.setAttribute('aria-label', `${i + 1}. ${s.name}`);
+    pin.addEventListener('click', () => goTo(i));
+    el.appendChild(pin);
+    markers.push({ pin, m: new mapboxgl.Marker({ element: el }).setLngLat(s.coord).addTo(map) });
+  });
+  goTo(0, true);
+});
+
+function lineData(coords) {
+  return { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } };
+}
+
+function mapPadding() {
+  const phone = innerWidth <= 720;
+  return phone ? { top: 40, bottom: 64, left: 30, right: 30 } : { top: 50, bottom: 70, left: 50, right: 50 };
+}
+
+// ---------- pages ----------
+const dots = $('dots'), refs = $('refs');
+STOPS.forEach((s, i) => {
+  const d = document.createElement('button');
+  d.className = 'dot'; d.setAttribute('aria-label', `Page ${i + 1}: ${s.name}`);
+  d.addEventListener('click', () => goTo(i));
+  dots.appendChild(d);
+  const li = document.createElement('li');
+  const b = document.createElement('button');
+  b.className = 'ref';
+  b.innerHTML = `<b>[${i + 1}]</b><span></span>`;
+  b.lastChild.textContent = s.name;
+  b.addEventListener('click', () => goTo(i));
+  li.appendChild(b); refs.appendChild(li);
+});
+
+function render(i) {
+  const s = STOPS[i];
+  page = i;
+  $('st-num').textContent = i + 1;
+  $('st-name').textContent = s.name;
+  $('st-note').textContent = i === 0 ? 'Starting point' : `${s.min} min on foot · ${s.km} km from [${i}]`;
+  const t = $('st-text'); t.textContent = '';
+  const cap = document.createElement('span'); cap.className = 'drop-cap'; cap.textContent = s.text[0];
+  t.append(cap, s.text.slice(1));
+  const pct = Math.round(((i + 1) / N) * 100);
+  $('chapter').textContent = `Ch. 3 · ${pct}%`;
+  $('progress').style.width = pct + '%';
+  $('folio').textContent = `— ${40 + i} —`;
+  [...dots.children].forEach((d, k) => k === i ? d.setAttribute('aria-current', 'true') : d.removeAttribute('aria-current'));
+  [...refs.querySelectorAll('.ref')].forEach((b, k) => b.setAttribute('aria-current', String(k === i)));
+  markers.forEach((mk, k) => mk.pin.setAttribute('aria-current', String(k === i)));
+  $('prev').disabled = $('side-prev').disabled = i === 0;
+  $('next').disabled = $('side-next').disabled = i === N - 1;
+  $('page-text').scrollTop = 0;
+  if (map.getSource('done')) map.getSource('done').setData(lineData(ROUTE.slice(0, STOP_IDX[i] + 1).concat(i ? [] : [ROUTE[0]])));
+  map.jumpTo({ center: s.coord, zoom: 15.8, padding: mapPadding() });   // e-ink does not animate
+}
+
+function goTo(i, instant) {
+  i = Math.max(0, Math.min(N - 1, i));
+  if (i === page) return;
+  if (instant || reduceMotion) return render(i);
+  const f = $('flash');
+  f.classList.remove('flash'); void f.offsetWidth; f.classList.add('flash');
+  setTimeout(() => render(i), 110);        // re-render while the screen is inverted
+}
+
+$('prev').onclick = $('side-prev').onclick = () => goTo(page - 1);
+$('next').onclick = $('side-next').onclick = () => goTo(page + 1);
+addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === 'PageDown') goTo(page + 1);
+  else if (e.key === 'ArrowLeft' || e.key === 'PageUp') goTo(page - 1);
+});
+
+// swipe on the text page
+let sx = null;
+const pt = $('page-text');
+pt.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
+pt.addEventListener('touchend', (e) => {
+  if (sx === null) return;
+  const dx = e.changedTouches[0].clientX - sx; sx = null;
+  if (Math.abs(dx) > 60) goTo(page + (dx < 0 ? 1 : -1));
+});
+
+// Aa menu
+const aaBtn = $('aa-btn'), aaMenu = $('aa-menu');
+aaBtn.onclick = () => {
+  const open = aaMenu.classList.toggle('hidden') === false;
+  aaBtn.setAttribute('aria-expanded', String(open));
+};
+aaMenu.querySelectorAll('.aa-opt').forEach((b) => b.addEventListener('click', () => {
+  $('screen').dataset.size = b.dataset.size;
+  aaMenu.querySelectorAll('.aa-opt').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+  aaMenu.classList.add('hidden'); aaBtn.setAttribute('aria-expanded', 'false');
+}));
+
+// clock
+const tick = () => { $('clock').textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
+tick(); setInterval(tick, 30000);
+addEventListener('resize', () => map.resize());
+</script>
+</body>
+</html>

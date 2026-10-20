@@ -1,0 +1,587 @@
+/*
+  Broadcast -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a live sports-TV graphics package --
+  broadcast navy, signal red, hard-edged slanted parallelogram plates, thin
+  white rule lines, bold condensed numerals, quick clip-path wipes, a news
+  ticker crawl -- deliberately distinct from every other style pack in this
+  folder: Arena, Editorial Paper, Highway Sign, Slate Console, Storefront,
+  Tarmac Glass, Vintage Chart, Weather Console, Riso Zine, Swiss Grid, Neon
+  HUD, Pastel Bento, Blueprint, Story Scroll, Retro OS, Aurora Command, Deco
+  Voyage and Washi Seasons).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/broadcast.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Saira Condensed for numerals, names
+  and plates; Rubik for small meta and ticker text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Rubik:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  Signature touch: every graphic is a parallelogram plate. A wrapper gets
+  skewX(-12deg) and its .plate-in child is counter-skewed so the text stays
+  upright, and new graphics enter with a hard left-to-right clip-path wipe
+  (.wipe, 360ms) -- re-trigger it from script by removing the class,
+  forcing a reflow, and adding it back.
+
+  Class/id contract (see broadcast-template.html in this same folder for a
+  full working example):
+
+  - #map                      full-bleed map container (every demo defines
+                               its own, per convention -- not included here)
+  - .ticker                   full-width news strip pinned to the top edge --
+    .ticker-tag                 red channel-bug plate on the left
+    .ticker-view                clipping viewport for the crawl
+    .ticker-track               the moving strip; put TWO identical
+      .ticker-run                .ticker-run children inside for a seamless
+                                 loop. Pauses on hover; static (first run,
+                                 ellipsis) under prefers-reduced-motion
+    .ticker-run .sep            small red diamond between ticker items
+  - .hud-left                 left column (scorebug + leaderboard), flows
+                               top to bottom so nothing overlaps
+  - .plate                    the slanted plate; colour variants .plate-red,
+    .plate-navy, .plate-white,   .plate-yellow, .plate-steel
+    .plate-yellow             .plate-in -- REQUIRED child that counter-skews
+    .plate-in                   the content
+  - .scorebug                 row of plates: .sb-live (red, with .dot),
+                               .sb-km, .sb-clock (bold race clock numerals)
+  - .leaderboard              vertical standings --
+    .lb-head                    header plate (event name, small meta)
+    .lb-rows                    wrapper the rows live in (FLIP reorders its children)
+    .lb-row (+.is-featured)     one runner: .lb-plate > .plate-in holding
+                                 .lb-pos, .lb-bib (boxed number), .lb-name,
+                                 .lb-gap. The .lb-row element is the one you
+                                 FLIP-animate (translateY) when re-sorting
+    .lb-toggle                  "Full standings" button -- phones only; the
+                                 board collapses to the top 3 rows unless
+                                 .leaderboard has .expanded
+  - .controls                 top-right cluster of .btn plates
+    .btn (+.is-on)              slanted button; .is-on = yellow "active"
+    .hide-sm / .show-sm         show a long / short label per breakpoint
+  - .lower-third              featured-athlete graphic, bottom-centre, lifted
+                               above the Mapbox logo and attribution --
+    .l3-top                     row: .l3-bib (red number plate) + .l3-name
+    .l3-name .nat               small nation code beside the name
+    .l3-stats                   navy plate of .l3-stat (label + value) items
+                                 (.l3-stat .k label, .l3-stat .v value)
+  - .results                  centred "FINAL RESULTS" plate: .results-title,
+    .res-row (+.win)            result rows (.pos .nm .tm); .win = 1st place, .results-actions for buttons
+  - .km-plate                 tiny plate for a Marker's inner element (never
+                               style the Marker root -- Mapbox positions it)
+  - .wipe                     one-shot entrance wipe (clip-path)
+  - .status-note (+.loading/  small plate for load / error messages
+    .success/.error)
+  - .hidden                   utility: display: none !important
+
+  Gotcha: if you add a raster-dem terrain source, GL JS hides the Mapbox logo
+  (the DEM TileJSON has mapbox_logo:false); the rule near the bottom of this
+  file forces it back. Keep the lower-third and any bottom UI above ~50px so
+  the logo (bottom-left) and attribution (bottom-right) stay clear.
+*/
+
+:root {
+  --navy: #0A1A3F;
+  --navy-2: #13275A;
+  --red: #E10600;
+  --white: #FFFFFF;
+  --yellow: #FFD60A;
+  --steel: #8A94A6;
+  --rule: rgba(255, 255, 255, 0.55);
+  --skew: -12deg;
+  --unskew: 12deg;
+  --success: #2FBF71;
+  --error: #E10600;
+
+  --font-display: 'Saira Condensed', 'Arial Narrow', Impact, sans-serif;
+  --font-body: 'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--navy);
+  color: var(--white);
+  font-family: var(--font-body);
+}
+
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
+}
+
+/* ---------- Plates: the core slanted-parallelogram building block ---------- */
+.plate {
+  display: inline-block;
+  transform: skewX(var(--skew));
+  background: var(--navy);
+  color: var(--white);
+  border-bottom: 2px solid var(--rule);
+}
+
+.plate-in {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transform: skewX(var(--unskew));
+  white-space: nowrap;
+}
+
+.plate-red { background: var(--red); }
+.plate-navy { background: var(--navy); }
+.plate-white { background: var(--white); color: var(--navy); border-bottom-color: var(--red); }
+.plate-yellow { background: var(--yellow); color: var(--navy); border-bottom-color: var(--navy); }
+.plate-steel { background: var(--steel); color: var(--navy); }
+
+/* ---------- Entrance wipe ---------- */
+@keyframes bc-wipe {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 -20px 0 -20px); }
+}
+
+.wipe { animation: bc-wipe 360ms cubic-bezier(0.7, 0, 0.2, 1); }
+
+/* ---------- News ticker ---------- */
+.ticker {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 34px;
+  z-index: 6;
+  display: flex;
+  align-items: stretch;
+  background: var(--navy);
+  border-bottom: 2px solid var(--white);
+}
+
+.ticker-tag {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 0 22px 0 14px;
+  background: var(--red);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 19px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  z-index: 1;
+}
+
+.ticker-view {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.ticker-track {
+  display: flex;
+  flex: none;
+  width: max-content;
+  animation: bc-crawl 70s linear infinite;
+}
+
+.ticker:hover .ticker-track { animation-play-state: paused; }
+
+.ticker-run {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  padding-right: 18px;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ticker-run .sep {
+  width: 7px;
+  height: 7px;
+  background: var(--red);
+  transform: rotate(45deg);
+  flex: none;
+}
+
+@keyframes bc-crawl {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* ---------- Left column ---------- */
+.hud-left {
+  position: absolute;
+  top: 46px;
+  left: 16px;
+  z-index: 3;
+  width: 288px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.hud-left > * { pointer-events: auto; }
+
+/* ---------- Scorebug ---------- */
+.scorebug {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  padding-left: 6px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.scorebug .plate { padding: 7px 12px; font-size: 22px; }
+.scorebug .sb-live { font-size: 17px; letter-spacing: 0.08em; }
+.scorebug .sb-km .k { font-size: 13px; font-weight: 600; letter-spacing: 0.1em; color: var(--steel); }
+.scorebug .sb-clock { background: var(--white); color: var(--navy); border-bottom-color: var(--red); min-width: 92px; }
+.scorebug .sb-clock .plate-in { font-variant-numeric: tabular-nums; }
+
+.scorebug .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--white);
+  animation: bc-blink 1.2s steps(2, jump-none) infinite;
+}
+
+@keyframes bc-blink {
+  0% { opacity: 1; }
+  100% { opacity: 0.15; }
+}
+
+/* ---------- Leaderboard ---------- */
+.leaderboard {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-left: 6px;
+  box-sizing: border-box;
+}
+
+.lb-head {
+  align-self: flex-start;
+  margin-bottom: 2px;
+}
+
+.lb-head .plate-in {
+  padding: 4px 12px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.lb-head .meta { font-family: var(--font-body); font-weight: 500; font-size: 10px; color: var(--steel); }
+
+.lb-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lb-row {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.lb-row.no-anim { transition: none; }
+
+.lb-plate {
+  display: block;
+  transform: skewX(var(--skew));
+  background: var(--navy);
+  border-bottom: 1px solid var(--rule);
+  transition: background 120ms;
+}
+
+.lb-row:hover .lb-plate { background: var(--navy-2); }
+.lb-row.is-featured .lb-plate { background: var(--red); border-bottom-color: var(--white); }
+
+.lb-plate .plate-in {
+  display: grid;
+  grid-template-columns: 26px 36px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 3px 12px 3px 10px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.lb-pos { font-size: 21px; font-weight: 800; text-align: center; color: var(--yellow); }
+.lb-row.is-featured .lb-pos { color: var(--white); }
+
+.lb-bib {
+  background: var(--white);
+  color: var(--navy);
+  text-align: center;
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.lb-name { overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.02em; }
+
+.lb-gap {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--steel);
+  font-variant-numeric: tabular-nums;
+  min-width: 42px;
+  text-align: right;
+}
+
+.lb-row.is-featured .lb-gap { color: var(--white); }
+
+.lb-toggle { display: none; }
+
+/* ---------- Controls ---------- */
+.controls {
+  position: absolute;
+  top: 46px;
+  right: 16px;
+  z-index: 3;
+  display: flex;
+  gap: 4px;
+}
+
+.btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--white);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.btn .plate-in {
+  display: block;
+  padding: 7px 14px;
+  background: var(--navy);
+  border-bottom: 2px solid var(--rule);
+  transform: skewX(var(--skew));
+}
+
+.btn > .plate-in > span { display: inline-block; transform: skewX(var(--unskew)); }
+.btn:hover .plate-in { background: var(--navy-2); }
+.btn.is-on .plate-in { background: var(--yellow); color: var(--navy); border-bottom-color: var(--navy); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.show-sm { display: none; }
+
+/* ---------- Lower third ---------- */
+.lower-third {
+  position: absolute;
+  left: 50%;
+  bottom: 56px; /* clears the Mapbox logo (bottom-left) and attribution (bottom-right) */
+  transform: translateX(-50%);
+  z-index: 3;
+  width: min(560px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 0 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  pointer-events: none;
+}
+
+.l3-top { display: flex; align-items: stretch; gap: 3px; max-width: 100%; }
+.l3-bib .plate-in, .l3-name .plate-in { font-family: var(--font-display); font-weight: 800; line-height: 1; }
+.l3-bib .plate-in { padding: 8px 14px; font-size: 34px; }
+.l3-name .plate-in { padding: 8px 18px; font-size: 34px; letter-spacing: 0.02em; text-transform: uppercase; }
+
+.l3-name .nat {
+  font-style: normal;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  padding: 3px 6px;
+  background: var(--navy);
+  color: var(--white);
+}
+
+.l3-stats { margin-left: 18px; }
+.l3-stats .plate-in { gap: 22px; padding: 7px 20px; }
+
+.l3-stat { display: flex; flex-direction: column; gap: 2px; line-height: 1; }
+.l3-stat .k { font-family: var(--font-body); font-weight: 500; font-size: 10px; letter-spacing: 0.12em; color: var(--steel); text-transform: uppercase; }
+.l3-stat .v { font-family: var(--font-display); font-weight: 700; font-size: 24px; font-variant-numeric: tabular-nums; }
+
+/* ---------- Results ---------- */
+.results {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  width: min(380px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.results-title .plate-in {
+  padding: 8px 22px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 30px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.res-row {
+  display: grid;
+  grid-template-columns: 30px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 7px 16px;
+  background: var(--navy);
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1.1;
+  text-transform: uppercase;
+  transform: skewX(var(--skew));
+}
+
+.res-row > * { transform: skewX(var(--unskew)); }
+.res-row .pos { color: var(--yellow); font-weight: 800; }
+.res-row .tm { font-variant-numeric: tabular-nums; color: var(--steel); }
+.res-row.win { background: var(--white); color: var(--navy); }
+.res-row.win .pos { color: var(--red); }
+.res-row.win .tm { color: var(--navy); }
+
+.results-actions { display: flex; gap: 4px; margin-top: 4px; }
+
+/* ---------- Map furniture ---------- */
+.km-plate {
+  padding: 1px 6px;
+  background: var(--white);
+  color: var(--navy);
+  border-bottom: 2px solid var(--red);
+  transform: skewX(var(--skew));
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.km-plate > span { display: inline-block; transform: skewX(var(--unskew)); }
+
+/* ---------- Status note ---------- */
+.status-note {
+  position: absolute;
+  bottom: 170px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 6px 18px;
+  background: var(--navy);
+  border-bottom: 2px solid var(--white);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+}
+
+.status-note.loading::after { content: ' ...'; }
+.status-note.success { border-bottom-color: var(--success); }
+.status-note.error { background: var(--red); }
+
+.hidden {
+  display: none !important;
+}
+
+/* DEM sources make GL JS hide the Mapbox logo; put it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+/* ---------- Phone ---------- */
+@media (max-width: 640px) {
+  .hide-sm { display: none; }
+  .show-sm { display: inline; }
+
+  .ticker { height: 30px; }
+  .ticker-tag { font-size: 16px; padding: 0 20px 0 10px; }
+  .ticker-run { font-size: 12px; }
+
+  .hud-left { top: 40px; width: calc(100vw - 32px); }
+  .controls { top: 40px; right: 12px; gap: 3px; }
+  .controls .btn { font-size: 14px; }
+  .controls .btn .plate-in { padding: 6px 10px; }
+
+  .scorebug { padding-left: 4px; gap: 2px; }
+  .scorebug .plate { padding: 6px 9px; font-size: 19px; }
+  .scorebug .sb-live { font-size: 14px; }
+  .scorebug .sb-clock { min-width: 0; }
+
+  .leaderboard { width: 250px; }
+  .leaderboard:not(.expanded) .lb-row:nth-child(n+4) { display: none; }
+  .lb-head .meta { display: none; }
+  .lb-plate .plate-in { font-size: 16px; padding: 2px 10px 2px 8px; grid-template-columns: 22px 32px 1fr auto; }
+  .lb-pos { font-size: 18px; }
+  .lb-bib { font-size: 14px; }
+
+  .lb-toggle { display: block; align-self: flex-start; margin-left: 6px; }
+  .lb-toggle .plate-in { font-size: 13px; padding: 4px 12px; }
+
+  /* Lower third: compact plate -- number, name and pace only */
+  .lower-third { bottom: 52px; padding: 0 10px; }
+  .l3-bib .plate-in, .l3-name .plate-in { font-size: 24px; padding: 6px 12px; }
+  .l3-stats { margin-left: 10px; }
+  .l3-stats .plate-in { gap: 14px; padding: 5px 14px; }
+  .l3-stat .v { font-size: 19px; }
+  .l3-stat.optional { display: none; }
+
+  .results-title .plate-in { font-size: 24px; }
+  .res-row { font-size: 19px; }
+  .status-note { bottom: 140px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track { animation: none; width: 100%; }
+  .ticker-run { display: block; overflow: hidden; text-overflow: ellipsis; }
+  .ticker-run + .ticker-run { display: none; }
+  .ticker-run .sep { display: inline-block; margin: 0 10px; }
+  .wipe { animation: none; }
+  .scorebug .dot { animation: none; }
+  .lb-row { transition: none; }
+}

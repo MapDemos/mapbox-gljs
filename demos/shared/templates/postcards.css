@@ -1,0 +1,890 @@
+/*
+  Postcards -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: an island-hopping holiday told through
+  vintage postcards -- a pile of cards on a table, flipped to read the
+  handwritten back, perforated stamps, wavy postmarks, airmail stripes --
+  deliberately distinct from every other style pack in this folder: Arena,
+  Editorial Paper, Highway Sign, Slate Console, Storefront, Tarmac Glass,
+  Vintage Chart, Weather Console, Riso Zine, Swiss Grid, Neon HUD, Pastel
+  Bento, Blueprint, Story Scroll, Retro OS, Aurora Command, Deco Voyage,
+  Washi Seasons, Raw Web, Case Board, Line Diagram, Aero Gadgets, Chat
+  Concierge, Chronicle, Broadcast, Bottom Sheet, Trailhead and Field
+  Journal. Where those use panels, sheets, tickets or notebook pages, this
+  pack's UI object is a physical postcard with two faces.)
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/postcards.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Yeseva One for lettering and all
+  UI text, Homemade Apple for the handwritten backs):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Yeseva+One&family=Homemade+Apple&display=swap" rel="stylesheet" />
+
+  Signature touch: each card is a real two-sided object. Clicking turns it
+  over in 3D (rotateY); the back has airmail-striped edges, a stamp whose
+  perforated edge is a CSS radial-gradient mask, and a circular wavy
+  postmark that thumps down when the card is first read. Fronts are
+  illustrated entirely in CSS (sky, sun, sea, whitewashed cubes, domes,
+  windmills, columns) from a tiny list of positioned <i class="it ..">
+  elements -- no images.
+
+  Class/id contract (see postcards-template.html in this same folder for
+  a full working example):
+
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .app                      page grid: .desk (left, ~42%) + .stage (map,
+                               right ~58%); on a phone the map stacks on
+                               top (45dvh) and the desk sits below
+  - .stage                    map column wrapper (position: relative)
+    .stage-actions              small floating button row inside the map
+  - .desk                     the table surface holding the pile
+    .desk-head                  title block
+      .album-title / .album-sub   heading + one-line subtitle
+      .pips > .pip(.done)         one dot per card, filled when postmarked
+      .progress                   "3 / 7 postmarked" counter
+    .pile                     sized box holding the stacked cards
+    .pile-controls            prev / turn / next row under the pile
+  - .postcard                 one card; JS sets --pos (0 = top), --rot,
+                               data-pos, and toggles .flipped / .leaving
+    .postcard.album             the final "Album complete" card (one face)
+    .pc-inner                   the 3D flipping body
+    .pc-face.pc-front           front: white border + .scene + lettering
+      .scene                      CSS illustration; children .sun .cloud
+                                   .sea .it (+ one of .cube .dome .mill
+                                   .col .slab .boat .sail .hut .hill
+                                   .tower), position via inline style
+      .greet / .place             "Greetings from" / big island name
+      .pc-tag                     small caption chip (top-right)
+      .turn-hint                  "turn over" chip (bottom-right)
+    .pc-face.pc-back            back: airmail stripe edge + .pc-back-in
+      .msg / .sign                handwritten message (>= 15px) + sign-off
+      .stamp                      fictional perforated stamp (+ .stamp-val)
+      .postmark                   wavy circular postmark (inline SVG)
+      .address                    ruled handwriting lines
+    .album-grid                 grid of .postmark badges on the album card
+  - .pm-marker                map marker CHILD (inner element of a
+                               mapboxgl.Marker) -- the postmark stamp
+                               that thumps down on the island
+  - .btn, .btn-primary,       buttons: pill-ish, card-stock; primary is
+    .btn-secondary              Aegean blue
+  - .status-note (+.loading/  a small status line under the controls
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --aegean: #1F5FA8;
+  --aegean-deep: #174A85;
+  --whitewash: #FBF8F2;
+  --terracotta: #D9774B;
+  --olive: #8A9A5B;
+  --stock: #F3EBDD;
+  --stock-edge: #E4D8C2;
+  --ink: #3A2E4A;            /* postmark ink */
+  --ink-soft: #6B5F78;
+  --air-red: #D7263D;
+  --air-blue: #1F5FA8;
+  --table: #E7D9BE;
+  --success: #5E7A3A;
+  --error: #B3261E;
+
+  --font-display: 'Yeseva One', Georgia, 'Times New Roman', serif;
+  --font-hand: 'Homemade Apple', 'Segoe Script', 'Bradley Hand', cursive;
+
+  /* airmail border: red / white / blue / white diagonal bars */
+  --airmail: repeating-linear-gradient(135deg,
+    var(--air-red) 0 14px, var(--whitewash) 14px 28px,
+    var(--air-blue) 28px 42px, var(--whitewash) 42px 56px);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--table);
+  color: var(--ink);
+  font-family: var(--font-display);
+}
+
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: 3px solid var(--aegean);
+  outline-offset: 3px;
+}
+
+/* ---------- Page grid ---------- */
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 42fr) minmax(0, 58fr);
+  grid-template-areas: "desk stage";
+  height: 100dvh;
+}
+
+.stage {
+  grid-area: stage;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  box-shadow: -6px 0 18px rgba(58, 46, 74, 0.25);
+  z-index: 2;
+}
+
+.stage-actions {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 3;
+  display: flex;
+  gap: 8px;
+}
+
+/* ---------- The table ---------- */
+.desk {
+  grid-area: desk;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  padding: 22px 22px 18px;
+  gap: 14px;
+  /* linen-ish table: soft vignette + a faint woven grid */
+  background:
+    radial-gradient(120% 90% at 50% 40%, rgba(255, 255, 255, 0.35), transparent 70%),
+    repeating-linear-gradient(0deg, rgba(120, 90, 50, 0.05) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(90deg, rgba(120, 90, 50, 0.05) 0 1px, transparent 1px 4px),
+    var(--table);
+}
+
+.desk-head { flex: none; }
+
+.album-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.1;
+  color: var(--aegean);
+  letter-spacing: 0.01em;
+}
+
+.album-sub {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--ink-soft);
+  letter-spacing: 0.02em;
+}
+
+.pips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.pip {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: transparent;
+  transition: background 0.3s, transform 0.3s;
+}
+
+.pip.done {
+  background: var(--terracotta);
+  border-color: var(--ink);
+  transform: scale(1.1);
+}
+
+.progress {
+  margin-left: 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  letter-spacing: 0.04em;
+}
+
+/* ---------- The pile ---------- */
+.pile {
+  position: relative;
+  flex: none;
+  width: min(100%, 600px, calc((100dvh - 300px) * 1.5));
+  aspect-ratio: 3 / 2;
+  /* extra bottom room for the rotated, offset cards beneath the top one */
+  margin: 8px auto 40px;
+}
+
+.postcard {
+  --rot: 0deg;
+  --pos: 0;
+  position: absolute;
+  inset: 0;
+  perspective: 1600px;
+  transform-origin: 50% 60%;
+  transform:
+    translate(calc(var(--pos) * 7px), calc(var(--pos) * 6px))
+    rotate(var(--rot));
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.25, 1), opacity 0.45s;
+  z-index: calc(20 - var(--pos));
+  pointer-events: none;
+}
+
+.postcard[data-pos="0"] {
+  transform: rotate(calc(var(--rot) * 0.25));
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.postcard[data-pos="4"],
+.postcard[data-pos="5"],
+.postcard[data-pos="6"],
+.postcard[data-pos="7"] {
+  opacity: 0;
+}
+
+.postcard.leaving {
+  transform: translate(-72%, -4%) rotate(-15deg);
+  opacity: 0;
+}
+
+.pc-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.8s cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+
+.postcard.flipped .pc-inner { transform: rotateY(180deg); }
+
+.pc-face {
+  position: absolute;
+  inset: 0;
+  container-type: inline-size;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 10px 22px -6px rgba(58, 46, 74, 0.45),
+    0 2px 4px rgba(58, 46, 74, 0.25);
+}
+
+/* ---------- Front ---------- */
+.pc-front {
+  background: var(--whitewash);
+  padding: 3.2%;
+}
+
+.scene {
+  position: absolute;
+  inset: 3.2%;
+  overflow: hidden;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #7FC1EE 0%, #BFE3F7 55%, #FFF1CE 100%);
+  isolation: isolate;
+}
+
+.scene .sun {
+  position: absolute;
+  right: 9%;
+  top: 8%;
+  width: 17cqw;
+  height: 17cqw;
+  border-radius: 50%;
+  background: radial-gradient(circle, #FFF6C8 0 38%, #FFD45E 40% 62%, rgba(255, 212, 94, 0.35) 64% 76%, transparent 78%);
+  animation: sun-pulse 6s ease-in-out infinite;
+  z-index: 0;
+}
+
+.scene .cloud {
+  position: absolute;
+  left: 46%;
+  top: 22%;
+  width: 14cqw;
+  height: 3.6cqw;
+  border-radius: 99px;
+  background: #fff;
+  opacity: 0.9;
+  box-shadow: 3cqw -1.6cqw 0 -0.4cqw #fff, -2.4cqw -1cqw 0 -0.8cqw #fff;
+  z-index: 0;
+  animation: cloud-drift 18s ease-in-out infinite alternate;
+}
+
+.scene .sea {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30%;
+  z-index: 2;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.22) 0 1.5px, transparent 1.5px 9px),
+    linear-gradient(180deg, #3C8FD0 0%, #1F5FA8 55%, #174A85 100%);
+  background-size: 28px 100%, 100% 100%;
+  animation: sea-shimmer 7s linear infinite;
+}
+
+@keyframes sun-pulse { 50% { transform: scale(1.07); } }
+@keyframes cloud-drift { to { transform: translateX(6cqw); } }
+@keyframes sea-shimmer { to { background-position: 28px 0, 0 0; } }
+
+/* generic scene item: left / bottom in %, width / height in cqw (inline) */
+.scene .it {
+  position: absolute;
+  display: block;
+  z-index: 3;
+}
+
+.it.hill {
+  z-index: 1;
+  background: var(--c, #D8C9A3);
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+}
+
+.it.cube {
+  background: linear-gradient(90deg, #fff 68%, #E3DCCB 68%);
+  box-shadow: 0 0.3cqw 0 rgba(58, 46, 74, 0.12);
+}
+
+.it.cube::before {               /* blue window */
+  content: "";
+  position: absolute;
+  left: 18%;
+  top: 24%;
+  width: 22%;
+  height: 28%;
+  background: var(--aegean);
+  border-radius: 1px;
+}
+
+.it.cube::after {                /* door */
+  content: "";
+  position: absolute;
+  left: 52%;
+  bottom: 0;
+  width: 18%;
+  height: 38%;
+  background: var(--c, var(--terracotta));
+}
+
+.it.dome {
+  background: linear-gradient(90deg, #fff 68%, #E3DCCB 68%);
+}
+
+.it.dome::before {               /* blue dome */
+  content: "";
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: 99%;
+  height: 78%;
+  border-radius: 50% 50% 0 0;
+  background: radial-gradient(circle at 35% 30%, #5FA3E0, var(--aegean) 60%, var(--aegean-deep));
+}
+
+.it.dome::after {                /* cross finial */
+  content: "";
+  position: absolute;
+  left: 48%;
+  width: 4%;
+  bottom: 170%;
+  height: 24%;
+  background: #fff;
+}
+
+.it.mill {                       /* windmill tower */
+  background: linear-gradient(90deg, #fff 62%, #E3DCCB 62%);
+  clip-path: polygon(14% 100%, 28% 22%, 72% 22%, 86% 100%);
+}
+
+.it.mill::before {               /* straw roof */
+  content: "";
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  top: 0;
+  height: 28%;
+  background: var(--terracotta);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.it.mill-blades {                /* sails of a windmill, drawn as an X */
+  background:
+    linear-gradient(45deg, transparent 47%, #8A6A4E 47% 53%, transparent 53%),
+    linear-gradient(-45deg, transparent 47%, #8A6A4E 47% 53%, transparent 53%);
+}
+
+.it.col {                        /* ancient column */
+  background: linear-gradient(90deg, #CFC3A8, #FFF 40%, #BDB093);
+  border-top: 0.9cqw solid #E9DFC8;
+}
+
+.it.slab {
+  background: linear-gradient(180deg, #FFF, #DDD2B8);
+  box-shadow: 0 0.4cqw 0 rgba(58, 46, 74, 0.15);
+}
+
+.it.tower {                      /* striped lighthouse */
+  background: repeating-linear-gradient(180deg, #fff 0 22%, var(--air-red) 22% 44%);
+  clip-path: polygon(20% 100%, 32% 10%, 68% 10%, 80% 100%);
+}
+
+.it.tower::before {
+  content: "";
+  position: absolute;
+  left: 30%;
+  right: 30%;
+  top: 0;
+  height: 14%;
+  background: #FFD45E;
+}
+
+.it.hut {                        /* fisherman's house with coloured door/boat shed */
+  background: linear-gradient(180deg, #fff 52%, var(--c, var(--aegean)) 52%);
+  clip-path: polygon(0 18%, 50% 0, 100% 18%, 100% 100%, 0 100%);
+}
+
+.it.boat {                       /* ferry hull + cabin + funnel */
+  background: linear-gradient(180deg, var(--air-red) 0 28%, #fff 28% 62%, var(--ink) 62%);
+  clip-path: polygon(0 0, 100% 0, 88% 100%, 10% 100%);
+  z-index: 4;
+}
+
+.it.boat::before {
+  content: "";
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  bottom: 100%;
+  height: 56%;
+  background: linear-gradient(180deg, #fff 0 20%, #E3DCCB 20%);
+}
+
+.it.sail {                       /* little sailing boat: sail + hull */
+  background: linear-gradient(180deg, #fff 0 66%, var(--c, var(--air-red)) 66%);
+  clip-path: polygon(44% 0, 90% 64%, 50% 64%, 50% 72%, 100% 72%, 86% 100%, 14% 100%, 0 72%, 44% 72%);
+  z-index: 4;
+}
+
+/* ---------- Front lettering ---------- */
+.greet {
+  position: absolute;
+  left: 7%;
+  top: 7.5%;
+  z-index: 6;
+  margin: 0;
+  max-width: 80%;
+  line-height: 0.95;
+  color: var(--whitewash);
+  pointer-events: none;
+}
+
+.greet small {
+  display: block;
+  font-size: clamp(14px, 6.4cqw, 34px);
+  letter-spacing: 0.02em;
+  text-shadow:
+    1.5px 1.5px 0 var(--terracotta), -1px 1px 0 var(--terracotta),
+    2.5px 2.5px 0 var(--ink);
+  transform: rotate(-3deg);
+  transform-origin: left bottom;
+}
+
+.place {
+  display: block;
+  margin-top: 0.8cqw;
+  font-size: clamp(32px, 15cqw, 84px);
+  letter-spacing: 0.01em;
+  color: #FFE9A8;
+  -webkit-text-stroke: 0.5cqw var(--aegean-deep);
+  paint-order: stroke fill;
+  text-shadow: 0.9cqw 0.9cqw 0 var(--terracotta), 1.3cqw 1.3cqw 0 rgba(58, 46, 74, 0.35);
+}
+
+.pc-tag,
+.turn-hint {
+  position: absolute;
+  z-index: 7;
+  padding: 0.6cqw 2.2cqw;
+  border-radius: 99px;
+  background: rgba(251, 248, 242, 0.94);
+  color: var(--ink);
+  font-size: clamp(11px, 2.5cqw, 14px);
+  letter-spacing: 0.06em;
+  pointer-events: none;
+}
+
+.pc-tag { right: 6.5%; bottom: 33%; }
+.turn-hint { right: 6.5%; bottom: 6.5%; background: var(--aegean); color: #fff; }
+
+/* ---------- Back ---------- */
+.pc-back {
+  transform: rotateY(180deg);
+  background: var(--airmail);
+  padding: 2.2%;
+}
+
+.pc-back-in {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  column-gap: 5%;
+  padding: 4.5% 4.5% 4%;
+  background:
+    radial-gradient(120% 100% at 30% 20%, rgba(255, 255, 255, 0.55), transparent 65%),
+    var(--stock);
+  border-radius: 3px;
+}
+
+.pc-back-in::before {            /* centre divider */
+  content: "";
+  position: absolute;
+  top: 7%;
+  bottom: 7%;
+  left: 52.5%;
+  width: 0;
+  border-left: 2px solid var(--stock-edge);
+}
+
+.msg-col { display: flex; flex-direction: column; min-width: 0; }
+
+.back-label {
+  margin: 0 0 2cqw;
+  font-size: clamp(10px, 2.4cqw, 13px);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--air-red);
+}
+
+.msg {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: clamp(15px, 3.3cqw, 19px);
+  line-height: 1.62;
+  color: #2B3C6B;
+  overflow-wrap: anywhere;
+}
+
+.sign {
+  margin: auto 0 0;
+  padding-top: 1.5cqw;
+  font-family: var(--font-hand);
+  font-size: clamp(15px, 3.3cqw, 19px);
+  color: var(--terracotta);
+}
+
+.addr-col {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.stamp {
+  align-self: flex-end;
+  width: 22cqw;
+  max-width: 120px;
+  aspect-ratio: 4 / 5;
+  padding: 7%;
+  background: var(--aegean);
+  /* perforated edge: four edge-tiled radial gradients intersected */
+  -webkit-mask-image:
+    radial-gradient(circle 3.5px at 50% 0, transparent 96%, #000 100%),
+    radial-gradient(circle 3.5px at 50% 100%, transparent 96%, #000 100%),
+    radial-gradient(circle 3.5px at 0 50%, transparent 96%, #000 100%),
+    radial-gradient(circle 3.5px at 100% 50%, transparent 96%, #000 100%);
+  mask-image:
+    radial-gradient(circle 3.5px at 50% 0, transparent 96%, #000 100%),
+    radial-gradient(circle 3.5px at 50% 100%, transparent 96%, #000 100%),
+    radial-gradient(circle 3.5px at 0 50%, transparent 96%, #000 100%),
+    radial-gradient(circle 3.5px at 100% 50%, transparent 96%, #000 100%);
+  -webkit-mask-size: 10px 100%, 10px 100%, 100% 10px, 100% 10px;
+  mask-size: 10px 100%, 10px 100%, 100% 10px, 100% 10px;
+  -webkit-mask-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+  mask-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+  -webkit-mask-composite: source-in, source-in, source-in;
+  mask-composite: intersect, intersect, intersect;
+  filter: drop-shadow(0 1px 1px rgba(58, 46, 74, 0.35));
+}
+
+.stamp-art {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-bottom: 8%;
+  color: #fff;
+  background:
+    radial-gradient(circle at 70% 24%, #FFD45E 0 9%, transparent 10%),
+    linear-gradient(180deg, transparent 0 56%, #2D78C4 56%),
+    linear-gradient(180deg, #8FCBF0, #D6EEFB);
+}
+
+.stamp-art::before {             /* sail */
+  content: "";
+  position: absolute;
+  left: 30%;
+  bottom: 38%;
+  width: 34%;
+  height: 34%;
+  background: #fff;
+  clip-path: polygon(40% 0, 40% 88%, 100% 88%);
+}
+
+.stamp-val {
+  position: relative;
+  font-size: clamp(9px, 2.3cqw, 12px);
+  letter-spacing: 0.05em;
+  text-shadow: 0 1px 0 rgba(23, 74, 133, 0.7);
+}
+
+.postmark {
+  position: absolute;
+  top: -3%;
+  right: 14cqw;
+  width: 24cqw;
+  max-width: 130px;
+  aspect-ratio: 1;
+  color: var(--ink);
+  opacity: 0.82;
+  mix-blend-mode: multiply;
+  transform: rotate(-14deg);
+  pointer-events: none;
+}
+
+.postmark svg { width: 100%; height: 100%; overflow: visible; }
+
+.postcard.flipped .postmark.fresh { animation: thump 0.55s 0.55s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+
+@keyframes thump {
+  from { transform: rotate(-30deg) scale(2); opacity: 0; }
+  to { transform: rotate(-14deg) scale(1); opacity: 0.82; }
+}
+
+.address {
+  margin-top: auto;
+  padding-bottom: 1%;
+  font-family: var(--font-hand);
+  font-size: clamp(14px, 2.9cqw, 17px);
+  color: #2B3C6B;
+}
+
+.address span {
+  display: block;
+  padding: 0.8cqw 0 0.2cqw;
+  border-bottom: 1.5px solid #C9BEA6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Album-complete card ---------- */
+.postcard.album { cursor: default; }
+
+.pc-album {
+  background: var(--airmail);
+  padding: 2.2%;
+}
+
+.pc-album .album-in {
+  width: 100%;
+  height: 100%;
+  padding: 4% 5%;
+  background:
+    radial-gradient(120% 100% at 30% 20%, rgba(255, 255, 255, 0.55), transparent 65%),
+    var(--stock);
+  border-radius: 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.pc-album h2 {
+  margin: 0;
+  font-weight: 400;
+  font-size: clamp(24px, 8.5cqw, 46px);
+  line-height: 1;
+  color: var(--aegean);
+  text-shadow: 1px 1px 0 var(--whitewash), 2.5px 2.5px 0 rgba(217, 119, 75, 0.55);
+}
+
+.pc-album p {
+  margin: 1.4cqw 0 0;
+  font-family: var(--font-hand);
+  font-size: clamp(15px, 3.2cqw, 18px);
+  color: var(--terracotta);
+}
+
+.album-grid {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  margin-top: 2cqw;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: center;
+  justify-items: center;
+}
+
+.album-grid .postmark {
+  position: static;
+  width: 100%;
+  max-width: 17cqw;
+  right: auto;
+  top: auto;
+  opacity: 0.9;
+}
+
+.album-grid .postmark:nth-child(odd) { transform: rotate(-9deg); }
+.album-grid .postmark:nth-child(even) { transform: rotate(8deg); }
+
+/* ---------- Controls ---------- */
+.pile-controls {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.btn {
+  appearance: none;
+  border: 2px solid var(--ink);
+  border-radius: 99px;
+  padding: 9px 18px;
+  min-height: 42px;
+  background: var(--stock);
+  color: var(--ink);
+  font-size: 14px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--ink);
+  transition: transform 0.12s, box-shadow 0.12s, background 0.15s;
+}
+
+.btn:hover { background: var(--whitewash); }
+
+.btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 var(--ink);
+}
+
+.btn-primary {
+  background: var(--aegean);
+  border-color: var(--aegean-deep);
+  color: #fff;
+  box-shadow: 0 3px 0 var(--aegean-deep);
+}
+
+.btn-primary:hover { background: #2A6FBE; }
+.btn-primary:active { box-shadow: 0 0 0 var(--aegean-deep); }
+
+.btn-secondary { background: var(--stock); }
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+}
+
+.stage-actions .btn {
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+.status-note {
+  flex: none;
+  min-height: 18px;
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft);
+}
+
+.status-note.loading::before { content: "\2026  "; }
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); }
+
+/* ---------- Map marker child (postmark stamped on an island) ---------- */
+.pm-marker {
+  width: 42px;
+  height: 42px;
+  color: var(--ink);
+  filter: drop-shadow(0 1px 2px rgba(58, 46, 74, 0.45));
+  animation: stamp-in 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.pm-marker svg { width: 100%; height: 100%; display: block; }
+
+@keyframes stamp-in {
+  from { transform: rotate(-25deg) scale(2.2); opacity: 0; }
+  to { transform: rotate(-8deg) scale(1); opacity: 1; }
+}
+
+.hidden { display: none !important; }
+
+/* ---------- Phone: map on top, one card below ---------- */
+@media (max-width: 760px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 45dvh minmax(0, 1fr);
+    grid-template-areas: "stage" "desk";
+  }
+
+  .stage { box-shadow: 0 4px 14px rgba(58, 46, 74, 0.3); }
+
+  .desk {
+    padding: 10px 16px 12px;
+    gap: 6px;
+  }
+
+  .album-title { font-size: 20px; }
+  .album-sub { display: none; }
+  .pips { margin-top: 6px; }
+  .progress { font-size: 12px; }
+
+  .pile {
+    width: min(100%, calc((55dvh - 150px) * 1.5));
+    margin: 2px auto 14px;
+  }
+
+  .postcard:not([data-pos="0"]) { opacity: 0; }
+
+  .btn { padding: 8px 14px; font-size: 13px; }
+  .pile-controls { gap: 8px; margin-top: 2px; }
+  .status-note { min-height: 0; }
+}
+
+@media (max-height: 640px) and (min-width: 761px) {
+  .album-sub { display: none; }
+  .pile { width: min(100%, 600px, calc((100dvh - 240px) * 1.5)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene .sun, .scene .cloud, .scene .sea { animation: none; }
+  .postcard, .pc-inner { transition-duration: 0.01s; }
+  .postcard.flipped .postmark.fresh,
+  .pm-marker { animation: none; }
+}

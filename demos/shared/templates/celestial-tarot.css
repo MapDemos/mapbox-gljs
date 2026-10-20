@@ -1,0 +1,737 @@
+/*
+  Celestial Tarot -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a mystical, gold-foil-on-midnight night
+  walk told through original tarot-style cards -- midnight indigo and deep
+  ultramarine panels, metallic gold-foil borders and display text, moon
+  silver body copy, a touch of crimson, star-field speckles and thin
+  ornamental frames with corner stars; playful, not occult-serious),
+  deliberately distinct from every other pack in this folder: Arena is a
+  dark stadium scoreboard, Editorial Paper is warm paper and serif
+  headlines, Highway Sign is cream/green MUTCD signage, Slate Console is a
+  cool-grey ops console, Storefront is a light retail locator, Tarmac Glass
+  is dark blur-glass + amber, Vintage Chart is navy/parchment/brass,
+  Weather Console is a dense forecast dashboard, Riso Zine is two-colour
+  misregistered print, Swiss Grid is white/black/red typographic grid, Neon
+  HUD is glowing sci-fi overlays, Pastel Bento is soft rounded tiles,
+  Blueprint is white-on-blue drafting lines, Story Scroll is a scrolling
+  narrative, Retro OS is a desktop-window UI, Aurora Command is a
+  gradient-glow control room, Deco Voyage is gold-on-black Art Deco, Washi
+  Seasons is quiet Japanese paper and seasonal colour, Raw Web is unstyled
+  default-browser HTML, Case Board is a corkboard of pinned notes, Line
+  Diagram is a transit-map schematic, Aero Gadgets is glossy 2000s
+  skeuomorphism, Chat Concierge is a messaging thread, Chronicle is a
+  newsprint timeline, Broadcast is a TV news lower-third, Bottom Sheet is
+  a mobile map sheet, Trailhead is olive/orange outdoor-gear tags, and
+  Field Journal is a naturalist's paper notebook.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/celestial-tarot.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Cinzel Decorative for card titles,
+  numerals and headings -- display only; Spectral for body text and card
+  meanings):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
+
+  Signature touch: a CARD SPREAD under the map -- a fanned row of face-down
+  gold-backed cards on a star-speckled velvet strip. Clicking a card flips
+  it in CSS 3D (rotateY, ~500ms) to an original face (Roman numeral, gold
+  line-art symbol, title, one-line meaning). Gold "foil" is a metallic
+  linear-gradient used on borders (padding-box/border-box trick) and on
+  display text (background-clip: text).
+
+  Layout: .app is a two-row grid -- .stage (the map) above, .spread-wrap
+  (the velvet strip with the cards) below. The map ends ABOVE the strip, so
+  the Mapbox logo and attribution sit in the map's own bottom corners and
+  are never covered. On phones the map is 50dvh and the cards become a
+  horizontal scroll-snap row of larger, unrotated cards. If you add a
+  raster-dem source (terrain), GL JS hides the logo; the rule near the
+  bottom of this file forces it back.
+
+  SVG sprite: the page supplies a hidden inline <svg> sprite (see the
+  template) with the gradient #ct-gold and symbols #ct-corner, #ct-star,
+  #ct-back plus one #sym-* line-art symbol per card. This file styles the
+  elements that <use> them; it cannot ship the sprite itself.
+
+  Class/id contract (see celestial-tarot-template.html in this same folder
+  for a full working example):
+
+  - .app                      page grid, 100dvh, never scrolls
+  - .stage                    positioned map area (grid row 1); holds #map
+                               and the title plate
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .title-plate (.gilt)      floating top-left gilded plate (compact
+                               strip across the top on phones)
+    .title-plate h1             foil display title
+    .tagline                    small italic silver line (hidden on phones)
+    .progress                   "n of 7 drawn" small-caps counter
+    .reading                    latest card's title + meaning (hidden on
+                                 phones; the card itself carries it)
+    .status-note (+.error)      small status line
+  - .foil                     any element: gold-foil gradient text
+  - .gilt                     gold-foil border + inner hairline frame;
+                               holds up to four <svg class="corner tl|tr|
+                               bl|br"><use href="#ct-corner"/></svg>
+  - .btn, .btn-primary,       pill buttons: gold-foil outline / gold fill /
+    .btn-secondary              quiet silver outline
+  - .spread-wrap              velvet strip (grid row 2) with a gold-foil
+                               top rule
+    .spread-bar                 header row: .spread-label, .spread-hint,
+                                 and a .btn (Shuffle)
+    .spread                     the row of cards (scrolls horizontally when
+                                 it does not fit; scroll-snap on phones)
+  - .card                     a <button>; custom props --i (index), --rot
+                               (fan angle) and --dy (fan drop). State
+                               classes: .flipped (turned over), .deal
+                               (entrance animation). .spread.shuffling
+                               plays the gather-and-riffle animation
+                               (needs --shift/--jit/--jr set per card).
+    .card-inner                 the 3D flipper (preserve-3d)
+    .face.face-back             gold-foil back with sun/moon art
+      .back-art                   the <svg> pattern
+    .face.face-front            indigo face
+      .card-num                   Roman numeral, foil, flanked by rules
+      .card-symbol                <svg> line-art (gold, 2px stroke)
+      .card-title                 Cinzel Decorative title
+      .card-meaning               Spectral italic one-line meaning
+  - .star-marker              INNER child of a mapboxgl.Marker element: a
+                               glowing gold star (.star-glow + <svg>); add
+                               .pulse to pulse it. Never style the Marker
+                               root itself.
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --midnight: #0E1033;
+  --ultramarine: #1B1F5E;
+  --indigo-land: #14173F;
+  --indigo-deep: #0A0C2A;
+  --gold-1: #F5D27A;
+  --gold-2: #B8862B;
+  --gold-3: #F7E3A3;
+  --gold-line: #D9B25A;
+  --gold-foil: linear-gradient(135deg, #F5D27A 0%, #B8862B 48%, #F7E3A3 100%);
+  --silver: #DDE3F0;
+  --silver-dim: #9AA3C4;
+  --crimson: #9E1B32;
+  --crimson-lit: #C9344F;
+  --success: #F5D27A;
+  --error: #E8758A;
+
+  --font-display: 'Cinzel Decorative', 'Trajan Pro', Georgia, serif;
+  --font-body: 'Spectral', Georgia, 'Times New Roman', serif;
+
+  /* Star-field speckles -- CSS radial-gradients, chrome only (never over the
+     map). Sized by the element's background-size (a repeating tile). */
+  --stars:
+    radial-gradient(1px 1px at 12% 18%, #DDE3F0 98%, transparent),
+    radial-gradient(1.5px 1.5px at 34% 62%, #F5D27A 98%, transparent),
+    radial-gradient(1px 1px at 58% 24%, #DDE3F0 98%, transparent),
+    radial-gradient(1px 1px at 76% 71%, #DDE3F0 98%, transparent),
+    radial-gradient(1.5px 1.5px at 88% 30%, #F7E3A3 98%, transparent),
+    radial-gradient(1px 1px at 22% 88%, #F5D27A 98%, transparent),
+    radial-gradient(1px 1px at 66% 92%, #DDE3F0 98%, transparent),
+    radial-gradient(1px 1px at 46% 8%, #F7E3A3 98%, transparent);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--midnight);
+  color: var(--silver);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--gold-1);
+  outline-offset: 3px;
+}
+
+/* ---------- Page grid ---------- */
+
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.stage {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---------- Foil text and gilt frames ---------- */
+
+.foil {
+  color: var(--gold-1);
+  font-family: var(--font-display);
+}
+
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .foil {
+    background-image: var(--gold-foil);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+}
+
+/* Gold-foil border (gradient painted under a transparent border) plus an
+   inner hairline; corner stars are <svg class="corner"> children. */
+.gilt {
+  position: relative;
+  border: 2px solid transparent;
+  background-origin: padding-box, border-box;
+  background-clip: padding-box, border-box;
+}
+
+.gilt::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(245, 210, 122, 0.5);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.corner {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.corner.tl { top: 1px; left: 1px; }
+.corner.tr { top: 1px; right: 1px; transform: scaleX(-1); }
+.corner.bl { bottom: 1px; left: 1px; transform: scaleY(-1); }
+.corner.br { bottom: 1px; right: 1px; transform: scale(-1, -1); }
+
+/* ---------- Title plate ---------- */
+
+.title-plate {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 2;
+  width: 316px;
+  max-height: calc(100% - 32px);
+  overflow: hidden;
+  padding: 20px 22px 18px;
+  border-radius: 12px;
+  background-image:
+    var(--stars),
+    linear-gradient(160deg, rgba(27, 31, 94, 0.94), rgba(14, 16, 51, 0.96)),
+    var(--gold-foil);
+  background-size: 200px 150px, auto, auto;
+  background-origin: padding-box, padding-box, border-box;
+  background-clip: padding-box, padding-box, border-box;
+  box-shadow: 0 14px 36px rgba(4, 5, 24, 0.55);
+  pointer-events: none;
+}
+
+.title-plate h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 21px;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+}
+
+.tagline {
+  margin: 8px 0 0;
+  font-style: italic;
+  font-size: 13.5px;
+  color: var(--silver-dim);
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-1);
+}
+
+.progress::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(245, 210, 122, 0.6), transparent);
+}
+
+.reading {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--silver);
+}
+
+.reading .reading-title {
+  display: block;
+  margin-bottom: 2px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--gold-3);
+}
+
+.status-note {
+  margin-top: 10px;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--silver-dim);
+}
+
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); }
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 18px;
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  background-image: linear-gradient(var(--midnight), var(--midnight)), var(--gold-foil);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  color: var(--gold-3);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.btn:hover {
+  box-shadow: 0 0 16px rgba(245, 210, 122, 0.45);
+  filter: brightness(1.15);
+}
+
+.btn-primary {
+  background-image: var(--gold-foil), var(--gold-foil);
+  color: var(--midnight);
+}
+
+.btn-secondary {
+  background-image: linear-gradient(var(--midnight), var(--midnight)),
+    linear-gradient(var(--silver-dim), var(--silver-dim));
+  color: var(--silver);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  filter: none;
+}
+
+/* ---------- Velvet strip and spread ---------- */
+
+.spread-wrap {
+  position: relative;
+  min-width: 0;
+  padding-top: 3px;
+  background-image:
+    var(--stars),
+    radial-gradient(70% 140% at 50% 120%, rgba(158, 27, 50, 0.38), transparent 70%),
+    linear-gradient(180deg, #181C55 0%, #0E1033 100%);
+  background-size: 240px 170px, auto, auto;
+}
+
+/* Gold-foil rule along the top edge of the strip */
+.spread-wrap::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gold-foil);
+}
+
+.spread-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 20px 0;
+  min-height: 50px;
+}
+
+.spread-label {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold-1);
+}
+
+.spread-hint {
+  flex: 1;
+  min-width: 0;
+  font-style: italic;
+  font-size: 13.5px;
+  color: var(--silver-dim);
+}
+
+.spread {
+  --card-w: clamp(120px, 10.4vw, 150px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: safe center;
+  gap: 10px;
+  padding: 26px 24px 28px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 210, 122, 0.4) transparent;
+}
+
+/* ---------- Cards ---------- */
+
+.card {
+  --rot: 0deg;
+  --dy: 0px;
+  flex: none;
+  position: relative;
+  width: var(--card-w);
+  aspect-ratio: 5 / 8;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: center;
+  cursor: pointer;
+  perspective: 900px;
+  container-type: inline-size;
+  transform: translateY(var(--dy)) rotate(var(--rot));
+  transition: transform 0.28s ease;
+  scroll-snap-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.card:hover,
+.card:focus-visible {
+  transform: translateY(calc(var(--dy) - 12px)) rotate(0deg);
+  z-index: 2;
+}
+
+.card:focus-visible {
+  outline-offset: 5px;
+  border-radius: 10px;
+}
+
+.card.deal {
+  animation: ct-deal 0.5s ease backwards;
+  animation-delay: calc(var(--i) * 70ms);
+}
+
+@keyframes ct-deal {
+  from { opacity: 0; transform: translateY(46px) rotate(0deg) scale(0.92); }
+}
+
+.spread.shuffling .card {
+  animation: ct-shuffle 1s ease-in-out both;
+  pointer-events: none;
+}
+
+@keyframes ct-shuffle {
+  0%   { transform: translateY(var(--dy)) rotate(var(--rot)); }
+  32%  { transform: translateX(var(--shift)) rotate(0deg); }
+  46%  { transform: translateX(calc(var(--shift) + var(--jit))) rotate(var(--jr)); }
+  60%  { transform: translateX(calc(var(--shift) - var(--jit))) rotate(calc(var(--jr) * -1)); }
+  74%  { transform: translateX(var(--shift)) rotate(0deg); }
+  100% { transform: translateY(var(--dy)) rotate(var(--rot)); }
+}
+
+.card-inner {
+  position: absolute;
+  inset: 0;
+  display: block;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.4, 0.1, 0.2, 1);
+}
+
+.card.flipped .card-inner {
+  transform: rotateY(180deg);
+}
+
+.face {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  border-radius: 10px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  box-shadow: 0 10px 20px rgba(2, 3, 16, 0.55);
+  transition: box-shadow 0.25s ease;
+}
+
+.card:hover .face,
+.card:focus-visible .face {
+  box-shadow: 0 0 20px rgba(245, 210, 122, 0.5), 0 10px 20px rgba(2, 3, 16, 0.55);
+}
+
+.face .corner {
+  width: 12%;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+/* Gold back with sun / moon line-art in midnight ink */
+.face-back {
+  background-image: var(--gold-foil), var(--gold-foil);
+  background-origin: padding-box, border-box;
+}
+
+.face-back::before {
+  border-color: rgba(14, 16, 51, 0.55);
+}
+
+.back-art {
+  position: absolute;
+  inset: 7% 11%;
+  width: 78%;
+  height: 86%;
+}
+
+/* Indigo front */
+.face-front {
+  transform: rotateY(180deg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9cqw 9cqw 8cqw;
+  background-image:
+    var(--stars),
+    radial-gradient(120% 60% at 50% 0%, rgba(62, 70, 190, 0.55), transparent 65%),
+    linear-gradient(180deg, #1B1F5E 0%, #0E1033 100%),
+    var(--gold-foil);
+  background-size: 120px 90px, auto, auto, auto;
+  background-origin: padding-box, padding-box, padding-box, border-box;
+  background-clip: padding-box, padding-box, padding-box, border-box;
+}
+
+.card-num {
+  display: flex;
+  align-items: center;
+  gap: 2.5cqw;
+  width: 100%;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: max(12px, 10.5cqw);
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: var(--gold-1);
+}
+
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .card-num {
+    background-image: var(--gold-foil);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+}
+
+.card-num::before,
+.card-num::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(245, 210, 122, 0.5);
+}
+
+.card-symbol {
+  flex: none;
+  width: 34cqw;
+  height: 34cqw;
+  margin: 1cqw 0;
+  fill: none;
+  stroke: #F2CF7C;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px rgba(245, 210, 122, 0.35));
+}
+
+.card-title {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: max(10px, 6.8cqw);
+  line-height: 1.25;
+  letter-spacing: 0;
+  color: var(--silver);
+  text-wrap: balance;
+}
+
+.card-title::after {
+  content: '';
+  display: block;
+  width: 9cqw;
+  height: 9cqw;
+  margin: 2.5cqw auto 0;
+  background: var(--crimson);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  transform: scale(0.45);
+}
+
+.card-meaning {
+  display: block;
+  font-style: italic;
+  font-size: max(11px, 7.6cqw);
+  line-height: 1.32;
+  color: var(--silver-dim);
+}
+
+/* ---------- Map star marker (inner child of a mapboxgl.Marker) ---------- */
+
+.star-marker {
+  position: relative;
+  display: block;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  animation: ct-drop 0.7s cubic-bezier(0.3, 1.4, 0.5, 1) backwards;
+}
+
+.star-marker svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 5px rgba(245, 210, 122, 0.95));
+  animation: ct-twinkle 3.2s ease-in-out infinite;
+}
+
+.star-glow {
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(245, 210, 122, 0.5), transparent 65%);
+  pointer-events: none;
+}
+
+.star-marker.pulse .star-glow {
+  animation: ct-pulse 0.9s ease-out 2;
+}
+
+@keyframes ct-drop {
+  from { opacity: 0; transform: translateY(-34px) scale(2.2); }
+}
+
+@keyframes ct-twinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.78; }
+}
+
+@keyframes ct-pulse {
+  0% { transform: scale(0.7); opacity: 1; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+/* ---------- Utility ---------- */
+
+.hidden {
+  display: none !important;
+}
+
+/* A raster-dem source makes GL JS hide the Mapbox logo; force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+/* ---------- Phones: 50dvh map, scroll-snap row of larger cards ---------- */
+
+@media (max-width: 640px) {
+  .app {
+    grid-template-rows: 50vh minmax(0, 1fr);
+    grid-template-rows: 50dvh minmax(0, 1fr);
+  }
+
+  .title-plate {
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    padding: 10px 16px 9px;
+    border-radius: 10px;
+  }
+
+  .title-plate h1 { font-size: 14px; }
+  .tagline, .reading { display: none; }
+  .progress { margin-top: 6px; font-size: 10px; }
+
+  .spread-wrap {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .spread-bar { padding: 6px 16px 0; min-height: 44px; }
+  .spread-hint { font-size: 12.5px; }
+
+  .spread {
+    --card-w: clamp(132px, calc((50dvh - 100px) * 0.625), 210px);
+    justify-content: flex-start;
+    gap: 14px;
+    padding: 10px 16px 12px;
+    scroll-snap-type: x mandatory;
+    scroll-padding: 0 16px;
+    scrollbar-width: none;
+  }
+
+  .spread::-webkit-scrollbar { display: none; }
+
+  .card {
+    --rot: 0deg !important;
+    --dy: 0px !important;
+  }
+
+  .card:hover {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

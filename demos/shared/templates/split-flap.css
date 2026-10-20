@@ -1,0 +1,585 @@
+/*
+  Split Flap -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a grand railway station's mechanical
+  split-flap departure board -- board-black, charcoal two-half flaps with a
+  hairline split and a soft shadow at the hinge, warm-white letters, amber
+  status text, brushed-steel framing -- deliberately distinct from every
+  other style pack in this folder: Arena, Editorial Paper, Highway Sign,
+  Slate Console, Storefront, Tarmac Glass, Vintage Chart, Weather Console,
+  Riso Zine, Swiss Grid, Neon HUD, Pastel Bento, Blueprint, Story Scroll,
+  Retro OS, Aurora Command, Deco Voyage, Washi Seasons, Raw Web, Case
+  Board, Line Diagram, Aero Gadgets, Chat Concierge, Chronicle, Broadcast,
+  Bottom Sheet, Trailhead and Field Journal). It is generic station-board
+  chrome: it does not imitate any real station operator's signage.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/split-flap.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Oswald for station headings and
+  destination names, Azeret Mono for flap characters, times and platforms):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Azeret+Mono:wght@500;700&display=swap" rel="stylesheet" />
+
+  Signature touch: every character is a real two-half flap. Each half is a
+  clipped copy of the glyph; a "flipper" top half rotates down (CSS 3D
+  rotateX, 30ms) revealing the new top, then a flipper bottom half drops
+  into place (30ms) -- one 60ms step per letter. JS (see the template)
+  cycles each cell through the intermediate characters before it lands on
+  the target and toggles the .flip class on the cell to restart the CSS
+  animation. Under prefers-reduced-motion the animation is off and cells
+  swap instantly.
+
+  Layout: .app is a two-row grid -- the board band on top (45% of the
+  height on desktop, 55% on a phone) and the .stage (the map) below it, so
+  nothing ever sits over the Mapbox logo or attribution. At <= 700px the
+  board shows only time, destination and platform; status is reduced to a
+  coloured bar on the row's left edge.
+
+  Class/id contract (see split-flap-template.html in this same folder for
+  a full working example):
+
+  - #map                      map container, absolutely filling .stage
+                               (every demo defines its own, per convention
+                               -- not included here)
+  - .app                      page grid: .board over .stage
+  - .board                    the board band (<section>): steel frame,
+                               black face. Scrolls internally if rows
+                               overflow
+    .board-head                 header strip --
+      .station                    left block --
+        .station-name               Oswald station heading (<h1>)
+        .station-sub                small spaced sub-line
+      .board-clock                right block: a .grp of flaps + a label
+      .btn                        steel pause / resume button
+    .tick-bar > .tick-fill      thin progress strip; JS scales the fill
+                                 (scaleX 0..1) as the next advance nears
+    .board-cols                 column labels, same grid as a row
+    .board-rows                 <ul> of rows --
+      .board-row                  <li><button>: grid time | dest | via |
+                                   plat | status. State classes: .is-hover,
+                                   .is-selected, .is-departing; data-status
+                                   is "ok" | "board" | "late" | "gone"
+      .grp                        a group of flaps; size modifiers
+                                   .g-time .g-dest .g-via .g-plat .g-status
+                                   (+ .st-ok/.st-board/.st-late/.st-gone
+                                   colours on the status group)
+        .flap                       one character cell: four <i.half>
+                                     children .t .b .ft .fb each holding
+                                     a <span> glyph; .flip runs a step
+  - .stage                    relative wrapper around #map
+    .map-key                    small legend chip, pointer-events: none
+  - .flap-popup               Mapbox popup className -- board-black card
+                               with steel border; inside use .pop-dest
+                               (Oswald), .pop-meta and small .grp rows
+  - .btn                      steel push-button
+  - .status-note (+.loading/  a one-line status chip (map errors etc.)
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --board: #111214;
+  --flap: #1E2023;
+  --flap-lo: #17181B;
+  --flap-hi: #26292D;
+  --split: #070708;
+  --letter: #F2EEE3;
+  --amber: #FFB000;
+  --red: #E5484D;
+  --steel: #8B9097;
+  --steel-hi: #B9BEC4;
+  --steel-lo: #5A5F66;
+  --dim: #6B7078;
+  --success: #FFB000;
+  --error: #E5484D;
+
+  --font-head: 'Oswald', 'Arial Narrow', Impact, sans-serif;
+  --font-flap: 'Azeret Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Flap geometry (overridden at narrower widths) */
+  --cw: 24px;
+  --chh: 36px;
+  --fs: 24px;
+  --gap: 2px;
+  --dcw: calc(var(--cw) * 0.82);   /* destination cells are narrower (Oswald) */
+  --dfs: calc(var(--fs) * 1.12);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--board);
+  color: var(--letter);
+  font-family: var(--font-flap);
+}
+
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+/* ---- Page grid ---- */
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 45% minmax(0, 1fr);
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.stage {
+  position: relative;
+  min-height: 0;
+}
+
+/* ---- Board: brushed-steel frame around a black face ---- */
+.board {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.04), transparent 60%),
+    var(--board);
+  border-bottom: 10px solid var(--steel);
+  border-image: linear-gradient(180deg, var(--steel-hi), var(--steel) 40%, var(--steel-lo)) 0 0 10 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  z-index: 2;
+}
+
+.board-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 24px 10px;
+  flex: none;
+}
+
+.station-name {
+  margin: 0;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 28px;
+  line-height: 1.1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--letter);
+}
+
+.station-sub {
+  margin-top: 3px;
+  font-family: var(--font-flap);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.board-head .right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.board-clock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.board-clock .label {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--steel);
+}
+
+/* Progress strip: the time until the next advance */
+.tick-bar {
+  flex: none;
+  height: 3px;
+  margin: 0 24px;
+  background: #24262A;
+  overflow: hidden;
+}
+
+.tick-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, var(--steel-lo), var(--amber));
+  transform-origin: left center;
+  transform: scaleX(0);
+}
+
+/* ---- Columns and rows ---- */
+.board-cols,
+.board-row {
+  display: grid;
+  /* Column widths = the exact width of the flap groups, so labels line up */
+  grid-template-columns:
+    calc(5 * var(--cw) + 4 * var(--gap))
+    calc(10 * var(--dcw) + 9 * var(--gap))
+    calc(8 * var(--cw) + 7 * var(--gap))
+    calc(2 * var(--cw) + var(--gap))
+    calc(9 * var(--cw) + 8 * var(--gap));
+  justify-content: space-between;   /* spread the columns across the full board */
+  column-gap: 20px;
+  align-items: center;
+}
+
+.board-cols {
+  flex: none;
+  padding: 12px 24px 4px;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--steel);
+}
+
+.board-cols span { white-space: nowrap; }
+
+.board-rows {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 10px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--steel-lo) transparent;
+}
+
+.board-rows li { margin: 0; padding: 0; }
+
+.board-row {
+  position: relative;
+  width: 100%;
+  padding: 4px 24px;
+  background: transparent;
+  border: 0;
+  border-left: 4px solid transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.board-row.is-hover,
+.board-row:hover { background: rgba(255, 176, 0, 0.07); }
+
+.board-row.is-selected {
+  background: rgba(255, 176, 0, 0.12);
+  border-left-color: var(--amber);
+}
+
+.board-row.is-departing .g-time .flap { box-shadow: 0 0 0 1px rgba(255, 176, 0, 0.55); }
+
+/* ---- Flap groups ---- */
+.grp {
+  display: inline-flex;
+  gap: var(--gap);
+  perspective: 400px;
+}
+
+.g-dest {
+  --cw: var(--dcw);
+  --fs: var(--dfs);
+  font-family: var(--font-head);
+  font-weight: 600;
+}
+
+.g-status.st-ok { color: var(--amber); }
+.g-status.st-board { color: var(--amber); }
+.g-status.st-late { color: var(--red); }
+.g-status.st-gone { color: var(--dim); }
+.g-status.st-board .flap { box-shadow: 0 0 10px rgba(255, 176, 0, 0.25); }
+
+/* ---- A single flap: two clipped halves with a hinge ---- */
+.flap {
+  position: relative;
+  display: inline-block;
+  width: var(--cw);
+  height: var(--chh);
+  font-size: var(--fs);
+  line-height: 1;
+  color: var(--letter);
+  background: var(--flap);
+  border-radius: 3px;
+  transform-style: preserve-3d;
+}
+
+.g-status .flap, .g-plat .flap { font-family: var(--font-flap); font-weight: 700; }
+.g-time .flap, .g-via .flap { font-family: var(--font-flap); font-weight: 700; }
+.g-status .flap { color: inherit; }
+.g-via .flap { color: #CFCABD; }
+
+.flap .half {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 50%;
+  overflow: hidden;
+  font-style: normal;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.flap .half span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 200%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flap .t,
+.flap .ft {
+  top: 0;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(180deg, var(--flap-hi), var(--flap));
+  transform-origin: 50% 100%;
+}
+
+.flap .b,
+.flap .fb {
+  bottom: 0;
+  border-radius: 0 0 3px 3px;
+  background: linear-gradient(180deg, var(--flap), var(--flap-lo));
+  transform-origin: 50% 0;
+}
+
+.flap .t span, .flap .ft span { top: 0; }
+.flap .b span, .flap .fb span { bottom: 0; }
+
+/* Resting positions of the two flippers: edge-on, hidden */
+.flap .ft { transform: rotateX(-90deg); }
+.flap .fb { transform: rotateX(90deg); }
+
+.flap.flip .ft { animation: flap-top 30ms ease-in forwards; }
+.flap.flip .fb { animation: flap-bot 30ms ease-out 30ms forwards; }
+
+@keyframes flap-top {
+  from { transform: rotateX(0deg); }
+  to { transform: rotateX(-90deg); }
+}
+
+@keyframes flap-bot {
+  from { transform: rotateX(90deg); }
+  to { transform: rotateX(0deg); }
+}
+
+/* Hinge: a hairline split, a soft shadow beneath it, and two pins */
+.flap::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% - 1px);
+  height: 2px;
+  background: var(--split);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.55), 0 -1px 0 rgba(255, 255, 255, 0.03);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.flap::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% - 2px);
+  height: 4px;
+  background:
+    radial-gradient(circle at 2px 50%, #3A3D42 1.2px, transparent 1.8px),
+    radial-gradient(circle at calc(100% - 2px) 50%, #3A3D42 1.2px, transparent 1.8px);
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* ---- Buttons ---- */
+.btn {
+  padding: 8px 14px;
+  border: 1px solid var(--steel-lo);
+  border-radius: 3px;
+  background: linear-gradient(180deg, #2A2D31, #1B1D20);
+  color: var(--steel-hi);
+  font-family: var(--font-head);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn:hover { color: var(--amber); border-color: var(--amber); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ---- Map legend chip ---- */
+.map-key {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background: rgba(17, 18, 20, 0.88);
+  border: 1px solid var(--steel-lo);
+  border-radius: 3px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--steel-hi);
+  pointer-events: none;
+}
+
+.map-key i {
+  display: inline-block;
+  width: 18px;
+  height: 3px;
+  margin-right: 8px;
+  vertical-align: middle;
+  border-radius: 2px;
+}
+
+.map-key .k-amber { background: var(--amber); }
+.map-key .k-grey { background: var(--dim); }
+
+/* ---- Status note ---- */
+.status-note {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 6px 12px;
+  background: var(--board);
+  border: 1px solid var(--steel-lo);
+  border-radius: 3px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--steel-hi);
+}
+
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); border-color: var(--error); }
+
+/* ---- Popup: a flap-styled card at the destination ---- */
+.flap-popup .mapboxgl-popup-content {
+  padding: 10px 12px 11px;
+  background: var(--board);
+  border: 1px solid var(--steel);
+  border-radius: 4px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+  color: var(--letter);
+}
+
+.flap-popup[class*='anchor-bottom'] .mapboxgl-popup-tip { border-top-color: var(--steel); }
+.flap-popup[class*='anchor-top'] .mapboxgl-popup-tip { border-bottom-color: var(--steel); }
+.flap-popup.mapboxgl-popup-anchor-left .mapboxgl-popup-tip { border-right-color: var(--steel); }
+.flap-popup.mapboxgl-popup-anchor-right .mapboxgl-popup-tip { border-left-color: var(--steel); }
+
+.flap-popup .pop-dest {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.15;
+}
+
+.flap-popup .pop-meta {
+  margin: 3px 0 8px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.flap-popup .pop-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.flap-popup .pop-row .lbl {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--steel);
+}
+
+.flap-popup .grp {
+  --cw: 15px;
+  --chh: 24px;
+  --fs: 15px;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---- Narrower screens ---- */
+@media (min-width: 1300px) {
+  :root { --cw: 28px; --chh: 40px; --fs: 27px; }
+}
+
+@media (max-width: 1100px) {
+  :root { --cw: 20px; --chh: 32px; --fs: 21px; }
+  .board-cols, .board-row { column-gap: 18px; }
+}
+
+@media (max-width: 900px) {
+  .board-cols, .board-row {
+    grid-template-columns:
+      calc(5 * var(--cw) + 4 * var(--gap))
+      calc(10 * var(--dcw) + 9 * var(--gap))
+      calc(2 * var(--cw) + var(--gap))
+      calc(9 * var(--cw) + 8 * var(--gap));
+  }
+  .board-cols .c-via, .board-row .g-via { display: none; }
+}
+
+@media (max-width: 700px) {
+  :root { --cw: 17px; --chh: 30px; --fs: 18px; --gap: 1px; }
+  .app { grid-template-rows: auto minmax(0, 1fr); }
+  .board { max-height: 55dvh; }
+  .board-head { padding: 8px 16px 6px; }
+  .station-name { font-size: 20px; letter-spacing: 0.06em; }
+  .station-sub { font-size: 9px; letter-spacing: 0.16em; }
+  .board-clock .label, .board-head .btn { display: none; }
+  .board-head .grp { --cw: 14px; --chh: 24px; --fs: 14px; }
+  .tick-bar { margin: 0 16px; }
+  .board-cols, .board-row {
+    grid-template-columns:
+      calc(5 * var(--cw) + 4 * var(--gap))
+      minmax(0, 1fr)
+      calc(2 * var(--cw) + var(--gap));
+    column-gap: 10px;
+    justify-content: stretch;
+  }
+  .board-cols { padding: 8px 16px 2px; }
+  .board-row { padding: 3px 16px 3px 12px; }
+  .board-cols .c-via, .board-cols .c-status,
+  .board-row .g-via, .board-row .g-status { display: none; }
+  .board-cols .c-plat, .board-row .g-plat { justify-self: end; }
+  .board-row[data-status='board'] { border-left-color: var(--amber); }
+  .board-row[data-status='late'] { border-left-color: var(--red); }
+  .board-row.is-selected { border-left-color: var(--amber); }
+  .map-key { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flap.flip .ft, .flap.flip .fb { animation: none; }
+  .board-row { transition: none; }
+}

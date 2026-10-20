@@ -1,0 +1,370 @@
+<!--
+  Working EXAMPLE of the Clinic Finder style pack (clinic-finder.css, in this
+  same folder). Open this file directly to see the pattern working with 14
+  fictional walk-in clinics across inner Melbourne on the Mapbox Standard
+  style (day preset, basemap points of interest hidden). It is an
+  accessibility-first search + results + map layout: a skip link, a large
+  labelled search field, "Use my location" (a fixed demo location -- no
+  geolocation prompt), toggle filter chips (Open now, Wheelchair access,
+  Interpreter, Children), sort by distance or wait, and an A- / A+ control
+  that rescales the layout. The list and the map are linked: numbers match,
+  arrow keys move through results, Enter selects (flies the map and
+  announces the selection through an aria-live region), and clicking a map
+  circle selects its card. On phones a Map / List toggle swaps the panes.
+  Copy the markup below into your own demo and link clinic-finder.css from
+  its <head> -- see the class/id contract documented at the top of that CSS
+  file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (accessibility-first public service: white, ink, deep
+  teal, WCAG AA colours, wait times always shown with icon + text) at the
+  user's request for something distinct from every other pack in this folder.
+  The suburbs are real but "Bayside Community Health Network", every clinic
+  name, hours, wait time and feature flag are fictional placeholders and the
+  coordinates are approximate -- swap in your own data. Not medical advice.
+
+  What's NOT included: real clinic data or live wait times, real geolocation
+  or geocoding, routing/directions, booking, or a hard-coded access token
+  (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Clinic Finder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Lexend:wght@500;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="clinic-finder.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#results" id="skip">Skip to results</a>
+
+<div class="app" id="app" data-view="list">
+  <header class="topbar">
+    <div class="topbar-row">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+          <rect width="40" height="40" rx="9" fill="#0B6E6E" />
+          <path d="M16 8h8v8h8v8h-8v8h-8v-8H8v-8h8z" fill="#fff" />
+        </svg>
+        <div>
+          <p class="brand-name">Bayside Community Health Network</p>
+          <p class="brand-sub">Walk-in clinic finder</p>
+        </div>
+      </div>
+      <div class="textsize" role="group" aria-label="Text size">
+        <button type="button" class="btn btn-sm" id="ts-dec" aria-label="Smaller text">A&minus;</button>
+        <button type="button" class="btn btn-sm" id="ts-inc" aria-label="Larger text">A+</button>
+        <span class="textsize-label" id="ts-label" aria-hidden="true">Text 100%</span>
+      </div>
+    </div>
+
+    <form class="search" role="search" id="search-form">
+      <label class="search-label" for="q">Search by suburb or clinic name</label>
+      <div class="search-row">
+        <input class="field" id="q" type="search" placeholder="For example: Fitzroy" autocomplete="off" />
+        <button type="button" class="btn btn-primary" id="locate-btn">Use my location</button>
+      </div>
+    </form>
+
+    <div class="chips" role="group" aria-label="Filter clinics">
+      <button type="button" class="chip" data-filter="open" aria-pressed="false">Open now</button>
+      <button type="button" class="chip" data-filter="wheel" aria-pressed="false">Wheelchair access</button>
+      <button type="button" class="chip" data-filter="interp" aria-pressed="false">Interpreter</button>
+      <button type="button" class="chip" data-filter="kids" aria-pressed="false">Children</button>
+    </div>
+
+    <div class="view-toggle" role="group" aria-label="Show">
+      <button type="button" class="seg" id="seg-list" aria-pressed="true">List</button>
+      <button type="button" class="seg" id="seg-map" aria-pressed="false">Map</button>
+    </div>
+
+    <p class="note"><strong>Illustrative data &mdash; not medical advice.</strong> In an emergency call 000.</p>
+  </header>
+
+  <div class="main">
+    <section class="results-pane" aria-labelledby="count">
+      <div class="results-head">
+        <h2 class="count" id="count">Loading&hellip;</h2>
+        <label class="sort">Sort by
+          <select id="sort">
+            <option value="dist">Distance</option>
+            <option value="wait">Wait time</option>
+          </select>
+        </label>
+      </div>
+      <ul class="results" id="results" tabindex="-1"></ul>
+      <p class="empty hidden" id="empty">No clinics match. Try clearing a filter or searching a different suburb.</p>
+    </section>
+    <div class="map-pane"><div id="map"></div></div>
+  </div>
+
+  <div class="sr-only" id="live" role="status" aria-live="polite"></div>
+</div>
+
+<script>
+// Fictional clinics at approximate real locations [lng, lat] in inner Melbourne.
+// wait = minutes, open = open right now (illustrative), until/opens = hours text.
+const CLINICS = [
+  { id: 'c1',  name: 'Collins Street Walk-in',        suburb: 'Melbourne CBD',    ll: [144.9631, -37.8150], open: true,  hours: 'Open until 8 pm',   wait: 15, wheel: true,  interp: true,  kids: false },
+  { id: 'c2',  name: 'Brunswick Street Family Clinic', suburb: 'Fitzroy',          ll: [144.9784, -37.7990], open: true,  hours: 'Open until 9 pm',   wait: 35, wheel: true,  interp: false, kids: true },
+  { id: 'c3',  name: 'Lygon Street Health Hub',        suburb: 'Carlton',          ll: [144.9669, -37.7993], open: true,  hours: 'Open until 7 pm',   wait: 60, wheel: true,  interp: true,  kids: true },
+  { id: 'c4',  name: 'Swan Street Medical',            suburb: 'Richmond',         ll: [144.9990, -37.8236], open: false, hours: 'Opens 8 am',        wait: 10, wheel: false, interp: false, kids: true },
+  { id: 'c5',  name: 'Clarendon Walk-in Centre',       suburb: 'South Melbourne',  ll: [144.9560, -37.8330], open: true,  hours: 'Open until 6 pm',   wait: 25, wheel: true,  interp: false, kids: false },
+  { id: 'c6',  name: 'Fitzroy Street Bayside Clinic',  suburb: 'St Kilda',         ll: [144.9807, -37.8676], open: true,  hours: 'Open until 10 pm',  wait: 50, wheel: true,  interp: true,  kids: true },
+  { id: 'c7',  name: 'Barkly Street Community Health', suburb: 'Footscray',        ll: [144.8997, -37.8008], open: true,  hours: 'Open until 8 pm',   wait: 40, wheel: true,  interp: true,  kids: true },
+  { id: 'c8',  name: 'Sydney Road Family Doctors',     suburb: 'Brunswick',        ll: [144.9610, -37.7664], open: false, hours: 'Opens 9 am',        wait: 20, wheel: false, interp: true,  kids: true },
+  { id: 'c9',  name: 'Elizabeth Street Urgent Care',   suburb: 'Melbourne CBD',    ll: [144.9615, -37.8085], open: true,  hours: 'Open 24 hours',     wait: 75, wheel: true,  interp: true,  kids: false },
+  { id: 'c10', name: 'Smith Street Clinic',            suburb: 'Collingwood',      ll: [144.9880, -37.8040], open: true,  hours: 'Open until 6 pm',   wait: 12, wheel: false, interp: false, kids: false },
+  { id: 'c11', name: 'Southbank Riverside Medical',    suburb: 'Southbank',        ll: [144.9645, -37.8240], open: true,  hours: 'Open until 7 pm',   wait: 30, wheel: true,  interp: false, kids: true },
+  { id: 'c12', name: 'Errol Street Health Centre',     suburb: 'North Melbourne',  ll: [144.9490, -37.7985], open: false, hours: 'Opens 8:30 am',     wait: 18, wheel: true,  interp: true,  kids: false },
+  { id: 'c13', name: 'Rathdowne Street Clinic',        suburb: 'Carlton North',    ll: [144.9715, -37.7860], open: true,  hours: 'Open until 5 pm',   wait: 45, wheel: false, interp: false, kids: true },
+  { id: 'c14', name: 'Bay Street Walk-in',             suburb: 'Port Melbourne',   ll: [144.9420, -37.8370], open: true,  hours: 'Open until 8 pm',   wait: 22, wheel: true,  interp: false, kids: true },
+];
+const ORIGINS = {
+  centre: { name: 'Melbourne CBD', ll: [144.9631, -37.8136] },
+  demo:   { name: 'Carlton Gardens (demo location)', ll: [144.9714, -37.8056] },
+};
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const state = { q: '', filters: new Set(), sort: 'dist', origin: ORIGINS.centre, sel: null, shown: [] };
+let ready = false;
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [144.9631, -37.8136],
+  zoom: 11.6,
+  config: { basemap: { lightPreset: 'day', showPointOfInterestLabels: false } },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+// ---- Helpers ----
+function km(a, b) {
+  const r = Math.PI / 180, dLat = (b[1] - a[1]) * r, dLng = (b[0] - a[0]) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * r) * Math.cos(b[1] * r) * Math.sin(dLng / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
+}
+const level = (w) => (w <= 20 ? 'short' : w <= 45 ? 'moderate' : 'long');
+const LEVEL_TEXT = { short: 'Short wait', moderate: 'Moderate wait', long: 'Long wait' };
+const svg = (body, size = 20) =>
+  `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+const ICON = {
+  short: svg('<circle cx="12" cy="12" r="9.5"/><path d="M7.5 12.5l3 3 6-6.5"/>'),
+  moderate: svg('<circle cx="12" cy="12" r="9.5"/><path d="M12 2.5a9.5 9.5 0 0 1 0 19z" fill="currentColor"/>'),
+  long: svg('<circle cx="12" cy="12" r="9.5" fill="currentColor"/>'),
+  open: svg('<circle cx="12" cy="12" r="9.5"/><path d="M12 6.5V12l3.5 2.5"/>', 18),
+  closed: svg('<circle cx="12" cy="12" r="9.5"/><path d="M8 8l8 8M16 8l-8 8"/>', 18),
+  wheel: svg('<circle cx="12" cy="4.5" r="1.8"/><path d="M12 8v6h4l2.5 5M12 11h4.5"/><path d="M8.5 13.5a5 5 0 1 0 6 7"/>'),
+  interp: svg('<path d="M4 5h16v10H10l-5 4v-4H4z"/><path d="M8 9h8M8 12h5"/>'),
+  kids: svg('<circle cx="12" cy="6" r="2.5"/><path d="M12 9.5v6M8 11.5l4 1.5 4-1.5M9.5 21l2.5-5.5 2.5 5.5"/>'),
+};
+
+// ---- Filtering + sorting ----
+function compute() {
+  const q = state.q.trim().toLowerCase();
+  const list = CLINICS
+    .map((c) => ({ ...c, dist: km(state.origin.ll, c.ll) }))
+    .filter((c) =>
+      (!q || c.name.toLowerCase().includes(q) || c.suburb.toLowerCase().includes(q)) &&
+      [...state.filters].every((f) => (f === 'open' ? c.open : c[f])));
+  list.sort((a, b) => (state.sort === 'wait' ? a.wait - b.wait || a.dist - b.dist : a.dist - b.dist));
+  return list;
+}
+
+function cardHTML(c, i) {
+  const lv = level(c.wait);
+  const feats = [['wheel', 'Wheelchair access'], ['interp', 'Interpreter'], ['kids', 'Children']]
+    .filter(([k]) => c[k])
+    .map(([k, label]) => `<span class="feat">${ICON[k]}${label}</span>`).join('');
+  return `<li><button type="button" class="card${c.id === state.sel ? ' is-selected' : ''}" data-id="${c.id}" aria-pressed="${c.id === state.sel}" tabindex="${i === 0 ? 0 : -1}">
+    <span class="card-top"><span class="num" aria-hidden="true">${i + 1}</span>
+      <span class="card-name">${c.name}</span>
+      <span class="card-dist">${c.dist.toFixed(1)}<small> km</small></span></span>
+    <span class="card-sub">${c.suburb}</span>
+    <span class="card-hours ${c.open ? 'open' : 'closed'}">${c.open ? ICON.open : ICON.closed}${c.open ? '' : 'Closed. '}${c.hours}</span>
+    <span class="wait w-${lv}"><span class="wait-text">${ICON[lv]}${LEVEL_TEXT[lv]}: about ${c.wait} min</span>
+      <span class="bar" aria-hidden="true"><span style="width:${Math.min(100, Math.round((c.wait / 90) * 100))}%"></span></span></span>
+    <span class="feats">${feats}</span>
+  </button></li>`;
+}
+
+function render({ fit = true, announce = true } = {}) {
+  const shown = compute();
+  state.shown = shown;
+  if (state.sel && !shown.some((c) => c.id === state.sel)) state.sel = null;
+  $('results').innerHTML = shown.map(cardHTML).join('');
+  $('empty').classList.toggle('hidden', shown.length > 0);
+  const msg = `${shown.length} ${shown.length === 1 ? 'clinic matches' : 'clinics match'}`;
+  $('count').textContent = msg;
+  if (announce) $('live').textContent = `${msg}, from ${state.origin.name}`;
+  syncMap(fit);
+}
+
+// ---- Map ----
+// Clinics are HTML markers (not a layer) so basemap place labels can never cover them.
+const markers = new Map();
+CLINICS.forEach((c) => {
+  const pin = document.createElement('button');
+  pin.type = 'button';
+  pin.className = 'pin';
+  pin.addEventListener('click', () => select(c.id, { fromMap: true }));
+  markers.set(c.id, { pin, marker: new mapboxgl.Marker({ element: wrap(pin), anchor: 'center' }).setLngLat(c.ll) });
+});
+function wrap(pin) {
+  const root = document.createElement('div');
+  root.appendChild(pin);
+  return root;
+}
+
+function syncMap(fit) {
+  const rank = new Map(state.shown.map((c, i) => [c.id, i + 1]));
+  markers.forEach(({ pin, marker }, id) => {
+    const n = rank.get(id), c = CLINICS.find((x) => x.id === id);
+    if (!n) { marker.remove(); return; }
+    pin.textContent = n;
+    pin.setAttribute('aria-label', `Clinic ${n}: ${c.name}`);
+    pin.classList.toggle('is-selected', id === state.sel);
+    pin.setAttribute('aria-pressed', id === state.sel);
+    marker.getElement().style.zIndex = id === state.sel ? 2 : 1;
+    marker.addTo(map);
+  });
+  if (!ready) return;
+  map.getSource('origin').setData({ type: 'Point', coordinates: state.origin.ll });
+  if (fit) fitAll();
+}
+
+function fitAll() {
+  const b = new mapboxgl.LngLatBounds(state.origin.ll, state.origin.ll);
+  state.shown.forEach((c) => b.extend(c.ll));
+  map.fitBounds(b, { padding: { top: 56, bottom: 72, left: 56, right: 56 }, maxZoom: 14, duration: reduce ? 0 : 700 });
+}
+
+map.on('load', () => {
+  map.addSource('origin', { type: 'geojson', data: { type: 'Point', coordinates: state.origin.ll } });
+  map.addLayer({
+    id: 'origin', type: 'circle', source: 'origin', slot: 'top',
+    paint: { 'circle-radius': 8, 'circle-color': '#0E1B2B', 'circle-stroke-color': '#fff', 'circle-stroke-width': 3 },
+  });
+  map.addLayer({
+    id: 'origin-label', type: 'symbol', source: 'origin', slot: 'top',
+    layout: {
+      'text-field': 'Start', 'text-size': 13, 'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+      'text-variable-anchor': ['top', 'bottom', 'left', 'right'], 'text-radial-offset': 1,
+    },
+    paint: { 'text-color': '#0E1B2B', 'text-halo-color': '#fff', 'text-halo-width': 2 },
+  });
+  ready = true;
+  syncMap(true);
+});
+
+// ---- Selection ----
+function select(id, { fromMap = false, focus = false } = {}) {
+  const c = state.shown.find((x) => x.id === id);
+  if (!c) return;
+  state.sel = id;
+  document.querySelectorAll('.card').forEach((el) => {
+    const on = el.dataset.id === id;
+    el.classList.toggle('is-selected', on);
+    el.setAttribute('aria-pressed', on);
+  });
+  const card = document.querySelector(`.card[data-id="${id}"]`);
+  if (card) {
+    card.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+    if (focus) card.focus();
+  }
+  $('live').textContent = `Selected: ${c.name}, ${c.dist.toFixed(1)} km, wait about ${c.wait} minutes`;
+  if (!ready) return;
+  syncMap(false);
+  const opts = { center: c.ll, zoom: Math.max(map.getZoom(), 14), duration: reduce ? 0 : 900, essential: false };
+  reduce ? map.jumpTo(opts) : map.flyTo(opts);
+}
+
+$('results').addEventListener('click', (e) => {
+  const card = e.target.closest('.card');
+  if (card) select(card.dataset.id);
+});
+
+// Arrow keys move focus through results (roving tabindex); Enter/Space click the card.
+$('results').addEventListener('keydown', (e) => {
+  const cards = [...document.querySelectorAll('.card')];
+  const i = cards.indexOf(document.activeElement);
+  if (i < 0) return;
+  const next = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: cards.length - 1 }[e.key];
+  if (next === undefined) return;
+  e.preventDefault();
+  cards[Math.max(0, Math.min(cards.length - 1, next))].focus();
+});
+$('results').addEventListener('focusin', (e) => {
+  const card = e.target.closest('.card');
+  if (!card) return;
+  document.querySelectorAll('.card').forEach((el) => (el.tabIndex = el === card ? 0 : -1));
+});
+
+$('skip').addEventListener('click', (e) => {
+  e.preventDefault();
+  setView('list');
+  (document.querySelector('.card') || $('results')).focus();
+});
+
+// ---- Controls ----
+$('q').addEventListener('input', (e) => { state.q = e.target.value; render(); });
+$('search-form').addEventListener('submit', (e) => { e.preventDefault(); render(); });
+$('sort').addEventListener('change', (e) => { state.sort = e.target.value; render({ fit: false }); });
+
+document.querySelectorAll('.chip').forEach((chip) =>
+  chip.addEventListener('click', () => {
+    const f = chip.dataset.filter, on = chip.getAttribute('aria-pressed') !== 'true';
+    chip.setAttribute('aria-pressed', on);
+    on ? state.filters.add(f) : state.filters.delete(f);
+    render();
+  }));
+
+$('locate-btn').addEventListener('click', () => {
+  // Fixed demo location: no browser geolocation prompt.
+  state.origin = ORIGINS.demo;
+  render();
+  $('live').textContent = `Using the demo location, ${ORIGINS.demo.name}. ${state.shown.length} clinics match, nearest first.`;
+});
+
+// Text size: root font-size 100-130%; everything is rem so the layout follows.
+let pct = 100;
+function setSize(p) {
+  pct = Math.max(100, Math.min(130, p));
+  document.documentElement.style.fontSize = pct + '%';
+  $('ts-label').textContent = 'Text ' + pct + '%';
+  $('ts-dec').disabled = pct <= 100;
+  $('ts-inc').disabled = pct >= 130;
+  if (ready) map.resize();
+}
+$('ts-dec').addEventListener('click', () => { setSize(pct - 10); $('live').textContent = `Text size ${pct} percent`; });
+$('ts-inc').addEventListener('click', () => { setSize(pct + 10); $('live').textContent = `Text size ${pct} percent`; });
+setSize(100);
+
+// Phone Map / List toggle
+function setView(v) {
+  $('app').dataset.view = v;
+  $('seg-list').setAttribute('aria-pressed', v === 'list');
+  $('seg-map').setAttribute('aria-pressed', v === 'map');
+  if (ready) map.resize();
+}
+$('seg-list').addEventListener('click', () => setView('list'));
+$('seg-map').addEventListener('click', () => setView('map'));
+window.addEventListener('resize', () => ready && map.resize());
+
+render({ fit: false, announce: false });
+</script>
+</body>
+</html>

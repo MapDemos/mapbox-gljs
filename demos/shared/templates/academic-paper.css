@@ -1,0 +1,536 @@
+/*
+  Academic Paper -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a typeset scientific journal article --
+  white sheet on a light grey surround, two-column justified body, numbered
+  sections, an inline equation, booktabs tables, and interactive figures
+  where the map is "Figure 1"), deliberately distinct from every other pack
+  in this folder: Arena is a dark stadium scoreboard, Editorial Paper is
+  warm paper and magazine headlines, Highway Sign is cream/green MUTCD
+  signage, Slate Console is a cool-grey ops console, Storefront is a light
+  retail locator, Tarmac Glass is dark blur-glass + amber, Vintage Chart is
+  navy/parchment/brass, Weather Console is a dense forecast dashboard, Riso
+  Zine is two-colour misregistered print, Swiss Grid is white/black/red
+  typographic grid, Neon HUD is glowing sci-fi overlays, Pastel Bento is
+  soft rounded tiles, Blueprint is white-on-blue drafting lines, Story
+  Scroll is a scrolling narrative, Retro OS is a desktop-window UI, Aurora
+  Command is a gradient-glow control room, Deco Voyage is gold-on-black Art
+  Deco, Washi Seasons is quiet Japanese paper and seasonal colour, Raw Web
+  is unstyled 1990s HTML, Case Board is a detective corkboard, Line Diagram
+  is a transit schematic, Aero Gadgets is glossy 2000s skeuomorphism, Chat
+  Concierge is a messaging thread, Chronicle is a newspaper front page,
+  Broadcast is a TV news lower-third, Bottom Sheet is a mobile map sheet,
+  Trailhead is rugged outdoor-gear tags and contours, and Field Journal is
+  a hand-kept naturalist notebook.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/academic-paper.css" rel="stylesheet" />
+  plus the Google Fonts it expects (STIX Two Text for body, headings and
+  equations; Inconsolata for code and data-availability text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=STIX+Two+Text:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Inconsolata:wght@400;600&display=swap" rel="stylesheet" />
+
+  Signature touch: journal typesetting details -- auto-numbered section
+  headings (CSS counters), justified hyphenated text, superscript
+  affiliations, a Manning-style stacked fraction built from HTML/CSS, a
+  booktabs table (heavy top/bottom rules, one hairline under the header, no
+  verticals) and hanging-indent references. The map is simply a figure, with
+  its legend, scale and north arrow set in the caption area like a print
+  figure; it has no floating UI at all, so the Mapbox logo and attribution
+  are never covered.
+
+  Layout: .page (grey surround) > .sheet (max ~1000px white sheet). Body copy
+  sits in .columns (two columns, one on phones); .figure.span spans the full
+  sheet width between two .columns blocks.
+
+  Class/id contract (see academic-paper-template.html in this same folder
+  for a full working example):
+
+  - .page > .sheet            grey surround + the white article sheet
+  - .journal-head             running header strip: .journal-name (italic
+                               journal title) + .article-meta (volume/DOI)
+  - .article-title            large serif title (h1)
+  - .authors                  author line; <sup> for affiliation numbers
+  - .affiliations             small italic numbered affiliation list
+  - .abstract                 boxed abstract; its <h2> is a run-in label
+  - .keywords                 keyword line (<b> label)
+  - .columns                  two-column justified body (1 column on phones)
+    h2.sec                      auto-numbered section heading (1, 2, ...);
+                                 h3.sub is an unnumbered run-in subheading
+    .eq                         display equation row: .eq-body + .eq-num;
+                                 .frac > .num / .den builds a fraction
+    a.xref                      in-text cross-reference ("Fig. 1"), dark
+                                 blue; data-target="<id>" scrolls to it, or
+                                 data-station="<n>" selects a station
+    sup.fn                      footnote marker; .footnotes holds the notes
+  - .figure                   a figure block (.figure.span = both columns);
+    .figure-map                 map frame (demo sets its height; holds #map
+                                 and .north-arrow)
+    .north-arrow                SVG compass top-right of the map, inert
+    .fig-controls               strip under the map: .month-control
+                                 (label + range input + value) and .legend
+    .legend > .legend-title, .legend-bar, .legend-ticks > span
+    .fig-caption                caption; <b class="fig-label"> is the bold
+                                 "Figure 1." lead-in
+    SVG classes                 .ch-axis, .ch-grid, .ch-zero, .ch-line,
+                                 .ch-dot, .ch-sel, .ch-tick, .ch-label,
+                                 .ch-hit (month hit areas)
+  - table.booktabs            booktabs table; tr.selected = highlighted row,
+                               .swatch = tiny colour chip in a cell;
+                               caption.table-caption sits above the table
+  - .references               hanging-indent reference list (ol > li)
+  - .data-avail               Inconsolata data-availability block; code
+                               uses <code>
+  - .status-note (+.loading/  small italic status line
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --surround: #EDEDED;
+  --sheet: #FFFFFF;
+  --ink: #1A1A1A;
+  --ink-muted: #4A4A4A;
+  --ink-faint: #767676;
+  --rule: #1A1A1A;
+  --hairline: #C8C8C8;
+  --link: #1F4E99;
+  --div-neg: #B2182B;
+  --div-mid: #F7F7F7;
+  --div-pos: #2166AC;
+  --select: #F0F0F0;
+  --success: #2166AC;
+  --error: #B2182B;
+
+  --font-serif: 'STIX Two Text', 'Times New Roman', Times, serif;
+  --font-mono: 'Inconsolata', ui-monospace, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--surround);
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-text-size-adjust: 100%;
+}
+
+button, input, select { font-family: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+.page {
+  padding: 32px 20px 56px;
+}
+
+.sheet {
+  max-width: 1000px;
+  margin: 0 auto;
+  background: var(--sheet);
+  padding: 28px 56px 48px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 8px 28px rgba(0, 0, 0, 0.08);
+  counter-reset: sec;
+}
+
+/* Running header */
+.journal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.journal-name { font-style: italic; font-weight: 600; color: var(--ink); }
+.article-meta { text-align: right; font-variant-numeric: lining-nums; }
+
+.article-title {
+  margin: 26px 0 14px;
+  font-size: 34px;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  text-wrap: balance;
+}
+
+.authors {
+  margin: 0 0 6px;
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.authors sup, .affiliations sup {
+  font-size: 0.68em;
+  line-height: 0;
+  margin-left: 1px;
+}
+
+.affiliations {
+  margin: 0 0 20px;
+  font-size: 13px;
+  line-height: 1.5;
+  font-style: italic;
+  color: var(--ink-muted);
+}
+
+.affiliations div { margin: 0; }
+
+.abstract {
+  margin: 0 0 12px;
+  padding: 14px 18px 16px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  background: #FAFAFA;
+  font-size: 14.5px;
+  line-height: 1.5;
+  text-align: justify;
+  hyphens: auto;
+}
+
+.abstract h2 {
+  display: inline;
+  margin: 0 6px 0 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  font-variant: small-caps;
+  letter-spacing: 0.06em;
+}
+
+.abstract p { display: inline; margin: 0; }
+
+.keywords {
+  margin: 0 0 26px;
+  font-size: 13.5px;
+  color: var(--ink-muted);
+}
+
+.keywords b { color: var(--ink); font-variant: small-caps; letter-spacing: 0.05em; }
+
+/* Two-column body */
+.columns {
+  column-count: 2;
+  column-gap: 32px;
+  column-rule: 1px solid var(--hairline);
+  font-size: 15px;
+  line-height: 1.5;
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.columns p { margin: 0 0 9px; text-indent: 1.2em; orphans: 2; widows: 2; }
+.columns p.first, .columns h2 + p, .columns h3 + p, .columns .eq + p.cont { text-indent: 0; }
+
+h2.sec {
+  counter-increment: sec;
+  margin: 18px 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: left;
+  break-after: avoid;
+}
+
+h2.sec::before {
+  content: counter(sec) '\2002';
+  font-variant-numeric: lining-nums;
+}
+
+.columns > h2.sec:first-child { margin-top: 0; }
+
+h3.sub {
+  display: inline;
+  margin: 0 4px 0 0;
+  font-size: 15px;
+  font-style: italic;
+  font-weight: 600;
+}
+
+/* Display equation */
+.eq {
+  display: flex;
+  align-items: center;
+  margin: 10px 0 12px;
+  text-align: left;
+  break-inside: avoid;
+}
+
+.eq-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  font-size: 17px;
+  white-space: nowrap;
+}
+
+.eq-body i { font-style: italic; }
+.eq-body sup, .eq-body sub { font-size: 0.7em; line-height: 0; }
+.eq-num { flex: none; font-size: 15px; font-variant-numeric: lining-nums; }
+
+.frac {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: middle;
+  line-height: 1.15;
+  margin: 0 2px;
+}
+
+.frac .num { padding: 0 4px 1px; border-bottom: 1px solid var(--ink); }
+.frac .den { padding: 1px 4px 0; }
+
+/* Cross-references */
+a.xref, .footnotes a, .data-avail a {
+  color: var(--link);
+  text-decoration: none;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(31, 78, 153, 0.3);
+}
+
+a.xref:hover { border-bottom-color: var(--link); }
+
+sup.fn {
+  font-size: 0.65em;
+  line-height: 0;
+  color: var(--link);
+  font-weight: 600;
+}
+
+.footnotes {
+  margin: 12px 0 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--rule);
+  width: 40%;
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: left;
+  color: var(--ink-muted);
+}
+
+.footnotes p { margin: 0 0 3px; text-indent: 0; }
+
+/* Figures */
+.figure {
+  margin: 14px 0 18px;
+  break-inside: avoid;
+}
+
+.figure.span { margin: 8px 0 22px; }
+
+.figure-map {
+  position: relative;
+  border: 1px solid var(--rule);
+  background: #F2F2F2;
+}
+
+.north-arrow {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 44px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.north-arrow text { font-family: var(--font-serif); font-size: 11px; font-weight: 700; fill: var(--ink); }
+
+.fig-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px 32px;
+  align-items: end;
+  padding: 10px 2px 2px;
+  font-size: 13px;
+}
+
+.month-control label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-style: italic;
+}
+
+.month-control .month-value { font-style: normal; font-weight: 600; font-variant-numeric: lining-nums; }
+
+.month-control input[type=range] {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--ink);
+  cursor: pointer;
+}
+
+.legend-title { margin-bottom: 3px; font-style: italic; }
+
+.legend-bar {
+  height: 11px;
+  border: 1px solid var(--rule);
+  background: linear-gradient(90deg, var(--div-neg), var(--div-mid) 50%, var(--div-pos));
+}
+
+.legend-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  padding: 0;
+  font-size: 11.5px;
+  font-variant-numeric: lining-nums;
+}
+
+.legend-ticks span { position: relative; flex: none; width: 0; display: flex; justify-content: center; white-space: nowrap; padding-top: 4px; }
+.legend-ticks span::before { content: ''; position: absolute; top: -2px; width: 1px; height: 5px; background: var(--rule); }
+
+.fig-caption {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+  text-align: justify;
+  hyphens: auto;
+  text-indent: 0 !important;
+}
+
+.fig-label { font-weight: 700; }
+
+/* Figure 2 chart */
+.chart { display: block; width: 100%; height: auto; border: 1px solid var(--hairline); background: #fff; }
+.ch-axis { stroke: var(--ink); stroke-width: 1; fill: none; }
+.ch-grid { stroke: #E4E4E4; stroke-width: 1; }
+.ch-zero { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 3 3; }
+.ch-line { fill: none; stroke: var(--ink); stroke-width: 1.4; stroke-linejoin: round; }
+.ch-dot { stroke: var(--ink); stroke-width: 0.8; }
+.ch-sel { fill: none; stroke: var(--ink); stroke-width: 1; stroke-dasharray: 2 2; }
+.ch-tick, .ch-label { font-family: var(--font-serif); fill: var(--ink-muted); }
+.ch-tick { font-size: 10px; }
+.ch-label { font-size: 10.5px; font-style: italic; }
+.ch-title { font-family: var(--font-serif); font-size: 11.5px; font-weight: 600; fill: var(--ink); }
+.ch-hit { fill: transparent; cursor: pointer; }
+.ch-tick.on { fill: var(--ink); font-weight: 700; }
+
+/* Booktabs table */
+.table-wrap { margin: 12px 0 16px; break-inside: avoid; }
+
+.table-caption {
+  display: block;
+  margin: 0 0 5px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+table.booktabs {
+  width: 100%;
+  border-collapse: collapse;
+  border-top: 2px solid var(--rule);
+  border-bottom: 2px solid var(--rule);
+  font-size: 13px;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+table.booktabs th {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--rule);
+  font-weight: 600;
+  font-style: italic;
+  text-align: left;
+  white-space: nowrap;
+}
+
+table.booktabs td { padding: 2px 6px; text-align: left; }
+table.booktabs .num { text-align: right; }
+table.booktabs tbody tr { cursor: pointer; }
+table.booktabs tbody tr:hover { background: #F7F7F7; }
+table.booktabs tbody tr.selected { background: var(--select); box-shadow: inset 3px 0 0 var(--ink); font-weight: 600; }
+table.booktabs tbody tr:focus-visible { outline-offset: -2px; }
+
+.swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 5px;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  vertical-align: -1px;
+}
+
+.table-note { margin: 4px 0 0; font-size: 12px; color: var(--ink-muted); text-indent: 0 !important; text-align: left; }
+
+/* References + data availability */
+.references {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+  hyphens: manual;
+  counter-reset: ref;
+}
+
+.references li {
+  counter-increment: ref;
+  margin: 0 0 5px;
+  padding-left: 2.2em;
+  text-indent: -2.2em;
+}
+
+.references li::before { content: '[' counter(ref) ']\00a0'; display: inline-block; width: 2.2em; text-indent: 0; }
+.references li { overflow-wrap: anywhere; }
+
+.data-avail {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--hairline);
+  background: #FAFAFA;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.4;
+  text-align: left;
+  hyphens: manual;
+}
+
+.data-avail p { margin: 0 0 4px; text-indent: 0; }
+.data-avail code { font-family: var(--font-mono); font-weight: 600; }
+
+.status-note {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--ink-muted);
+}
+
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); }
+.status-note.loading::after { content: ' \2026'; }
+
+.hidden { display: none !important; }
+
+@media (max-width: 900px) {
+  .sheet { padding: 24px 32px 40px; }
+}
+
+@media (max-width: 700px) {
+  .page { padding: 0; }
+  .sheet { padding: 20px 16px 36px; box-shadow: none; }
+  .article-title { font-size: 26px; }
+  .authors { font-size: 16px; }
+  .columns { column-count: 1; column-gap: 0; column-rule: none; font-size: 15.5px; }
+  .fig-controls { grid-template-columns: minmax(0, 1fr); }
+  .footnotes { width: 100%; }
+  .journal-head { flex-direction: column; gap: 0; }
+  .article-meta { text-align: left; }
+  .eq-body { font-size: 16px; }
+}

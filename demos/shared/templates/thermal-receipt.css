@@ -1,0 +1,721 @@
+/*
+  Thermal Receipt -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a food-delivery order tracked on a
+  thermal-printed till receipt -- off-white thermal paper with faint grain,
+  slightly faded monospaced ink, dashed separators, zigzag torn edges and a
+  single highlighter-pink marker scribble, hanging from a printer slot over
+  a warm-concrete page), deliberately distinct from every other pack in
+  this folder: Arena is a dark stadium scoreboard, Editorial Paper is warm
+  paper and serif headlines, Highway Sign is cream/green MUTCD signage,
+  Slate Console is a cool-grey ops console, Storefront is a light retail
+  locator, Tarmac Glass is dark blur-glass + amber, Vintage Chart is
+  navy/parchment/brass, Weather Console is a dense forecast dashboard, Riso
+  Zine is two-colour misregistered print, Swiss Grid is white/black/red
+  typographic grid, Neon HUD is glowing sci-fi overlays, Pastel Bento is
+  soft rounded tiles, Blueprint is white-on-blue drafting lines, Story
+  Scroll is a scrolling narrative, Retro OS is a desktop-window UI, Aurora
+  Command is a gradient-glow control room, Deco Voyage is gold-on-black Art
+  Deco, Washi Seasons is quiet Japanese paper and seasonal colour, Raw Web
+  is a 1996 hand-coded homepage, Case Board is a detective's corkboard, Line
+  Diagram is a modernist transit strip map, Aero Gadgets is glossy mid-2000s
+  glass and jelly buttons, Chat Concierge is a conversational assistant in
+  bubbles, Chronicle is a plum museum-timeline explorer, Broadcast is live
+  sports-TV graphics, Bottom Sheet is a native-feeling mobile sheet over a
+  full-screen map, Trailhead is rugged olive/orange outdoor tags, and Field
+  Journal is a naturalist's notebook with rubber stamps and tape.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/thermal-receipt.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Courier Prime for the receipt body,
+  line items and totals; Xanh Mono for the big order number, status headers
+  and ETA):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Xanh+Mono&display=swap" rel="stylesheet" />
+
+  Signature touch: the receipt PRINTS. A dark printer mouth bar sits at the
+  top of the screen and the paper hangs from it; every line you add with
+  the .feeding class (see the template's print() helper) feeds out of the
+  slot -- height grows in mechanical steps while the line slides down and
+  un-clips -- so the receipt gets taller as the order progresses. Torn
+  zigzag bottom edge, faint paper grain, and one pink marker accent used
+  sparingly (stamp, scribble, LED).
+
+  Layout: .app holds .stage (the full-bleed map) and .receipt-wrap, the
+  printer + paper column hanging at top-right (360px). The wrap never
+  reaches the bottom 64px of the screen, so the Mapbox logo and attribution
+  stay clear; the paper scrolls inside it once it is taller than the
+  screen. On phones (<= 640px) the map is the top 50dvh and the receipt
+  flows below it, the page scrolls, and the map-chip shows live status over
+  the map.
+
+  Class/id contract (see thermal-receipt-template.html in this same folder
+  for a full working example):
+
+  - .app                      page wrapper (desktop: 100dvh, never scrolls;
+                               phone: normal flow, scrolls)
+  - .stage                    positioned map area; holds #map and overlays
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .stage-actions            top-left button holder over the map
+  - .btn, .btn-primary        label-maker buttons: ink border, hard
+                               shadow, pink on hover
+  - .map-chip                 phone-only live-status chip over the map
+                               (hidden above 640px)
+  - .receipt-wrap             printer + paper column (top-right)
+    .printer                    dark printer mouth bar
+      .printer-mouth              the paper slot
+      .printer-led                pink LED; add .on while printing
+    .receipt                    the paper (grain, scrolls internally)
+      #feed / .receipt-feed       the line container; give it role="log"
+    .receipt-tear               zigzag torn bottom edge (empty div)
+  - .rl                       one printed line. Add .feeding to animate it
+                               out of the slot (set --h to its height first)
+    .rl-center                  centred text
+    .rl-sep                     dashed separator (.rl-sep.solid = "=====")
+    .rl-brand                   shop name line
+    .rl-order                   big order number block (.rl-order-no uses
+                               Xanh Mono)
+    .rl-meta                    two-column meta row (label / value)
+    .rl-item                    line item: .rl-qty .rl-name .rl-lead (dotted
+                               leader) .rl-price (right aligned)
+    .rl-note                    indented faint sub-line; .scribble inside it
+                               is the pink marker underline (inline SVG)
+    .rl-sum                     subtotal-style row (.rl-lead + .rl-price)
+    .rl-total                   bold total row
+    .rl-stage                   status header: .rl-time + .rl-label (Xanh
+                               Mono); add .done for a ticked variant
+    .rl-eta                     big ETA block: .eta-num (Xanh Mono) +
+                               .eta-unit + .eta-sub
+    .rl-bar                     ASCII-style progress bar line
+    .rl-stamp                   stamp row holding .stamp (+.stamp-small);
+                               pink, rotated, multiply-blended
+    .rl-barcode                 holds an inline <svg> barcode
+    .fade                       a lightly faded ("weak heat") span
+  - .courier                  inner child of a mapboxgl.Marker element
+                               (the scooter): .courier-tag + .courier-glyph.
+                               Rotate .courier-glyph, never the marker root.
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --paper: #FBFBF7;
+  --paper-edge: #ECEBE2;
+  --ink: #2A2A2A;
+  --ink-fade: #8C8B85;
+  --ink-soft: #55544F;
+  --pink: #FF4F8B;
+  --concrete: #D9D4CC;
+  --concrete-dark: #C4BFB6;
+  --printer: #25231F;
+  --printer-hi: #3B3833;
+  --receipt-w: 360px;
+  --success: #2A2A2A;
+  --error: #C2255C;
+
+  --font-receipt: 'Courier Prime', 'Courier New', Courier, monospace;
+  --font-display: 'Xanh Mono', 'Courier Prime', 'Courier New', monospace;
+  --font-body: var(--font-receipt);
+  --font-label: var(--font-display);
+
+  /* Faint thermal-paper grain (tiled noise) */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+  /* Zigzag tooth for the torn bottom edge, paper coloured */
+  --tooth: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='8' viewBox='0 0 14 8'%3E%3Cpolygon points='0,0 14,0 7,8' fill='%23FBFBF7'/%3E%3C/svg%3E");
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background-color: var(--concrete);
+  background-image: var(--grain);
+  color: var(--ink);
+  font-family: var(--font-receipt);
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--pink);
+  outline-offset: 2px;
+}
+
+.app {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+}
+
+/* Buttons -- label-maker: ink border, hard shadow, pink on hover */
+.btn {
+  display: inline-block;
+  padding: 8px 14px;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--ink);
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.1s ease;
+}
+
+.btn:hover {
+  background: var(--pink);
+}
+
+.btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.btn-primary:hover {
+  color: var(--ink);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.stage-actions {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 2;
+  display: flex;
+  gap: 10px;
+}
+
+/* Phone-only live status chip (desktop reads the receipt itself) */
+.map-chip {
+  display: none;
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  max-width: calc(100% - 150px);
+  padding: 6px 10px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 1.25;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: right;
+  pointer-events: none;
+}
+
+/* ---- Printer + paper column ---- */
+.receipt-wrap {
+  position: absolute;
+  top: 0;
+  right: 28px;
+  z-index: 3;
+  width: var(--receipt-w);
+  max-height: calc(100vh - 64px);
+  max-height: calc(100dvh - 64px);
+  display: flex;
+  flex-direction: column;
+  filter: drop-shadow(0 8px 10px rgba(42, 42, 42, 0.28));
+}
+
+.printer {
+  position: relative;
+  flex: none;
+  z-index: 2;
+  width: calc(100% + 24px);
+  height: 30px;
+  margin: 0 -12px;
+  background: linear-gradient(var(--printer-hi), var(--printer) 40%);
+  border-radius: 0 0 8px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px 0 22px;
+}
+
+.printer::after {
+  /* shadow cast on the paper where it leaves the slot */
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 100%;
+  height: 10px;
+  background: linear-gradient(rgba(42, 42, 42, 0.25), transparent);
+  pointer-events: none;
+}
+
+.printer-mouth {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 4px;
+  height: 7px;
+  background: #0E0D0B;
+  border-radius: 4px;
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.8);
+}
+
+.printer-led {
+  width: 8px;
+  height: 8px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: #5A2A3A;
+}
+
+.printer-led.on {
+  background: var(--pink);
+  box-shadow: 0 0 6px var(--pink);
+  animation: led-blink 0.5s steps(2, jump-none) infinite;
+}
+
+@keyframes led-blink {
+  0% { opacity: 1; }
+  100% { opacity: 0.35; }
+}
+
+.receipt {
+  position: relative;
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 22px 20px 6px;
+  background-color: var(--paper);
+  background-image: var(--grain);
+  scrollbar-width: none;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.receipt::-webkit-scrollbar {
+  display: none;
+}
+
+.receipt-tear {
+  flex: none;
+  height: 8px;
+  margin-top: -1px;
+  background: var(--tooth) 0 0 / 14px 8px repeat-x;
+}
+
+/* ---- Printed lines ---- */
+.rl {
+  position: relative;
+  margin: 0;
+  padding: 1px 0;
+  overflow-wrap: anywhere;
+}
+
+.rl.feeding {
+  animation: rl-feed 0.42s steps(7, end) backwards;
+}
+
+/* Paper feeds out of the slot: height opens in steps, line slides down */
+@keyframes rl-feed {
+  from {
+    max-height: 0;
+    transform: translateY(-14px);
+    clip-path: inset(0 0 100% 0);
+    opacity: 0.5;
+  }
+  to {
+    max-height: var(--h, 3em);
+    transform: translateY(0);
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+}
+
+.rl-center {
+  text-align: center;
+}
+
+.rl-brand {
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.rl-sep {
+  height: 0;
+  margin: 7px 0;
+  border-top: 2px dashed var(--ink);
+  opacity: 0.55;
+}
+
+.rl-sep.solid {
+  border-top-style: double;
+  border-top-width: 4px;
+}
+
+.rl-order {
+  text-align: center;
+  padding: 2px 0 4px;
+}
+
+.rl-order small {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.rl-order-no {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 54px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.rl-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.rl-meta span:last-child {
+  text-align: right;
+}
+
+.rl-item,
+.rl-sum,
+.rl-total {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.rl-qty {
+  flex: none;
+  min-width: 2.2ch;
+}
+
+.rl-name {
+  min-width: 0;
+}
+
+.rl-lead {
+  flex: 1 1 14px;
+  min-width: 14px;
+  border-bottom: 2px dotted var(--ink);
+  opacity: 0.4;
+  transform: translateY(-3px);
+}
+
+.rl-price {
+  flex: none;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.rl-note {
+  padding-left: 2.2ch;
+  font-size: 12px;
+  color: var(--ink-fade);
+}
+
+.scribble {
+  display: block;
+  width: 150px;
+  height: 9px;
+  margin-top: -2px;
+  overflow: visible;
+}
+
+.scribble path {
+  fill: none;
+  stroke: var(--pink);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.9;
+}
+
+.rl-sum {
+  color: var(--ink-soft);
+}
+
+.rl-total {
+  margin-top: 2px;
+  font-weight: 700;
+  font-size: 17px;
+}
+
+/* Status headers: Xanh Mono, inverted-bar like a thermal "heading" */
+.rl-stage {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.rl-time {
+  flex: none;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.rl-label {
+  font-family: var(--font-display);
+  font-size: 19px;
+  line-height: 1.1;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.rl-stage.done .rl-label::before {
+  content: '[x] ';
+}
+
+.rl-eta {
+  padding: 4px 0 2px;
+  text-align: center;
+  border: 2px solid var(--ink);
+  border-style: dashed;
+  margin: 6px 0 2px;
+}
+
+.eta-num {
+  font-family: var(--font-display);
+  font-size: 52px;
+  line-height: 1;
+}
+
+.eta-unit {
+  margin-left: 6px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: 0.08em;
+}
+
+.eta-sub {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.rl-bar {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  white-space: pre;
+  color: var(--ink-soft);
+}
+
+.rl-stamp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 84px;
+  padding: 10px 0 6px;
+}
+
+.stamp {
+  display: inline-block;
+  padding: 3px 10px 2px;
+  border: 3px double var(--pink);
+  border-radius: 4px;
+  color: var(--pink);
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: rotate(-7deg);
+  mix-blend-mode: multiply;
+  opacity: 0.92;
+  animation: stamp-in 0.3s cubic-bezier(0.2, 1.4, 0.4, 1) backwards;
+}
+
+.stamp-small {
+  font-size: 20px;
+  transform: rotate(6deg);
+  animation-delay: 0.25s;
+}
+
+@keyframes stamp-in {
+  from { transform: rotate(-7deg) scale(1.8); opacity: 0; }
+}
+
+.rl-barcode {
+  padding-top: 6px;
+  text-align: center;
+}
+
+.rl-barcode svg {
+  display: block;
+  width: 100%;
+  height: 54px;
+}
+
+.fade {
+  color: var(--ink-fade);
+}
+
+/* ---- Map marker: the courier. Inner child of a mapboxgl.Marker root
+   (the root is positioned by Mapbox via transform; never style it). ---- */
+.courier {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  pointer-events: none;
+}
+
+.courier-glyph {
+  display: block;
+  width: 36px;
+  height: 36px;
+  filter: drop-shadow(0 2px 2px rgba(42, 42, 42, 0.4));
+}
+
+.courier-glyph .ink {
+  fill: var(--ink);
+  stroke: var(--paper);
+  stroke-width: 2.4;
+  paint-order: stroke;
+  stroke-linejoin: round;
+}
+
+.courier-glyph .bag {
+  fill: var(--pink);
+}
+
+.courier-glyph .head {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1.6;
+}
+
+.courier-tag {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  margin: 0 0 2px;
+  transform: translateX(-50%);
+  padding: 0 5px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  font-family: var(--font-display);
+  font-size: 12px;
+  line-height: 1.3;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Mapbox controls re-skinned to match */
+.mapboxgl-ctrl-group {
+  border-radius: 0 !important;
+  border: 2px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink) !important;
+}
+
+/* A raster-dem (terrain) source makes GL JS hide the Mapbox logo; force it
+   back if you add one. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+/* Phone: map on top (~50dvh), receipt flows below, page scrolls */
+@media (max-width: 640px) {
+  html, body {
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .app {
+    height: auto;
+    overflow: visible;
+  }
+
+  .stage {
+    position: relative;
+    inset: auto;
+    height: 50vh;
+    height: 50dvh;
+  }
+
+  .map-chip {
+    display: block;
+  }
+
+  .receipt-wrap {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: calc(100% - 32px);
+    max-height: none;
+    margin: 0 auto 32px;
+  }
+
+  .printer {
+    width: calc(100% + 16px);
+    margin: 0 -8px;
+  }
+
+  .receipt {
+    overflow: visible;
+  }
+
+  .rl-order-no {
+    font-size: 46px;
+  }
+
+  .btn {
+    padding: 6px 12px;
+    font-size: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rl.feeding,
+  .stamp {
+    animation: none;
+  }
+
+  .printer-led.on {
+    animation: none;
+  }
+
+  .btn {
+    transition: none;
+  }
+}

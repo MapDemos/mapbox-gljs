@@ -1,0 +1,732 @@
+/*
+  Trailhead -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a rugged outdoor-gear brand look for a
+  hiking route with an elevation profile -- olive and forest panels, safety
+  orange, sand type, stencil/tag labelling over faint topographic contour
+  lines), deliberately distinct from every other pack in this folder:
+  Arena is a dark stadium scoreboard, Editorial Paper is warm paper and
+  serif headlines, Highway Sign is cream/green MUTCD signage, Slate Console
+  is a cool-grey ops console, Storefront is a light retail locator, Tarmac
+  Glass is dark blur-glass + amber, Vintage Chart is navy/parchment/brass,
+  Weather Console is a dense forecast dashboard, Riso Zine is two-colour
+  misregistered print, Swiss Grid is white/black/red typographic grid, Neon
+  HUD is glowing sci-fi overlays, Pastel Bento is soft rounded tiles,
+  Blueprint is white-on-blue drafting lines, Story Scroll is a scrolling
+  narrative, Retro OS is a desktop-window UI, Aurora Command is a
+  gradient-glow control room, Deco Voyage is gold-on-black Art Deco, and
+  Washi Seasons is quiet Japanese paper and seasonal colour.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/trailhead.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Barlow Condensed for headings,
+  numerals and labels; Barlow for body text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  Signature touch: a topographic contour-line pattern (wavy nested closed
+  curves, an inline SVG data URI, low opacity) tiled behind the trail card
+  and the profile panel, plus rectangular "tag" chips with a punched hole
+  and thick stencil borders.
+
+  Layout: .app is a two-row grid -- .stage (the map) on top and
+  .profile-panel below. The map ends ABOVE the panel, so the Mapbox logo
+  and attribution sit in the map's own bottom corners and are never
+  covered. If you add a raster-dem source (terrain), GL JS hides the logo;
+  the rule near the bottom of this file forces it back.
+
+  Class/id contract (see trailhead-template.html in this same folder for a
+  full working example):
+
+  - .app                      page grid, 100dvh, never scrolls
+  - .stage                    positioned map area (grid row 1); holds #map
+                               and the floating cards
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .trail-card               floating top-left card (on phones a compact
+                               one-line strip across the top)
+    .brand-stamp                tiny uppercase brand line
+    .trail-name                 big condensed title
+    .tag (+.tag-diff)           stencil tag chip; .tag-hole is the punched
+                                 hole (an inner <i>)
+    .stats > .stat              figure grid; .stat-value + .stat-label;
+                                 add data-opt to hide a stat on phones
+  - .btn, .btn-primary        stencil buttons: thick border, uppercase
+  - .stage-actions            top-right button holder over the map
+  - .profile-panel            full-width bottom panel (forest, contours)
+    .panel-head                 header row: .panel-title + .wp-chips
+    .wp-chips > .wp-chip        waypoint tag chips (.wp-num + label),
+                                 horizontally scrollable on phones
+    .profile-body               chart area; holds <svg id="profile">,
+                                 .profile-readout and .profile-status
+    .profile-readout            hover readout (km / m / grade)
+    .profile-status             "Measuring terrain..." overlay
+    SVG classes                 .pf-area, .pf-line, .pf-grid, .pf-axis,
+                                 .pf-tick, .pf-cursor, .pf-wp
+  - .wp-tag                   inner child of a mapboxgl.Marker element
+                               (stencil tag with stem); never style the
+                               marker root itself
+  - .cursor-dot               inner child of the profile-cursor marker
+  - .status-note (+.loading/  small status line with a square icon
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --olive: #3F4A2E;
+  --forest: #2A3220;
+  --orange: #FF6B1A;
+  --orange-deep: #D9540C;
+  --sand: #E9E1CF;
+  --sand-dim: #B9B29F;
+  --charcoal: #1D1F1A;
+  --lichen: #A3B18A;
+  --line: rgba(233, 225, 207, 0.22);
+  --success: #A3B18A;
+  --error: #FF8A5C;
+  --panel-h: 190px;
+
+  --font-heading: 'Barlow Condensed', 'Arial Narrow', 'Helvetica Neue', sans-serif;
+  --font-body: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-label: var(--font-heading);
+
+  /* Topographic contours: nested wavy closed curves, tiled 400x240. */
+  --contours: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='240' viewBox='0 0 400 240'%3E%3Cg fill='none' stroke='%23A3B18A' stroke-width='1.2' opacity='0.16'%3E%3Cpath d='M140 92C160 88 178 102 180 120C182 138 164 150 144 150C124 150 108 138 110 120C112 104 124 96 140 92Z'/%3E%3Cpath d='M140 70C175 62 210 85 212 118C214 152 180 172 142 170C104 168 78 144 82 112C86 82 108 74 140 70Z'/%3E%3Cpath d='M140 52C190 40 236 72 240 118C244 166 196 192 142 190C90 188 56 156 60 110C64 70 98 60 140 52Z'/%3E%3Cpath d='M140 34C204 20 262 62 268 118C274 180 214 212 142 210C74 208 34 170 38 108C42 56 86 46 140 34Z'/%3E%3Cpath d='M300 40C320 30 350 38 356 60C362 84 336 98 312 92C290 86 282 52 300 40Z'/%3E%3Cpath d='M290 28C318 12 366 22 376 58C386 96 346 116 308 108C272 100 262 46 290 28Z'/%3E%3Cpath d='M300 190C320 180 352 188 358 208C364 228 336 240 312 236C290 232 284 202 300 190Z'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--charcoal);
+  color: var(--sand);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--orange);
+  outline-offset: 2px;
+}
+
+/* Page grid: map on top, profile panel below. */
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) var(--panel-h);
+  grid-template-areas: "stage" "profile";
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.stage {
+  grid-area: stage;
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Floating trail card -- forest slab, thick sand-edged stencil border */
+.trail-card {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 2;
+  width: 320px;
+  padding: 14px 16px 14px;
+  background-color: var(--forest);
+  background-image: var(--contours);
+  border: 3px solid var(--sand);
+  box-shadow: 5px 5px 0 rgba(29, 31, 26, 0.55);
+  --hole: var(--forest);
+}
+
+.brand-stamp {
+  margin: 0 0 6px;
+  font-family: var(--font-label);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--lichen);
+}
+
+.trail-name {
+  margin: 0 0 10px;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 30px;
+  line-height: 0.98;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--sand);
+}
+
+.trail-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+/* Tag chip -- rectangular, thick border, punched hole at the left */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 10px 3px 8px;
+  border: 2px solid var(--sand);
+  background: transparent;
+  color: var(--sand);
+  font-family: var(--font-label);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.tag-hole {
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--sand);
+  border-radius: 50%;
+  background: var(--hole, var(--forest));
+}
+
+.tag-diff {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: var(--charcoal);
+}
+
+.tag-diff .tag-hole {
+  border-color: var(--charcoal);
+  background: var(--forest);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  border-top: 2px solid var(--line);
+}
+
+.stat {
+  padding: 8px 8px 0 0;
+  min-width: 0;
+}
+
+.stat-value {
+  display: block;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--sand);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-value small {
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--lichen);
+  margin-left: 2px;
+}
+
+.stat-value .up {
+  color: var(--orange);
+}
+
+.stat-label {
+  display: block;
+  margin-top: 3px;
+  font-family: var(--font-label);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--sand-dim);
+}
+
+/* Buttons -- stencil: thick border, uppercase condensed, hard shadow */
+.btn {
+  display: inline-block;
+  padding: 9px 16px;
+  border: 3px solid var(--sand);
+  background: var(--forest);
+  color: var(--sand);
+  font-family: var(--font-label);
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 4px 4px 0 rgba(29, 31, 26, 0.55);
+  transition: background 0.12s ease, color 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.btn:hover {
+  background: var(--sand);
+  color: var(--charcoal);
+}
+
+.btn:active {
+  transform: translate(3px, 3px);
+  box-shadow: 1px 1px 0 rgba(29, 31, 26, 0.55);
+}
+
+.btn-primary {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: var(--charcoal);
+}
+
+.btn-primary:hover {
+  background: var(--sand);
+  border-color: var(--sand);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.stage-actions {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  display: flex;
+  gap: 10px;
+}
+
+/* Profile panel -- full-width forest slab under the map */
+.profile-panel {
+  grid-area: profile;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background-color: var(--forest);
+  background-image: var(--contours);
+  border-top: 4px solid var(--sand);
+  --hole: var(--forest);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: none;
+  padding: 8px 16px 0;
+  min-width: 0;
+}
+
+.panel-title {
+  flex: none;
+  font-family: var(--font-label);
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--lichen);
+}
+
+.wp-chips {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 2px 4px 5px 2px;
+  scrollbar-width: none;
+}
+
+.wp-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.wp-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 10px 3px 7px;
+  border: 2px solid var(--sand);
+  background: var(--forest);
+  color: var(--sand);
+  font-family: var(--font-label);
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.wp-chip .wp-num {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--orange);
+  color: var(--charcoal);
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.wp-chip small {
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--lichen);
+}
+
+.wp-chip:hover {
+  background: var(--sand);
+  color: var(--charcoal);
+}
+
+.wp-chip:hover small {
+  color: var(--olive);
+}
+
+.profile-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+#profile {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.pf-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.pf-axis {
+  fill: var(--sand-dim);
+  font-family: var(--font-label);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.pf-line {
+  fill: none;
+  stroke: var(--orange);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.pf-tick {
+  stroke: var(--sand);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+  opacity: 0.7;
+}
+
+.pf-wp circle {
+  fill: var(--orange);
+  stroke: var(--charcoal);
+  stroke-width: 2;
+}
+
+.pf-wp text {
+  fill: var(--charcoal);
+  font-family: var(--font-label);
+  font-weight: 800;
+  font-size: 11px;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.pf-cursor line {
+  stroke: var(--sand);
+  stroke-width: 2;
+}
+
+.pf-cursor circle {
+  fill: var(--sand);
+  stroke: var(--orange);
+  stroke-width: 3;
+}
+
+.profile-readout {
+  position: absolute;
+  top: 4px;
+  right: 14px;
+  display: flex;
+  gap: 14px;
+  padding: 4px 10px;
+  border: 2px solid var(--sand);
+  background: var(--forest);
+  pointer-events: none;
+}
+
+.profile-readout span {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 18px;
+  line-height: 1.1;
+  color: var(--sand);
+  font-variant-numeric: tabular-nums;
+}
+
+.profile-readout small {
+  margin-left: 2px;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--lichen);
+}
+
+.profile-status {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+/* Status note -- stencil square icon + condensed uppercase text */
+.status-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border: 2px solid var(--sand);
+  background: var(--forest);
+  font-family: var(--font-label);
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--sand);
+}
+
+.status-note::before {
+  content: '';
+  flex: none;
+  width: 10px;
+  height: 10px;
+  background: var(--lichen);
+}
+
+.status-note.loading::before {
+  background: var(--orange);
+  animation: trail-blink 0.9s steps(2, jump-none) infinite;
+}
+
+.status-note.success::before {
+  background: var(--success);
+}
+
+.status-note.error {
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.status-note.error::before {
+  background: var(--error);
+}
+
+@keyframes trail-blink {
+  0% { opacity: 1; }
+  100% { opacity: 0.2; }
+}
+
+/* Waypoint marker -- inner child of a mapboxgl.Marker root (the root is
+   positioned by Mapbox via transform; never style it). Anchor 'bottom'. */
+.wp-tag {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.wp-tag-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px 2px 6px;
+  border: 2px solid var(--sand);
+  background: var(--forest);
+  color: var(--sand);
+  font-family: var(--font-label);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 3px 3px 0 rgba(29, 31, 26, 0.5);
+}
+
+.wp-tag-label i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--sand);
+  border-radius: 50%;
+  background: var(--orange);
+}
+
+.wp-tag::after {
+  content: '';
+  width: 3px;
+  height: 14px;
+  background: var(--sand);
+}
+
+.cursor-dot {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border: 4px solid var(--orange);
+  border-radius: 50%;
+  background: var(--sand);
+  box-shadow: 0 0 0 2px var(--charcoal);
+  pointer-events: none;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Mapbox controls re-skinned to match */
+.mapboxgl-ctrl-group {
+  border-radius: 0 !important;
+  border: 2px solid var(--sand);
+  background: var(--forest) !important;
+  box-shadow: 3px 3px 0 rgba(29, 31, 26, 0.5) !important;
+}
+
+/* A raster-dem (terrain) source makes GL JS hide the Mapbox logo (the DEM
+   TileJSON has mapbox_logo:false). Force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --panel-h: 170px;
+  }
+
+  /* Trail card collapses to a compact one-line strip across the top */
+  .trail-card {
+    top: 10px;
+    left: 16px;
+    right: 16px;
+    width: auto;
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-width: 2px;
+    box-shadow: 3px 3px 0 rgba(29, 31, 26, 0.55);
+  }
+
+  .brand-stamp,
+  .trail-meta,
+  .stat[data-opt] {
+    display: none;
+  }
+
+  .trail-name {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    font-size: 19px;
+    line-height: 1.1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .stats {
+    display: flex;
+    flex: none;
+    gap: 12px;
+    border-top: 0;
+  }
+
+  .stat {
+    padding: 0;
+  }
+
+  .stat-value {
+    font-size: 17px;
+  }
+
+  .stat-label {
+    display: none;
+  }
+
+  .stage-actions {
+    top: 58px;
+    right: 16px;
+  }
+
+  .btn {
+    padding: 6px 12px;
+    font-size: 14px;
+  }
+
+  .panel-head {
+    padding: 6px 16px 0;
+    gap: 10px;
+  }
+
+  .panel-title {
+    display: none;
+  }
+
+  .profile-readout {
+    top: 2px;
+    right: 16px;
+    gap: 10px;
+    padding: 2px 8px;
+  }
+
+  .profile-readout span {
+    font-size: 16px;
+  }
+
+  .wp-tag-label {
+    font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-note.loading::before {
+    animation: none;
+  }
+
+  .btn,
+  .wp-chip {
+    transition: none;
+  }
+}

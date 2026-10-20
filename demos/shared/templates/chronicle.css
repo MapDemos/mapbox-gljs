@@ -1,0 +1,502 @@
+/*
+  Chronicle -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a museum-exhibit-grade timeline
+  explorer -- deep plum and aubergine, saffron and dusty-rose accents,
+  ivory type, a calm globe above a bottom timeline panel with a histogram
+  and a draggable range brush -- deliberately distinct from every other
+  style pack in this folder: Arena is a Linear-dark compare layout,
+  Editorial Paper is warm paper + serif, Highway Sign is MUTCD cream/green,
+  Slate Console is a dark cinematic globe, Storefront is a sidebar of
+  filters, Tarmac Glass is dark glass + amber, Vintage Chart is
+  navy/parchment/brass, Weather Console is a layer-explorer dock, Riso Zine
+  is two-ink print, Swiss Grid is a visible 12-column split, Neon HUD is
+  glowing cyberpunk, Pastel Bento is a soft tile grid, Blueprint is
+  drafting-paper line work, Story Scroll is scrollytelling chapter cards,
+  Retro OS is a windowed desktop, Aurora Command is a night-sky ops
+  console, Deco Voyage is gilded Art Deco, Washi Seasons is paper and
+  seasonal colour).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/chronicle.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Fraunces, with its optical-size and
+  "soft" axes, for years and titles; Commissioner for UI and body):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..700,0..100;1,9..144,400..600,0..100&family=Commissioner:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  Signature touch: the time scrubber. The map ends above a fixed bottom
+  .timeline panel holding an events-per-decade histogram and a two-handle
+  brush; the big Fraunces year range in .readout always mirrors the brush.
+  The map's own logo and attribution sit at the map's bottom corners,
+  above the panel, so no UI ever covers them.
+
+  Class/id contract (see chronicle-template.html in this same folder for
+  a full working example):
+
+  - .chronicle                root layout: a grid of two rows, the .stage
+                               (1fr) and the .timeline (--timeline-h),
+                               exactly 100dvh, never scrolls
+  - .stage                    row 1: position relative, holds #map and .hud
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here). Make
+                               it fill .stage (position absolute, inset 0)
+  - .hud                      overlay on the stage (pointer-events none;
+                               children opt back in). Row on desktop
+                               (readout left, card right), column on phone
+  - .readout                  year-range panel, top-left --
+    .eyebrow                    small caps line above the numerals
+    .years                      big Fraunces range: .year, .dash, .year
+    .count                      one-line counter ("12 of 41 in view")
+  - .event-card               detail card for the selected event --
+    .card-close                 round close button, top-right of the card
+    .card-kicker                small caps meta line (year + category)
+    .card-title                 Fraunces title
+    .card-meta                  one-line place / figures
+    .card-body                  short description
+  - .timeline                 the bottom panel (aubergine) --
+    .tl-controls                left column (phone: top row) --
+      .btn.btn-play               the Play / Pause button
+      .tl-note                    one-line hint / hover readout
+    .tl-chart-wrap              right column: .tl-chart above .tl-axis
+    .tl-chart                   brush surface (touch-action none) --
+      .tl-bars                    inline <svg> histogram; <rect class="bar">
+                                   gets .on (inside window) / .hl (hovered)
+      .tl-window                  the shaded selected span
+      .handle                     keyboard-accessible slider handle
+                                   (data-h="a" or "b"; role="slider")
+    .tl-axis                    decade labels; span.tick, span.tick.major
+                                 (only .major shows on phone)
+  - .btn, .btn-primary,       pill buttons: hairline border, saffron fill on
+    .btn-secondary              primary
+  - .status-note (+.loading/  small centred pill over the map (pointer-
+    .success/.error)           events none), shown only while loading/error
+  - .chron-pop                add as a Popup className for hover labels
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --plum: #24152F;
+  --land: #43295A;
+  --aubergine: #3A2449;
+  --aubergine-deep: #2F1C3D;
+  --deep-water: #140A1C;
+  --saffron: #F4A259;
+  --rose: #E26D5C;
+  --ivory: #F6EEE3;
+  --lilac: #9C88B0;
+  --hairline: rgba(156, 136, 176, 0.28);
+  --shadow: rgba(10, 4, 16, 0.5);
+  --success: #A9C9A4;
+  --error: #E26D5C;
+  --timeline-h: 150px;
+
+  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --font-ui: 'Commissioner', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--plum);
+  color: var(--ivory);
+  font-family: var(--font-ui);
+  overflow: hidden;
+}
+
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--saffron);
+  outline-offset: 2px;
+}
+
+.chronicle {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) var(--timeline-h);
+  height: 100vh;
+  height: 100dvh;
+}
+
+.stage {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.hud {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px;
+  pointer-events: none;
+}
+
+.hud > * { pointer-events: auto; }
+
+/* Year-range readout */
+.readout {
+  background: rgba(36, 21, 47, 0.86);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 14px 22px 14px;
+  box-shadow: 0 10px 30px var(--shadow);
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--lilac);
+}
+
+.years {
+  margin-top: 2px;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 56px;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  font-variation-settings: 'SOFT' 60;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--ivory);
+}
+
+.years .dash {
+  color: var(--saffron);
+  font-weight: 300;
+}
+
+.count {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--lilac);
+}
+
+.count b {
+  color: var(--saffron);
+  font-weight: 600;
+}
+
+/* Detail card */
+.event-card {
+  position: relative;
+  width: 320px;
+  max-width: 100%;
+  background: rgba(58, 36, 73, 0.94);
+  border: 1px solid var(--hairline);
+  border-top: 3px solid var(--saffron);
+  border-radius: 6px;
+  padding: 18px 22px 20px;
+  box-shadow: 0 10px 30px var(--shadow);
+}
+
+.card-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--hairline);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--lilac);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.card-close:hover { color: var(--ivory); border-color: var(--lilac); }
+
+.card-kicker {
+  padding-right: 34px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--saffron);
+}
+
+.card-title {
+  margin: 8px 0 4px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 28px;
+  line-height: 1.12;
+  font-variation-settings: 'SOFT' 60;
+  color: var(--ivory);
+}
+
+.card-meta {
+  font-size: 13px;
+  color: var(--rose);
+  font-weight: 500;
+}
+
+.card-body {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: rgba(246, 238, 227, 0.82);
+}
+
+/* Timeline panel */
+.timeline {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  grid-template-areas: "controls chart";
+  column-gap: 28px;
+  padding: 16px 32px 12px 24px;
+  background: var(--aubergine);
+  border-top: 1px solid var(--hairline);
+  box-shadow: 0 -8px 24px var(--shadow);
+  min-height: 0;
+}
+
+.tl-controls {
+  grid-area: controls;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tl-note {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--lilac);
+}
+
+.tl-chart-wrap {
+  grid-area: chart;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.tl-chart {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+  border-bottom: 1px solid var(--lilac);
+}
+
+.tl-bars {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.tl-bars .bar {
+  fill: var(--lilac);
+  opacity: 0.32;
+  transition: fill 0.2s ease, opacity 0.2s ease;
+}
+
+.tl-bars .bar.on { fill: var(--saffron); opacity: 0.9; }
+.tl-bars .bar.hl { fill: var(--rose); opacity: 1; }
+
+.tl-window {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(244, 162, 89, 0.1);
+  border-top: 2px solid var(--saffron);
+  cursor: grab;
+  pointer-events: none;
+}
+
+.handle {
+  position: absolute;
+  top: -6px;
+  bottom: -1px;
+  width: 22px;
+  margin-left: -11px;
+  cursor: ew-resize;
+  z-index: 2;
+  outline: none;
+}
+
+.handle::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--saffron);
+}
+
+.handle::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--plum);
+  border: 2px solid var(--saffron);
+}
+
+.handle:hover::after,
+.handle:focus-visible::after { background: var(--saffron); }
+
+.tl-axis {
+  position: relative;
+  height: 20px;
+  margin-top: 4px;
+}
+
+.tl-axis .tick {
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--lilac);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border: 1px solid var(--lilac);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ivory);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.btn:hover { border-color: var(--ivory); }
+
+.btn-primary {
+  background: var(--saffron);
+  border-color: var(--saffron);
+  color: var(--plum);
+}
+
+.btn-primary:hover { background: var(--ivory); border-color: var(--ivory); }
+
+.btn-secondary { color: var(--lilac); }
+
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-play { min-width: 104px; }
+
+.btn-play svg { width: 12px; height: 12px; fill: currentColor; }
+
+/* Status note */
+.status-note {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  transform: translate(-50%, -50%);
+  padding: 8px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: rgba(36, 21, 47, 0.9);
+  font-size: 13px;
+  color: var(--lilac);
+  pointer-events: none;
+}
+
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); }
+
+/* Hover popup */
+.chron-pop .mapboxgl-popup-content {
+  padding: 6px 12px;
+  background: var(--aubergine);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  color: var(--ivory);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  box-shadow: 0 6px 18px var(--shadow);
+}
+
+.chron-pop.mapboxgl-popup-anchor-top .mapboxgl-popup-tip { border-bottom-color: var(--aubergine); }
+.chron-pop.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip { border-top-color: var(--aubergine); }
+.chron-pop.mapboxgl-popup-anchor-left .mapboxgl-popup-tip { border-right-color: var(--aubergine); }
+.chron-pop.mapboxgl-popup-anchor-right .mapboxgl-popup-tip { border-left-color: var(--aubergine); }
+
+/* Keep the Mapbox logo visible when a raster-dem (terrain) source is added */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) { display: block !important; }
+
+.hidden { display: none !important; }
+
+@media (max-width: 640px) {
+  :root { --timeline-h: 170px; }
+
+  .hud {
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    gap: 8px;
+    padding: 12px 16px;
+  }
+
+  .readout { padding: 10px 16px 10px; }
+  .eyebrow { font-size: 10px; }
+  .years { font-size: 36px; gap: 10px; }
+  .count { font-size: 12px; margin-top: 2px; }
+
+  .event-card {
+    width: auto;
+    max-height: 38dvh;
+    overflow-y: auto;
+    padding: 14px 18px 16px;
+  }
+
+  .card-title { font-size: 22px; }
+  .card-body { font-size: 13px; margin-top: 8px; }
+
+  .timeline {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: "controls" "chart";
+    row-gap: 10px;
+    padding: 12px 24px 10px;
+  }
+
+  .tl-controls {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .btn { padding: 8px 16px; }
+
+  .tl-axis .tick:not(.major) { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tl-bars .bar, .btn { transition: none; }
+}

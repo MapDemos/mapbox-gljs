@@ -1,0 +1,856 @@
+/*
+  Board Game -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a family board game where the city map
+  IS the board -- cream board, canal blue, tulip red, sunflower yellow and
+  leaf green; chunky rounded stop tiles with a 3px darker bottom edge in a
+  ring around the map, pawn tokens, a CSS 3D dice cube), deliberately
+  distinct from every other pack in this folder: Arena is a dark stadium
+  scoreboard, Editorial Paper is warm paper and serif headlines, Highway
+  Sign is cream/green MUTCD signage, Slate Console is a cool-grey ops
+  console, Storefront is a light retail locator, Tarmac Glass is dark
+  blur-glass + amber, Vintage Chart is navy/parchment/brass, Weather
+  Console is a dense forecast dashboard, Riso Zine is two-colour
+  misregistered print, Swiss Grid is white/black/red typographic grid, Neon
+  HUD is glowing sci-fi overlays, Pastel Bento is soft rounded tiles,
+  Blueprint is white-on-blue drafting lines, Story Scroll is a scrolling
+  narrative, Retro OS is a desktop-window UI, Aurora Command is a
+  gradient-glow control room, Deco Voyage is gold-on-black Art Deco, Washi
+  Seasons is quiet Japanese paper and seasonal colour, Raw Web is
+  unstyled-browser brutalism, Case Board is a pinned corkboard of evidence,
+  Line Diagram is a transit-map schematic, Aero Gadgets is glossy skeuomorphic
+  hardware, Chat Concierge is a messaging thread, Chronicle is a dated
+  newspaper timeline, Broadcast is a TV news lower-third, Bottom Sheet is a
+  mobile draggable sheet, Trailhead is olive/orange outdoor stencil and
+  Field Journal is a handwritten naturalist notebook.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/board-game.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Lilita One for titles, tile names and
+  dice; Karla for rules and UI text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Karla:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  Signature touch: the wooden board edge around a cream playing surface, a
+  ring of chunky coloured tiles (each with a 3px darker "thickness" edge)
+  around the map, tactile buttons that press down, and a real 3D dice cube
+  that tumbles. Pawn tokens are inline SVG.
+
+  Layout: desktop -- .app is a two-column grid: .board-wrap (a square
+  .board) and the .side panel. .board is a 5x5 CSS grid; the 16 .tile
+  elements sit on its outer ring (via --r / --c custom properties) and
+  .map-slot occupies the inner 3x3, so the ring never overlaps the map's
+  corners (logo and attribution stay visible). Phone (<= 900px) -- the page
+  scrolls: map (50dvh), then .track becomes a horizontal scroll strip of
+  tiles, then the side panel. If you add a raster-dem source (terrain), GL
+  JS hides the logo; the rule near the bottom of this file forces it back.
+
+  Class/id contract (see board-game-template.html in this same folder for a
+  full working example):
+
+  - .app                      page grid
+  - .board-wrap               centres the square board
+  - .board                    wooden-edged 5x5 grid (flex column on phones)
+  - .track                    holds the 16 tiles (display: contents on
+                               desktop, scroll strip on phones)
+    .tile (+.tile-red/-blue/   chunky stop tile; set style="--r:1;--c:1"
+    -yellow/-green)             (grid row/column on the ring); .is-current
+                                marks the active player's tile
+      .tile-num                 numbered badge
+      .tile-name                Lilita One place name
+      .tile-pawns               row of small .token pawns standing there
+  - .token                    inline-SVG pawn (also used in the side panel)
+  - .map-slot                 rounded map frame inside the ring; holds #map
+                               and .btn-fit
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .btn, .btn-roll,          tactile buttons with a bottom edge
+    .btn-ghost, .btn-fit
+  - .side                     side panel
+    .brand > .brand-title,     game title lockup
+      .brand-sub
+    .section-label             small uppercase Karla heading
+    .seg > .seg-btn            player-count segmented control
+                                ([aria-pressed="true"] is active)
+    .players > .player         one row per player: .token, .player-name,
+                                .player-pos, .player-meter > i; .is-turn
+    .turn-banner               "Tulip's turn" strip, tinted by --pc
+    .dice-area                 dice + Roll button
+      .dice-stage > .dice >    CSS 3D cube; set --rx / --ry in JS to
+      .face-1 ... .face-6        show a result; .pip are the dots
+    .fact-card                 fun-fact card (.fact-tag, .fact-title,
+                                .fact-text, .fact-bonus); --fc tints it
+    .win-card                  winner card with a play-again button
+    .log                       move log (<ol>, newest first)
+  - .stop-pin                 inner child of a mapboxgl.Marker element: a
+                               rounded tile with a number (.stop-pin-num);
+                               never style the marker root itself
+  - .pawn-pin > .pawn-body    inner children of a player's map Marker
+                               (--ox is a horizontal offset); .hop plays
+                               the hop animation
+  - .confetti > .confetti-piece   celebration layer (pointer-events: none)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --cream: #FFF4DC;
+  --cream-dark: #F1DDB0;
+  --canal: #3BA7E0;
+  --canal-dark: #2A82B3;
+  --tulip: #E8484B;
+  --tulip-dark: #B8343A;
+  --sun: #FFC93C;
+  --sun-dark: #D69E12;
+  --leaf: #4CB76A;
+  --leaf-dark: #348C4D;
+  --wood: #B9824F;
+  --wood-dark: #8C5E34;
+  --ink: #222222;
+  --paper: #FFFFFF;
+  --table: #F6E7C3;
+  --side-w: 360px;
+
+  --font-title: 'Lilita One', 'Arial Rounded MT Bold', 'Trebuchet MS', sans-serif;
+  --font-body: 'Karla', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background-color: var(--table);
+  background-image: radial-gradient(rgba(185, 130, 79, 0.22) 1.5px, transparent 1.6px);
+  background-size: 22px 22px;
+  color: var(--ink);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---------- Page grid ---------- */
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--side-w);
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.board-wrap {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 16px;
+}
+
+/* ---------- Board: wooden edge, 5x5 grid, tile ring + map inside ---------- */
+.board {
+  --board: min(calc(100vw - var(--side-w) - 32px), calc(100vh - 32px), calc(100dvh - 32px));
+  width: var(--board);
+  height: var(--board);
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-rows: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  background: var(--cream);
+  border: 14px solid var(--wood);
+  border-radius: 30px;
+  box-shadow: 0 6px 0 var(--wood-dark), 0 14px 22px rgba(34, 34, 34, 0.18), inset 0 0 0 3px var(--cream-dark);
+}
+
+.track {
+  display: contents;
+}
+
+.map-slot {
+  grid-row: 2 / 5;
+  grid-column: 2 / 5;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 4px solid var(--canal);
+  border-radius: 20px;
+  background: var(--cream-dark);
+  box-shadow: 0 3px 0 var(--canal-dark);
+}
+
+/* ---------- Tiles ---------- */
+.tile {
+  --c: 1;
+  --tc: var(--tulip);
+  --td: var(--tulip-dark);
+  grid-row: var(--r);
+  grid-column: var(--c);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+  min-height: 0;
+  padding: 8px 10px 8px;
+  text-align: left;
+  background: var(--tc);
+  border: 0;
+  border-radius: 16px;
+  box-shadow: 0 3px 0 var(--td), inset 0 0 0 3px rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.tile-red { --tc: var(--tulip); --td: var(--tulip-dark); }
+.tile-blue { --tc: var(--canal); --td: var(--canal-dark); }
+.tile-yellow { --tc: var(--sun); --td: var(--sun-dark); }
+.tile-green { --tc: var(--leaf); --td: var(--leaf-dark); }
+
+.tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 var(--td), inset 0 0 0 3px rgba(255, 255, 255, 0.35);
+}
+
+.tile:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--td), inset 0 0 0 3px rgba(255, 255, 255, 0.35);
+}
+
+.tile.is-current {
+  outline: 4px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.tile-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  background: var(--paper);
+  border-bottom: 3px solid rgba(34, 34, 34, 0.25);
+  font-family: var(--font-title);
+  font-size: 15px;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.tile-name {
+  font-family: var(--font-title);
+  font-size: clamp(14px, 1.45vw, 21px);
+  line-height: 1.05;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.tile-pawns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 2px;
+  min-height: 24px;
+}
+
+.token {
+  display: block;
+  flex: none;
+  width: 22px;
+  height: 27px;
+}
+
+.tile-pawns .token.is-hop {
+  animation: pawn-hop 0.34s ease-out;
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-block;
+  padding: 8px 16px;
+  font-family: var(--font-title);
+  font-size: 17px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  box-shadow: 0 4px 0 var(--ink);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 0 var(--ink);
+}
+
+.btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 var(--ink);
+}
+
+.btn-roll {
+  width: 100%;
+  padding: 12px 18px;
+  font-size: 28px;
+  background: var(--sun);
+}
+
+.btn-ghost {
+  font-size: 15px;
+  padding: 5px 12px;
+}
+
+.btn-fit {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+}
+
+/* ---------- Side panel ---------- */
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  padding: 16px 16px 16px 0;
+  overflow-y: auto;
+}
+
+.brand {
+  padding: 10px 16px 12px;
+  background: var(--canal);
+  border: 3px solid var(--ink);
+  border-radius: 18px;
+  box-shadow: 0 5px 0 var(--ink);
+  color: var(--paper);
+}
+
+.brand-title {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: 40px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: var(--paper);
+  text-shadow: 0 3px 0 var(--canal-dark), 2px 2px 0 var(--ink), -2px 2px 0 var(--ink);
+}
+
+.brand-sub {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.section-label {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--wood-dark);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.seg {
+  display: inline-flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.seg-btn {
+  width: 34px;
+  height: 30px;
+  padding: 0;
+  font-family: var(--font-title);
+  font-size: 17px;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 0 3px 0 var(--ink);
+  cursor: pointer;
+}
+
+.seg-btn[aria-pressed="true"] {
+  background: var(--leaf);
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.players {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
+.player {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  grid-template-areas: "tok name pos" "tok meter meter";
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 3px;
+  padding: 6px 12px 6px 10px;
+  background: var(--paper);
+  border: 3px solid transparent;
+  border-radius: 14px;
+  box-shadow: 0 3px 0 var(--cream-dark);
+}
+
+.player .token { grid-area: tok; }
+
+.player.is-turn {
+  border-color: var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+.player-name {
+  grid-area: name;
+  font-family: var(--font-title);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.player-pos {
+  grid-area: pos;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--wood-dark);
+}
+
+.player-meter {
+  grid-area: meter;
+  height: 8px;
+  border-radius: 6px;
+  background: var(--cream-dark);
+  overflow: hidden;
+}
+
+.player-meter i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 6px;
+  background: var(--pc, var(--tulip));
+  transition: width 0.3s ease;
+}
+
+.turn-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  font-family: var(--font-title);
+  font-size: 22px;
+  line-height: 1.1;
+  background: var(--pc, var(--tulip));
+  border: 3px solid var(--ink);
+  border-radius: 16px;
+  box-shadow: 0 4px 0 var(--ink);
+}
+
+.turn-banner .token {
+  filter: drop-shadow(0 2px 0 rgba(34, 34, 34, 0.35));
+}
+
+/* ---------- Dice ---------- */
+.dice-area {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px 14px;
+  background: var(--cream);
+  border: 3px solid var(--wood);
+  border-radius: 18px;
+  box-shadow: 0 4px 0 var(--wood-dark);
+}
+
+.dice-stage {
+  --d: 64px;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  perspective: 420px;
+}
+
+.dice {
+  --rx: 0deg;
+  --ry: 0deg;
+  position: relative;
+  width: var(--d);
+  height: var(--d);
+  transform-style: preserve-3d;
+  transform: rotateX(var(--rx)) rotateY(var(--ry));
+  transition: transform 0.85s cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+
+.face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  place-items: center;
+  padding: 9px;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  box-shadow: inset 0 -4px 0 rgba(34, 34, 34, 0.08);
+}
+
+.face-1 { transform: translateZ(32px); }
+.face-6 { transform: rotateY(180deg) translateZ(32px); }
+.face-3 { transform: rotateY(90deg) translateZ(32px); }
+.face-4 { transform: rotateY(-90deg) translateZ(32px); }
+.face-2 { transform: rotateX(90deg) translateZ(32px); }
+.face-5 { transform: rotateX(-90deg) translateZ(32px); }
+
+.pip {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+.face-1 .pip {
+  width: 15px;
+  height: 15px;
+  background: var(--tulip);
+}
+
+.dice-side {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dice-hint {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--wood-dark);
+}
+
+/* ---------- Fact card ---------- */
+.fact-card {
+  --fc: var(--sun);
+  padding: 10px 14px 12px;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-left-width: 12px;
+  border-left-color: var(--fc);
+  border-radius: 14px;
+  box-shadow: 0 4px 0 var(--ink);
+  animation: card-pop 0.3s ease-out;
+}
+
+.fact-tag {
+  margin: 0 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--wood-dark);
+}
+
+.fact-title {
+  margin: 0 0 4px;
+  font-family: var(--font-title);
+  font-size: 24px;
+  line-height: 1.05;
+}
+
+.fact-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.fact-bonus {
+  display: inline-block;
+  margin: 8px 0 0;
+  padding: 4px 10px;
+  font-family: var(--font-title);
+  font-size: 16px;
+  line-height: 1.1;
+  background: var(--sun);
+  border: 3px solid var(--ink);
+  border-radius: 10px;
+}
+
+.win-card {
+  padding: 12px 16px 14px;
+  text-align: center;
+  background: var(--sun);
+  border: 3px solid var(--ink);
+  border-radius: 18px;
+  box-shadow: 0 5px 0 var(--ink);
+  animation: card-pop 0.35s ease-out;
+}
+
+.win-card h2 {
+  margin: 0 0 4px;
+  font-family: var(--font-title);
+  font-size: 32px;
+  line-height: 1;
+}
+
+.win-card p {
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+
+/* ---------- Log ---------- */
+.log-wrap {
+  flex: 1 1 120px;
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+}
+
+.log {
+  flex: 1 1 0;
+  min-height: 0;
+  margin: 0;
+  padding: 8px 12px;
+  list-style: none;
+  overflow-y: auto;
+  background: var(--cream);
+  border: 3px dashed var(--wood);
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.log li {
+  padding: 2px 0;
+}
+
+.log li + li {
+  border-top: 1px dotted rgba(140, 94, 52, 0.45);
+}
+
+.log b {
+  font-weight: 700;
+}
+
+/* ---------- Map markers (inner children of mapboxgl.Marker roots) ---------- */
+.stop-pin {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: var(--tc, var(--tulip));
+  border: 3px solid var(--ink);
+  border-radius: 9px;
+  box-shadow: 0 3px 0 var(--ink);
+  cursor: pointer;
+}
+
+.stop-pin-num {
+  font-family: var(--font-title);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.pawn-pin {
+  transform: translateX(var(--ox, 0px));
+  pointer-events: none;
+}
+
+.pawn-body {
+  width: 30px;
+  height: 37px;
+  filter: drop-shadow(0 3px 0 rgba(34, 34, 34, 0.3));
+}
+
+.pawn-body .token {
+  width: 100%;
+  height: 100%;
+}
+
+.pawn-body.hop {
+  animation: pawn-hop 0.34s ease-out;
+}
+
+/* ---------- Confetti ---------- */
+.confetti {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -20px;
+  width: 10px;
+  height: 14px;
+  border-radius: 3px;
+  animation: confetti-fall var(--dur, 2.6s) linear var(--delay, 0s) forwards;
+}
+
+/* ---------- Animations ---------- */
+@keyframes pawn-hop {
+  0% { transform: translateY(0) scale(1, 1); }
+  45% { transform: translateY(-14px) scale(0.94, 1.08); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+
+@keyframes card-pop {
+  0% { transform: scale(0.94); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes confetti-fall {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate3d(var(--dx, 0px), 110vh, 0) rotate(720deg); opacity: 0.9; }
+}
+
+/* If you add a raster-dem source (terrain), GL JS hides the Mapbox logo;
+   force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+/* ---------- Tablet / phone: map, tile strip, then the panel; page scrolls ---------- */
+@media (max-width: 900px) {
+  html, body {
+    height: auto;
+    min-height: 100%;
+    overflow: auto;
+  }
+
+  .app {
+    display: block;
+    height: auto;
+    overflow: visible;
+  }
+
+  .board-wrap {
+    display: block;
+    padding: 12px 16px 0;
+  }
+
+  .board {
+    width: 100%;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+    border-width: 10px;
+    border-radius: 24px;
+  }
+
+  .map-slot {
+    order: 1;
+    flex: none;
+    height: 50vh;
+    height: 50dvh;
+    min-height: 300px;
+  }
+
+  .track {
+    order: 2;
+    display: flex;
+    gap: 8px;
+    padding: 4px 2px 8px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tile {
+    flex: 0 0 124px;
+    min-height: 104px;
+    scroll-snap-align: start;
+  }
+
+  .tile-name {
+    font-size: 16px;
+  }
+
+  .side {
+    padding: 14px 16px 24px;
+    overflow: visible;
+  }
+
+  .brand-title {
+    font-size: 34px;
+  }
+
+  .log-wrap {
+    flex: none;
+  }
+
+  .log {
+    max-height: 200px;
+  }
+}
+
+@media (max-width: 420px) {
+  .dice-area {
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .btn-roll {
+    font-size: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dice,
+  .btn,
+  .tile,
+  .player-meter i {
+    transition: none;
+  }
+
+  .fact-card,
+  .win-card,
+  .tile-pawns .token.is-hop,
+  .pawn-body.hop {
+    animation: none;
+  }
+
+  .confetti {
+    display: none;
+  }
+}

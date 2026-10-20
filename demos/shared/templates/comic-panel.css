@@ -1,0 +1,732 @@
+/*
+  Comic Panel -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a Silver-Age comic book page -- newsprint
+  paper, thick 4px black panel borders with gutters, Ben-Day halftone dots in
+  cyan / magenta / yellow / red, jagged "POW" bursts, caption boxes and
+  speech balloons with tails), deliberately distinct from every other pack in
+  this folder: Arena is a dark stadium scoreboard, Editorial Paper is warm
+  paper and serif headlines, Highway Sign is cream/green MUTCD signage, Slate
+  Console is a cool-grey ops console, Storefront is a light retail locator,
+  Tarmac Glass is dark blur-glass + amber, Vintage Chart is navy/parchment/
+  brass, Weather Console is a dense forecast dashboard, Riso Zine is two-colour
+  misregistered print, Swiss Grid is white/black/red typographic grid, Neon
+  HUD is glowing sci-fi overlays, Pastel Bento is soft rounded tiles,
+  Blueprint is white-on-blue drafting lines, Story Scroll is a scrolling
+  narrative, Retro OS is a desktop-window UI, Aurora Command is a
+  gradient-glow control room, Deco Voyage is gold-on-black Art Deco, Washi
+  Seasons is quiet Japanese paper and seasonal colour, Raw Web is unstyled
+  brutalist HTML, Case Board is pinned evidence and string, Line Diagram is a
+  transit-map schematic, Aero Gadgets is glossy early-2000s skeuomorphism,
+  Chat Concierge is a messaging thread, Chronicle is a vertical timeline,
+  Broadcast is a TV news lower-third, Bottom Sheet is a mobile draggable
+  sheet, Trailhead is rugged outdoor-gear tags over contour lines, and Field
+  Journal is a naturalist's notebook.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/comic-panel.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Bangers for titles, SFX and captions;
+  Comic Neue for speech-balloon text and body):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
+
+  Signature touch: Ben-Day halftone dots (tiled radial-gradients) on the page
+  and in every panel, plus jagged starburst shapes (clip-path polygon, the
+  --burst token) used for the "NEW!" badge, the numbered map markers and the
+  SFX word ("ZOOM!") that pops over the map panel's top-right corner.
+
+  Layout: .page is a comic-page grid. On desktop (>= 900px) it is a 4-column
+  grid: .title-panel across the top, .map-panel as one big tall panel in the
+  middle, .story panels around it (slots 1-2 left, 3-4 right, 5-6 along the
+  bottom, the last two .wide). On phones the panels stack and the map panel is
+  sticky at the top (45dvh) while the page scrolls. The map lives INSIDE its
+  own bordered panel, so the Mapbox logo and attribution sit in the map's own
+  bottom corners and are never covered. If you add a raster-dem (terrain)
+  source, GL JS hides the logo; the rule near the bottom of this file forces
+  it back.
+
+  Class/id contract (see comic-panel-template.html in this same folder for a
+  full working example):
+
+  - .page                     comic-page grid (stacked flex column on phones)
+  - .title-panel              banner panel (grid-area title)
+    .title-text > h1.title      Bangers headline, red with black outline
+    .byline                     white caption strip under the headline
+    .status-note (+.loading/    small caption-style status line
+      .success/.error)
+    .pow                        starburst shape; put a <span> inside. Set
+                                 --pow-fill (default red) and --pow-edge
+                                 (inner inset, default 5px). Used by the
+                                 "NEW!" badge, markers and the SFX
+  - .map-panel                the tall map panel (grid-area map); holds #map
+                               (every demo defines its own #map, per
+                               convention -- not included here)
+    .map-tools                  top-left holder for the Next button
+    .sfx (+.show)               top-right SFX burst, pointer-events none;
+                                 holds .pow > span; toggle .show to pop it
+  - .btn, .btn-primary        chunky comic buttons (hard black shadow)
+  - .story (+.slot-1..6,      a story panel = one chapter. Add .tone-cyan /
+    .tone-cyan/.tone-yellow/    .tone-yellow / .tone-magenta for the halftone
+    .tone-magenta, .wide,       colour, .wide for the two bottom panels,
+    .active)                    .active for the selected one. Children:
+    .caption                    yellow caption box (Bangers)
+    .balloon                    speech balloon with a CSS tail (Comic Neue)
+    .art                        halftone illustration placeholder; holds an
+                                 inline <svg> using the fill classes
+                                 .k (ink) .c (cyan) .m (magenta) .y (yellow)
+                                 .r (red) .g (green) .n (newsprint)
+  - .mk                       inner child of a mapboxgl.Marker element: a
+                               numbered burst (.pow > span). Never style the
+                               marker root itself. Add .active for the
+                               selected chapter
+  - .comic-popup              className for a mapboxgl.Popup: a speech
+                               balloon; inner .pop-title + .pop-text
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --newsprint: #FFF6DA;
+  --ink: #111111;
+  --cyan: #00A6D6;
+  --magenta: #E6007E;
+  --yellow: #FFE600;
+  --red: #E8231F;
+  --green: #3DBE5A;
+  --white: #FFFFFF;
+  --success: #1E9E4A;
+  --error: #E8231F;
+  --mk: 40px;
+
+  --font-title: 'Bangers', 'Impact', 'Arial Narrow Bold', sans-serif;
+  --font-body: 'Comic Neue', 'Comic Sans MS', 'Chalkboard SE', sans-serif;
+
+  /* Jagged 12-point starburst (24 vertices) for clip-path polygon(). */
+  --burst: 50% 0%, 58.8% 17.2%, 75% 6.7%, 74% 26%, 93.3% 25%, 82.8% 41.2%, 100% 50%, 82.8% 58.8%, 93.3% 75%, 74% 74%, 75% 93.3%, 58.8% 82.8%, 50% 100%, 41.2% 82.8%, 25% 93.3%, 26% 74%, 6.7% 75%, 17.2% 58.8%, 0% 50%, 17.2% 41.2%, 6.7% 25%, 26% 26%, 25% 6.7%, 41.2% 17.2%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  background-color: var(--newsprint);
+  /* Ben-Day dots across the whole page */
+  background-image: radial-gradient(circle at center, rgba(230, 0, 126, 0.2) 1.5px, transparent 2px);
+  background-size: 9px 9px;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 700;
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 4px solid var(--red);
+  outline-offset: 3px;
+}
+
+/* Page grid -- phones: stacked column with a sticky map panel */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.page > * {
+  min-width: 0;
+}
+
+/* Title banner panel */
+.title-panel {
+  grid-area: title;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  background-color: var(--yellow);
+  background-image: radial-gradient(circle at center, rgba(232, 35, 31, 0.45) 2px, transparent 2.6px);
+  background-size: 10px 10px;
+  border: 4px solid var(--ink);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+.title-text {
+  min-width: 0;
+}
+
+.title {
+  margin: 0 0 8px;
+  font-family: var(--font-title);
+  font-weight: 400;
+  font-size: clamp(34px, 5vw, 64px);
+  line-height: 1;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--red);
+  overflow-wrap: break-word;
+  text-shadow:
+    -2px -2px 0 var(--ink), 2px -2px 0 var(--ink), -2px 2px 0 var(--ink), 2px 2px 0 var(--ink),
+    5px 5px 0 var(--ink);
+}
+
+.byline {
+  display: inline-block;
+  max-width: 100%;
+  margin: 0 0 8px;
+  padding: 4px 10px;
+  background: var(--white);
+  border: 3px solid var(--ink);
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+/* Starburst shape: ink outline layer + coloured inner layer.
+   Wrap in an element with filter: drop-shadow() if you want a shadow
+   (clip-path would clip a box-shadow). */
+.pow {
+  position: relative;
+  display: grid;
+  place-items: center;
+  background: var(--ink);
+  clip-path: polygon(var(--burst));
+  font-family: var(--font-title);
+  text-align: center;
+}
+
+.pow::before {
+  content: '';
+  position: absolute;
+  inset: var(--pow-edge, 5px);
+  background: var(--pow-fill, var(--red));
+  clip-path: polygon(var(--burst));
+}
+
+.pow > span {
+  position: relative;
+  color: var(--yellow);
+  text-shadow: 2px 2px 0 var(--ink);
+  line-height: 1;
+}
+
+.title-panel .pow {
+  flex: none;
+  width: 104px;
+  height: 104px;
+  --pow-fill: var(--magenta);
+  filter: drop-shadow(4px 4px 0 var(--ink));
+}
+
+.title-panel .pow > span {
+  font-size: 28px;
+  letter-spacing: 0.04em;
+}
+
+/* Status note -- a small caption box */
+.status-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 3px 10px;
+  background: var(--cyan);
+  border: 3px solid var(--ink);
+  font-family: var(--font-title);
+  font-size: 17px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.status-note::before {
+  content: '';
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background: var(--yellow);
+  clip-path: polygon(var(--burst));
+}
+
+.status-note.loading::before {
+  animation: comic-blink 0.7s steps(2, jump-none) infinite;
+}
+
+.status-note.success {
+  background: var(--green);
+}
+
+.status-note.error {
+  background: var(--red);
+  color: var(--white);
+}
+
+@keyframes comic-blink {
+  0% { opacity: 1; }
+  100% { opacity: 0.15; }
+}
+
+/* Map panel -- the tall panel. The demo positions #map inside it. */
+.map-panel {
+  grid-area: map;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  flex: none;
+  height: 45vh;
+  height: 45dvh;
+  min-height: 280px;
+  overflow: hidden;
+  background: var(--cyan);
+  border: 4px solid var(--ink);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+.map-tools {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 3;
+  display: flex;
+  gap: 8px;
+}
+
+/* SFX word -- top-right of the map panel, never over logo/attribution */
+.sfx {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  width: 150px;
+  height: 100px;
+  opacity: 0;
+  pointer-events: none;
+  filter: drop-shadow(4px 4px 0 var(--ink));
+}
+
+.sfx .pow {
+  width: 100%;
+  height: 100%;
+}
+
+.sfx .pow > span {
+  font-size: 28px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.sfx.show {
+  opacity: 1;
+  animation: comic-sfx 1.2s ease-out both;
+}
+
+@keyframes comic-sfx {
+  0% { opacity: 0; transform: scale(0.2) rotate(-14deg); }
+  18% { opacity: 1; transform: scale(1.18) rotate(5deg); }
+  32% { transform: scale(1) rotate(-3deg); }
+  80% { opacity: 1; transform: scale(1) rotate(-3deg); }
+  100% { opacity: 0; transform: scale(1.1) rotate(-3deg); }
+}
+
+/* Buttons -- chunky, hard black shadow */
+.btn {
+  display: inline-block;
+  padding: 6px 14px 5px;
+  border: 4px solid var(--ink);
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font-title);
+  font-size: 22px;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 4px 4px 0 var(--ink);
+  transition: background 0.1s ease, transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.btn:hover {
+  background: var(--yellow);
+}
+
+.btn:active {
+  transform: translate(3px, 3px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+.btn-primary {
+  background: var(--red);
+  color: var(--white);
+  text-shadow: 2px 2px 0 var(--ink);
+}
+
+.btn-primary:hover {
+  background: var(--magenta);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Story panels -- one per chapter */
+.story {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 4px solid var(--ink);
+  box-shadow: 6px 6px 0 var(--ink);
+  background-color: var(--newsprint);
+  scroll-margin-top: calc(45dvh + 20px);
+  transition: box-shadow 0.12s ease;
+}
+
+.story.tone-cyan {
+  background-color: var(--cyan);
+  background-image: radial-gradient(circle at center, rgba(17, 17, 17, 0.22) 1.6px, transparent 2.1px);
+  background-size: 8px 8px;
+}
+
+.story.tone-yellow {
+  background-color: var(--yellow);
+  background-image: radial-gradient(circle at center, rgba(232, 35, 31, 0.4) 2px, transparent 2.6px);
+  background-size: 10px 10px;
+}
+
+.story.tone-magenta {
+  background-color: var(--magenta);
+  background-image: radial-gradient(circle at center, rgba(255, 230, 0, 0.45) 1.8px, transparent 2.3px);
+  background-size: 9px 9px;
+}
+
+.story:hover {
+  box-shadow: 9px 9px 0 var(--ink);
+}
+
+.story.active {
+  box-shadow: 0 0 0 4px var(--white), 0 0 0 8px var(--red), 10px 10px 0 8px var(--ink);
+}
+
+.caption {
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 3px 10px 2px;
+  background: var(--yellow);
+  border: 3px solid var(--ink);
+  font-family: var(--font-title);
+  font-size: 19px;
+  letter-spacing: 0.05em;
+  line-height: 1.15;
+  text-transform: uppercase;
+  overflow-wrap: break-word;
+}
+
+.story.tone-yellow .caption {
+  background: var(--white);
+}
+
+/* Speech balloon with a two-layer CSS tail (ink outline + white fill) */
+.balloon {
+  position: relative;
+  margin: 0 0 16px;
+  padding: 8px 14px 9px;
+  background: var(--white);
+  border: 3px solid var(--ink);
+  border-radius: 20px;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.balloon::before,
+.balloon::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-color: var(--ink) transparent transparent transparent;
+}
+
+.balloon::before {
+  left: 24px;
+  bottom: -21px;
+  border-width: 18px 10px 0 4px;
+}
+
+.balloon::after {
+  left: 25px;
+  bottom: -15px;
+  border-width: 15px 7px 0 3px;
+  border-top-color: var(--white);
+}
+
+/* Halftone illustration placeholder: an inline SVG over a dotted sky */
+.art {
+  position: relative;
+  flex: 1;
+  min-height: 110px;
+  overflow: hidden;
+  border: 3px solid var(--ink);
+  background-color: var(--cyan);
+  background-image: radial-gradient(circle at center, rgba(255, 255, 255, 0.55) 1.4px, transparent 1.9px);
+  background-size: 7px 7px;
+}
+
+.tone-cyan .art {
+  background-color: var(--yellow);
+  background-image: radial-gradient(circle at center, rgba(232, 35, 31, 0.4) 1.6px, transparent 2.1px);
+}
+
+.art svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.art svg * {
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.art svg .k { fill: var(--ink); }
+.art svg .c { fill: var(--cyan); }
+.art svg .m { fill: var(--magenta); }
+.art svg .y { fill: var(--yellow); }
+.art svg .r { fill: var(--red); }
+.art svg .g { fill: var(--green); }
+.art svg .n { fill: var(--newsprint); }
+.art svg .o { fill: none; }
+
+/* Halftone shading screen over the drawing */
+.art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at center, rgba(17, 17, 17, 0.32) 1px, transparent 1.5px);
+  background-size: 5px 5px;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(160deg, transparent 45%, #000 100%);
+  mask-image: linear-gradient(160deg, transparent 45%, #000 100%);
+}
+
+/* Map marker -- inner child of a mapboxgl.Marker root (the root is
+   positioned by Mapbox via transform; never style it). Anchor 'center'. */
+.mk {
+  width: var(--mk);
+  height: var(--mk);
+  cursor: pointer;
+  filter: drop-shadow(2px 3px 0 rgba(17, 17, 17, 0.7));
+}
+
+.mk .pow {
+  width: 100%;
+  height: 100%;
+  --pow-fill: var(--yellow);
+  --pow-edge: 4px;
+}
+
+.mk .pow > span {
+  font-size: 21px;
+  color: var(--ink);
+  text-shadow: none;
+}
+
+.mk.active {
+  transform: scale(1.3);
+  animation: comic-pop 0.5s ease-out both;
+}
+
+.mk.active .pow {
+  --pow-fill: var(--red);
+}
+
+.mk.active .pow > span {
+  color: var(--yellow);
+  text-shadow: 1px 1px 0 var(--ink);
+}
+
+@keyframes comic-pop {
+  0% { transform: scale(0.2) rotate(-25deg); }
+  60% { transform: scale(1.6) rotate(8deg); }
+  100% { transform: scale(1.3) rotate(0); }
+}
+
+/* Popup as a speech balloon */
+.comic-popup .mapboxgl-popup-content {
+  padding: 8px 14px 9px;
+  background: var(--white);
+  border: 3px solid var(--ink);
+  border-radius: 20px;
+  box-shadow: 4px 4px 0 var(--ink);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.comic-popup .pop-title {
+  display: block;
+  font-family: var(--font-title);
+  font-weight: 400;
+  font-size: 20px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--red);
+}
+
+.comic-popup .pop-text {
+  display: block;
+}
+
+.comic-popup[class*="anchor-bottom"] .mapboxgl-popup-tip { border-top-color: var(--ink); }
+.comic-popup[class*="anchor-top"] .mapboxgl-popup-tip { border-bottom-color: var(--ink); }
+.comic-popup.mapboxgl-popup-anchor-left .mapboxgl-popup-tip { border-right-color: var(--ink); }
+.comic-popup.mapboxgl-popup-anchor-right .mapboxgl-popup-tip { border-left-color: var(--ink); }
+
+.hidden {
+  display: none !important;
+}
+
+/* A raster-dem (terrain) source makes GL JS hide the Mapbox logo (the DEM
+   TileJSON has mapbox_logo:false). Force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+/* Desktop: the comic-page grid */
+@media (min-width: 900px) {
+  .page {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(250px, 1fr) minmax(250px, 1fr) auto;
+    grid-template-areas:
+      "title title title title"
+      "s1 map map s3"
+      "s2 map map s4"
+      "s5 s5 s6 s6";
+    gap: 18px;
+    padding: 18px;
+  }
+
+  .map-panel {
+    position: relative;
+    height: auto;
+    min-height: 0;
+  }
+
+  .slot-1 { grid-area: s1; }
+  .slot-2 { grid-area: s2; }
+  .slot-3 { grid-area: s3; }
+  .slot-4 { grid-area: s4; }
+  .slot-5 { grid-area: s5; }
+  .slot-6 { grid-area: s6; }
+
+  .story {
+    scroll-margin-top: 16px;
+  }
+
+  /* Wide bottom panels: illustration left, caption + balloon right */
+  .story.wide {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.2fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "art cap" "art bal";
+    column-gap: 14px;
+    row-gap: 10px;
+  }
+
+  .story.wide .art {
+    grid-area: art;
+    min-height: 100px;
+  }
+
+  .story.wide .caption {
+    grid-area: cap;
+  }
+
+  .story.wide .balloon {
+    grid-area: bal;
+    align-self: start;
+  }
+}
+
+/* Phones */
+@media (max-width: 640px) {
+  :root {
+    --mk: 30px;
+  }
+
+  .page {
+    gap: 14px;
+  }
+
+  .title-panel {
+    padding: 12px 14px;
+  }
+
+  .title-panel .pow {
+    width: 64px;
+    height: 64px;
+  }
+
+  .title-panel .pow > span {
+    font-size: 18px;
+  }
+
+  .byline {
+    font-size: 13px;
+  }
+
+  .status-note {
+    font-size: 15px;
+  }
+
+  .mk .pow > span {
+    font-size: 16px;
+  }
+
+  .mk .pow {
+    --pow-edge: 3px;
+  }
+
+  .sfx {
+    width: 118px;
+    height: 80px;
+  }
+
+  .sfx .pow > span {
+    font-size: 21px;
+  }
+
+  .btn {
+    padding: 4px 10px 3px;
+    font-size: 19px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-note.loading::before,
+  .sfx.show,
+  .mk.active {
+    animation: none;
+  }
+
+  .btn,
+  .story {
+    transition: none;
+  }
+}

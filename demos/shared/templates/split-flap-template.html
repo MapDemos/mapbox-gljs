@@ -1,0 +1,458 @@
+<!--
+  Working EXAMPLE of the Split Flap style pack (split-flap.css, in this same
+  folder). Open this file directly to see the pattern working: a mechanical
+  departure board for a fictional timetable out of Milano Centrale, with a
+  Mapbox Standard (night) route map beneath it. Every character is a
+  two-half flap that cycles through intermediate letters when a row changes;
+  every ~6 seconds the top service departs (a dot runs along its route) and
+  the rest of the board shifts up while a new service flips in at the
+  bottom. Hover a row (or a city on the map) to highlight its route; click
+  to fly to it and open a flap-styled popup at the destination. Hovering
+  the board or pressing Pause holds the timetable still. Copy the markup
+  below into your own demo and link split-flap.css from its <head> -- see
+  the class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (a grand railway station's split-flap board) at the
+  user's request for something distinct from every other pack in this
+  folder. The cities are real and the routes are drawn as simple curved
+  arcs from the hub, but the services, times, platforms, train codes and
+  delays are fictional placeholders -- swap in your own.
+
+  What's NOT included: real timetable data, real rail geometry,
+  search/geocoding, routing, or a hard-coded access token (demo-kit.js sets
+  that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Split Flap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Azeret+Mono:wght@500;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="split-flap.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="board" id="board" aria-label="Departures from Milano Centrale">
+    <div class="board-head">
+      <div class="station">
+        <h1 class="station-name">Milano Centrale</h1>
+        <div class="station-sub">Partenze &middot; Departures</div>
+      </div>
+      <div class="right">
+        <div class="board-clock" aria-live="off">
+          <span class="label">Time</span>
+          <span id="clock"></span>
+        </div>
+        <button class="btn" id="pause-btn" type="button">Pause</button>
+      </div>
+    </div>
+    <div class="tick-bar" aria-hidden="true"><div class="tick-fill" id="tick"></div></div>
+    <div class="board-cols" aria-hidden="true">
+      <span class="c-time">Time</span><span class="c-dest">Destination</span><span class="c-via">Via</span><span class="c-plat">Plat</span><span class="c-status">Status</span>
+    </div>
+    <ul class="board-rows" id="rows"></ul>
+  </section>
+
+  <div class="stage">
+    <div id="map"></div>
+    <div class="map-key"><span><i class="k-amber"></i>Departing now</span><span><i class="k-grey"></i>Other services</span></div>
+    <div class="status-note error hidden" id="status-note"></div>
+  </div>
+</div>
+
+<script>
+// Fictional services out of the hub. Coordinates are the real cities.
+const HUB = { name: 'Milano Centrale', coord: [9.2040, 45.4863] };
+const SERVICES = [
+  { id: 'zrh', name: 'Zürich HB',  dest: 'ZÜRICH HB',  via: 'LUGANO',  code: 'EC 31', coord: [8.5402, 47.3779], late: false },
+  { id: 'par', name: 'Paris',      dest: 'PARIS',      via: 'DIJON',   code: 'TGV 9', coord: [2.3730, 48.8809], late: false },
+  { id: 'vce', name: 'Venezia',    dest: 'VENEZIA',    via: 'VERONA',  code: 'FR 12', coord: [12.3210, 45.4411], late: false },
+  { id: 'rom', name: 'Roma',       dest: 'ROMA TERM.', via: 'BOLOGNA', code: 'FR 24', coord: [12.5016, 41.9010], late: true },
+  { id: 'muc', name: 'München',    dest: 'MÜNCHEN',    via: 'BRENNER', code: 'EC 87', coord: [11.5600, 48.1402], late: false },
+  { id: 'vie', name: 'Wien',       dest: 'WIEN HBF',   via: 'UDINE',   code: 'NJ 41', coord: [16.3778, 48.1853], late: true },
+  { id: 'gva', name: 'Genève',     dest: 'GENÈVE',     via: 'BRIG',    code: 'EC 55', coord: [6.1425, 46.2102], late: false },
+  { id: 'trn', name: 'Torino',     dest: 'TORINO PN',  via: 'NOVARA',  code: 'IC 63', coord: [7.6785, 45.0620], late: false },
+];
+const START_MIN = 18 * 60 + 42;
+const GAPS = [0, 7, 6, 8, 7, 8, 7, 8];
+const PLATS = [7, 12, 4, 15, 9, 3, 18, 11];
+const VISIBLE = 6;
+const TICK = 6000;       // ms between board advances
+const STEP_MS = 60;      // one flap step
+const STATUS_TEXT = { ok: 'ON TIME', board: 'BOARDING', late: 'DELAYED', gone: 'DEPARTED' };
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = () => window.matchMedia('(max-width: 700px)').matches;
+const $ = (id) => document.getElementById(id);
+
+SERVICES.reduce((t, s, i) => { t += GAPS[i]; s.time = START_MIN + t; s.plat = PLATS[i]; return t; }, 0);
+const queue = SERVICES.slice();
+let recycleCount = 0;
+
+/* ---- Flap cells ---- */
+const CHARS = ' ABCDEFGHIJKLMNOPQRSTUVWXYZÜÈ0123456789:.+-';
+
+function makeCell() {
+  const cell = document.createElement('span');
+  cell.className = 'flap';
+  cell.innerHTML = '<i class="half t"><span> </span></i><i class="half b"><span> </span></i>' +
+                   '<i class="half ft"><span> </span></i><i class="half fb"><span> </span></i>';
+  const [t, b, ft, fb] = cell.querySelectorAll('span');
+  cell._s = { t, b, ft, fb };
+  cell._ch = ' ';
+  cell._target = ' ';
+  return cell;
+}
+
+function makeGroup(len, cls) {
+  const g = document.createElement('span');
+  g.className = 'grp ' + cls;
+  g.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < len; i++) g.appendChild(makeCell());
+  return g;
+}
+
+function paintAll(cell, ch) {
+  const s = cell._s;
+  s.t.textContent = s.b.textContent = s.ft.textContent = s.fb.textContent = ch === ' ' ? ' ' : ch;
+  cell._ch = ch;
+}
+
+function flapStep(cell, next) {
+  const s = cell._s, old = cell._ch, show = (c) => (c === ' ' ? ' ' : c);
+  s.t.textContent = show(next);
+  s.b.textContent = show(old);
+  s.ft.textContent = show(old);
+  s.fb.textContent = show(next);
+  cell.classList.remove('flip');
+  void cell.offsetWidth;            // restart the CSS animation
+  cell.classList.add('flip');
+  cell._ch = next;
+}
+
+function setCell(cell, ch, delay) {
+  if (!CHARS.includes(ch)) ch = ' ';
+  if (cell._target === ch) return;
+  cell._target = ch;
+  clearTimeout(cell._timer);
+  if (reduce) { paintAll(cell, ch); return; }
+  const L = CHARS.length;
+  const from = CHARS.indexOf(cell._ch), to = CHARS.indexOf(ch);
+  const steps = Math.min((to - from + L) % L, 6 + (to % 3));
+  const seq = [];
+  for (let i = 1; i <= steps; i++) seq.push(CHARS[(to - steps + i + L) % L]);
+  const run = (i) => {
+    if (i >= seq.length) { cell._s.b.textContent = ch === ' ' ? ' ' : ch; return; }
+    flapStep(cell, seq[i]);
+    cell._timer = setTimeout(() => run(i + 1), STEP_MS);
+  };
+  cell._timer = setTimeout(() => run(0), delay || 0);
+}
+
+function setGroup(g, text, delay = 0, align = 'start') {
+  const cells = g.children;
+  const t = align === 'end' ? text.padStart(cells.length, ' ') : text.padEnd(cells.length, ' ');
+  for (let i = 0; i < cells.length; i++) setCell(cells[i], t[i] || ' ', delay + i * 22);
+}
+
+const fmt = (m) => String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+
+/* ---- Board rows ---- */
+const rowsEl = $('rows');
+const rows = [];
+let selectedId = null;
+let hoverId = null;
+
+for (let i = 0; i < VISIBLE; i++) {
+  const li = document.createElement('li');
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'board-row';
+  const g = {
+    time: makeGroup(5, 'g-time'), dest: makeGroup(10, 'g-dest'), via: makeGroup(8, 'g-via'),
+    plat: makeGroup(2, 'g-plat'), status: makeGroup(9, 'g-status st-ok'),
+  };
+  Object.values(g).forEach((el) => btn.appendChild(el));
+  btn.addEventListener('mouseenter', () => setHover(btn.dataset.id));
+  btn.addEventListener('mouseleave', () => setHover(null));
+  btn.addEventListener('focus', () => setHover(btn.dataset.id));
+  btn.addEventListener('blur', () => setHover(null));
+  btn.addEventListener('click', () => select(btn.dataset.id));
+  li.appendChild(btn);
+  rowsEl.appendChild(li);
+  rows.push({ btn, g });
+}
+
+function statusOf(svc, i) {
+  return svc.late ? 'late' : (i === 0 ? 'board' : 'ok');
+}
+
+function renderRow(i, svc, status, delay) {
+  const { btn, g } = rows[i];
+  btn.dataset.id = svc.id;
+  btn.dataset.status = status;
+  setGroup(g.time, fmt(svc.time), delay);
+  setGroup(g.dest, svc.dest, delay + 40);
+  setGroup(g.via, svc.via, delay + 80);
+  setGroup(g.plat, String(svc.plat), delay + 120, 'end');
+  setStatus(i, status, delay + 160);
+  btn.setAttribute('aria-label', `${fmt(svc.time)} ${svc.name}, platform ${svc.plat}, ${STATUS_TEXT[status].toLowerCase()}`);
+}
+
+function setStatus(i, status, delay) {
+  const { btn, g } = rows[i];
+  btn.dataset.status = status;
+  g.status.className = 'grp g-status st-' + status;
+  setGroup(g.status, STATUS_TEXT[status], delay || 0);
+}
+
+function renderBoard(stagger) {
+  queue.slice(0, VISIBLE).forEach((svc, i) => renderRow(i, svc, statusOf(svc, i), reduce ? 0 : i * stagger));
+  setGroup(clockGrp, fmt(queue[0].time - 3), 0);
+  applyHighlight();
+}
+
+const clockGrp = makeGroup(5, 'g-time');
+$('clock').appendChild(clockGrp);
+
+/* ---- Map ---- */
+function arc(a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy);
+  let nx = -dy / len, ny = dx / len;
+  if (ny < 0) { nx = -nx; ny = -ny; }
+  const c = [(a[0] + b[0]) / 2 + nx * len * 0.14, (a[1] + b[1]) / 2 + ny * len * 0.14];
+  const pts = [];
+  for (let i = 0; i <= 48; i++) {
+    const t = i / 48, u = 1 - t;
+    pts.push([u * u * a[0] + 2 * u * t * c[0] + t * t * b[0], u * u * a[1] + 2 * u * t * c[1] + t * t * b[1]]);
+  }
+  return pts;
+}
+
+const ARCS = {};
+SERVICES.forEach((s) => { ARCS[s.id] = arc(HUB.coord, s.coord); });
+const BY_ID = Object.fromEntries(SERVICES.map((s) => [s.id, s]));
+
+const routeFC = {
+  type: 'FeatureCollection',
+  features: SERVICES.map((s) => ({ type: 'Feature', properties: { id: s.id }, geometry: { type: 'LineString', coordinates: ARCS[s.id] } })),
+};
+const cityFC = {
+  type: 'FeatureCollection',
+  features: SERVICES.map((s) => ({ type: 'Feature', properties: { id: s.id, name: s.name }, geometry: { type: 'Point', coordinates: s.coord } })),
+};
+const hubFC = { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { name: 'MILANO CENTRALE' }, geometry: { type: 'Point', coordinates: HUB.coord } }] };
+const emptyPt = { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: HUB.coord } };
+
+const allBounds = SERVICES.reduce((b, s) => b.extend(s.coord), new mapboxgl.LngLatBounds(HUB.coord, HUB.coord));
+const pad = () => (phone() ? { top: 40, bottom: 64, left: 60, right: 48 } : { top: 90, bottom: 80, left: 70, right: 70 });
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  projection: 'mercator',
+  config: { basemap: { lightPreset: 'night', showPointOfInterestLabels: false, showTransitLabels: false } },
+  bounds: allBounds,
+  fitBoundsOptions: { padding: pad() },
+  attributionControl: true,
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+let mapReady = false;
+map.on('style.load', () => {
+  const join = { 'line-join': 'round', 'line-cap': 'round' };
+  map.addSource('routes', { type: 'geojson', data: routeFC });
+  map.addSource('cities', { type: 'geojson', data: cityFC });
+  map.addSource('hub', { type: 'geojson', data: hubFC });
+  map.addSource('dot', { type: 'geojson', data: emptyPt });
+  const none = ['==', ['get', 'id'], ''];
+
+  map.addLayer({ id: 'route-grey', type: 'line', source: 'routes', slot: 'top', layout: join,
+    paint: { 'line-emissive-strength': 1, 'line-color': '#7B8088', 'line-width': 2.2, 'line-opacity': 0.6 } });
+  map.addLayer({ id: 'route-dep', type: 'line', source: 'routes', slot: 'top', layout: join, filter: none,
+    paint: { 'line-emissive-strength': 1, 'line-color': '#FFB000', 'line-width': 3.5 } });
+  map.addLayer({ id: 'route-hi-casing', type: 'line', source: 'routes', slot: 'top', layout: join, filter: none,
+    paint: { 'line-emissive-strength': 1, 'line-color': '#111214', 'line-width': 9, 'line-opacity': 0.75 } });
+  map.addLayer({ id: 'route-hi', type: 'line', source: 'routes', slot: 'top', layout: join, filter: none,
+    paint: { 'line-emissive-strength': 1, 'line-color': '#FFB000', 'line-width': 5 } });
+  map.addLayer({ id: 'city-hi', type: 'circle', source: 'cities', slot: 'top', filter: none,
+    paint: { 'circle-emissive-strength': 1, 'circle-radius': 14, 'circle-color': 'rgba(255,176,0,0.18)', 'circle-stroke-color': '#FFB000', 'circle-stroke-width': 2 } });
+  map.addLayer({ id: 'cities', type: 'circle', source: 'cities', slot: 'top',
+    paint: { 'circle-emissive-strength': 1, 'circle-radius': 7.5, 'circle-color': '#111214', 'circle-stroke-color': '#F2EEE3', 'circle-stroke-width': 2.5 } });
+  map.addLayer({ id: 'hub', type: 'circle', source: 'hub', slot: 'top',
+    paint: { 'circle-emissive-strength': 1, 'circle-radius': 10, 'circle-color': '#FFB000', 'circle-stroke-color': '#111214', 'circle-stroke-width': 3 } });
+  const dotVis = { visibility: reduce ? 'none' : 'visible' };
+  map.addLayer({ id: 'dot-halo', type: 'circle', source: 'dot', slot: 'top', layout: dotVis,
+    paint: { 'circle-emissive-strength': 1, 'circle-radius': 12, 'circle-color': '#FFB000', 'circle-opacity': 0.3, 'circle-blur': 0.6 } });
+  map.addLayer({ id: 'dot', type: 'circle', source: 'dot', slot: 'top', layout: dotVis,
+    paint: { 'circle-emissive-strength': 1, 'circle-radius': 6, 'circle-color': '#FFB000', 'circle-stroke-color': '#F2EEE3', 'circle-stroke-width': 2 } });
+  const text = {
+    'text-field': ['get', 'name'], 'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'], 'text-size': 13,
+    'text-variable-anchor': ['top', 'bottom', 'right', 'left'], 'text-radial-offset': 0.9, 'text-letter-spacing': 0.04,
+  };
+  const label = { 'text-color': '#F2EEE3', 'text-halo-color': '#111214', 'text-halo-width': 1.6, 'text-emissive-strength': 1 };
+  map.addLayer({ id: 'city-labels', type: 'symbol', source: 'cities', slot: 'top', layout: text, paint: label });
+  map.addLayer({ id: 'hub-label', type: 'symbol', source: 'hub', slot: 'top',
+    layout: { ...text, 'text-size': 12, 'text-letter-spacing': 0.12, 'symbol-sort-key': 0 },
+    paint: { ...label, 'text-color': '#FFB000' } });
+
+  map.on('mouseenter', 'cities', (e) => { map.getCanvas().style.cursor = 'pointer'; setHover(e.features[0].properties.id); });
+  map.on('mouseleave', 'cities', () => { map.getCanvas().style.cursor = ''; setHover(null); });
+  map.on('click', 'cities', (e) => { e.preventDefault(); select(e.features[0].properties.id); });
+  map.on('click', (e) => { if (!e.defaultPrevented) deselect(); });
+  mapReady = true;
+  // Board height settles after fonts/layout; re-fit so every destination is in view.
+  map.resize(); if (!selectedId) map.fitBounds(allBounds, { padding: pad(), duration: 0 });
+  applyHighlight();
+  setDeparting();
+});
+
+map.on('error', (e) => {
+  if (mapReady) return;
+  const n = $('status-note');
+  n.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+  n.classList.remove('hidden');
+});
+
+/* ---- Highlight, selection, popup ---- */
+let popup = null;
+
+function applyHighlight() {
+  const hi = hoverId || selectedId || '';
+  rows.forEach(({ btn }, i) => {
+    btn.classList.toggle('is-hover', !!hoverId && btn.dataset.id === hoverId);
+    btn.classList.toggle('is-selected', !!selectedId && btn.dataset.id === selectedId);
+    btn.classList.toggle('is-departing', i === 0);
+  });
+  if (!mapReady) return;
+  const f = ['==', ['get', 'id'], hi];
+  ['route-hi', 'route-hi-casing', 'city-hi'].forEach((id) => { if (map.getLayer(id)) map.setFilter(id, f); });
+}
+
+function setDeparting() {
+  if (mapReady && map.getLayer('route-dep')) map.setFilter('route-dep', ['==', ['get', 'id'], queue[0].id]);
+}
+
+function setHover(id) {
+  hoverId = id;
+  applyHighlight();
+}
+
+function popupContent(svc, status) {
+  const el = document.createElement('div');
+  el.innerHTML = '<div class="pop-dest"></div><div class="pop-meta"></div>' +
+    '<div class="pop-row"><span class="lbl">Dep</span><span class="p-time"></span><span class="lbl">Plat</span><span class="p-plat"></span></div>' +
+    '<div class="pop-row" style="margin-top:6px"><span class="p-status"></span></div>';
+  el.querySelector('.pop-dest').textContent = svc.name;
+  el.querySelector('.pop-meta').textContent = `${svc.code} · via ${svc.via.charAt(0) + svc.via.slice(1).toLowerCase()}`;
+  const gt = makeGroup(5, 'g-time'), gp = makeGroup(2, 'g-plat'), gs = makeGroup(9, 'g-status st-' + status);
+  el.querySelector('.p-time').appendChild(gt);
+  el.querySelector('.p-plat').appendChild(gp);
+  el.querySelector('.p-status').appendChild(gs);
+  setGroup(gt, fmt(svc.time), 0);
+  setGroup(gp, String(svc.plat), 60, 'end');
+  setGroup(gs, STATUS_TEXT[status], 120);
+  return el;
+}
+
+function select(id) {
+  const svc = BY_ID[id];
+  if (!svc) return;
+  selectedId = id;
+  applyHighlight();
+  if (popup) popup.remove();
+  const idx = queue.indexOf(svc);
+  const status = statusOf(svc, idx);
+  popup = new mapboxgl.Popup({ className: 'flap-popup', closeButton: false, closeOnClick: false, offset: 14, maxWidth: '280px' })
+    .setLngLat(svc.coord).setDOMContent(popupContent(svc, status)).addTo(map);
+  const b = ARCS[id].reduce((bb, c) => bb.extend(c), new mapboxgl.LngLatBounds(ARCS[id][0], ARCS[id][0]));
+  const p = phone() ? { top: 110, bottom: 80, left: 40, right: 40 } : { top: 130, bottom: 80, left: 90, right: 90 };
+  map.fitBounds(b, { padding: p, duration: reduce ? 0 : 1400, maxZoom: 7 });
+}
+
+function deselect() {
+  selectedId = null;
+  if (popup) { popup.remove(); popup = null; }
+  applyHighlight();
+}
+
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') deselect(); });
+
+/* ---- Advance loop: top row departs, board shifts, a new row flips in ---- */
+let elapsed = 0, last = performance.now(), userPaused = false, overBoard = false, advancing = false;
+const pauseBtn = $('pause-btn');
+const tickEl = $('tick');
+if (reduce) $('tick').parentElement.classList.add('hidden');
+
+pauseBtn.addEventListener('click', () => {
+  userPaused = !userPaused;
+  pauseBtn.textContent = userPaused ? 'Resume' : 'Pause';
+});
+$('board').addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') overBoard = true; });
+$('board').addEventListener('pointerleave', () => { overBoard = false; });
+
+function advance() {
+  if (advancing) return;
+  advancing = true;
+  setStatus(0, 'gone', 0);
+  setTimeout(() => {
+    const gone = queue.shift();
+    recycleCount++;
+    const tail = queue[queue.length - 1];
+    gone.time = tail.time + 6 + (recycleCount * 3) % 5;
+    gone.plat = PLATS[(recycleCount * 3) % PLATS.length];
+    gone.late = recycleCount % 3 === 0;
+    queue.push(gone);
+    renderBoard(70);
+    setDeparting();
+    if (popup && selectedId) popup.setDOMContent(popupContent(BY_ID[selectedId], statusOf(BY_ID[selectedId], queue.indexOf(BY_ID[selectedId]))));
+    advancing = false;
+  }, reduce ? 0 : 900);
+}
+
+function updateDot() {
+  if (!mapReady || reduce) return;
+  const pts = ARCS[queue[0].id];
+  const f = Math.min(1, elapsed / TICK) * (pts.length - 1);
+  const i = Math.min(pts.length - 2, Math.floor(f)), t = f - i;
+  const src = map.getSource('dot');
+  if (src) src.setData({ type: 'Feature', properties: {}, geometry: { type: 'Point',
+    coordinates: [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t] } });
+}
+
+function loop(now) {
+  const dt = Math.min(now - last, 100);
+  last = now;
+  if (!userPaused && !overBoard && !advancing) {
+    elapsed += dt;
+    if (elapsed >= TICK) { elapsed = 0; advance(); }
+  }
+  if (!reduce) tickEl.style.transform = `scaleX(${Math.min(1, elapsed / TICK)})`;
+  updateDot();
+  requestAnimationFrame(loop);
+}
+
+if (reduce) {
+  // No per-frame animation: advance on a plain timer, dot stays hidden.
+  setInterval(() => { if (!userPaused && !overBoard) advance(); }, TICK);
+} else {
+  requestAnimationFrame(loop);
+}
+
+renderBoard(110);
+</script>
+</body>
+</html>

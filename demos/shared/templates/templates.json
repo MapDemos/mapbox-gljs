@@ -117,5 +117,215 @@
       "en": "Japanese minimal washi layout — season switcher",
       "ja": "和紙を思わせる和のミニマルなレイアウト — 季節の切り替え"
     }
+  },
+  {
+    "name": "raw-web",
+    "description": {
+      "en": "1996 hand-coded homepage — map above a sortable data table",
+      "ja": "1996年の手作りホームページ風 — 地図の下に並べ替え可能なデータ表"
+    }
+  },
+  {
+    "name": "case-board",
+    "description": {
+      "en": "Detective corkboard — clue cards, pushpins and red yarn on a pinned city map",
+      "ja": "探偵のコルクボード風 — 手がかりカード、画鋲、赤い糸で結ぶ街の地図"
+    }
+  },
+  {
+    "name": "line-diagram",
+    "description": {
+      "en": "Transit line strip diagram synced with a geographic map",
+      "ja": "路線図の帯と実際の地図が連動する交通案内"
+    }
+  },
+  {
+    "name": "aero-gadgets",
+    "description": {
+      "en": "Glossy sky-and-glass look — map window with clock, compass and places gadgets",
+      "ja": "光沢のある空とガラスの質感 — 時計・方位・スポットのガジェット付き地図ウィンドウ"
+    }
+  },
+  {
+    "name": "chat-concierge",
+    "description": {
+      "en": "Warm chat assistant — replies with place cards that pin to the map",
+      "ja": "温かみのあるチャットアシスタント — 返信のスポットカードが地図にピン留め"
+    }
+  },
+  {
+    "name": "chronicle",
+    "description": {
+      "en": "Museum-style timeline — histogram range brush filters a globe",
+      "ja": "博物館の展示風タイムライン — ヒストグラムの範囲選択で地球儀を絞り込み"
+    }
+  },
+  {
+    "name": "broadcast",
+    "description": {
+      "en": "Sports TV graphics — live race tracker with leaderboard and ticker",
+      "ja": "スポーツ中継風グラフィック — 順位表とテロップ付きのライブ追跡"
+    }
+  },
+  {
+    "name": "bottom-sheet",
+    "description": {
+      "en": "Native-feeling mobile app — draggable bottom sheet, floating card on desktop",
+      "ja": "ネイティブアプリ風 — ドラッグできるボトムシート、デスクトップではフローティングカード"
+    }
+  },
+  {
+    "name": "trailhead",
+    "description": {
+      "en": "Rugged outdoor brand — 3D terrain route with an elevation profile",
+      "ja": "アウトドアブランド風 — 3D地形のルートと標高プロファイル"
+    }
+  },
+  {
+    "name": "field-journal",
+    "description": {
+      "en": "Naturalist's notebook spread — sightings list and a taped-in sepia map",
+      "ja": "博物学者のフィールドノート風 — 観察記録と貼り付けたセピア色の地図"
+    }
+  },
+  {
+    "name": "split-flap",
+    "description": {
+      "en": "Mechanical railway departure board — flipping letters over a route map",
+      "ja": "駅の反転フラップ式発車標 — 文字がパタパタ切り替わる路線マップ"
+    }
+  },
+  {
+    "name": "comic-panel",
+    "description": {
+      "en": "Retro comic book page — halftone panels, speech balloons and a map panel",
+      "ja": "レトロなコミック誌面 — 網点のコマ、吹き出し、地図のコマ"
+    }
+  },
+  {
+    "name": "data-notebook",
+    "description": {
+      "en": "Analyst's code notebook — editable parameters drive map, chart and table outputs",
+      "ja": "分析用コードノートブック — パラメータ編集で地図・グラフ・表を出力"
+    }
+  },
+  {
+    "name": "thermal-receipt",
+    "description": {
+      "en": "Delivery order on a thermal receipt that prints as the courier moves",
+      "ja": "配達状況に合わせて印字が進む感熱レシート"
+    }
+  },
+  {
+    "name": "sticker-book",
+    "description": {
+      "en": "Kids' sticker activity book — drag stickers onto the right places",
+      "ja": "子ども向けシール帳 — シールを正しい場所にドラッグ"
+    }
+  },
+  {
+    "name": "amber-terminal",
+    "description": {
+      "en": "Amber CRT terminal with text windows — typed commands drive the map",
+      "ja": "琥珀色のCRT端末 — コマンド入力で地図を操作"
+    }
+  },
+  {
+    "name": "estate-luxe",
+    "description": {
+      "en": "Quiet-luxury property listings with price-pin map",
+      "ja": "上質な不動産物件一覧と価格ピンの地図"
+    }
+  },
+  {
+    "name": "frontier-poster",
+    "description": {
+      "en": "Wood-type stagecoach handbill — timetable and 3D terrain route",
+      "ja": "木活字の駅馬車ポスター — 時刻表と3D地形のルート"
+    }
+  },
+  {
+    "name": "clinic-finder",
+    "description": {
+      "en": "Accessibility-first service locator — keyboard and screen-reader friendly",
+      "ja": "アクセシビリティ重視の施設検索 — キーボード・読み上げ対応"
+    }
+  },
+  {
+    "name": "vapor-sunset",
+    "description": {
+      "en": "Synthwave sunset drive — map in a retro TV with a cassette playlist",
+      "ja": "シンセウェーブの夕暮れドライブ — レトロTVの地図とカセットのプレイリスト"
+    }
+  },
+  {
+    "name": "board-game",
+    "description": {
+      "en": "Family board game — tile ring around the map and a rolling die",
+      "ja": "家族向けボードゲーム — 地図を囲むマスとサイコロ"
+    }
+  },
+  {
+    "name": "academic-paper",
+    "description": {
+      "en": "Typeset journal article — the map is an interactive Figure 1",
+      "ja": "論文誌風のレイアウト — 地図はインタラクティブな図1"
+    }
+  },
+  {
+    "name": "ski-piste",
+    "description": {
+      "en": "Ski resort status board with a 3D piste map",
+      "ja": "スキー場のリフト・コース状況ボードと3Dゲレンデマップ"
+    }
+  },
+  {
+    "name": "celestial-tarot",
+    "description": {
+      "en": "Gold foil on midnight blue — flip tarot-style cards to reveal places",
+      "ja": "深い藍に金箔 — タロット風カードをめくって場所を表示"
+    }
+  },
+  {
+    "name": "isotype",
+    "description": {
+      "en": "1930s pictogram statistics poster — repeated icons per district",
+      "ja": "1930年代の絵文字統計ポスター — 地区ごとのアイコン列"
+    }
+  },
+  {
+    "name": "fleet-ops",
+    "description": {
+      "en": "Light enterprise fleet dashboard — KPIs, vehicle table and live map",
+      "ja": "明るい業務用フリートダッシュボード — KPI、車両一覧、ライブ地図"
+    }
+  },
+  {
+    "name": "e-ink",
+    "description": {
+      "en": "E-reader device with a greyscale map and e-ink page refresh",
+      "ja": "電子ペーパー端末風 — グレースケールの地図とページ書き換え"
+    }
+  },
+  {
+    "name": "postcards",
+    "description": {
+      "en": "Vintage postcards — flip cards to reveal islands and the ferry route",
+      "ja": "ヴィンテージ絵はがき — めくると島とフェリー航路が現れる"
+    }
+  },
+  {
+    "name": "drop-culture",
+    "description": {
+      "en": "Streetwear release site — countdown and raffle-store map",
+      "ja": "ストリートウェアの発売サイト — カウントダウンと抽選店舗マップ"
+    }
+  },
+  {
+    "name": "event-invite",
+    "description": {
+      "en": "Letterpress wedding invitation — schedule, guest travel map and RSVP",
+      "ja": "活版印刷風の招待状 — スケジュール、ゲスト向け地図、出欠フォーム"
+    }
   }
 ]

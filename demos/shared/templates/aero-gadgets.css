@@ -1,0 +1,744 @@
+/*
+  Aero Gadgets -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: glossy mid-2000s "aero" optimism -- a
+  bright sky gradient, frosted white glass with a strong top highlight,
+  glossy aqua and grass-green jelly buttons, floating bubbles -- laid out
+  as a map in a glass-framed window beside a sidebar of desktop-style
+  "gadgets"; generic, not an imitation of any operating system, deliberately
+  distinct from every other style pack in this folder: Arena is a
+  Linear-dark compare layout, Editorial Paper is warm paper + serif,
+  Highway Sign is MUTCD cream/green, Slate Console is a dark cinematic
+  globe, Storefront is a sidebar of filters, Tarmac Glass is dark glass +
+  amber, Vintage Chart is navy/parchment/brass, Weather Console is a
+  layer-explorer dock, Riso Zine is two-ink print, Swiss Grid is a 12-column
+  split screen, Neon HUD is glowing cyber-HUD, Pastel Bento is a rounded
+  tile grid, Blueprint is white-on-blue drafting lines, Story Scroll is
+  cinematic scrollytelling, Retro OS is a pixel-era desktop, Aurora Command
+  is a dark aurora control room, Deco Voyage is gold-and-black art deco,
+  Washi Seasons is soft Japanese paper).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/aero-gadgets.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Varela Round for UI text, Exo 2 for
+  headings, numerals and the clock):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Varela+Round&family=Exo+2:wght@500;700;800&display=swap" rel="stylesheet" />
+
+  Signature touch: every panel is frosted glass with a white gloss
+  highlight over its upper half (a ::before gradient), and the whole page
+  sits on a sky gradient with a grass hill and a few drifting CSS bubbles
+  behind the glass. Setting body[data-preset="dawn|day|dusk|night"] re-tints
+  the sky to match the map's light preset. The bubbles and hill are
+  decorative, pointer-events: none and sit behind the window -- never over
+  the map or its logo/attribution.
+
+  Class/id contract (see aero-gadgets-template.html in this same folder
+  for a full working example):
+
+  - body[data-preset]         optional; dawn | day | dusk | night re-tints
+                               the sky gradient and grass
+  - .bubbles, .bubble         decorative drifting bubbles behind the UI
+                               (position them with inline left/top/size)
+  - .app                      the page grid: window (left) + sidebar
+                               (right, 300px); stacks on phones with the
+                               map ~55dvh and the sidebar a scroll-snap row
+  - .window                   the glass window frame around the map --
+    .window-bar                 title bar
+    .window-title               an <h1> with a small .window-glyph
+    .window-body                holds #map-frame
+  - #map-frame                position: relative box the map fills; the
+                               Mapbox logo/attribution live inside it, so
+                               nothing overlaps them
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here); make
+                               it position: absolute; inset: 0 in #map-frame
+  - .sidebar                  vertical stack of gadgets (a horizontal
+                               scroll-snap row on phones)
+  - .gadget                   one glass gadget; gets .is-closing while it
+                               fades out (data-gadget names it) --
+    .gadget-head                title row
+    .gadget-title               small Exo 2 heading
+    .gadget-close               the round x button
+    .gadget-body                content area
+  - .gadget-row               svg/dial on the left, text on the right --
+    .gadget-text                the text column
+    .readout                    big Exo 2 numeral line (+ .readout small)
+    .caption                    small muted line
+  - .clock-face               inline SVG clock; its hands are <g> elements
+                               you rotate from script
+  - .compass                  draggable/clickable dial (role="button");
+                               .compass-needle is the rotating <g>
+  - .btn, .btn-primary,       glossy jelly buttons: aqua (primary), green
+    .btn-secondary,             (secondary), plain glass (.btn); set
+    .btn-round                  aria-pressed="true" for the pressed state;
+                                .btn-round is the circular arrow button
+  - .btn-grid                 2-column grid of .btn
+  - .slide                    slideshow content; add .swap to replay its
+    .slide-art                  fade-in; .slide-art takes --a/--b colours
+    .slide-title, .slide-text
+    .slide-nav                  prev / dots / next row
+    .dots, .dot                 slideshow pager (.dot.is-active)
+  - .add-gadgets              glossy "+ Add gadgets" button in the window
+                               bar (hidden until a gadget is closed)
+  - .bubble-marker            the mapboxgl.Marker root element -- leave it
+                               unstyled; style its .bubble-pin child, a
+                               glass sphere (.is-active when selected)
+  - .status-note (+.loading/  small glass pill, top-left of the map frame
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --sky-a: #5BC0F8;
+  --sky-b: #CFF1FF;
+  --grass: #6CC24A;
+  --grass-deep: #4AA82F;
+  --aqua: #00B4D8;
+  --aqua-deep: #0086AD;
+  --glass: rgba(255, 255, 255, 0.55);
+  --glass-edge: rgba(255, 255, 255, 0.85);
+  --glow: rgba(0, 150, 220, 0.35);
+  --ink: #0B3A5B;
+  --ink-muted: #3F6C8C;
+  --success: #2E8B1E;
+  --error: #C23B22;
+
+  --font-ui: 'Varela Round', 'Trebuchet MS', 'Segoe UI', sans-serif;
+  --font-display: 'Exo 2', 'Trebuchet MS', 'Segoe UI', sans-serif;
+
+  --gutter: 16px;
+  --sidebar: 300px;
+}
+
+body[data-preset="dawn"] {
+  --sky-a: #7FA8E8;
+  --sky-b: #FFE3D0;
+  --grass: #7DBE55;
+}
+
+body[data-preset="dusk"] {
+  --sky-a: #4A63B8;
+  --sky-b: #F7C3A0;
+  --grass: #4F9A3C;
+  --grass-deep: #3A7F2A;
+}
+
+body[data-preset="night"] {
+  --sky-a: #0B2A5C;
+  --sky-b: #4A7DB8;
+  --grass: #2F7A3A;
+  --grass-deep: #1F5E2B;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+}
+
+body {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--sky-a) 0%, var(--sky-b) 100%) fixed;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Grass hill behind everything, along the bottom edge */
+body::after {
+  content: '';
+  position: fixed;
+  z-index: 0;
+  left: -10%;
+  bottom: 0;
+  width: 120%;
+  height: 16vh;
+  background:
+    radial-gradient(60% 100% at 25% 100%, var(--grass) 0 98%, transparent 100%),
+    radial-gradient(55% 80% at 80% 100%, var(--grass-deep) 0 98%, transparent 100%);
+  pointer-events: none;
+}
+
+button, input {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--aqua-deep);
+  outline-offset: 2px;
+}
+
+/* Decorative bubbles (behind the glass) */
+.bubbles {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.bubble {
+  position: absolute;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.95) 0 8%, rgba(255, 255, 255, 0) 24%),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.05) 55%, rgba(255, 255, 255, 0.55) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.5), inset 0 -8px 14px rgba(0, 170, 240, 0.25);
+  animation: aero-float 9s ease-in-out infinite;
+}
+
+@keyframes aero-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-16px); }
+}
+
+/* Page grid */
+.app {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--sidebar);
+  gap: 18px;
+  height: 100vh;
+  height: 100dvh;
+  padding: var(--gutter);
+}
+
+/* Shared glass treatment: window and gadgets */
+.window,
+.gadget {
+  position: relative;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+  border: 1px solid var(--glass-edge);
+  border-radius: 20px;
+  box-shadow: 0 0 0 1px rgba(0, 120, 200, 0.22), 0 12px 36px var(--glow), inset 0 0 14px rgba(255, 255, 255, 0.5);
+}
+
+/* Gloss highlight across the upper half */
+.window::before,
+.gadget::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 50% 0;
+  border-radius: 19px 19px 60% 60% / 19px 19px 24px 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+/* Map window */
+.window {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px;
+}
+
+.window-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 38px;
+  padding: 0 6px 6px 10px;
+}
+
+.window-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.window-glyph {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 28%, #fff 0 12%, rgba(255, 255, 255, 0) 30%),
+    linear-gradient(180deg, #5fe0ff, var(--aqua) 55%, var(--aqua-deep));
+  border: 1px solid var(--aqua-deep);
+  box-shadow: 0 0 8px rgba(0, 180, 216, 0.6);
+}
+
+.window-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+#map-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 13px;
+  border: 1px solid rgba(0, 110, 170, 0.45);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.6), 0 2px 8px rgba(0, 90, 150, 0.25);
+  background: #9bd6f2;
+}
+
+/* Sidebar of gadgets */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  padding: 2px 4px 4px 2px;
+  margin: -2px -4px -4px -2px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.8) transparent;
+}
+
+.gadget {
+  flex: none;
+  padding: 10px 14px 14px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.25s ease;
+}
+
+.gadget:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 0 0 1px rgba(0, 120, 200, 0.3), 0 16px 40px rgba(0, 150, 230, 0.5), inset 0 0 14px rgba(255, 255, 255, 0.5);
+}
+
+.gadget.is-closing {
+  opacity: 0;
+  transform: scale(0.92);
+  pointer-events: none;
+}
+
+.gadget-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.gadget-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.gadget-close {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 110, 170, 0.45);
+  background: linear-gradient(180deg, #fff, #cdeeff 55%, #a9ddf7);
+  color: var(--ink-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.gadget:hover .gadget-close,
+.gadget-close:focus-visible {
+  opacity: 1;
+}
+
+.gadget-close:hover {
+  background: linear-gradient(180deg, #ffb59f, #ef6a49 55%, #d4482a);
+  color: #fff;
+}
+
+.gadget-body {
+  position: relative;
+}
+
+.gadget-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.gadget-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.readout {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.readout small {
+  margin-left: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-muted);
+}
+
+.caption {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+/* Clock */
+.clock-face {
+  width: 112px;
+  height: 112px;
+  flex: none;
+  filter: drop-shadow(0 4px 8px rgba(0, 110, 180, 0.35));
+}
+
+.clock-face .rim { fill: url(#clock-rim); stroke: var(--aqua-deep); stroke-width: 1; }
+.clock-face .dial { fill: url(#clock-dial); }
+.clock-face .tick { fill: none; stroke: var(--ink); }
+.clock-face .hand-hour,
+.clock-face .hand-min { stroke: var(--ink); stroke-linecap: round; }
+.clock-face .hand-sec { stroke: var(--grass-deep); stroke-linecap: round; }
+.clock-face .hub { fill: var(--aqua); stroke: #fff; stroke-width: 1.5; }
+.clock-face .gloss { fill: url(#clock-gloss); pointer-events: none; }
+
+/* Compass */
+.compass {
+  position: relative;
+  display: block;
+  width: 104px;
+  height: 104px;
+  flex: none;
+  cursor: grab;
+  touch-action: none;
+  border-radius: 50%;
+  filter: drop-shadow(0 4px 8px rgba(0, 110, 180, 0.35));
+}
+
+.compass:active { cursor: grabbing; }
+
+.compass svg { width: 100%; height: 100%; display: block; pointer-events: none; }
+
+.compass .rim { fill: url(#compass-rim); stroke: var(--aqua-deep); stroke-width: 1; }
+.compass .dial { fill: url(#clock-dial); }
+.compass .letter {
+  fill: var(--ink-muted);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 11px;
+  text-anchor: middle;
+}
+.compass .letter.north { fill: #D4482A; }
+.compass .needle-n { fill: #E5532F; stroke: #fff; stroke-width: 0.8; }
+.compass .needle-s { fill: #fff; stroke: var(--aqua-deep); stroke-width: 0.8; }
+.compass .hub { fill: var(--aqua); stroke: #fff; stroke-width: 1.5; }
+.compass .gloss { fill: url(#clock-gloss); }
+
+/* Glossy jelly buttons */
+.btn {
+  position: relative;
+  display: inline-block;
+  padding: 9px 14px;
+  border: 1px solid rgba(0, 110, 170, 0.55);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffffff 0%, #dff4ff 48%, #b6e3fa 52%, #d9f2ff 100%);
+  box-shadow: 0 2px 6px rgba(0, 110, 180, 0.3), inset 0 1px 0 #fff;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.btn:hover {
+  filter: brightness(1.07) saturate(1.1);
+  box-shadow: 0 0 12px rgba(0, 190, 240, 0.7), 0 2px 6px rgba(0, 110, 180, 0.3), inset 0 1px 0 #fff;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-primary {
+  background: linear-gradient(180deg, #a3ebff 0%, #35c9ec 48%, #00a6cf 52%, #3fd0f0 100%);
+  border-color: var(--aqua-deep);
+  color: #04304a;
+}
+
+.btn-secondary {
+  background: linear-gradient(180deg, #c3f2a5 0%, #86d95f 48%, #5cbb38 52%, #8fe06a 100%);
+  border-color: #3b8a22;
+  color: #0F3A06;
+}
+
+.btn[aria-pressed="true"] {
+  background: linear-gradient(180deg, #00a6cf 0%, #35c9ec 48%, #5fd8f5 52%, #8fe6fb 100%);
+  border-color: var(--aqua-deep);
+  color: #04304a;
+  box-shadow: inset 0 3px 7px rgba(0, 80, 120, 0.4), 0 0 10px rgba(0, 190, 240, 0.55);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-round {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  font-size: 16px;
+  line-height: 1;
+  background: linear-gradient(180deg, #a3ebff 0%, #35c9ec 48%, #00a6cf 52%, #3fd0f0 100%);
+  border-color: var(--aqua-deep);
+  color: #04304a;
+}
+
+.btn-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* Slideshow */
+.slide.swap {
+  animation: aero-swap 0.4s ease;
+}
+
+@keyframes aero-swap {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.slide-art {
+  --a: #5BC0F8;
+  --b: #CFF1FF;
+  position: relative;
+  height: 64px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: linear-gradient(180deg, var(--a), var(--b));
+  box-shadow: inset 0 0 0 1px rgba(0, 110, 170, 0.3);
+}
+
+.slide-art svg { display: block; width: 100%; height: 100%; }
+.slide-art .sun { fill: rgba(255, 255, 255, 0.9); }
+.slide-art .hill { fill: var(--grass); }
+.slide-art .sea { fill: rgba(0, 150, 210, 0.75); }
+
+.slide-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.slide-text {
+  margin: 4px 0 0;
+  min-height: 3.9em;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+.slide-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.dots {
+  display: flex;
+  gap: 6px;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--aqua-deep);
+  background: linear-gradient(180deg, #fff, #bfeaff);
+  cursor: pointer;
+}
+
+.dot.is-active {
+  background: linear-gradient(180deg, #8fe06a, var(--grass-deep));
+  border-color: #3b8a22;
+  box-shadow: 0 0 6px rgba(108, 194, 74, 0.9);
+}
+
+/* Add-gadgets button */
+.add-gadgets {
+  flex: none;
+  padding: 6px 14px;
+  font-size: 12px;
+}
+
+/* Markers: the root is Mapbox's; style only the child sphere */
+.bubble-marker {
+  cursor: pointer;
+}
+
+.bubble-pin {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.95);
+  background:
+    radial-gradient(circle at 32% 26%, #fff 0 10%, rgba(255, 255, 255, 0) 34%),
+    radial-gradient(circle at 50% 80%, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(180deg, #62dcfb, var(--aqua) 60%, var(--aqua-deep));
+  box-shadow: 0 3px 8px rgba(0, 60, 110, 0.5), 0 0 10px rgba(120, 225, 255, 0.8);
+  color: #04304a;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13px;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bubble-marker:hover .bubble-pin {
+  transform: scale(1.12);
+}
+
+.bubble-pin.is-active {
+  transform: scale(1.3);
+  background:
+    radial-gradient(circle at 32% 26%, #fff 0 10%, rgba(255, 255, 255, 0) 34%),
+    linear-gradient(180deg, #b2f08f, var(--grass) 60%, var(--grass-deep));
+  box-shadow: 0 3px 10px rgba(0, 60, 20, 0.5), 0 0 16px rgba(160, 240, 120, 0.95);
+}
+
+/* Status pill, top-left of the map frame */
+.status-note {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  box-shadow: 0 4px 14px var(--glow);
+  font-size: 12px;
+  color: var(--ink-muted);
+  pointer-events: none;
+}
+
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); }
+
+.status-note.loading::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(0, 150, 210, 0.3);
+  border-top-color: var(--aqua-deep);
+  border-radius: 50%;
+  animation: aero-spin 0.9s linear infinite;
+}
+
+@keyframes aero-spin {
+  to { transform: rotate(360deg); }
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* The terrain-dem TileJSON sets mapbox_logo:false, which makes GL JS hide
+   the logo; Mapbox maps must still show it, so force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+/* Phone: ~55dvh map, gadgets as a scroll-snap row beneath */
+@media (max-width: 760px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    /* Gadgets keep their natural height; the map takes the rest. */
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 12px;
+  }
+
+  .window { padding: 6px; }
+  .window-bar { min-height: 34px; padding: 0 4px 4px 6px; }
+  .window-title { font-size: 16px; }
+
+  .sidebar {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scroll-padding: 0 2px;
+    padding-bottom: 6px;
+    margin-bottom: -6px;
+  }
+
+  .gadget {
+    flex: 0 0 min(264px, 78vw);
+    scroll-snap-align: start;
+    padding: 8px 12px 12px;
+    overflow-y: auto;
+  }
+
+  .gadget:hover { transform: none; }
+
+  .gadget-close { opacity: 1; }
+
+  .clock-face { width: 84px; height: 84px; }
+  .compass { width: 84px; height: 84px; }
+  .readout { font-size: 24px; }
+  .slide-art { height: 42px; margin-bottom: 6px; }
+  .slide-title { font-size: 16px; }
+  .slide-text { min-height: 0; font-size: 12px; }
+  .slide-nav { margin-top: 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble,
+  .slide.swap,
+  .status-note.loading::before { animation: none; }
+  .gadget,
+  .bubble-pin { transition: none; }
+}

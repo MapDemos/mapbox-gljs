@@ -1,0 +1,408 @@
+<!--
+  Working EXAMPLE of the Academic Paper style pack (academic-paper.css, in
+  this same folder). Open this file directly to see a typeset two-column
+  journal article whose Figure 1 is a live Mapbox map (14 illustrative river
+  gauging stations near Manaus, recoloured by a month slider), whose Figure 2
+  is an inline-SVG line chart, and whose Table 1 is a clickable booktabs
+  station list. Copy the markup into your own demo and link
+  academic-paper.css from its <head> -- see the class/id contract documented
+  at the top of that CSS file for what to build.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief at the user's request. The journal, authors,
+  institutions, references and the monthly anomaly values are fictional,
+  illustrative placeholders (station positions are approximate points on the
+  river banks), not real data -- swap in your own.
+
+  What's NOT included: real hydrological data or a real tileset, MathJax /
+  KaTeX (the equation is plain HTML/CSS), a charting library (Figure 2 is
+  hand-written SVG), pagination or print stylesheets, and any server calls
+  beyond the Mapbox style and tiles.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Seasonal stage anomalies along the central Amazon - Journal of Applied Riverine Cartography</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=STIX+Two+Text:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Inconsolata:wght@400;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="academic-paper.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo sizes its own #map. */
+  #map { width: 100%; height: 460px; }
+  @media (max-width: 700px) { #map { height: 360px; } }
+</style>
+</head>
+<body>
+<div class="page">
+<article class="sheet">
+
+  <div class="journal-head">
+    <span class="journal-name">Journal of Applied Riverine Cartography</span>
+    <span class="article-meta">Vol. 12, No. 3 &middot; pp. 141&ndash;152 &middot; Research Article</span>
+  </div>
+
+  <h1 class="article-title">Seasonal stage anomalies along the central Amazon, mapped from fourteen gauging stations</h1>
+
+  <p class="authors">Marisol Quintana<sup>1,*</sup>, Tobias Hartwell<sup>2</sup>, Ilse Brandvold<sup>1</sup> and Kofi Adjei-Lindqvist<sup>2</sup></p>
+  <div class="affiliations">
+    <div><sup>1</sup> Institute for Fluvial Geomorphology, University of Vale Branco</div>
+    <div><sup>2</sup> Centre for Hydrographic Survey, Northern Rivers Academy &middot; <sup>*</sup> Correspondence: m.quintana@example.org</div>
+  </div>
+
+  <section class="abstract">
+    <h2>Abstract</h2>
+    <p>We present monthly stage anomalies for fourteen illustrative gauging stations on the Solim&otilde;es, Negro and Amazon rivers around Manaus, and show how a diverging colour scale makes the lagged flood pulse legible on a single map. Anomalies peak first on the upper Solim&otilde;es and arrive at the lower Amazon roughly six weeks later, while the Negro responds with a damped, delayed signal. An interactive figure lets readers step through the hydrological year and inspect any station.</p>
+  </section>
+  <p class="keywords"><b>Keywords:</b> stage anomaly; flood pulse; gauging network; diverging colour scale; Amazon basin</p>
+
+  <div class="columns">
+    <h2 class="sec">Introduction</h2>
+    <p class="first">Water levels on the central Amazon rise and fall by more than ten metres each year, yet the departures from the long-term mean are what matter for navigation and floodplain agriculture. Mapping those departures, rather than absolute stage, removes the dominant seasonal cycle and exposes anomalous years at a glance.</p>
+    <p>Earlier atlases show stations as proportional symbols on a continental base. Here we colour each station by its anomaly in the selected month (<a class="xref" data-target="fig1">Fig. 1</a>) and give the full annual trace on demand (<a class="xref" data-target="fig2">Fig. 2</a>). Station metadata are listed in <a class="xref" data-target="tab1">Table 1</a>.</p>
+
+    <h2 class="sec">Study area and data</h2>
+    <p class="first">The network spans about 330&nbsp;km of the central Amazon, from Novo Air&atilde;o on the lower Negro to Itapiranga on the Amazon main stem<sup class="fn">1</sup>. The reach includes the confluence near Manaus, where dark Negro water meets the sediment-laden Solim&otilde;es and the two flow side by side for tens of kilometres.</p>
+    <p>Daily stage readings were reduced to monthly means and expressed as departures from a twenty-year reference mean at each station. Positive values indicate stage above the reference.</p>
+
+    <h2 class="sec">Methods</h2>
+    <p class="first">Discharge at a station is related to stage through Manning&rsquo;s equation for uniform open-channel flow,</p>
+    <div class="eq">
+      <div class="eq-body">
+        <i>Q</i> =
+        <span class="frac"><span class="num">1</span><span class="den"><i>n</i></span></span>
+        <i>A</i>&thinsp;<i>R</i><sup>2/3</sup><i>S</i><sup>1/2</sup>
+      </div>
+      <div class="eq-num">(1)</div>
+    </div>
+    <p class="cont">where <i>Q</i> is discharge, <i>n</i> the roughness coefficient, <i>A</i> the flow area, <i>R</i> the hydraulic radius and <i>S</i> the energy slope. Because <i>A</i> and <i>R</i> both grow with stage, small stage anomalies translate into disproportionately large discharge anomalies.<sup class="fn">2</sup></p>
+    <p>Anomalies are encoded with a colour-blind-safe diverging scale, red for below-reference and blue for above-reference stage, centred on a neutral light grey so that near-normal stations recede.</p>
+
+    <div class="footnotes">
+      <p><sup>1</sup> Station positions are approximate and illustrative.</p>
+      <p><sup>2</sup> Roughness is held constant across the reach.</p>
+    </div>
+  </div>
+
+  <figure class="figure span" id="fig1">
+    <div class="figure-map">
+      <div id="map" role="img" aria-label="Map of fourteen gauging stations near Manaus coloured by monthly stage anomaly"></div>
+      <svg class="north-arrow" viewBox="0 0 30 44" aria-hidden="true">
+        <path d="M15 3 L24 30 L15 24 L6 30 Z" fill="#1A1A1A"/>
+        <path d="M15 3 L15 24 L6 30 Z" fill="#fff" stroke="#1A1A1A" stroke-width="1"/>
+        <text x="15" y="42" text-anchor="middle">N</text>
+      </svg>
+    </div>
+    <div class="fig-controls">
+      <div class="month-control">
+        <label for="month">Month <span class="month-value" id="month-value">Jun</span></label>
+        <input type="range" id="month" min="0" max="11" step="1" value="5" aria-label="Month of the hydrological year" />
+      </div>
+      <div class="legend">
+        <div class="legend-title">Stage anomaly (m)</div>
+        <div class="legend-bar"></div>
+        <div class="legend-ticks"><span>&minus;3</span><span>&minus;2</span><span>&minus;1</span><span>0</span><span>+1</span><span>+2</span><span>+3</span></div>
+      </div>
+    </div>
+    <figcaption class="fig-caption"><b class="fig-label">Figure 1.</b> Mean monthly stage anomaly at 14 gauging stations on the Solim&otilde;es, Negro and Amazon rivers near Manaus. Use the slider to change month; select a station to update <a class="xref" data-target="fig2">Fig. 2</a>. Base map greyscale; stations numbered as in <a class="xref" data-target="tab1">Table 1</a>.</figcaption>
+    <div class="status-note loading" id="status">Loading map</div>
+  </figure>
+
+  <div class="columns">
+    <h2 class="sec">Results</h2>
+    <p class="first">In June the upper Solim&otilde;es stations are the wettest in the network (<a class="xref" data-station="3">station 3</a>, <a class="xref" data-target="fig1">Fig. 1</a>), whereas the Negro stations remain close to the reference. Moving the slider to October reverses the pattern at the western end, with <a class="xref" data-station="9">station 9</a> at Manaus already below its reference.</p>
+
+    <figure class="figure" id="fig2">
+      <svg class="chart" id="chart" viewBox="0 0 360 214" role="img" aria-label="Monthly stage anomaly of the selected station"></svg>
+      <figcaption class="fig-caption"><b class="fig-label">Figure 2.</b> Twelve-month stage anomaly (m) at the selected station, <span id="fig2-station">station 9, Manaus</span>. Dot colour follows the scale in <a class="xref" data-target="fig1">Fig. 1</a>; the dashed line marks the selected month.</figcaption>
+    </figure>
+
+    <div class="table-wrap" id="tab1">
+      <span class="table-caption"><b class="fig-label">Table 1.</b> Gauging stations and annual stage anomaly summary. Select a row to highlight it on the map.</span>
+      <table class="booktabs" id="stations-table">
+        <thead><tr><th>No.</th><th>Station</th><th>River</th><th class="num">Mean</th><th class="num" id="th-month">Jun</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="table-note">Mean = annual mean anomaly (m). Last column: anomaly in the selected month (m).</p>
+    </div>
+
+    <h2 class="sec">Discussion</h2>
+    <p class="first">The lag between the western and eastern stations is consistent with a flood wave travelling at roughly 0.5&nbsp;m&nbsp;s<sup>&minus;1</sup>. Because the diverging scale is anchored at zero, a single glance at <a class="xref" data-target="fig1">Fig. 1</a> separates anomalously wet from anomalously dry reaches without reading a number.</p>
+    <p>Limitations include the short reference period and the assumption of a stable rating curve. Future work will extend the network to the Madeira and Purus tributaries.</p>
+
+    <h2 class="sec">Data availability</h2>
+    <div class="data-avail">
+      <p>Station table and monthly anomalies:</p>
+      <p><code>doi:10.0000/jarc.2026.0312</code></p>
+      <p>Code: <code>stage-anomaly/map.js</code> (illustrative placeholder).</p>
+    </div>
+
+    <h2 class="sec">References</h2>
+    <ol class="references">
+      <li>Quintana, M., &amp; Brandvold, I. (2024). Flood-pulse lag along the central Amazon. <i>J. Appl. Riverine Cartogr.</i>, 11(2), 55&ndash;71.</li>
+      <li>Hartwell, T. (2023). Diverging palettes for hydrological anomalies. <i>Cartogr. Perspect. Water</i>, 8, 12&ndash;27.</li>
+      <li>Adjei-Lindqvist, K., et al. (2022). Rating-curve stability on large tropical rivers. <i>Fluvial Surv. Lett.</i>, 5(4), 201&ndash;215.</li>
+      <li>Brandvold, I., &amp; Hartwell, T. (2021). Mapping confluences: colour, texture and scale. <i>Riverine Atlas Q.</i>, 3(1), 4&ndash;19.</li>
+      <li>Vale Branco Hydrographic Office (2020). <i>Manual of Stage Observation</i>, 3rd ed. Vale Branco Press.</li>
+    </ol>
+  </div>
+
+</article>
+</div>
+
+<script>
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const RANGE = 3; // anomaly colour scale spans -RANGE..+RANGE metres
+const COL_NEG = [178, 24, 43], COL_MID = [247, 247, 247], COL_POS = [33, 102, 172];
+
+// [no, name, river, lon, lat, amplitude (m), phase (month), bias (m)]
+const RAW = [
+  [1, 'Novo Airão', 'Negro', -60.945, -2.625, 0.9, 7.5, -0.4],
+  [2, 'Boca do Cuieiras', 'Negro', -60.55, -2.74, 1.0, 7.0, -0.3],
+  [3, 'Caapiranga', 'Solimões', -61.22, -3.32, 2.2, 3.5, 0.5],
+  [4, 'Manacapuru', 'Solimões', -60.62, -3.295, 2.0, 4.0, 0.4],
+  [5, 'Cacau Pirêra', 'Solimões', -60.47, -3.25, 1.9, 4.5, 0.2],
+  [6, 'Iranduba', 'Solimões', -60.19, -3.28, 1.8, 4.8, 0.1],
+  [7, 'Tarumã', 'Negro', -60.15, -3.03, 1.1, 6.0, -0.2],
+  [8, 'Ponta Negra', 'Negro', -60.09, -3.08, 1.2, 6.0, -0.2],
+  [9, 'Manaus', 'Negro', -60.02, -3.14, 1.5, 5.8, -0.5],
+  [10, 'Encontro das Águas', 'Amazon', -59.93, -3.12, 1.6, 6.2, -0.1],
+  [11, 'Careiro da Várzea', 'Amazon', -59.83, -3.2, 1.7, 6.6, 0.0],
+  [12, 'Paraná do Careiro', 'Amazon', -59.55, -3.3, 1.8, 7.0, 0.2],
+  [13, 'Itacoatiara', 'Amazon', -58.44, -3.14, 1.9, 8.0, 0.3],
+  [14, 'Itapiranga', 'Amazon', -58.03, -2.75, 1.7, 8.6, 0.4],
+];
+
+// Illustrative annual cycle: seasonal harmonic + a smaller second harmonic.
+const STATIONS = RAW.map(([no, name, river, lon, lat, amp, ph, bias]) => {
+  const a = MONTHS.map((_, m) => {
+    const v = bias + amp * Math.sin(2 * Math.PI * (m - ph) / 12) + 0.35 * Math.sin(4 * Math.PI * (m - ph) / 12 + no);
+    return Math.round(Math.max(-RANGE, Math.min(RANGE, v)) * 100) / 100;
+  });
+  return { no, name, river, lon, lat, a, mean: a.reduce((s, v) => s + v, 0) / 12 };
+});
+
+const lerp = (p, q, t) => Math.round(p + (q - p) * t);
+function anomalyColor(v) {
+  const t = Math.max(-1, Math.min(1, v / RANGE));
+  const [from, to] = t < 0 ? [COL_MID, COL_NEG] : [COL_MID, COL_POS];
+  const k = Math.abs(t);
+  return `rgb(${lerp(from[0], to[0], k)},${lerp(from[1], to[1], k)},${lerp(from[2], to[2], k)})`;
+}
+const fmt = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(2);
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let month = 5;
+let selected = 9;
+
+const statusEl = document.getElementById('status');
+const monthEl = document.getElementById('month');
+const monthValueEl = document.getElementById('month-value');
+const chartEl = document.getElementById('chart');
+const tbody = document.querySelector('#stations-table tbody');
+
+// ---- Table 1 ----
+STATIONS.forEach((s) => {
+  const tr = document.createElement('tr');
+  tr.dataset.no = s.no;
+  tr.tabIndex = 0;
+  tr.innerHTML = `<td>${s.no}</td><td>${s.name}</td><td>${s.river}</td><td class="num">${fmt(s.mean)}</td><td class="num"><span class="swatch"></span><span class="mval"></span></td>`;
+  tr.addEventListener('click', () => select(s.no));
+  tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(s.no); } });
+  tbody.appendChild(tr);
+});
+
+function updateTable() {
+  document.getElementById('th-month').textContent = MONTHS[month];
+  tbody.querySelectorAll('tr').forEach((tr) => {
+    const s = STATIONS[tr.dataset.no - 1];
+    tr.querySelector('.mval').textContent = fmt(s.a[month]);
+    tr.querySelector('.swatch').style.background = anomalyColor(s.a[month]);
+    tr.classList.toggle('selected', s.no === selected);
+    tr.setAttribute('aria-selected', s.no === selected);
+  });
+}
+
+// ---- Figure 2 (hand-written SVG) ----
+const NS = 'http://www.w3.org/2000/svg';
+const X0 = 40, X1 = 346, Y0 = 34, Y1 = 176; // plot box; y spans +RANGE (top) .. -RANGE
+const px = (m) => X0 + 14 + (m * (X1 - X0 - 28)) / 11;
+const py = (v) => Y0 + ((RANGE - v) / (2 * RANGE)) * (Y1 - Y0);
+function el(name, attrs, text) {
+  const e = document.createElementNS(NS, name);
+  Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v));
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+function drawChart() {
+  const s = STATIONS[selected - 1];
+  chartEl.replaceChildren();
+  for (let v = -RANGE; v <= RANGE; v++) {
+    chartEl.append(el('line', { class: v === 0 ? 'ch-zero' : 'ch-grid', x1: X0, x2: X1, y1: py(v), y2: py(v) }));
+    chartEl.append(el('text', { class: 'ch-tick', x: X0 - 6, y: py(v) + 3.5, 'text-anchor': 'end' }, (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v)));
+  }
+  chartEl.append(el('path', { class: 'ch-axis', d: `M${X0} ${Y0} V${Y1} H${X1}` }));
+  chartEl.append(el('text', { class: 'ch-title', x: X0, y: 16 }, `Station ${s.no}, ${s.name} (${s.river})`));
+  chartEl.append(el('text', { class: 'ch-label', x: 10, y: (Y0 + Y1) / 2, transform: `rotate(-90 10 ${(Y0 + Y1) / 2})`, 'text-anchor': 'middle' }, 'Anomaly (m)'));
+  chartEl.append(el('line', { class: 'ch-sel', x1: px(month), x2: px(month), y1: Y0, y2: Y1 }));
+  chartEl.append(el('polyline', { class: 'ch-line', points: s.a.map((v, m) => `${px(m)},${py(v)}`).join(' ') }));
+  s.a.forEach((v, m) => {
+    chartEl.append(el('circle', { class: 'ch-dot', cx: px(m), cy: py(v), r: m === month ? 5.5 : 3.6, fill: anomalyColor(v) }));
+    chartEl.append(el('text', { class: 'ch-tick' + (m === month ? ' on' : ''), x: px(m), y: Y1 + 14, 'text-anchor': 'middle' }, MONTHS[m][0]));
+    const hit = el('rect', { class: 'ch-hit', x: px(m) - 11, y: Y0, width: 22, height: Y1 - Y0 + 20 });
+    hit.addEventListener('click', () => setMonth(m));
+    chartEl.append(hit);
+  });
+  chartEl.append(el('text', { class: 'ch-label', x: (X0 + X1) / 2, y: 208, 'text-anchor': 'middle' }, 'Month'));
+  document.getElementById('fig2-station').textContent = `station ${s.no}, ${s.name}`;
+}
+
+// ---- Figure 1 (map) ----
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  bounds: [[-61.45, -3.6], [-57.8, -2.45]],
+  fitBoundsOptions: { padding: { top: 30, left: 30, right: 30, bottom: 64 } },
+  attributionControl: true,
+  dragRotate: false,
+  cooperativeGestures: window.matchMedia('(max-width: 700px)').matches,
+});
+map.touchZoomRotate.disableRotation();
+map.addControl(new mapboxgl.ScaleControl({ maxWidth: 110, unit: 'metric' }), 'bottom-left');
+
+// Recolour the basemap to a neutral greyscale journal figure. Every call is guarded.
+function journalBasemap() {
+  const guard = (fn) => { try { fn(); } catch (e) { /* layer lacks this property */ } };
+  map.getStyle().layers.forEach((l) => {
+    const id = l.id;
+    if (l.type === 'background') guard(() => map.setPaintProperty(id, 'background-color', '#F2F2F2'));
+    else if (l.type === 'fill') {
+      if (/water/.test(id)) guard(() => map.setPaintProperty(id, 'fill-color', '#CFE3F3'));
+      else if (/building/.test(id)) guard(() => map.setPaintProperty(id, 'fill-color', '#E9E9E9'));
+      else guard(() => map.setPaintProperty(id, 'fill-color', '#EBEBEB'));
+    } else if (l.type === 'line') {
+      if (/water/.test(id)) guard(() => map.setPaintProperty(id, 'line-color', '#CFE3F3'));
+      else if (/admin|boundary/.test(id)) guard(() => map.setPaintProperty(id, 'line-color', '#A8A8A8'));
+      else guard(() => map.setPaintProperty(id, 'line-color', /case/.test(id) ? '#F2F2F2' : '#E4E4E4'));
+    } else if (l.type === 'symbol') {
+      if (/poi|transit|airport|shield|natural-point|rail|settlement/.test(id)) guard(() => map.setLayoutProperty(id, 'visibility', 'none'));
+      else {
+        guard(() => map.setPaintProperty(id, 'text-color', /water/.test(id) ? '#4F7FA6' : '#4A4A4A'));
+        guard(() => map.setPaintProperty(id, 'text-halo-color', 'rgba(255,255,255,0.85)'));
+        guard(() => map.setLayoutProperty(id, 'text-size', ['interpolate', ['linear'], ['zoom'], 4, 9, 10, 11.5]));
+      }
+    }
+  });
+}
+
+function addStations() {
+  map.addSource('stations', {
+    type: 'geojson',
+    data: {
+      type: 'FeatureCollection',
+      features: STATIONS.map((s) => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [s.lon, s.lat] },
+        properties: Object.assign({ no: s.no, name: s.name }, ...s.a.map((v, m) => ({ ['a' + m]: v }))),
+      })),
+    },
+  });
+  map.addLayer({
+    id: 'station-ring', type: 'circle', source: 'stations',
+    filter: ['==', ['get', 'no'], selected],
+    paint: { 'circle-radius': 14, 'circle-color': 'rgba(255,255,255,0)', 'circle-stroke-color': '#1A1A1A', 'circle-stroke-width': 2 },
+  });
+  map.addLayer({
+    id: 'station-dots', type: 'circle', source: 'stations',
+    paint: { 'circle-radius': 9, 'circle-color': colorExpr(), 'circle-stroke-color': '#000', 'circle-stroke-width': 0.8 },
+  });
+  map.addLayer({
+    id: 'station-nums', type: 'symbol', source: 'stations',
+    layout: { 'text-field': ['to-string', ['get', 'no']], 'text-size': 10.5, 'text-allow-overlap': true, 'text-ignore-placement': true },
+    paint: { 'text-color': textExpr() },
+  });
+  map.addLayer({
+    id: 'station-names', type: 'symbol', source: 'stations',
+    layout: {
+      'text-field': ['get', 'name'], 'text-size': 11,
+      'text-variable-anchor': ['top', 'bottom', 'left', 'right'], 'text-radial-offset': 1.1,
+      'text-optional': true,
+    },
+    paint: { 'text-color': '#1A1A1A', 'text-halo-color': '#fff', 'text-halo-width': 1.4 },
+  });
+
+  map.on('click', 'station-dots', (e) => { if (e.features[0]) select(e.features[0].properties.no); });
+  map.on('mouseenter', 'station-dots', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'station-dots', () => { map.getCanvas().style.cursor = ''; });
+}
+
+function colorExpr() {
+  const v = ['to-number', ['get', 'a' + month]];
+  return ['interpolate', ['linear'], v, -RANGE, '#B2182B', 0, '#F7F7F7', RANGE, '#2166AC'];
+}
+function textExpr() {
+  return ['case', ['>', ['abs', ['to-number', ['get', 'a' + month]]], 1.9], '#FFFFFF', '#1A1A1A'];
+}
+
+// ---- State ----
+function setMonth(m) {
+  month = m;
+  monthEl.value = m;
+  monthValueEl.textContent = MONTHS[m];
+  if (map.getLayer('station-dots')) {
+    map.setPaintProperty('station-dots', 'circle-color', colorExpr());
+    map.setPaintProperty('station-nums', 'text-color', textExpr());
+  }
+  updateTable();
+  drawChart();
+}
+
+function select(no, ease = true) {
+  selected = no;
+  if (map.getLayer('station-ring')) map.setFilter('station-ring', ['==', ['get', 'no'], no]);
+  updateTable();
+  drawChart();
+  const s = STATIONS[no - 1];
+  if (ease) {
+    const opts = { center: [s.lon, s.lat], zoom: Math.max(map.getZoom(), 8.6) };
+    if (reduceMotion) map.jumpTo(opts); else map.easeTo(Object.assign(opts, { duration: 900 }));
+  }
+}
+
+monthEl.addEventListener('input', () => setMonth(+monthEl.value));
+
+// In-text cross-references: scroll smoothly, optionally selecting a station first.
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('a.xref');
+  if (!a) return;
+  e.preventDefault();
+  if (a.dataset.station) select(+a.dataset.station);
+  const target = document.getElementById(a.dataset.target || 'fig1');
+  if (target) target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+});
+document.querySelectorAll('a.xref').forEach((a) => { a.tabIndex = 0; a.setAttribute('role', 'link'); a.addEventListener('keydown', (e) => { if (e.key === 'Enter') a.click(); }); });
+
+map.on('load', () => {
+  try { journalBasemap(); } catch (e) { /* keep default basemap */ }
+  addStations();
+  statusEl.classList.remove('loading');
+  statusEl.classList.add('hidden');
+});
+map.on('error', (e) => {
+  if (statusEl.classList.contains('loading')) {
+    statusEl.classList.remove('loading');
+    statusEl.classList.add('error');
+    statusEl.textContent = 'The map could not be loaded.';
+  }
+});
+
+setMonth(month);
+select(selected, false);
+</script>
+</body>
+</html>

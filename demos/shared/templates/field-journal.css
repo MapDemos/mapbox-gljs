@@ -1,0 +1,797 @@
+/*
+  Field Journal -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a naturalist's hand-kept field notebook
+  lying open on a wooden desk -- graph-paper pages, ink-green handwriting,
+  sepia sketches, rust rubber stamps, masking tape and hanging specimen
+  tags -- deliberately distinct from every other style pack in this folder:
+  Arena is a Linear-dark compare layout, Editorial Paper is warm paper +
+  serif, Highway Sign is MUTCD cream/green, Slate Console is a dark
+  cinematic globe, Storefront is a sidebar of filters, Tarmac Glass is dark
+  glass + amber, Vintage Chart is navy/parchment/brass, Weather Console is a
+  layer-explorer dock, Riso Zine is two-ink print, Swiss Grid is a
+  12-column split screen, Neon HUD is glowing cyber-HUD, Pastel Bento is a
+  rounded tile grid, Blueprint is white-on-blue drafting lines, Story
+  Scroll is cinematic scrollytelling, Retro OS is a desktop-window
+  nostalgia skin, Aurora Command is a glowing aurora control room, Deco
+  Voyage is gilded Art Deco travel posters, Washi Seasons is Japanese paper
+  and seasonal colour).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/field-journal.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Kalam for handwritten entries and
+  headings, Cutive Mono for dates, coordinates and specimen-tag text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@300;400;700&family=Cutive+Mono&display=swap" rel="stylesheet" />
+
+  Signature touch: an OPEN NOTEBOOK SPREAD on a dark wood desk. The left
+  page holds a scrolling list of dated entries, each with a tiny sepia
+  sketch and a hanging specimen tag; the right page has the map "taped in"
+  with masking-tape strips across its TOP corners only (the bottom corners
+  stay clear for the Mapbox logo and attribution). Choosing an entry
+  stamps a rust OBSERVED on it and the demo draws a hand-drawn ring around
+  its spot on the map (a dash-offset draw-on animation, skipped under
+  prefers-reduced-motion). On phones the pages stack: map first, entries
+  below, the page scrolls.
+
+  Class/id contract (see field-journal-template.html in this same folder
+  for a full working example):
+
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here). Give
+                               it position: absolute; inset: 6px inside
+                               .map-frame
+  - .desk                     full-viewport wooden desk, centres the spread
+    .notebook                   the two-page spread (CSS grid, 2 columns;
+                                 one stacked column on phones) --
+    .binding                    decorative ring-binding dots down the gutter
+                                 (hidden on phones)
+    .page                       a paper page: graph grid + vignette --
+    .page-left                  journal page (header, entries)
+    .page-right                 map page (plate caption, taped map, toolbar)
+  - .journal-head             left-page header --
+    .journal-head h1            handwritten title (e.g. "Field Notes")
+    .journal-head .vol          Cutive Mono sub-line (e.g. "Isle of Skye,
+                                 Vol. III")
+  - .entries                  scrollable list of entries (<div>) --
+    .entry                      one sighting, role="button" tabindex="0";
+                                 .is-active = selected, .observed = stamped,
+                                 .mine = added by the user
+    .entry-sketch               48px sepia line drawing (inline SVG)
+    .entry-body                 text column --
+    .entry-date                   Cutive Mono date
+    .species                      handwritten species name (an <h3>)
+    .note                         handwritten note paragraph
+    .entry-place                  small place label
+    .tag                        hanging specimen tag (punched hole + string)
+    .tag-text                     Cutive Mono coordinates
+    .stamp                      rust OBSERVED rubber stamp, hidden until the
+                                 entry has .observed
+  - .plate-head               right-page caption row --
+    .plate-title                handwritten caption
+    .compass                    hand-drawn compass rose (inline SVG) in the
+                                 page margin; .compass-star rotates with the
+                                 map bearing
+  - .map-frame                the "taped in" print: white border, soft
+                               shadow, position: relative --
+    .tape, .tape-l, .tape-r     translucent masking-tape strips with torn
+                                 ends; top corners only
+  - .toolbar                  row under the map (select + buttons) --
+    .field                      styled <select>
+    .btn, .btn-primary,         ink-outlined buttons; primary is rust
+    .btn-secondary               ("+ Add sighting"); .is-on while armed
+    .link-btn                   underlined text button ("Clear my additions")
+  - .status-note (+.loading/  handwritten status line (hidden by default
+    .success/.error)           via .hidden)
+  - .sight-marker             Mapbox marker root (never set position or
+                               transform on it) with an inner .ink-dot
+                               (.mine = rust); .circle-wrap root with an
+                               inner svg.circle-mark whose path draws on
+  - .is-adding                on .map-frame while add mode is armed:
+                               crosshair cursor
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --desk: #3B2E25;
+  --desk-dark: #2A2019;
+  --paper: #F4EBD8;
+  --paper-edge: #E9DDC3;
+  --grid: #D9E1E3;
+  --ink: #2F5D50;
+  --ink-soft: #4F7A6C;
+  --sepia: #7A5A3A;
+  --sepia-soft: rgba(122, 90, 58, 0.35);
+  --rust: #B5532A;
+  --tape: #E6D3A3;
+  --success: #2F5D50;
+  --error: #B5532A;
+
+  --font-hand: 'Kalam', 'Segoe Print', 'Bradley Hand', cursive;
+  --font-mono: 'Cutive Mono', 'Courier New', Courier, monospace;
+  --font-body: var(--font-hand);
+  --font-label: var(--font-mono);
+
+  --gutter: 16px;
+}
+
+html {
+  background: var(--desk-dark);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  color: var(--ink);
+  font-family: var(--font-hand);
+  background: var(--desk-dark);
+}
+
+button, select {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--rust);
+  outline-offset: 2px;
+}
+
+/* Desk: dark wood with a simple CSS grain */
+.desk {
+  box-sizing: border-box;
+  height: 100vh;
+  height: 100dvh;
+  padding: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background-color: var(--desk);
+  background-image:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(90deg, rgba(255, 220, 170, 0.05) 0 3px, transparent 3px 19px),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.1) 0 1px, transparent 1px 61px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.25));
+}
+
+/* The spread */
+.notebook {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1320px;
+  height: 100%;
+  max-height: 860px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-radius: 6px;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), 0 4px 0 #1f1711;
+}
+
+.page {
+  position: relative;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 26px 30px 22px;
+  background-color: var(--paper);
+  background-image:
+    repeating-linear-gradient(0deg, var(--grid) 0 1px, transparent 1px 19px),
+    repeating-linear-gradient(90deg, var(--grid) 0 1px, transparent 1px 19px);
+  box-shadow: inset 0 0 70px rgba(122, 90, 58, 0.24);
+}
+
+.page > * {
+  position: relative;
+  z-index: 1;
+}
+
+.page-left {
+  border-radius: 6px 0 0 6px;
+  padding-left: 40px;
+  padding-right: 52px;
+}
+
+.page-right {
+  border-radius: 0 6px 6px 0;
+  padding-left: 52px;
+  padding-right: 40px;
+}
+
+/* Gutter shadow: a narrow fold at each page's inner edge, under content */
+.page-left::after,
+.page-right::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  bottom: 0;
+  width: 34px;
+  pointer-events: none;
+}
+
+.page-left::after {
+  right: 0;
+  background: linear-gradient(90deg, transparent, rgba(60, 40, 20, 0.3));
+}
+
+.page-right::before {
+  left: 0;
+  background: linear-gradient(270deg, transparent, rgba(60, 40, 20, 0.3));
+}
+
+/* Ring binding dots down the centre */
+.binding {
+  position: absolute;
+  z-index: 3;
+  top: 10px;
+  bottom: 10px;
+  left: 50%;
+  width: 30px;
+  margin-left: -15px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 50%, #17110c 0 4px, #cfc8bb 4.5px 7.5px, #8d877b 8px 9px, transparent 9.5px)
+    0 0 / 30px 34px repeat-y;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
+}
+
+/* Journal header */
+.journal-head {
+  flex: none;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--sepia-soft);
+}
+
+.journal-head h1 {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 34px;
+  line-height: 1.1;
+  color: var(--ink);
+  transform: rotate(-0.6deg);
+  transform-origin: left center;
+}
+
+.journal-head .vol {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--sepia);
+}
+
+/* Entries */
+.entries {
+  flex: 1;
+  min-height: 0;
+  margin: 0 -14px;
+  padding: 4px 14px 8px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sepia-soft) transparent;
+}
+
+.entry {
+  position: relative;
+  display: grid;
+  grid-template-columns: 52px 1fr 76px;
+  gap: 12px;
+  align-items: start;
+  padding: 18px 8px 14px;
+  border-bottom: 1px dashed var(--sepia-soft);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.entry:hover {
+  background: rgba(122, 90, 58, 0.06);
+}
+
+.entry.is-active {
+  background: rgba(181, 83, 42, 0.07);
+}
+
+.entry-sketch svg {
+  display: block;
+  width: 52px;
+  height: 52px;
+  fill: none;
+  stroke: var(--sepia);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.entry-body {
+  min-width: 0;
+}
+
+.entry-date {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--sepia);
+}
+
+.species {
+  display: inline;
+  margin: 0;
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: linear-gradient(transparent 58%, rgba(181, 83, 42, 0.22) 58%, rgba(181, 83, 42, 0.22) 92%, transparent 92%);
+  background-size: 0% 100%;
+  background-repeat: no-repeat;
+  transition: background-size 0.5s ease;
+}
+
+.entry.is-active .species {
+  background-size: 100% 100%;
+}
+
+.note {
+  margin: 2px 0 0;
+  font-family: var(--font-hand);
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.entry-place {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--sepia);
+}
+
+.entry-place::before {
+  content: '\2022\00a0';
+  color: var(--rust);
+}
+
+/* Hanging specimen tag: punched hole + a string rising to the entry's top */
+.tag {
+  position: relative;
+  box-sizing: border-box;
+  margin-top: 6px;
+  padding: 20px 6px 8px;
+  text-align: center;
+  background: #EFE2C2;
+  border: 1px solid var(--sepia-soft);
+  clip-path: polygon(22% 0, 78% 0, 100% 16%, 100% 100%, 0 100%, 0 16%);
+  transform: rotate(2deg);
+  transform-origin: 50% 0;
+}
+
+.tag::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 1px solid var(--sepia);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.25);
+}
+
+.tag-text {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--sepia);
+}
+
+/* The string runs from the entry's top edge down to the tag's punched hole
+   (tag column centre = 8px padding + 38px) */
+.entry::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 32px;
+  width: 14px;
+  height: 34px;
+  border-left: 1.5px solid var(--sepia);
+  pointer-events: none;
+}
+
+/* OBSERVED rubber stamp */
+.stamp {
+  position: absolute;
+  right: 92px;
+  bottom: 10px;
+  padding: 1px 8px 0;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--rust);
+  border: 2px solid var(--rust);
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 2px var(--paper), inset 0 0 0 3px rgba(181, 83, 42, 0.55);
+  background: rgba(244, 235, 216, 0.5);
+  opacity: 0;
+  transform: rotate(-9deg) scale(1.5);
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(circle at 20% 30%, #000 60%, rgba(0, 0, 0, 0.7) 100%);
+  mask-image: radial-gradient(circle at 20% 30%, #000 60%, rgba(0, 0, 0, 0.7) 100%);
+}
+
+.entry.observed .stamp {
+  opacity: 0.88;
+  transform: rotate(-9deg) scale(1);
+  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+/* Right page */
+.plate-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 74px;
+  padding-bottom: 14px;
+}
+
+.plate-title {
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1.2;
+  color: var(--ink);
+  transform: rotate(0.5deg);
+}
+
+.plate-title small {
+  display: block;
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--sepia);
+}
+
+.compass {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  fill: none;
+  stroke: var(--sepia);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  overflow: visible;
+}
+
+.compass-star {
+  transform-origin: 50% 50%;
+  transform-box: fill-box;
+}
+
+.compass .north {
+  fill: var(--rust);
+  stroke: var(--rust);
+}
+
+.compass text {
+  fill: var(--rust);
+  stroke: none;
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* The taped-in print */
+.map-frame {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  box-sizing: border-box;
+  background: #FBF6E9;
+  box-shadow: 0 6px 16px rgba(60, 40, 20, 0.35), 0 0 0 1px rgba(122, 90, 58, 0.25);
+}
+
+.tape {
+  position: absolute;
+  z-index: 5;
+  top: -12px;
+  width: 92px;
+  height: 28px;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 2px, transparent 2px 6px),
+    rgba(230, 211, 163, 0.82);
+  clip-path: polygon(0 0, 100% 0, 98% 14%, 100% 30%, 97% 48%, 100% 66%, 98% 84%, 100% 100%, 0 100%, 2% 86%, 0 68%, 3% 50%, 0 32%, 2% 15%);
+}
+
+.tape-l {
+  left: -26px;
+  transform: rotate(-38deg);
+}
+
+.tape-r {
+  right: -26px;
+  transform: rotate(38deg);
+}
+
+.map-frame.is-adding .mapboxgl-canvas,
+.map-frame.is-adding .mapboxgl-canvas-container.mapboxgl-interactive {
+  cursor: crosshair !important;
+}
+
+.mapboxgl-ctrl-group {
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px var(--sepia-soft);
+}
+
+/* Toolbar */
+.toolbar {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding-top: 14px;
+}
+
+.field {
+  box-sizing: border-box;
+  height: 38px;
+  padding: 0 10px;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 16px;
+  color: var(--ink);
+  background: rgba(251, 246, 233, 0.9);
+  border: 1.5px solid var(--sepia);
+  border-radius: 3px;
+}
+
+.btn {
+  box-sizing: border-box;
+  height: 38px;
+  padding: 0 16px;
+  border: 1.5px solid var(--ink);
+  border-radius: 3px 5px 4px 6px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.btn:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-primary {
+  border-color: var(--rust);
+  color: var(--rust);
+}
+
+.btn-primary:hover,
+.btn-primary.is-on {
+  background: var(--rust);
+  color: var(--paper);
+}
+
+.btn-secondary {
+  border-color: var(--sepia);
+  color: var(--sepia);
+}
+
+.btn-secondary:hover {
+  background: var(--sepia);
+  color: var(--paper);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.link-btn {
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  font-size: 15px;
+  color: var(--sepia);
+  text-decoration: underline;
+  text-decoration-style: wavy;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  color: var(--rust);
+}
+
+.status-note {
+  flex-basis: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 22px;
+  font-size: 15px;
+  color: var(--sepia);
+}
+
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); }
+
+.status-note.loading::before {
+  content: '';
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--sepia-soft);
+  border-top-color: var(--sepia);
+  border-radius: 50%;
+  align-self: center;
+  animation: journal-spin 0.9s linear infinite;
+}
+
+@keyframes journal-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Markers: style the inner children only, never the Mapbox root element */
+.sight-marker {
+  cursor: pointer;
+}
+
+.ink-dot {
+  display: block;
+  width: 13px;
+  height: 13px;
+  box-sizing: border-box;
+  border-radius: 52% 48% 55% 45%;
+  background: var(--ink);
+  border: 2px solid var(--paper);
+  box-shadow: 0 0 0 1px var(--ink), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.ink-dot.mine {
+  background: var(--rust);
+  box-shadow: 0 0 0 1px var(--rust), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.circle-wrap {
+  pointer-events: none;
+}
+
+.circle-mark {
+  display: block;
+  width: 78px;
+  height: 58px;
+  overflow: visible;
+  fill: none;
+  stroke: var(--rust);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.circle-mark path {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 0;
+}
+
+.circle-mark.draw path {
+  animation: journal-draw 0.9s ease-out both;
+}
+
+@keyframes journal-draw {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* The terrain-dem TileJSON sets mapbox_logo:false, which makes GL JS hide
+   the logo; Mapbox maps must still show it, so force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Phones / narrow: pages stack, map page first, the page scrolls */
+@media (max-width: 860px) {
+  .desk {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: var(--gutter);
+    display: block;
+    overflow: visible;
+  }
+
+  .notebook {
+    display: flex;
+    flex-direction: column;
+    max-width: 640px;
+    height: auto;
+    max-height: none;
+    margin: 0 auto;
+    box-shadow: none;
+  }
+
+  .binding,
+  .page-left::after,
+  .page-right::before {
+    display: none;
+  }
+
+  .page {
+    padding: 20px 18px 18px;
+  }
+
+  .page-right {
+    order: -1;
+    border-radius: 6px 6px 0 0;
+    padding: 20px 18px 16px;
+    border-bottom: 2px dashed var(--sepia-soft);
+  }
+
+  .page-left {
+    border-radius: 0 0 6px 6px;
+    padding: 18px 18px 20px;
+  }
+
+  .map-frame {
+    flex: none;
+    height: 50vh;
+    height: 50dvh;
+    min-height: 280px;
+  }
+
+  .entries {
+    flex: none;
+    overflow: visible;
+    margin: 0;
+    padding: 4px 0;
+  }
+
+  .journal-head h1 { font-size: 30px; }
+  .plate-title { font-size: 19px; }
+  .compass { width: 56px; height: 56px; }
+  .plate-head { min-height: 60px; }
+
+  .entry {
+    grid-template-columns: 44px 1fr 68px;
+    gap: 10px;
+    padding: 18px 2px 14px;
+  }
+
+  .entry-sketch svg { width: 44px; height: 44px; }
+  .species { font-size: 18px; }
+  .note { font-size: 15px; }
+  .stamp { right: 80px; font-size: 13px; }
+  .entry::after { right: 22px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .circle-mark.draw path { animation: none; }
+  .entry,
+  .species,
+  .btn { transition: none; }
+  .entry.observed .stamp { transition: none; }
+  .status-note.loading::before { animation: none; }
+}

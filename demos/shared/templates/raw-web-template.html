@@ -1,0 +1,359 @@
+<!--
+  Working EXAMPLE of the Raw Web style pack (raw-web.css, in this same
+  folder). Open this file directly to see the pattern working with 25
+  real observatories, then copy the markup below into your own demo and
+  link raw-web.css from its <head> -- see the class/id contract documented
+  at the top of that CSS file for what to build.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (a 1996 hand-coded homepage: Times, blue links, outset
+  tables, a hit counter) at the user's request for something distinct from
+  every other pack in this folder. The observatory figures (coordinates,
+  altitudes, founding years) are approximate and illustrative; the page
+  title, "visitor" count and copy are placeholders -- swap in your own.
+
+  What's NOT included: a real data source (the list is inline), pagination,
+  multi-column sorting, or any persistence beyond the joke visitor counter
+  (localStorage, optional).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The World Observatory Index</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Tinos:ital,wght@0,400;0,700;1,400&family=Cousine:wght@400;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="raw-web.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+</style>
+</head>
+<body>
+<div class="page" id="top">
+
+  <header class="site-header">
+    <h1>The World Observatory Index</h1>
+    <p class="updated"><span class="new">NEW!</span> Now with sortable columns! Last updated: <time>21 October 1996</time> (probably)</p>
+    <div class="counter">
+      <span class="counter-label">You are visitor number</span>
+      <span class="digits" id="digits" aria-live="off"></span>
+    </div>
+    <div class="construction" aria-hidden="true"><span class="construction-text">This page is under construction</span></div>
+  </header>
+
+  <hr />
+
+  <p>Welcome to my page about telescopes! Click a dot, click a name, or click a column heading. Figures are approximate and for illustration only.</p>
+
+  <div class="map-frame"><div id="map"></div></div>
+  <p class="map-caption">Figure 1. Observatories of the world (map data from the net).</p>
+
+  <hr />
+
+  <fieldset class="filter-box">
+    <legend>Filter</legend>
+    <div class="controls">
+      <label class="field">Name or country: <input type="search" id="q" autocomplete="off" /></label>
+      <label class="field">Altitude:
+        <select id="alt">
+          <option value="0">all</option>
+          <option value="2000">&gt; 2000 m</option>
+          <option value="4000">&gt; 4000 m</option>
+        </select>
+      </label>
+      <button type="button" class="btn" id="reset">Reset</button>
+    </div>
+  </fieldset>
+
+  <p class="row-count" id="row-count" aria-live="polite"></p>
+  <p class="status-note loading" id="status-note">Loading map...</p>
+
+  <div class="table-wrap" id="table-wrap" tabindex="0" role="region" aria-label="Observatories table">
+    <table class="data">
+      <thead>
+        <tr>
+          <th scope="col" aria-sort="ascending"><a href="#" class="sort-link" data-key="name">Name</a><span class="sort-ind"></span></th>
+          <th scope="col"><a href="#" class="sort-link" data-key="country">Country</a><span class="sort-ind"></span></th>
+          <th scope="col" class="num"><a href="#" class="sort-link" data-key="lat">Lat</a><span class="sort-ind"></span></th>
+          <th scope="col" class="num"><a href="#" class="sort-link" data-key="lon">Lon</a><span class="sort-ind"></span></th>
+          <th scope="col" class="num"><a href="#" class="sort-link" data-key="alt">Altitude (m)</a><span class="sort-ind"></span></th>
+          <th scope="col" class="num"><a href="#" class="sort-link" data-key="year">Founded</a><span class="sort-ind"></span></th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <hr />
+  <p class="footer-note">Best viewed in any browser. <a href="#top">Back to top</a></p>
+</div>
+
+<script>
+const OBS = [
+  ['Mauna Kea Observatories', 'USA (Hawaii)', 19.8207, -155.4681, 4205, 1964],
+  ['Paranal Observatory', 'Chile', -24.6275, -70.4044, 2635, 1998],
+  ['La Silla Observatory', 'Chile', -29.2563, -70.7380, 2400, 1969],
+  ['ALMA', 'Chile', -23.0193, -67.7532, 5058, 2013],
+  ['Las Campanas Observatory', 'Chile', -29.0146, -70.6926, 2380, 1969],
+  ['Cerro Tololo', 'Chile', -30.1690, -70.8063, 2200, 1963],
+  ['Roque de los Muchachos', 'Spain (La Palma)', 28.7606, -17.8816, 2396, 1985],
+  ['Teide Observatory', 'Spain (Tenerife)', 28.3000, -16.5097, 2390, 1959],
+  ['Kitt Peak', 'USA', 31.9583, -111.5967, 2096, 1958],
+  ['Palomar Observatory', 'USA', 33.3564, -116.8650, 1712, 1948],
+  ['Lick Observatory', 'USA', 37.3414, -121.6429, 1283, 1888],
+  ['Yerkes Observatory', 'USA', 42.5703, -88.5564, 334, 1897],
+  ['Mount Wilson Observatory', 'USA', 34.2258, -118.0572, 1742, 1904],
+  ['Griffith Observatory', 'USA', 34.1184, -118.3004, 346, 1935],
+  ['Royal Observatory Greenwich', 'United Kingdom', 51.4769, -0.0005, 62, 1675],
+  ['Jodrell Bank', 'United Kingdom', 53.2367, -2.3085, 77, 1945],
+  ['Pulkovo Observatory', 'Russia', 59.7716, 30.3273, 75, 1839],
+  ['Parkes Observatory', 'Australia', -32.9998, 148.2635, 415, 1961],
+  ['Siding Spring', 'Australia', -31.2733, 149.0644, 1165, 1965],
+  ['Mount Stromlo', 'Australia', -35.3206, 149.0083, 770, 1924],
+  ['Sutherland (SAAO)', 'South Africa', -32.3783, 20.8105, 1798, 1972],
+  ['Devasthal / ARIES', 'India', 29.3600, 79.4570, 1951, 1954],
+  ['Hanle (IAO)', 'India', 32.7794, 78.9640, 4500, 2001],
+  ['Xinglong Station', 'China', 40.3935, 117.5750, 900, 1968],
+  ['Lijiang Observatory', 'China', 26.6950, 100.0300, 3193, 2008],
+].map(([name, country, lat, lon, alt, year], id) => ({ id, name, country, lat, lon, alt, year }));
+
+const NUMERIC = new Set(['lat', 'lon', 'alt', 'year']);
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SOURCE = 'obs';
+const LAYER = 'obs-points';
+
+const state = { key: 'name', dir: 1, query: '', altMin: 0, hoverId: null, selectedId: null };
+const visited = new Set();
+let ready = false;
+
+const rowsEl = document.getElementById('rows');
+const countEl = document.getElementById('row-count');
+const wrapEl = document.getElementById('table-wrap');
+const statusEl = document.getElementById('status-note');
+const qEl = document.getElementById('q');
+const altEl = document.getElementById('alt');
+
+/* Joke hit counter: seven odometer digits, bumped once per visit. */
+(function counter() {
+  let n = 4217;
+  try {
+    n += Number(localStorage.getItem('rawweb-hits') || 0) + 1;
+    localStorage.setItem('rawweb-hits', String(n - 4217));
+  } catch (e) { /* storage blocked: keep the base number */ }
+  document.getElementById('digits').innerHTML = String(n).padStart(7, '0')
+    .split('').map((d) => `<span class="digit">${d}</span>`).join('');
+})();
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/streets-v12',
+  projection: 'mercator',
+  bounds: [[-165, -40], [155, 62]],
+  fitBoundsOptions: { padding: 24 },
+  attributionControl: true,
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+const popup = new mapboxgl.Popup({ className: 'raw-popup', maxWidth: '280px', offset: 10 });
+popup.on('close', () => clearSelection(false));
+
+function visibleList() {
+  const q = state.query.trim().toLowerCase();
+  const list = OBS.filter((o) =>
+    o.alt >= state.altMin && (!q || o.name.toLowerCase().includes(q) || o.country.toLowerCase().includes(q)));
+  const k = state.key;
+  list.sort((a, b) => (NUMERIC.has(k) ? a[k] - b[k] : a[k].localeCompare(b[k])) * state.dir);
+  return list;
+}
+
+const fmtCoord = (v) => v.toFixed(2);
+
+function render() {
+  const list = visibleList();
+  setHover(null);
+  rowsEl.innerHTML = list.length ? list.map((o) => `
+    <tr data-id="${o.id}"${o.id === state.selectedId ? ' class="is-selected"' : ''}>
+      <td><a href="#" class="obs-link${visited.has(o.id) ? ' visited' : ''}" data-id="${o.id}">${o.name}</a></td>
+      <td>${o.country}</td>
+      <td class="num">${fmtCoord(o.lat)}</td>
+      <td class="num">${fmtCoord(o.lon)}</td>
+      <td class="num">${o.alt.toLocaleString('en-US')}</td>
+      <td class="num">${o.year}</td>
+    </tr>`).join('') : '<tr><td class="empty" colspan="6">No observatories match. Try the Reset button.</td></tr>';
+  countEl.textContent = `Showing ${list.length} of ${OBS.length} observatories`;
+
+  document.querySelectorAll('th[scope="col"]').forEach((th) => {
+    const link = th.querySelector('.sort-link');
+    const active = link.dataset.key === state.key;
+    th.querySelector('.sort-ind').textContent = active ? (state.dir > 0 ? '▲' : '▼') : '';
+    if (active) th.setAttribute('aria-sort', state.dir > 0 ? 'ascending' : 'descending');
+    else th.removeAttribute('aria-sort');
+  });
+
+  if (ready) {
+    map.setFilter(LAYER, ['in', ['get', 'id'], ['literal', list.map((o) => o.id)]]);
+    if (state.selectedId !== null && !list.some((o) => o.id === state.selectedId)) clearSelection(true);
+  }
+}
+
+function rowFor(id) {
+  return rowsEl.querySelector(`tr[data-id="${id}"]`);
+}
+
+function setHover(id) {
+  if (id === state.hoverId) return;
+  if (state.hoverId !== null) {
+    if (ready) map.setFeatureState({ source: SOURCE, id: state.hoverId }, { hover: false });
+    const old = rowFor(state.hoverId);
+    if (old) old.classList.remove('is-hover');
+  }
+  state.hoverId = id;
+  if (id !== null) {
+    if (ready) map.setFeatureState({ source: SOURCE, id }, { hover: true });
+    const tr = rowFor(id);
+    if (tr) tr.classList.add('is-hover');
+  }
+}
+
+function clearSelection(removePopup) {
+  if (state.selectedId === null) return;
+  const id = state.selectedId;
+  state.selectedId = null;
+  if (ready) map.setFeatureState({ source: SOURCE, id }, { selected: false });
+  const tr = rowFor(id);
+  if (tr) tr.classList.remove('is-selected');
+  if (removePopup) popup.remove();
+}
+
+function scrollRowIntoView(id) {
+  const tr = rowFor(id);
+  if (!tr) return;
+  const r = tr.getBoundingClientRect();
+  const w = wrapEl.getBoundingClientRect();
+  wrapEl.scrollTo({
+    top: wrapEl.scrollTop + (r.top - w.top) - w.height / 2 + r.height / 2,
+    behavior: reduceMotion ? 'auto' : 'smooth',
+  });
+}
+
+function select(id, fly) {
+  const o = OBS[id];
+  // Removing the open popup fires 'close', which clears the previous selection.
+  if (popup.isOpen()) popup.remove();
+  state.selectedId = id;
+  map.setFeatureState({ source: SOURCE, id }, { selected: true });
+  const tr = rowFor(id);
+  if (tr) tr.classList.add('is-selected');
+
+  popup.setLngLat([o.lon, o.lat]).setHTML(`
+    <table class="popup-table">
+      <caption>${o.name}</caption>
+      <tr><th>Country</th><td>${o.country}</td></tr>
+      <tr><th>Lat / Lon</th><td>${fmtCoord(o.lat)}, ${fmtCoord(o.lon)}</td></tr>
+      <tr><th>Altitude</th><td>${o.alt.toLocaleString('en-US')} m</td></tr>
+      <tr><th>Founded</th><td>${o.year}</td></tr>
+    </table>`).addTo(map);
+
+  if (fly) {
+    document.querySelector('.map-frame').scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+    const cam = { center: [o.lon, o.lat], zoom: Math.max(map.getZoom(), 5) };
+    if (reduceMotion) map.jumpTo(cam);
+    else map.flyTo({ ...cam, duration: 1800 });
+  } else {
+    scrollRowIntoView(id);
+  }
+}
+
+/* Table interactions */
+document.querySelector('thead').addEventListener('click', (e) => {
+  const link = e.target.closest('.sort-link');
+  if (!link) return;
+  e.preventDefault();
+  const key = link.dataset.key;
+  if (state.key === key) state.dir *= -1;
+  else { state.key = key; state.dir = 1; }
+  render();
+});
+
+rowsEl.addEventListener('click', (e) => {
+  const link = e.target.closest('.obs-link');
+  if (!link) return;
+  e.preventDefault();
+  const id = Number(link.dataset.id);
+  visited.add(id);
+  link.classList.add('visited');
+  if (ready) select(id, true);
+});
+
+rowsEl.addEventListener('mouseover', (e) => {
+  const tr = e.target.closest('tr[data-id]');
+  setHover(tr ? Number(tr.dataset.id) : null);
+});
+rowsEl.addEventListener('mouseleave', () => setHover(null));
+
+/* Filter controls */
+qEl.addEventListener('input', () => { state.query = qEl.value; render(); });
+altEl.addEventListener('change', () => { state.altMin = Number(altEl.value); render(); });
+document.getElementById('reset').addEventListener('click', () => {
+  qEl.value = '';
+  altEl.value = '0';
+  state.query = '';
+  state.altMin = 0;
+  render();
+});
+
+/* Map */
+map.on('load', () => {
+  map.addSource(SOURCE, {
+    type: 'geojson',
+    data: {
+      type: 'FeatureCollection',
+      features: OBS.map((o) => ({
+        type: 'Feature',
+        id: o.id,
+        properties: { id: o.id, name: o.name },
+        geometry: { type: 'Point', coordinates: [o.lon, o.lat] },
+      })),
+    },
+  });
+  map.addLayer({
+    id: LAYER,
+    type: 'circle',
+    source: SOURCE,
+    paint: {
+      'circle-radius': ['case', ['boolean', ['feature-state', 'hover'], false], 9, 6],
+      'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FF0000', '#0000EE'],
+      'circle-stroke-color': '#000000',
+      'circle-stroke-width': 1.5,
+    },
+  });
+  ready = true;
+  statusEl.classList.add('hidden');
+  render();
+
+  map.on('mouseenter', LAYER, () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mousemove', LAYER, (e) => setHover(e.features[0].properties.id));
+  map.on('mouseleave', LAYER, () => { map.getCanvas().style.cursor = ''; setHover(null); });
+  map.on('click', LAYER, (e) => select(e.features[0].properties.id, false));
+});
+
+map.on('error', (e) => {
+  if (ready) return;
+  statusEl.classList.remove('loading', 'hidden');
+  statusEl.classList.add('error');
+  statusEl.textContent = 'Error: the map did not load (' + ((e.error && e.error.message) || 'unknown') + ').';
+});
+
+render();
+</script>
+</body>
+</html>

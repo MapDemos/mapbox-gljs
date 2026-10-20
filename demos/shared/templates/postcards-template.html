@@ -1,0 +1,479 @@
+<!--
+  Working EXAMPLE of the Postcards style pack (postcards.css, in this same
+  folder). Open this file directly to see the pattern working with one
+  island-hopping holiday through the Cyclades (Piraeus, Mykonos, Delos,
+  Naxos, Paros, Santorini, Milos) on Mapbox Standard (day, faded). The
+  left half is a pile of vintage postcards: click the top card to turn it
+  over (handwritten message, perforated stamp, wavy postmark), which also
+  stamps a postmark on the island and draws that ferry leg as a dashed
+  airmail-red/blue line. "Next card" sends the top card to the bottom of
+  the pile. Turn all seven and an "Album complete" card appears. Copy the
+  markup below into your own demo and link postcards.css from its <head>
+  -- see the class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (sunny nostalgic holiday postcards, airmail stripes,
+  Aegean blue and whitewash) at the user's request for something distinct
+  from every other pack in this folder. The islands are real, but the
+  ferry route is hand-approximated across open water, and the traveller
+  "Kit", the messages, the stamp and the dates are fictional placeholders
+  -- swap in your own.
+
+  What's NOT included: real ferry timetables or geometry, real postal
+  stamp artwork, search/geocoding, routing, popups, or a hard-coded access
+  token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Postcards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Yeseva+One&family=Homemade+Apple&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="postcards.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="desk" aria-label="Postcard pile">
+    <header class="desk-head">
+      <h1 class="album-title">Greetings from the Cyclades</h1>
+      <p class="album-sub">Seven postcards, one ferry route. Turn each card over.</p>
+      <div class="pips" id="pips"><span class="progress" id="progress">0 / 7 postmarked</span></div>
+    </header>
+
+    <div class="pile" id="pile"></div>
+
+    <div class="pile-controls">
+      <button class="btn btn-secondary" id="prev-btn" aria-label="Previous card">&larr; Back</button>
+      <button class="btn btn-primary" id="flip-btn">Turn over</button>
+      <button class="btn btn-secondary" id="next-btn" aria-label="Next card">Next card &rarr;</button>
+    </div>
+    <p class="status-note loading" id="status-note">Unrolling the map</p>
+  </section>
+
+  <div class="stage">
+    <div id="map"></div>
+    <div class="stage-actions">
+      <button class="btn" id="overview-btn">Whole voyage</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Islands in travel order. [lng, lat] sit on land (town / site). `off` nudges
+// the postmark marker apart from its neighbour while zoomed out. Scene items
+// are [type, left %, bottom %, width cqw, height cqw, colour?].
+const ISL = [
+  { id: 'piraeus', name: 'Piraeus', c: [23.647, 37.942], z: 10, date: '12 JUN', stamp: 'AEGEA 0.80',
+    msg: 'Ferry day! Sea air, salty rope and a very loud horn.', sign: 'Love, Kit',
+    scene: [['hill', -8, 28, 60, 10, '#C9B98E'], ['hill', 45, 28, 70, 8, '#A9B27A'], ['cube', 3, 27, 9, 8], ['cube', 11, 27, 8, 11],
+      ['cube', 19, 27, 10, 8, '#1F5FA8'], ['dome', 30, 27, 9, 7], ['tower', 84, 27, 6, 17], ['boat', 32, 15, 34, 10], ['sail', 74, 12, 12, 14, '#1F5FA8']] },
+  { id: 'mykonos', name: 'Mykonos', c: [25.3283, 37.4467], z: 9.8, date: '14 JUN', stamp: 'AEGEA 1.20', off: [14, -12],
+    msg: 'Windmills, whitewash and cats on every step. Ate far too much!', sign: 'Love, Kit',
+    scene: [['hill', -6, 26, 74, 16, '#D9C79B'], ['hill', 55, 28, 60, 9, '#C9B98E'], ['mill', 10, 44, 6.5, 11], ['mill', 22, 41, 6, 10],
+      ['cube', 44, 28, 9, 8], ['cube', 52, 28, 11, 11, '#1F5FA8'], ['cube', 62, 28, 9, 7], ['cube', 70, 28, 12, 13], ['dome', 82, 28, 8, 8], ['sail', 20, 10, 10, 12, '#D9774B']] },
+  { id: 'delos', name: 'Delos', c: [25.2685, 37.3957], z: 10.8, date: '15 JUN', stamp: 'AEGEA 0.60', off: [-14, 16],
+    msg: 'Walked among the lions and broken columns. Hot stones, blue sky!', sign: 'Love, Kit',
+    scene: [['hill', -10, 27, 120, 12, '#C5BB8B'], ['col', 12, 29, 3.4, 14], ['col', 20, 29, 3.4, 18], ['col', 28, 29, 3.4, 11], ['col', 36, 29, 3.4, 17],
+      ['col', 44, 29, 3.4, 15], ['col', 52, 29, 3.4, 9], ['col', 62, 29, 3.4, 16], ['slab', 19, 59, 16, 2.4], ['cube', 76, 28, 8, 7], ['sail', 82, 10, 10, 12, '#D7263D']] },
+  { id: 'naxos', name: 'Naxos', c: [25.377, 37.103], z: 9.8, date: '17 JUN', stamp: 'AEGEA 1.50',
+    msg: 'Climbed to the marble gate at sunset. Worth every single step.', sign: 'Love, Kit',
+    scene: [['hill', -10, 27, 130, 18, '#A9B27A'], ['col', 36, 29, 6, 26], ['col', 52, 29, 6, 26], ['slab', 34, 72, 25, 4.5], ['sail', 72, 10, 12, 14, '#1F5FA8']] },
+  { id: 'paros', name: 'Paros', c: [25.1495, 37.0853], z: 10, date: '19 JUN', stamp: 'AEGEA 0.90',
+    msg: 'Fishing boats at dawn and honey cake for breakfast. Bliss!', sign: 'Love, Kit',
+    scene: [['hill', -10, 27, 70, 12, '#D8C9A3'], ['cube', 14, 28, 10, 8], ['dome', 28, 28, 13, 10], ['cube', 44, 28, 10, 10], ['cube', 54, 28, 8, 7, '#1F5FA8'],
+      ['mill', 68, 28, 7, 13], ['sail', 60, 10, 12, 14, '#D7263D'], ['sail', 82, 14, 9, 11, '#1F5FA8']] },
+  { id: 'santorini', name: 'Santorini', c: [25.3753, 36.4618], z: 10.2, date: '22 JUN', stamp: 'AEGEA 2.00',
+    msg: 'Blue domes above the caldera. I have run out of words!', sign: 'Love, Kit',
+    scene: [['hill', -12, 20, 70, 36, '#B5694A'], ['cube', 8, 64, 8, 6], ['dome', 16, 72, 9, 8], ['cube', 27, 70, 9, 7], ['dome', 36, 60, 8, 7],
+      ['hill', 66, 28, 50, 8, '#8A6A4E'], ['sail', 60, 10, 12, 14, '#D9774B']] },
+  { id: 'milos', name: 'Milos', c: [24.446, 36.725], z: 10, date: '25 JUN', stamp: 'AEGEA 1.00',
+    msg: 'Swam below the white rocks at Sarakiniko. The moon on Earth!', sign: 'Love, Kit',
+    scene: [['hill', -4, 28, 50, 9, '#F6F1E6'], ['hill', 40, 28, 60, 7, '#EAE3D3'], ['hut', 6, 26, 9, 9, '#1F5FA8'], ['hut', 16, 26, 9, 9, '#D9774B'],
+      ['hut', 26, 26, 9, 9, '#8A9A5B'], ['hut', 36, 26, 9, 9, '#D7263D'], ['sail', 60, 12, 12, 14, '#1F5FA8']] },
+];
+
+// Ferry legs: waypoints (over open water) from the previous island to this one.
+const LEGS = [
+  null,
+  [[23.647, 37.942], [23.68, 37.88], [23.72, 37.78], [23.85, 37.65], [24.05, 37.58], [24.3, 37.3], [24.85, 37.25], [25.1, 37.38], [25.2, 37.47], [25.3283, 37.4467]],
+  [[25.3283, 37.4467], [25.29, 37.44], [25.255, 37.4], [25.2685, 37.3957]],
+  [[25.2685, 37.3957], [25.24, 37.37], [25.3, 37.2], [25.377, 37.103]],
+  [[25.377, 37.103], [25.3, 37.17], [25.19, 37.165], [25.1, 37.12], [25.1495, 37.0853]],
+  [[25.1495, 37.0853], [25.115, 37.085], [24.96, 37.04], [24.93, 36.9], [25.15, 36.75], [25.3, 36.55], [25.36, 36.49], [25.3753, 36.4618]],
+  [[25.3753, 36.4618], [25.3, 36.5], [25.1, 36.55], [24.9, 36.55], [24.75, 36.62], [24.68, 36.86], [24.45, 36.86], [24.39, 36.78], [24.4, 36.74], [24.43, 36.72], [24.446, 36.725]],
+];
+
+const ROT = [-3.2, 2.6, -1.8, 3.6, -2.7, 1.9, -3.4, 2.2];
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = () => window.matchMedia('(max-width: 760px)').matches;
+const $ = (id) => document.getElementById(id);
+const statusEl = $('status-note');
+const say = (cls, text) => { statusEl.className = 'status-note ' + cls; statusEl.textContent = text; };
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [24.6, 37.2],
+  zoom: 6.8,
+  attributionControl: false,
+  config: { basemap: { lightPreset: 'day', theme: 'faded', showPointOfInterestLabels: false, showPlaceLabels: false } },
+});
+map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+/* ---- Postmark artwork (inline SVG): ring, name on an arc, date in the middle ---- */
+let pmUid = 0;
+function postmarkSVG(d, waves = true) {
+  const u = 'pm' + (pmUid++);
+  return `<svg viewBox="0 0 100 100" aria-hidden="true" style="font-family:var(--font-display)" fill="none" stroke="currentColor">
+    <defs><path id="${u}t" d="M12 50A38 38 0 0 1 88 50"/><path id="${u}b" d="M6 50A44 44 0 0 0 94 50"/></defs>
+    <circle cx="50" cy="50" r="47" stroke-width="2.6"/><circle cx="50" cy="50" r="29" stroke-width="1.4" stroke-dasharray="3 2.4"/>
+    <text fill="currentColor" stroke="none" font-size="12" letter-spacing="1.2" text-anchor="middle"><textPath href="#${u}t" startOffset="50%">${d.name.toUpperCase()}</textPath></text>
+    <text fill="currentColor" stroke="none" font-size="9" letter-spacing="2" text-anchor="middle"><textPath href="#${u}b" startOffset="50%">GREECE</textPath></text>
+    <text fill="currentColor" stroke="none" font-size="12" text-anchor="middle" x="50" y="48">${d.date}</text>
+    <text fill="currentColor" stroke="none" font-size="10" text-anchor="middle" x="50" y="61">1968</text>
+    ${waves ? '<path stroke-width="2.4" d="M92 30q5-5 10 0t10 0t10 0M94 42q5-5 10 0t10 0t10 0M94 54q5-5 10 0t10 0t10 0M92 66q5-5 10 0t10 0t10 0"/>' : ''}
+  </svg>`;
+}
+
+function markerSVG(n) {
+  return `<svg viewBox="0 0 42 42" aria-hidden="true" style="font-family:var(--font-display)">
+    <circle cx="21" cy="21" r="19.5" fill="#FBF8F2" fill-opacity=".94" stroke="currentColor" stroke-width="2.4"/>
+    <circle cx="21" cy="21" r="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.6 2.2"/>
+    <text x="21" y="26.5" text-anchor="middle" font-size="15" fill="currentColor">${n}</text></svg>`;
+}
+
+/* ---- Cards ---- */
+function sceneHTML(d) {
+  let h = '<i class="sun"></i><i class="cloud"></i>';
+  d.scene.forEach(([t, l, b, w, hh, c]) => {
+    const col = c ? `--c:${c};` : '';
+    h += `<i class="it ${t}" style="left:${l}%;bottom:${b}%;width:${w}cqw;height:${hh}cqw;${col}"></i>`;
+    if (t === 'mill') { // sails sit on the hub near the top of the tower
+      const bw = hh * 0.9;
+      h += `<i class="it mill-blades" style="left:${l + (w / 2 - bw / 2) * 1.068}%;bottom:${b + (hh * 0.8 - bw / 2) * 1.667}%;width:${bw}cqw;height:${bw}cqw"></i>`;
+    }
+  });
+  return h + '<i class="sea"></i>';
+}
+
+function cardEl(d, i) {
+  const el = document.createElement('article');
+  el.className = 'postcard';
+  el.dataset.id = d.id;
+  el.style.setProperty('--rot', ROT[i] + 'deg');
+  el.innerHTML = `<div class="pc-inner">
+    <div class="pc-face pc-front">
+      <div class="scene">${sceneHTML(d)}</div>
+      <h2 class="greet"><small>Greetings from</small><span class="place">${d.name}</span></h2>
+      <span class="pc-tag">No. ${i + 1} &middot; Cyclades</span>
+      <span class="turn-hint">Turn over &#8635;</span>
+    </div>
+    <div class="pc-face pc-back"><div class="pc-back-in">
+      <div class="msg-col">
+        <p class="back-label">Air mail &middot; Postcard</p>
+        <p class="msg">${d.msg}</p>
+        <p class="sign">${d.sign}</p>
+      </div>
+      <div class="addr-col">
+        <div class="stamp"><div class="stamp-art"><span class="stamp-val">${d.stamp}</span></div></div>
+        <div class="postmark fresh">${postmarkSVG(d)}</div>
+        <div class="address"><span>Mum &amp; Dad</span><span>12 Plane Tree Lane</span><span>Anytown</span></div>
+      </div>
+    </div></div>
+  </div>`;
+  el.querySelector('.postmark').addEventListener('animationend', (e) => e.target.classList.remove('fresh'));
+  return el;
+}
+
+function albumEl() {
+  const el = document.createElement('article');
+  el.className = 'postcard album';
+  el.dataset.id = 'album';
+  el.style.setProperty('--rot', '1.2deg');
+  el.innerHTML = `<div class="pc-inner"><div class="pc-face pc-album"><div class="album-in">
+    <h2>Album complete</h2><p>Seven islands, seven postmarks. Wish you were here!</p>
+    <div class="album-grid">${ISL.map((d) => `<div class="postmark">${postmarkSVG(d, false)}</div>`).join('')}
+      <button class="btn btn-primary" id="again-btn">Start over</button></div>
+  </div></div></div>`;
+  el.querySelector('#again-btn').addEventListener('click', (e) => { e.stopPropagation(); resetAll(); });
+  return el;
+}
+
+const pile = $('pile');
+const cards = ISL.map(cardEl);
+cards.forEach((c, i) => {
+  c.setAttribute('role', 'button');
+  c.setAttribute('aria-label', 'Postcard from ' + ISL[i].name + '. Press to turn over.');
+  c.addEventListener('click', () => { if (order[0] === c) flip(); });
+  c.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && order[0] === c) { e.preventDefault(); flip(); } });
+  pile.appendChild(c);
+});
+let order = cards.slice(); // order[0] = top of the pile
+const idx = (card) => ISL.findIndex((d) => d.id === card.dataset.id);
+
+ISL.forEach((d, i) => {
+  const dot = document.createElement('i');
+  dot.className = 'pip';
+  dot.id = 'pip-' + i;
+  $('pips').insertBefore(dot, $('progress'));
+});
+
+function layout() {
+  order.forEach((c, i) => {
+    c.dataset.pos = i;
+    c.style.setProperty('--pos', Math.min(i, 4));
+    c.tabIndex = i === 0 ? 0 : -1;
+    c.setAttribute('aria-hidden', i === 0 ? 'false' : 'true');
+  });
+  const top = order[0];
+  $('flip-btn').disabled = top.classList.contains('album');
+  $('flip-btn').textContent = top.classList.contains('flipped') ? 'Turn back' : 'Turn over';
+}
+layout();
+
+let busy = false;
+function next() {
+  if (busy) return;
+  busy = true;
+  const c = order[0];
+  c.classList.add('leaving');
+  setTimeout(() => {
+    order.push(order.shift());
+    c.classList.remove('leaving');
+    layout();
+    selected();
+  }, reduce ? 0 : 350);
+  setTimeout(() => { busy = false; }, reduce ? 50 : 700);
+}
+
+function prev() {
+  if (busy) return;
+  busy = true;
+  const c = order.pop();
+  c.style.transition = 'none';
+  c.classList.add('leaving');
+  order.unshift(c);
+  layout();
+  void c.offsetWidth; // commit the off-pile pose, then let it slide in
+  c.style.transition = '';
+  c.classList.remove('leaving');
+  selected();
+  setTimeout(() => { busy = false; }, reduce ? 50 : 700);
+}
+
+function bringToTop(c) {
+  const k = order.indexOf(c);
+  if (k < 0 || k === 0) return;
+  order = order.slice(k).concat(order.slice(0, k));
+  layout();
+  selected();
+}
+
+$('next-btn').addEventListener('click', next);
+$('prev-btn').addEventListener('click', prev);
+$('flip-btn').addEventListener('click', flip);
+$('overview-btn').addEventListener('click', overview);
+
+/* ---- Flip, visit, completion ---- */
+const visited = new Set();
+const markers = {};
+let albumShown = false;
+
+function flip() {
+  const c = order[0];
+  if (c.classList.contains('album')) return;
+  const first = !visited.has(c.dataset.id);
+  c.classList.toggle('flipped');
+  layout();
+  if (first) visit(idx(c));
+}
+
+function visit(i) {
+  const d = ISL[i];
+  visited.add(d.id);
+  $('pip-' + i).classList.add('done');
+  $('progress').textContent = `${visited.size} / ${ISL.length} postmarked`;
+  say('', '');
+  setTimeout(() => { stampMarker(i); drawLeg(i); updateIslands(); }, reduce ? 0 : 700);
+  if (i > 0 && LEGS[i]) fitLeg(i); else fly(i);
+  if (visited.size === ISL.length && !albumShown) {
+    albumShown = true;
+    setTimeout(showAlbum, reduce ? 300 : 2600);
+  }
+}
+
+function showAlbum() {
+  const a = albumEl();
+  pile.appendChild(a);
+  order.unshift(a);
+  layout();
+  overview();
+  say('success', 'Album complete. Wish you were here!');
+}
+
+function resetAll() {
+  const a = order.find((c) => c.classList.contains('album'));
+  if (a) { order = order.filter((c) => c !== a); a.remove(); }
+  visited.clear();
+  albumShown = false;
+  Object.values(markers).forEach((m) => m.remove());
+  Object.keys(markers).forEach((k) => delete markers[k]);
+  shown.fill(0);
+  cards.forEach((c) => { c.classList.remove('flipped'); c.querySelector('.postmark').classList.add('fresh'); });
+  order = cards.slice();
+  document.querySelectorAll('.pip').forEach((p) => p.classList.remove('done'));
+  $('progress').textContent = `0 / ${ISL.length} postmarked`;
+  layout();
+  updateRoute();
+  updateIslands();
+  overview();
+  say('', 'Pick up a card to begin');
+}
+
+/* ---- Map: markers, dots, route ---- */
+function stampMarker(i) {
+  const d = ISL[i];
+  if (markers[d.id]) return;
+  const root = document.createElement('div');
+  root.innerHTML = `<div class="pm-marker" style="cursor:pointer" title="${d.name}">${markerSVG(i + 1)}</div>`;
+  root.addEventListener('click', () => bringToTop(cards[i]));
+  markers[d.id] = new mapboxgl.Marker({ element: root, offset: d.off && map.getZoom() < 8.6 ? d.off : [0, 0] })
+    .setLngLat(d.c).addTo(map);
+}
+
+map.on('zoom', () => {
+  const low = map.getZoom() < 8.6;
+  ISL.forEach((d) => { if (d.off && markers[d.id]) markers[d.id].setOffset(low ? d.off : [0, 0]); });
+});
+
+const shown = ISL.map(() => 0); // revealed fraction of each ferry leg (0..1)
+
+function sliceLine(line, f) {
+  if (f >= 1) return line;
+  const seg = [];
+  let total = 0;
+  for (let k = 1; k < line.length; k++) { seg.push(Math.hypot(line[k][0] - line[k - 1][0], line[k][1] - line[k - 1][1])); total += seg[k - 1]; }
+  let left = total * f;
+  const out = [line[0]];
+  for (let k = 1; k < line.length && left > 0; k++) {
+    if (left >= seg[k - 1]) { out.push(line[k]); left -= seg[k - 1]; continue; }
+    const t = left / seg[k - 1];
+    out.push([line[k - 1][0] + (line[k][0] - line[k - 1][0]) * t, line[k - 1][1] + (line[k][1] - line[k - 1][1]) * t]);
+    left = 0;
+  }
+  return out;
+}
+
+function updateRoute() {
+  const s = map.getSource('route');
+  if (!s) return;
+  const features = [];
+  LEGS.forEach((l, i) => { if (l && shown[i] > 0) features.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: sliceLine(l, shown[i]) } }); });
+  s.setData({ type: 'FeatureCollection', features });
+}
+
+function drawLeg(i) {
+  if (!LEGS[i]) return;
+  if (reduce) { shown[i] = 1; updateRoute(); return; }
+  const t0 = performance.now();
+  const step = (now) => {
+    const t = Math.min(1, (now - t0) / 1400);
+    shown[i] = 1 - Math.pow(1 - t, 2);
+    updateRoute();
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+function updateIslands() {
+  const s = map.getSource('isl');
+  if (!s) return;
+  s.setData({ type: 'FeatureCollection', features: ISL.map((d) => ({
+    type: 'Feature', properties: { id: d.id, name: d.name, v: visited.has(d.id) ? 1 : 0 },
+    geometry: { type: 'Point', coordinates: d.c } })) });
+}
+
+/* ---- Camera ---- */
+const move = (opts) => (reduce ? map.jumpTo(opts) : map.flyTo({ ...opts, duration: 2200 }));
+
+function fly(i) {
+  const d = ISL[i];
+  move({ center: d.c, zoom: 9.2, padding: { top: 64, bottom: 72, left: 48, right: 48 } });
+}
+
+function fitLeg(i) {
+  const pts = [ISL[i - 1].c, ISL[i].c];
+  const b = pts.reduce((bb, p) => bb.extend(p), new mapboxgl.LngLatBounds(pts[0], pts[0]));
+  const o = { padding: { top: 70, bottom: 90, left: 60, right: 60 }, maxZoom: 9.6 };
+  if (reduce) map.fitBounds(b, { ...o, duration: 0 }); else map.fitBounds(b, { ...o, duration: 1800 });
+}
+
+function overview() {
+  const b = ISL.reduce((bb, d) => bb.extend(d.c), new mapboxgl.LngLatBounds(ISL[0].c, ISL[0].c));
+  const p = phone() ? { top: 56, bottom: 72, left: 28, right: 28 } : { top: 64, bottom: 80, left: 50, right: 50 };
+  map.fitBounds(b, { padding: p, duration: reduce ? 0 : 1600 });
+}
+
+function selected() {
+  const c = order[0];
+  const ring = map.isStyleLoaded() && map.getLayer('isl-ring');
+  if (c.classList.contains('album')) { if (ring) map.setFilter('isl-ring', ['==', ['get', 'id'], '']); return; }
+  const i = idx(c);
+  if (ring) map.setFilter('isl-ring', ['==', ['get', 'id'], ISL[i].id]);
+  fly(i);
+}
+
+map.on('style.load', () => {
+  // Standard draws its own thin ferry lines radiating from ports; hide them so only our airmail route shows.
+  ['ferry', 'ferry-auto'].forEach((id) => {
+    try { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none'); } catch (err) { /* layer shape differs; skip */ }
+  });
+  map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  const join = { 'line-join': 'round', 'line-cap': 'butt' };
+  map.addLayer({ id: 'route-casing', type: 'line', source: 'route', slot: 'middle', layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: { 'line-color': '#FBF8F2', 'line-width': 8, 'line-opacity': 0.9 } });
+  map.addLayer({ id: 'route-red', type: 'line', source: 'route', slot: 'middle', layout: join,
+    paint: { 'line-color': '#D7263D', 'line-width': 4, 'line-dasharray': [2, 2] } });
+  map.addLayer({ id: 'route-blue', type: 'line', source: 'route', slot: 'middle', layout: join,
+    paint: { 'line-color': '#1F5FA8', 'line-width': 4, 'line-dasharray': [0, 2, 2, 0] } });
+
+  map.addSource('isl', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({ id: 'isl-ring', type: 'circle', source: 'isl', slot: 'top', filter: ['==', ['get', 'id'], ISL[0].id],
+    paint: { 'circle-radius': 15, 'circle-color': 'rgba(31,95,168,0.12)', 'circle-stroke-color': '#1F5FA8', 'circle-stroke-width': 3 } });
+  map.addLayer({ id: 'isl-dot', type: 'circle', source: 'isl', slot: 'top',
+    paint: { 'circle-radius': 7.5, 'circle-color': ['case', ['==', ['get', 'v'], 1], '#8A9A5B', '#D9774B'],
+      'circle-stroke-color': '#FBF8F2', 'circle-stroke-width': 2.5 } });
+  map.addLayer({ id: 'isl-label', type: 'symbol', source: 'isl', slot: 'top',
+    layout: { 'text-field': ['get', 'name'], 'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'], 'text-size': 14,
+      'text-variable-anchor': ['top', 'bottom', 'left', 'right'], 'text-radial-offset': 1.5 },
+    paint: { 'text-color': '#3A2E4A', 'text-halo-color': '#FBF8F2', 'text-halo-width': 2 } });
+  updateIslands();
+
+  map.on('click', 'isl-dot', (e) => {
+    const id = e.features[0].properties.id;
+    bringToTop(cards.find((c) => c.dataset.id === id));
+  });
+  map.on('mouseenter', 'isl-dot', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'isl-dot', () => { map.getCanvas().style.cursor = ''; });
+
+  overview();
+  say('', 'Pick up a card to begin');
+});
+
+map.on('error', (e) => say('error', 'Map error: ' + ((e.error && e.error.message) || 'unknown')));
+</script>
+</body>
+</html>

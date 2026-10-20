@@ -1,0 +1,814 @@
+/*
+  Drop Culture -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a hyped streetwear "drop" microsite --
+  pure black and white, one acid-volt accent, a warning orange for SOLD OUT,
+  enormous condensed type, hairline 1px rules, zero radius, zero shadows,
+  and a never-ending marquee band), deliberately distinct from every other
+  style pack in this folder: Arena, Editorial Paper, Highway Sign, Slate
+  Console, Storefront, Tarmac Glass, Vintage Chart, Weather Console, Riso
+  Zine, Swiss Grid, Neon HUD, Pastel Bento, Blueprint, Story Scroll, Retro
+  OS, Aurora Command, Deco Voyage, Washi Seasons, Raw Web, Case Board, Line
+  Diagram, Aero Gadgets, Chat Concierge, Chronicle, Broadcast, Bottom Sheet,
+  Trailhead and Field Journal.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/drop-culture.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Anton for the massive condensed
+  display type, Space Grotesk for UI and small print):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  Signature touch: the marquee band -- a volt strip pinned to the top of the
+  page whose text scrolls forever (a duplicated track translated by -50%).
+  It stops under prefers-reduced-motion.
+
+  Class/id contract (see drop-culture-template.html in this same folder for
+  a full working example). This is a SCROLLING PAGE, not a full-bleed map:
+
+  - .marquee                  top band, volt on black text, overflow hidden
+    .marquee-track              the moving strip (display:flex)
+    .marquee-group              one copy of the message; repeat it twice,
+                                 mark the second aria-hidden="true"
+  - .hero                     black hero block, two columns on desktop
+    .hero.live                  "LIVE NOW" state: volt background, flashing
+    .hero-copy                  left column
+    .eyebrow                    small uppercase label above the title
+    .hero-title                 huge Anton product title
+    .countdown                  DD:HH:MM:SS row (flex)
+      .cd-seg                     one number + its label
+      .cd-num                     the digits (Anton)
+      .cd-lab                     DAYS / HRS / MIN / SEC caption
+      .cd-sep                     the colon between segments
+    .live-flash                 the big "LIVE NOW" block shown instead of
+                                 the countdown when the drop opens
+    .hero-art                   framed product illustration (inline SVG)
+  - .btn, .btn-volt, .btn-ghost  square buttons: white outline, volt on
+                                 hover; .btn-volt is the volt-filled CTA
+  - .split                    two-column raffle area (list left, map right);
+                                 one column under 900px with the map FIRST
+    .raffle                     the list column
+    .section-head               Anton heading row with a small meta line
+    .store-list                 <ul> of stores
+    .store                      one <li> store card
+      .store.is-active            inverted (white) selected card
+      .store.is-sold              sold-out card (dimmed, button disabled)
+      .store-head                 <button> that selects the store on the map
+      .store-num                  square numbered badge (matches the map pin)
+      .store-name / .store-area   name + arrondissement
+      .tag                        status chip: .tag-open (volt),
+                                   .tag-closing (volt outline),
+                                   .tag-sold (orange)
+      .meter > .meter-fill        entries-left bar (set width in %)
+      .meter-label                "312 / 500 entries left" caption
+  - .map-frame                black frame with a 1px white border; sticky on
+                               desktop, ~50dvh and above the list on phones.
+                               Position it relative -- demo's #map fills it
+    .map-hud                    small label chip top-left inside the frame
+    .map-reset                  small "show all" button top-right
+  - .pin-root                 Marker root element (never positioned/transformed
+                               by this pack -- styling lives on the child)
+    .pin                        square volt pin holding the store number
+    .pin.is-sold                crossed out in orange
+    .pin.is-active              inverted white + pulsing outline
+  - .sheet-wrap               fixed full-screen layer; add .open to show
+    .sheet-scrim                dimming backdrop (click to close)
+    .sheet                      black slide-up sheet, hairline top border
+    .sheet-close                close button
+    .size-grid > .size          EU size buttons (aria-pressed toggles)
+    .field                      label + input pair
+    .stamp                      rotated volt "YOU'RE IN" confirmation
+  - .fine                     small-print paragraph / footer
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --black: #000000;
+  --white: #FFFFFF;
+  --volt: #D4FF00;
+  --orange: #FF4D00;
+  --grey: #9A9A9A;
+  --rule: #FFFFFF;
+  --dim: #2A2A2A;
+  --gutter: 24px;
+
+  --font-display: 'Anton', 'Impact', 'Arial Narrow', sans-serif;
+  --font-ui: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--black);
+  color: var(--white);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+button, input { font-family: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--volt);
+  outline-offset: 2px;
+}
+
+/* ---------- Marquee ---------- */
+.marquee {
+  background: var(--volt);
+  color: var(--black);
+  overflow: hidden;
+  border-bottom: 1px solid var(--black);
+  white-space: nowrap;
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: dc-marquee 32s linear infinite;
+}
+
+.marquee-group {
+  display: flex;
+  flex: none;
+}
+
+.marquee-group span {
+  padding: 9px 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+@keyframes dc-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* ---------- Hero ---------- */
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 32px;
+  align-items: center;
+  padding: 40px var(--gutter) 44px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--black);
+  color: var(--white);
+}
+
+.hero-copy { min-width: 0; }
+
+.eyebrow {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--volt);
+}
+
+.hero-title {
+  margin: 0 0 28px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(44px, 7.4vw, 124px);
+  line-height: 0.92;
+  letter-spacing: 0.005em;
+  text-transform: uppercase;
+}
+
+.countdown {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  font-family: var(--font-display);
+  font-size: clamp(52px, 9.2vw, 150px);
+  line-height: 1;
+}
+
+.cd-seg {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.cd-num {
+  display: block;
+  min-width: 2ch;
+  font-variant-numeric: tabular-nums;
+  color: var(--white);
+}
+
+.cd-lab {
+  margin-top: 6px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+.cd-sep {
+  padding: 0 0.08em;
+  color: var(--volt);
+}
+
+.hero-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.hero-art {
+  position: relative;
+  border: 1px solid var(--rule);
+  padding: 24px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.hero-art svg { display: block; width: 100%; height: auto; }
+
+.hero-art .art-num {
+  position: absolute;
+  top: 6px;
+  left: 14px;
+  font-family: var(--font-display);
+  font-size: clamp(72px, 9vw, 140px);
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--white);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.hero-art .art-cap {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+/* LIVE NOW state: the whole hero flips to volt and flashes */
+.live-flash {
+  font-family: var(--font-display);
+  font-size: clamp(64px, 12vw, 190px);
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.live-flash small {
+  display: block;
+  margin-top: 10px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.hero.live {
+  background: var(--volt);
+  color: var(--black);
+  animation: dc-flash 0.7s steps(1, end) 6;
+}
+
+.hero.live .eyebrow { color: var(--black); }
+.hero.live .hero-art { border-color: var(--black); }
+.hero.live .hero-art .art-num { -webkit-text-stroke-color: var(--black); }
+.hero.live .hero-art .art-cap { color: var(--black); }
+.hero.live .btn { border-color: var(--black); color: var(--black); }
+.hero.live .btn:hover { background: var(--black); color: var(--volt); }
+
+@keyframes dc-flash {
+  0% { background: var(--volt); }
+  50% { background: var(--white); }
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-block;
+  padding: 13px 20px;
+  border: 1px solid var(--white);
+  border-radius: 0;
+  background: transparent;
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--volt);
+  border-color: var(--volt);
+  color: var(--black);
+}
+
+.btn-volt {
+  background: var(--volt);
+  border-color: var(--volt);
+  color: var(--black);
+}
+
+.btn-volt:hover {
+  background: var(--white);
+  border-color: var(--white);
+}
+
+.btn-ghost {
+  border-color: var(--grey);
+  color: var(--grey);
+}
+
+.btn:disabled {
+  background: transparent;
+  border-color: var(--dim);
+  color: var(--grey);
+  cursor: not-allowed;
+}
+
+/* ---------- Split: raffle list + map ---------- */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 480px) minmax(0, 1fr);
+  gap: 0;
+  align-items: start;
+}
+
+.raffle {
+  min-width: 0;
+  border-right: 1px solid var(--rule);
+}
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding: 24px var(--gutter) 16px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.section-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 44px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.section-head .meta {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+.store-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.store {
+  padding: 16px var(--gutter) 18px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--black);
+  color: var(--white);
+}
+
+.store-head {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.store-num {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  background: var(--volt);
+  color: var(--black);
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.store-name {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.store-area {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--grey);
+}
+
+.tag {
+  display: inline-block;
+  padding: 4px 8px;
+  border: 1px solid var(--volt);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tag-open { background: var(--volt); color: var(--black); }
+.tag-closing { background: transparent; color: var(--volt); }
+.tag-sold { background: var(--orange); border-color: var(--orange); color: var(--black); }
+
+.meter {
+  height: 8px;
+  margin: 14px 0 6px;
+  border: 1px solid var(--white);
+}
+
+.meter-fill {
+  height: 100%;
+  background: var(--volt);
+  transition: width 0.8s ease;
+}
+
+.meter-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--grey);
+}
+
+.store .btn {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.store.is-active {
+  background: var(--white);
+  color: var(--black);
+}
+
+.store.is-active .store-area,
+.store.is-active .meter-label { color: #444; }
+.store.is-active .meter { border-color: var(--black); }
+.store.is-active .meter-fill { background: var(--black); }
+.store.is-active .store-num { background: var(--black); color: var(--volt); }
+.store.is-active .btn { border-color: var(--black); color: var(--black); }
+.store.is-active .btn:hover { background: var(--black); color: var(--volt); }
+.store.is-active .btn:disabled { border-color: #bbb; color: #777; background: transparent; }
+.store.is-active .tag-closing { color: var(--black); border-color: var(--black); }
+.store.is-active .tag-open { background: var(--black); color: var(--volt); border-color: var(--black); }
+
+.store.is-sold .store-num { background: var(--black); color: var(--orange); border: 1px solid var(--orange); }
+.store.is-sold .store-name { text-decoration: line-through; text-decoration-color: var(--orange); text-decoration-thickness: 2px; }
+.store.is-sold .meter-fill { background: var(--orange); }
+.store.is-sold.is-active .store-num { background: var(--black); }
+
+/* ---------- Map frame ---------- */
+.map-frame {
+  position: sticky;
+  top: 16px;
+  height: min(calc(100dvh - 32px), 860px);
+  min-height: 420px;
+  background: var(--black);
+  border: 1px solid var(--white);
+  margin: 16px var(--gutter);
+}
+
+.map-hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  padding: 8px 12px;
+  background: var(--black);
+  border-right: 1px solid var(--white);
+  border-bottom: 1px solid var(--white);
+  font-family: var(--font-display);
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.map-hud b { color: var(--volt); font-weight: 400; }
+
+.map-reset {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 3;
+  padding: 9px 12px;
+  border: 0;
+  border-left: 1px solid var(--white);
+  border-bottom: 1px solid var(--white);
+  border-radius: 0;
+  background: var(--black);
+  color: var(--white);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.map-reset:hover { background: var(--volt); color: var(--black); }
+
+/* ---------- Map pins (children of a mapboxgl.Marker root) ---------- */
+.pin-root { cursor: pointer; }
+
+.pin {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--black);
+  outline: 1px solid var(--white);
+  background: var(--volt);
+  color: var(--black);
+  font-family: var(--font-display);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.pin.is-sold {
+  background:
+    linear-gradient(to top right, transparent calc(50% - 1.5px), var(--orange) calc(50% - 1.5px), var(--orange) calc(50% + 1.5px), transparent calc(50% + 1.5px)),
+    linear-gradient(to bottom right, transparent calc(50% - 1.5px), var(--orange) calc(50% - 1.5px), var(--orange) calc(50% + 1.5px), transparent calc(50% + 1.5px)),
+    var(--black);
+  color: var(--orange);
+  outline-color: var(--orange);
+}
+
+.pin.is-sold b { opacity: 0; }
+
+.pin.is-active {
+  background: var(--white);
+  color: var(--black);
+  outline-color: var(--volt);
+}
+
+.pin.is-active::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: 2px solid var(--volt);
+  animation: dc-pulse 1.4s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes dc-pulse {
+  from { transform: scale(0.8); opacity: 1; }
+  to { transform: scale(1.8); opacity: 0; }
+}
+
+/* ---------- Slide-up sheet ---------- */
+.sheet-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  visibility: hidden;
+  pointer-events: none;
+  transition: visibility 0s linear 0.35s;
+}
+
+.sheet-wrap.open {
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+
+.sheet-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.sheet-wrap.open .sheet-scrim { opacity: 1; }
+
+.sheet {
+  position: relative;
+  width: min(100%, 620px);
+  max-height: 100dvh;
+  overflow-y: auto;
+  padding: 24px var(--gutter) 28px;
+  background: var(--black);
+  border: 1px solid var(--white);
+  border-bottom: 0;
+  transform: translateY(100%);
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sheet-wrap.open .sheet { transform: translateY(0); }
+
+.sheet h3 {
+  margin: 0 40px 4px 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 38px;
+  line-height: 1;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.sheet .sub {
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: var(--grey);
+}
+
+.sheet-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--white);
+  border-radius: 0;
+  background: transparent;
+  color: var(--white);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sheet-close:hover { background: var(--volt); border-color: var(--volt); color: var(--black); }
+
+.sheet .field-label {
+  display: block;
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+.size-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.size {
+  padding: 12px 0;
+  border: 1px solid var(--white);
+  border-radius: 0;
+  background: transparent;
+  color: var(--white);
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.size:hover { border-color: var(--volt); color: var(--volt); }
+.size[aria-pressed="true"] { background: var(--volt); border-color: var(--volt); color: var(--black); }
+
+.field { margin-bottom: 20px; }
+
+.field input {
+  width: 100%;
+  padding: 14px 12px;
+  border: 1px solid var(--white);
+  border-radius: 0;
+  background: var(--black);
+  color: var(--white);
+  font-size: 16px;
+}
+
+.field input::placeholder { color: #666; }
+.field input:focus { outline: 2px solid var(--volt); outline-offset: 0; border-color: var(--volt); }
+
+.sheet .btn-volt { width: 100%; padding: 16px 20px; font-size: 13px; }
+
+.stamp {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 12px auto 24px;
+  padding: 16px 22px 14px;
+  background: var(--volt);
+  color: var(--black);
+  border: 3px solid var(--black);
+  outline: 2px solid var(--volt);
+  text-align: center;
+  transform: rotate(-3deg);
+  animation: dc-stamp 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.stamp strong {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(40px, 11vw, 64px);
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.stamp span {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+@keyframes dc-stamp {
+  from { transform: rotate(-3deg) scale(1.8); opacity: 0; }
+  to { transform: rotate(-3deg) scale(1); opacity: 1; }
+}
+
+/* ---------- Small print ---------- */
+.fine {
+  margin: 0;
+  padding: 20px var(--gutter) 28px;
+  border-top: 1px solid var(--rule);
+  font-size: 12px;
+  color: var(--grey);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    padding-top: 28px;
+  }
+
+  .countdown { font-size: clamp(44px, 16.5vw, 120px); }
+
+  /* hero, then the map, then the list */
+  .split { grid-template-columns: minmax(0, 1fr); }
+  .raffle { border-right: 0; }
+  .map-frame {
+    position: relative;
+    order: -1;
+    height: 50dvh;
+    min-height: 320px;
+    margin: 16px var(--gutter);
+  }
+}
+
+@media (max-width: 480px) {
+  :root { --gutter: 16px; }
+  .section-head h2 { font-size: 38px; }
+  .store-head { grid-template-columns: 40px minmax(0, 1fr); gap: 12px; }
+  .store-num { width: 40px; height: 40px; }
+  .store-head .tag { grid-column: 2; justify-self: start; }
+  .hero-art { padding: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .marquee-track { animation: none; }
+  .pin.is-active::after { animation: none; opacity: 0.8; transform: scale(1.3); }
+  .hero.live { animation: none; }
+  .meter-fill { transition: none; }
+  .sheet, .sheet-scrim { transition: none; }
+  .stamp { animation: none; }
+}

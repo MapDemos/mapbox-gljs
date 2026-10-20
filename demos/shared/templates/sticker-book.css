@@ -1,0 +1,920 @@
+/*
+  Sticker Book -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a children's explorer sticker activity
+  book -- sky blue, grass green, sunshine yellow, tomato red and grape
+  purple on page-white, with die-cut cartoon stickers that have a thick
+  white border, a soft drop shadow and a glossy sheen, plus dotted "stick
+  here" outlines on the map), deliberately distinct from every other pack
+  in this folder: Arena is a dark stadium scoreboard, Editorial Paper is
+  warm paper and serif headlines, Highway Sign is cream/green MUTCD
+  signage, Slate Console is a cool-grey ops console, Storefront is a light
+  retail locator, Tarmac Glass is dark blur-glass + amber, Vintage Chart is
+  navy/parchment/brass, Weather Console is a dense forecast dashboard, Riso
+  Zine is two-colour misregistered print, Swiss Grid is white/black/red
+  typographic grid, Neon HUD is glowing sci-fi overlays, Pastel Bento is
+  soft rounded tiles, Blueprint is white-on-blue drafting lines, Story
+  Scroll is a scrolling narrative, Retro OS is a desktop-window UI, Aurora
+  Command is a gradient-glow control room, Deco Voyage is gold-on-black Art
+  Deco, Washi Seasons is quiet Japanese paper and seasonal colour, Raw Web
+  is unstyled default-browser HTML, Case Board is a corkboard of pinned
+  evidence, Line Diagram is a transit-map schematic, Aero Gadgets is glossy
+  early-2000s skeuomorphism, Chat Concierge is a messaging thread, Chronicle
+  is a vertical timeline of dated entries, Broadcast is a TV news
+  lower-third, Bottom Sheet is a draggable phone-style sheet, Trailhead is
+  olive/orange outdoor-gear stencil tags, and Field Journal is a notebook
+  of sketched entries.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/sticker-book.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Baloo 2 for headings and buttons;
+  Gochi Hand for handwritten notes and labels):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Gochi+Hand&display=swap" rel="stylesheet" />
+
+  Signature touch: DIE-CUT STICKERS. Every sticker is an inline SVG whose
+  silhouette gets a thick white border from stacked white drop-shadow()
+  filters (so the border follows the shape) plus a soft coloured shadow.
+  Stickers are dragged from the sheet onto dashed "stick here" circles on
+  the map; a right drop snaps on as a mapboxgl.Marker with a random tilt, a
+  bounce-in and a CSS confetti burst, a wrong drop bounces back.
+
+  Layout: .app is a two-area grid. Desktop: .stage (the map "activity
+  page", framed like a page with a thick white border) on the left and
+  .sheet (the sticker sheet, ~320px) on the right. Phone: the map is ~55dvh
+  on top and the sheet is a horizontally scrolling sticker row below. The
+  map never sits under the sheet, so the Mapbox logo and attribution stay
+  in the map's own bottom corners. If you add a raster-dem source (terrain),
+  GL JS hides the logo; the rule near the bottom of this file forces it back.
+
+  Class/id contract (see sticker-book-template.html in this same folder for
+  a full working example):
+
+  - .app                      page grid, 100dvh, never scrolls
+  - .stage                    framed map area; holds #map and the overlays
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .stage-bar                top row over the map (pointer-events: none
+                               except its buttons): .page-title + .btn
+    .page-title                handwritten "tape" note
+  - .toast (+.show/.oops)     one-line message near the bottom of the map
+  - .certificate (+.hidden)   "You did it!" panel centred on the map;
+                               .cert-kicker, .cert-title, .cert-line,
+                               .cert-name, .cert-actions, .cert-stars
+  - .sheet                    the sticker sheet (right column / bottom row)
+    .sheet-title, .sheet-sub    heading + handwritten instructions
+    .progress-row               holds .progress-count and the reset button
+    .progress-count            "5/8 stickers!" (aria-live)
+    .progress-bar > i           track + fill (width set in %)
+    .stickers                  slot container (2-col grid; a scroll row on
+                               phones)
+    .sticker-slot              one sticker's backing; modifiers .armed
+                               (tapped, waiting for a target), .dragging,
+                               .used (already stuck on the map), .shake
+      .sticker                   the die-cut art wrapper (inline <svg>)
+      .sticker-label             Gochi Hand name under the art
+  - .ghost                    the sticker following the pointer (fixed)
+  - .target                   inner <button> of a target Marker: dashed
+                               "stick here" circle; modifiers .hint (the
+                               armed/dragged sticker's match), .near (the
+                               ghost is within range), .done (stuck)
+    .target-ring, .target-label
+  - .stuck                    inner child of a placed-sticker Marker;
+                               .stuck-art (tilted, bounces in) and
+                               .confetti-box > i (confetti pieces)
+  - .btn, .btn-primary,       big rounded buttons
+    .btn-ghost
+  - .hidden                   utility: display: none !important
+
+  Never set position or transform on a mapboxgl.Marker root element --
+  style the inner .target / .stuck children (the CSS here does).
+*/
+
+:root {
+  --sky: #BDE7FF;
+  --sky-deep: #5BB8F0;
+  --grass: #9BE07A;
+  --grass-deep: #5FB83E;
+  --sun: #FFD23F;
+  --tomato: #FF6B57;
+  --grape: #8E7DFF;
+  --grape-deep: #5B4BC4;
+  --paper: #FFFDF7;
+  --ink: #3B2F5C;
+  --ink-soft: #7A6FA0;
+  --shadow: rgba(59, 47, 92, 0.28);
+  --target-size: 58px;
+  --stuck-size: 76px;
+
+  --font-heading: 'Baloo 2', 'Nunito', 'Trebuchet MS', sans-serif;
+  --font-body: 'Baloo 2', 'Nunito', 'Trebuchet MS', sans-serif;
+  --font-hand: 'Gochi Hand', 'Comic Sans MS', 'Segoe Print', cursive;
+  --font-label: var(--font-hand);
+
+  /* Die-cut border: a thick white outline that follows the SVG shape,
+     then a soft shadow underneath. */
+  --die-cut: drop-shadow(3px 0 0 #fff) drop-shadow(-3px 0 0 #fff)
+             drop-shadow(0 3px 0 #fff) drop-shadow(0 -3px 0 #fff)
+             drop-shadow(0 5px 6px var(--shadow));
+
+  /* Faint polka dots for the paper background. */
+  --dots: radial-gradient(circle, rgba(142, 125, 255, 0.18) 2px, transparent 2.5px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--sky);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 600;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 4px solid var(--grape);
+  outline-offset: 3px;
+}
+
+/* Page grid: map page left, sticker sheet right */
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-areas: "stage sheet";
+  gap: 14px;
+  padding: 14px;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background-color: var(--sky);
+  background-image: var(--dots);
+  background-size: 28px 28px;
+}
+
+.stage {
+  grid-area: stage;
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  border: 7px solid var(--paper);
+  border-radius: 26px;
+  background: var(--paper);
+  box-shadow: 0 6px 0 rgba(59, 47, 92, 0.16), 0 10px 22px var(--shadow);
+}
+
+.stage-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  pointer-events: none;
+}
+
+.stage-bar .btn {
+  pointer-events: auto;
+}
+
+/* Handwritten note on a strip of tape */
+.page-title {
+  position: relative;
+  margin: 0;
+  padding: 8px 18px 6px;
+  background: var(--sun);
+  border-radius: 6px;
+  box-shadow: 0 3px 0 rgba(59, 47, 92, 0.18);
+  font-family: var(--font-hand);
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 1.1;
+  color: var(--ink);
+  rotate: -1.5deg;
+}
+
+.page-title::before {
+  content: '';
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  width: 70px;
+  height: 18px;
+  margin-left: -35px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px dashed rgba(59, 47, 92, 0.2);
+  rotate: 3deg;
+}
+
+/* Buttons -- big, chunky, with a hard "sticker" bottom edge */
+.btn {
+  display: inline-block;
+  min-height: 46px;
+  padding: 8px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--grape-deep);
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 18px;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--grape), 0 7px 12px var(--shadow);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+.btn:hover {
+  background: #fff;
+  transform: translateY(-2px);
+}
+
+.btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--grape), 0 3px 6px var(--shadow);
+}
+
+.btn-primary {
+  background: var(--tomato);
+  color: #fff;
+  box-shadow: 0 4px 0 #C4402E, 0 7px 12px var(--shadow);
+}
+
+.btn-primary:hover {
+  background: #FF7D6B;
+}
+
+.btn-primary:active {
+  box-shadow: 0 1px 0 #C4402E, 0 3px 6px var(--shadow);
+}
+
+.btn-ghost {
+  background: var(--sky);
+  color: var(--ink);
+  box-shadow: 0 4px 0 var(--sky-deep), 0 7px 12px var(--shadow);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Toast -- a speech bubble above the logo row */
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 48px;
+  z-index: 3;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 8px 20px 6px;
+  border: 3px solid var(--grape);
+  border-radius: 20px;
+  background: var(--paper);
+  box-shadow: 0 5px 0 rgba(59, 47, 92, 0.18);
+  font-family: var(--font-hand);
+  font-size: 22px;
+  line-height: 1.15;
+  text-align: center;
+  color: var(--ink);
+  pointer-events: none;
+  opacity: 0;
+  translate: -50% 14px;
+  transition: opacity 0.2s ease, translate 0.2s ease;
+}
+
+.toast.show {
+  opacity: 1;
+  translate: -50% 0;
+}
+
+.toast.oops {
+  border-color: var(--tomato);
+}
+
+/* Sticker sheet -- the backing paper */
+.sheet {
+  grid-area: sheet;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 16px 16px 18px;
+  overflow-y: auto;
+  border-radius: 26px;
+  background-color: var(--paper);
+  background-image: var(--dots);
+  background-size: 26px 26px;
+  box-shadow: 0 6px 0 rgba(59, 47, 92, 0.16), 0 10px 22px var(--shadow);
+}
+
+.sheet-title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 25px;
+  line-height: 1.05;
+  color: var(--grape-deep);
+}
+
+.sheet-title span {
+  color: var(--tomato);
+}
+
+.sheet-sub {
+  margin: 6px 0 10px;
+  font-family: var(--font-hand);
+  font-size: 19px;
+  line-height: 1.15;
+  color: var(--ink-soft);
+}
+
+.progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.progress-count {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.progress-row .btn {
+  min-height: 40px;
+  padding: 5px 14px;
+  font-size: 16px;
+}
+
+.progress-bar {
+  flex: none;
+  height: 16px;
+  margin: 10px 0 14px;
+  border-radius: 999px;
+  background: var(--sky);
+  box-shadow: inset 0 2px 3px rgba(59, 47, 92, 0.2);
+  overflow: hidden;
+}
+
+.progress-bar i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: repeating-linear-gradient(-45deg, var(--grass) 0 10px, #B3EC96 10px 20px);
+  transition: width 0.4s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+.stickers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.sticker-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px 6px;
+  border: 3px solid rgba(142, 125, 255, 0.22);
+  border-radius: 20px;
+  background: linear-gradient(160deg, rgba(189, 231, 255, 0.55), rgba(255, 255, 255, 0.9));
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.sticker-slot:hover {
+  border-color: var(--grape);
+}
+
+.sticker-slot.armed {
+  border-color: var(--tomato);
+  background: rgba(255, 210, 63, 0.35);
+}
+
+.sticker {
+  display: block;
+  width: 84px;
+  height: 84px;
+  transition: translate 0.15s ease, rotate 0.15s ease;
+}
+
+.sticker svg,
+.ghost svg,
+.stuck-art svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: var(--die-cut);
+}
+
+.sticker-slot:hover .sticker {
+  translate: 0 -3px;
+  rotate: -3deg;
+}
+
+.sticker-label {
+  font-family: var(--font-hand);
+  font-size: 18px;
+  line-height: 1.05;
+  text-align: center;
+  color: var(--ink);
+}
+
+/* Slot while its sticker is being dragged or is already on the map */
+.sticker-slot.dragging .sticker {
+  opacity: 0.25;
+}
+
+.sticker-slot.used {
+  cursor: default;
+  border-style: dotted;
+  background: transparent;
+}
+
+.sticker-slot.used .sticker {
+  opacity: 0.12;
+  filter: grayscale(1);
+}
+
+.sticker-slot.used::after {
+  content: '\2713';
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  translate: -50% 0;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 46px;
+  line-height: 1;
+  color: var(--grass-deep);
+}
+
+.sticker-slot.shake {
+  animation: sb-shake 0.4s ease;
+}
+
+@keyframes sb-shake {
+  0%, 100% { translate: 0 0; }
+  20% { translate: -7px 0; }
+  40% { translate: 7px 0; }
+  60% { translate: -5px 0; }
+  80% { translate: 5px 0; }
+}
+
+/* Sticker following the pointer */
+.ghost {
+  position: fixed;
+  z-index: 100;
+  width: 96px;
+  height: 96px;
+  pointer-events: none;
+  scale: 1.18;
+  rotate: -6deg;
+  transition: none;
+}
+
+.ghost.back {
+  transition: left 0.38s cubic-bezier(0.3, 1.5, 0.5, 1), top 0.38s cubic-bezier(0.3, 1.5, 0.5, 1), scale 0.38s ease;
+  scale: 0.9;
+  rotate: 0deg;
+}
+
+/* "Stick here" target -- inner child of a Marker root */
+.target {
+  position: relative;
+  display: block;
+  width: var(--target-size);
+  height: var(--target-size);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.target-ring {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border: 4px dotted var(--tomato);
+  border-radius: 50%;
+  background: rgba(255, 253, 247, 0.62);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.7);
+  font-family: var(--font-hand);
+  font-size: 14px;
+  line-height: 0.95;
+  color: var(--tomato);
+  text-align: center;
+  white-space: pre;
+  transition: scale 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.target-ring::before {
+  content: 'stick\Ahere';
+}
+
+.target-label {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 50%;
+  translate: -50% 0;
+  padding: 2px 10px 0;
+  border: 2px solid var(--grape);
+  border-radius: 12px;
+  background: var(--paper);
+  font-family: var(--font-hand);
+  font-size: 16px;
+  line-height: 1.2;
+  color: var(--ink);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.target.hint .target-ring {
+  border-color: var(--grape);
+  background: rgba(255, 210, 63, 0.75);
+  animation: sb-pulse 0.9s ease-in-out infinite;
+}
+
+.target.near .target-ring {
+  border-style: solid;
+  border-color: var(--grass-deep);
+  background: rgba(155, 224, 122, 0.85);
+  scale: 1.2;
+  animation: none;
+}
+
+.target.done {
+  display: none;
+}
+
+@keyframes sb-pulse {
+  0%, 100% { scale: 1; }
+  50% { scale: 1.14; }
+}
+
+/* Placed sticker -- inner child of a Marker root */
+.stuck {
+  position: relative;
+  width: var(--stuck-size);
+  height: var(--stuck-size);
+  cursor: pointer;
+}
+
+.stuck-art {
+  width: 100%;
+  height: 100%;
+  rotate: var(--tilt, 0deg);
+  animation: sb-pop 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+@keyframes sb-pop {
+  0% { scale: 0.2; translate: 0 -34px; opacity: 0; }
+  55% { scale: 1.25; translate: 0 4px; opacity: 1; }
+  100% { scale: 1; translate: 0 0; opacity: 1; }
+}
+
+/* Confetti burst */
+.confetti-box {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.confetti-box i {
+  position: absolute;
+  width: 10px;
+  height: 14px;
+  margin: -7px 0 0 -5px;
+  border-radius: 3px;
+  background: var(--c, var(--sun));
+  animation: sb-confetti 0.95s cubic-bezier(0.2, 0.7, 0.4, 1) forwards;
+}
+
+.confetti-box i:nth-child(3n) {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+
+@keyframes sb-confetti {
+  0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; }
+}
+
+/* Certificate */
+.certificate {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 4;
+  width: min(420px, calc(100% - 32px));
+  max-height: calc(100% - 24px);
+  padding: 22px 22px 20px;
+  overflow-y: auto;
+  border: 5px dashed var(--grape);
+  border-radius: 24px;
+  background-color: var(--paper);
+  background-image: var(--dots);
+  background-size: 24px 24px;
+  box-shadow: 0 0 0 8px var(--sun), 0 14px 30px var(--shadow);
+  text-align: center;
+  translate: -50% -50%;
+  animation: sb-cert 0.7s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+}
+
+@keyframes sb-cert {
+  0% { scale: 0.4; opacity: 0; rotate: -8deg; }
+  100% { scale: 1; opacity: 1; rotate: 0deg; }
+}
+
+.cert-stars {
+  display: block;
+  width: 130px;
+  height: 36px;
+  margin: 0 auto 4px;
+}
+
+.cert-kicker {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: 21px;
+  color: var(--ink-soft);
+}
+
+.cert-title {
+  margin: 2px 0 6px;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 46px;
+  line-height: 1;
+  color: var(--tomato);
+  text-shadow: 0 3px 0 var(--sun);
+}
+
+.cert-line {
+  margin: 0 0 12px;
+  font-family: var(--font-hand);
+  font-size: 21px;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.cert-name {
+  display: block;
+  margin: 0 auto 14px;
+  max-width: 280px;
+  border-bottom: 3px dotted var(--grape);
+  font-family: var(--font-hand);
+  font-size: 22px;
+  color: var(--grape-deep);
+}
+
+.cert-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.pt-short {
+  display: none;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Mapbox controls re-skinned to match */
+.mapboxgl-ctrl-group {
+  border-radius: 16px !important;
+  border: 3px solid var(--paper);
+  background: var(--paper) !important;
+  box-shadow: 0 4px 0 rgba(59, 47, 92, 0.2), 0 6px 12px var(--shadow) !important;
+}
+
+.mapboxgl-ctrl-group button {
+  width: 40px;
+  height: 40px;
+}
+
+/* A raster-dem (terrain) source makes GL JS hide the Mapbox logo (the DEM
+   TileJSON has mapbox_logo:false). Force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+/* Phones: map on top (~55dvh), sticker sheet as a scroll row below */
+@media (max-width: 760px) {
+  :root {
+    --target-size: 30px;
+    --stuck-size: 62px;
+  }
+
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "stage" "sheet";
+    gap: 10px;
+    padding: 12px 16px;
+  }
+
+  .stage {
+    border-width: 5px;
+    border-radius: 22px;
+  }
+
+  .stage-bar {
+    padding: 8px;
+  }
+
+  .page-title {
+    padding: 5px 12px 3px;
+    font-size: 16px;
+    white-space: nowrap;
+  }
+
+  .pt-long {
+    display: none;
+  }
+
+  .pt-short {
+    display: inline;
+  }
+
+  .page-title::before {
+    top: -7px;
+    width: 50px;
+    height: 12px;
+    margin-left: -25px;
+  }
+
+  .stage-bar .btn {
+    min-height: 38px;
+    padding: 4px 14px;
+    font-size: 15px;
+  }
+
+  .toast {
+    bottom: 42px;
+    font-size: 18px;
+  }
+
+  .sheet {
+    max-height: 45dvh;
+    padding: 10px 12px 12px;
+    overflow-y: auto;
+    border-radius: 22px;
+  }
+
+  .sheet-title {
+    font-size: 19px;
+  }
+
+  .sheet-sub {
+    margin: 2px 0 6px;
+    font-size: 16px;
+  }
+
+  .progress-count {
+    font-size: 22px;
+  }
+
+  .progress-row .btn {
+    min-height: 36px;
+    padding: 3px 12px;
+    font-size: 15px;
+  }
+
+  .progress-bar {
+    height: 12px;
+    margin: 6px 0 8px;
+  }
+
+  /* Horizontal scroll row; vertical drags are ours, horizontal swipes scroll */
+  .stickers {
+    display: flex;
+    gap: 10px;
+    margin: 0 -4px;
+    padding: 4px 4px 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .stickers::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sticker-slot {
+    flex: none;
+    width: 104px;
+    touch-action: pan-x;
+  }
+
+  .sticker {
+    width: 80px;
+    height: 80px;
+  }
+
+  .sticker-slot.used::after {
+    top: 16px;
+  }
+
+  .target-ring {
+    border-width: 3px;
+    font-size: 18px;
+  }
+
+  .target-ring::before {
+    content: '+';
+  }
+
+  /* Labels would pile up on a small map -- show only the active hint's */
+  .target-label {
+    display: none;
+    max-width: 120px;
+    white-space: normal;
+    text-align: center;
+    font-size: 15px;
+  }
+
+  .target.hint .target-label {
+    display: block;
+  }
+
+  .certificate {
+    padding: 16px 14px 14px;
+    border-width: 4px;
+    box-shadow: 0 0 0 6px var(--sun), 0 10px 24px var(--shadow);
+  }
+
+  .cert-stars {
+    width: 100px;
+    height: 28px;
+  }
+
+  .cert-title {
+    font-size: 36px;
+  }
+
+  .cert-line {
+    font-size: 18px;
+    margin-bottom: 8px;
+  }
+
+  .cert-name {
+    margin-bottom: 10px;
+    font-size: 19px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stuck-art,
+  .certificate,
+  .target.hint .target-ring,
+  .sticker-slot.shake {
+    animation: none;
+  }
+
+  .confetti-box {
+    display: none;
+  }
+
+  .btn,
+  .toast,
+  .sticker,
+  .progress-bar i,
+  .ghost.back,
+  .target-ring {
+    transition: none;
+  }
+}

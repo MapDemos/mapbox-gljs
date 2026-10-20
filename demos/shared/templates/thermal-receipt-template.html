@@ -1,0 +1,357 @@
+<!--
+  Working EXAMPLE of the Thermal Receipt style pack (thermal-receipt.css,
+  in this same folder). Open this file directly to see the pattern working
+  with one fictional food-delivery order -- "Soi 9 Noodle Bar" in Ari to a
+  door near Lumphini Park, Bangkok, delivered by a courier called Nok --
+  tracked on a receipt that PRINTS line by line out of a printer slot as
+  the order progresses: ORDER PLACED, KITCHEN PREPARING, COURIER PICKED UP,
+  ON THE WAY (live ETA countdown, the scooter rides the route and the
+  travelled part darkens) and DELIVERED (pink stamps, a barcode). Press
+  "Replay" to run it again. Copy the markup below into your own demo and
+  link thermal-receipt.css from its <head> -- see the class/id contract
+  documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (thermal paper, faded monospaced ink, dashed
+  separators, torn edges, one highlighter-pink accent) at the user's request
+  for something distinct from every other pack in this folder. The places
+  are real, the route is a simplified Mapbox Directions (driving) line, and
+  the shop, courier, order number and prices are fictional placeholders --
+  swap in your own.
+
+  What's NOT included: a real ordering backend or live courier feed (the
+  progress is a scripted timeline), search/geocoding, routing at runtime,
+  or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Thermal Receipt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Xanh+Mono&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="thermal-receipt.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stage">
+    <div id="map"></div>
+    <div class="stage-actions">
+      <button class="btn btn-primary" id="replay">Replay</button>
+    </div>
+    <div class="map-chip" id="chip">Warming up</div>
+  </div>
+
+  <aside class="receipt-wrap" aria-label="Order receipt">
+    <div class="printer"><span class="printer-mouth"></span><span class="printer-led" id="led"></span></div>
+    <div class="receipt"><div class="receipt-feed" id="feed" role="log" aria-live="polite"></div></div>
+    <div class="receipt-tear"></div>
+  </aside>
+</div>
+
+<script>
+// Kitchen (Ari) to a door near Lumphini Park, Bangkok [lng, lat].
+// Route geometry: Mapbox Directions (driving), simplified.
+const ROUTE = [
+  [100.54461, 13.77973], [100.54549, 13.78223], [100.54559, 13.78219], [100.54252, 13.77351],
+  [100.54137, 13.77046], [100.54103, 13.76975], [100.53888, 13.76578], [100.5388, 13.76545],
+  [100.5388, 13.76494], [100.53874, 13.76472], [100.53859, 13.76449], [100.53797, 13.76411],
+  [100.53774, 13.76384], [100.53464, 13.75826], [100.5347, 13.75806], [100.53482, 13.75791],
+  [100.53665, 13.75748], [100.53698, 13.75736], [100.53945, 13.75682], [100.54242, 13.75609],
+  [100.54111, 13.75047], [100.54107, 13.75005], [100.54112, 13.74997], [100.54102, 13.74918],
+  [100.54029, 13.74462], [100.53924, 13.73759], [100.54017, 13.73743], [100.54034, 13.73748],
+  [100.54066, 13.73772], [100.5414, 13.7376], [100.54136, 13.73718],
+];
+const KITCHEN = ROUTE[0];
+const DOOR = ROUTE[ROUTE.length - 1];
+const RIDE_MIN = 22;        // simulated minutes on the road
+const RIDE_MS = 30000;      // real milliseconds the ride takes on screen
+const START = 19 * 60 + 12; // order placed at 19:12
+const ITEMS = [
+  [1, 'Pad kee mao, pork', '140.00'],
+  [1, 'Boat noodles, extra pork', '95.00'],
+  [2, 'Thai iced tea', '90.00'],
+  [1, 'Mango sticky rice', '120.00'],
+];
+const INK = '#2A2A2A', TODO = '#9A9993';
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const feed = $('feed'), led = $('led'), chip = $('chip');
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: { basemap: { theme: 'faded', lightPreset: 'day', showPointOfInterestLabels: false, showTransitLabels: false } },
+  center: [100.5425, 13.759],
+  zoom: 12,
+});
+
+/* ---- Route maths ---- */
+const M_LNG = 111320 * Math.cos(13.76 * Math.PI / 180), M_LAT = 110574;
+const cum = [0];
+for (let i = 1; i < ROUTE.length; i++) {
+  cum.push(cum[i - 1] + Math.hypot((ROUTE[i][0] - ROUTE[i - 1][0]) * M_LNG, (ROUTE[i][1] - ROUTE[i - 1][1]) * M_LAT));
+}
+const TOTAL = cum[cum.length - 1];
+
+function at(d) {
+  d = Math.min(TOTAL, Math.max(0, d));
+  let i = 1;
+  while (i < cum.length - 1 && cum[i] < d) i++;
+  const t = (d - cum[i - 1]) / (cum[i] - cum[i - 1] || 1);
+  return [ROUTE[i - 1][0] + (ROUTE[i][0] - ROUTE[i - 1][0]) * t, ROUTE[i - 1][1] + (ROUTE[i][1] - ROUTE[i - 1][1]) * t];
+}
+
+function bearingAt(d) {
+  const a = at(d < TOTAL - 40 ? d : d - 40), b = at(d < TOTAL - 40 ? d + 40 : d);
+  return Math.atan2((b[0] - a[0]) * M_LNG, (b[1] - a[1]) * M_LAT) * 180 / Math.PI;
+}
+
+/* ---- Courier marker: rotate the inner glyph, never the marker root ---- */
+const courierRoot = document.createElement('div');
+courierRoot.innerHTML =
+  '<div class="courier"><span class="courier-tag">NOK</span>' +
+  '<svg class="courier-glyph" viewBox="0 0 36 36" aria-hidden="true">' +
+  '<rect class="ink" x="16" y="2" width="4" height="8" rx="2"/><rect class="ink" x="9" y="10" width="18" height="3" rx="1.5"/>' +
+  '<ellipse class="ink" cx="18" cy="19" rx="7.5" ry="5"/><rect class="ink bag" x="12" y="24" width="12" height="10" rx="2"/>' +
+  '<circle class="head" cx="18" cy="18.5" r="3.2"/></svg></div>';
+const courier = new mapboxgl.Marker({ element: courierRoot });
+const glyph = courierRoot.querySelector('.courier-glyph');
+let heading = null;
+
+function place(p) {
+  const d = p * TOTAL, target = bearingAt(d);
+  if (heading === null) heading = target;
+  else heading += ((target - heading + 540) % 360 - 180) * 0.2;
+  courier.setLngLat(at(d));
+  glyph.style.transform = `rotate(${heading - map.getBearing()}deg)`;
+  setProgress(p);
+  const left = Math.ceil(RIDE_MIN * (1 - p));
+  const num = $('eta-num');
+  if (num) {
+    num.textContent = String(left).padStart(2, '0');
+    $('eta-sub').textContent = p >= 1 ? 'arrived' : `${((1 - p) * TOTAL / 1000).toFixed(1)} km to go`;
+  }
+  chip.textContent = p >= 1 ? 'Arrived' : `On the way · ETA ${left} min`;
+}
+map.on('rotate', () => { if (heading !== null) glyph.style.transform = `rotate(${heading - map.getBearing()}deg)`; });
+
+/* Travelled part of the route darkens (line-gradient needs lineMetrics) */
+function gradient(p) {
+  const q = Math.min(Math.max(p, 0.0001), 0.9996);
+  return ['interpolate', ['linear'], ['line-progress'], 0, INK, q, INK, q + 0.0003, TODO, 1, TODO];
+}
+function setProgress(p) {
+  if (map.getLayer('route')) map.setPaintProperty('route', 'line-gradient', gradient(p));
+}
+
+/* ---- Map layers ---- */
+function fit() {
+  const phone = window.matchMedia('(max-width: 640px)').matches;
+  const bounds = ROUTE.reduce((b, c) => b.extend(c), new mapboxgl.LngLatBounds(ROUTE[0], ROUTE[0]));
+  map.fitBounds(bounds, {
+    padding: phone ? { top: 64, bottom: 64, left: 40, right: 40 } : { top: 70, bottom: 80, left: 80, right: 360 + 28 + 40 },
+    duration: 0, maxZoom: 15,
+  });
+}
+
+let ready = false;
+map.on('style.load', () => {
+  const pts = {
+    type: 'FeatureCollection',
+    features: [
+      { type: 'Feature', properties: { label: 'Soi 9 Noodle Bar', kind: 'kitchen' }, geometry: { type: 'Point', coordinates: KITCHEN } },
+      { type: 'Feature', properties: { label: 'Your door', kind: 'door' }, geometry: { type: 'Point', coordinates: DOOR } },
+    ],
+  };
+  map.addSource('route', { type: 'geojson', lineMetrics: true, data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE } } });
+  map.addSource('stops', { type: 'geojson', data: pts });
+  const join = { 'line-join': 'round', 'line-cap': 'round' };
+  const w = (a, b) => ['interpolate', ['linear'], ['zoom'], 10, a, 15, b];
+  map.addLayer({ id: 'route-casing', type: 'line', source: 'route', slot: 'middle', layout: join,
+    paint: { 'line-color': '#FBFBF7', 'line-width': w(5, 12) } });
+  map.addLayer({ id: 'route', type: 'line', source: 'route', slot: 'middle', layout: join,
+    paint: { 'line-gradient': gradient(0), 'line-width': w(3, 7) } });
+  map.addLayer({ id: 'stops-dot', type: 'circle', source: 'stops', slot: 'top',
+    paint: {
+      'circle-radius': 9, 'circle-stroke-width': 3,
+      'circle-color': ['match', ['get', 'kind'], 'door', '#FF4F8B', INK],
+      'circle-stroke-color': ['match', ['get', 'kind'], 'door', INK, '#FBFBF7'],
+    } });
+  map.addLayer({ id: 'stops-label', type: 'symbol', source: 'stops', slot: 'top',
+    layout: {
+      'text-field': ['get', 'label'], 'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'], 'text-size': 14,
+      'text-variable-anchor': ['left', 'right', 'top', 'bottom'], 'text-radial-offset': 1.2, 'text-justify': 'auto',
+    },
+    paint: { 'text-color': INK, 'text-halo-color': '#FBFBF7', 'text-halo-width': 2 } });
+  fit();
+  ready = true;
+  play();
+});
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (ready) fit(); }, 200);
+});
+
+/* ---- The printer ---- */
+let printing = 0;
+function setPrinting(on) {
+  printing = Math.max(0, printing + (on ? 1 : -1));
+  led.classList.toggle('on', printing > 0 && !reduce);
+}
+
+// Appends one line; .feeding makes it feed out of the slot. --h is the
+// line's natural height so the stepped max-height animation ends exactly.
+function print(html, cls = '') {
+  const el = document.createElement('div');
+  el.className = 'rl ' + cls;
+  el.innerHTML = html;
+  feed.appendChild(el);
+  if (!reduce) {
+    el.style.setProperty('--h', Math.max(el.scrollHeight, 10) + 'px');
+    el.classList.add('feeding');
+    setPrinting(true);
+    setTimeout(() => setPrinting(false), 430);
+  }
+  const paper = feed.parentElement;
+  const follow = () => paper.scrollTo({ top: paper.scrollHeight, behavior: reduce ? 'auto' : 'smooth' });
+  follow();
+  setTimeout(follow, 450);
+  return el;
+}
+
+function barcode(seed) {
+  let x = 0, bars = '', s = seed;
+  for (let i = 0; x < 300; i++) {
+    s = (s * 1103515245 + 12345) & 0x7fffffff;
+    const w = 1 + ((s >> 8) % 3);
+    if (i % 2 === 0) bars += `<rect x="${x}" width="${w}" height="54"/>`;
+    x += w;
+  }
+  return `<svg viewBox="0 0 ${x} 54" preserveAspectRatio="none" fill="#2A2A2A" opacity="0.88" aria-label="Order barcode" role="img">${bars}</svg>`;
+}
+
+const clock = (min) => {
+  const t = START + min;
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+};
+const sep = (solid) => ['', 'rl-sep' + (solid ? ' solid' : '')];
+const stage = (min, label, done) => [`<span class="rl-time">${clock(min)}</span><span class="rl-label">${label}</span>`, 'rl-stage' + (done ? ' done' : '')];
+
+/* ---- Scripted order timeline (Replay re-runs it) ---- */
+const CANCEL = {};
+let run = 0;
+
+async function play() {
+  const my = ++run;
+  const wait = (ms) => new Promise((res, rej) => setTimeout(() => (my === run ? res() : rej(CANCEL)), ms));
+  const lines = async (list, gap = 110) => { for (const l of list) { print(...l); await wait(gap); } };
+  feed.innerHTML = '';
+  printing = 0;
+  led.classList.remove('on');
+  courier.remove();
+  heading = null;
+  setProgress(0);
+  chip.textContent = 'Order placed';
+  try {
+    await wait(500);
+    // 1. ORDER PLACED
+    await lines([
+      ['Soi 9 Noodle Bar', 'rl-center rl-brand'],
+      ['Soi Ari 1, Phaya Thai<br>Bangkok 10400', 'rl-center fade'],
+      sep(),
+      ['<small>Delivery order</small><span class="rl-order-no">#0427</span>', 'rl-order'],
+      ['<span>Wed 21 Oct 2026</span><span>' + clock(0) + '</span>', 'rl-meta'],
+      ['<span>Courier</span><span>NOK (scooter)</span>', 'rl-meta'],
+      ['<span>Deliver to</span><span>Sarasin Rd, opp. Lumphini Park</span>', 'rl-meta'],
+      sep(),
+      ...ITEMS.map(([q, n, pr]) => [`<span class="rl-qty">${q}x</span><span class="rl-name">${n}</span><span class="rl-lead"></span><span class="rl-price">${pr}</span>`, 'rl-item']),
+      ['no coriander, please. we mean it.<svg class="scribble" viewBox="0 0 150 9" preserveAspectRatio="none" aria-hidden="true"><path d="M2 5C20 1 40 8 60 4S100 2 120 6S140 3 148 4"/></svg>', 'rl-note'],
+      sep(),
+      ['<span>Subtotal</span><span class="rl-lead"></span><span class="rl-price">445.00</span>', 'rl-sum'],
+      ['<span>Delivery</span><span class="rl-lead"></span><span class="rl-price">29.00</span>', 'rl-sum'],
+      ['<span>VAT 7% incl.</span><span class="rl-lead"></span><span class="rl-price fade">31.01</span>', 'rl-sum'],
+      sep(true),
+      ['<span>TOTAL</span><span class="rl-lead"></span><span class="rl-price">&#3647;474.00</span>', 'rl-total'],
+      sep(),
+      stage(0, 'Order placed', true),
+      ['The kitchen has seen it. No takebacks.', 'rl-note'],
+    ]);
+    await wait(1500);
+
+    // 2. KITCHEN PREPARING (an ASCII bar fills in place)
+    print(...stage(2, 'Kitchen preparing', true));
+    print('Wok: hot. Chef: unbothered.', 'rl-note');
+    const bar = print('', 'rl-bar');
+    for (let i = 0; i <= 10; i++) {
+      bar.textContent = '[' + '#'.repeat(i) + '.'.repeat(10 - i) + '] ' + String(i * 10).padStart(3) + '%';
+      await wait(260);
+    }
+    await wait(500);
+
+    // 3. COURIER PICKED UP
+    await lines([stage(14, 'Courier picked up', true), ['Nok has the bag. The bag has the noodles.', 'rl-note']], 160);
+    courier.setLngLat(KITCHEN).addTo(map);
+    place(0);
+    chip.textContent = 'Courier picked up';
+    await wait(1400);
+
+    // 4. ON THE WAY: live ETA, scooter rides the route
+    print(...stage(15, 'On the way'));
+    print('Nok is negotiating Phahonyothin traffic.', 'rl-note');
+    print(`<span class="eta-num" id="eta-num">${RIDE_MIN}</span><span class="eta-unit">MIN</span><span class="eta-sub" id="eta-sub">${(TOTAL / 1000).toFixed(1)} km to go</span>`, 'rl-eta');
+    await wait(900);
+    if (reduce) {
+      for (let k = 1; k <= 5; k++) { place(k / 5); await wait(1200); }
+    } else {
+      await new Promise((res) => {
+        const t0 = performance.now();
+        const frame = (now) => {
+          if (my !== run) return res();
+          const p = Math.min(1, (now - t0) / RIDE_MS);
+          place(p);
+          if (p < 1) requestAnimationFrame(frame); else res();
+        };
+        requestAnimationFrame(frame);
+      });
+    }
+    await wait(0);
+    place(1);
+
+    // 5. DELIVERED
+    const t = RIDE_MIN + 15;
+    await lines([
+      stage(t, 'Delivered', true),
+      ['Handed over. Still warm. Mostly.', 'rl-note'],
+      ['<span>Tip (cash)</span><span class="rl-lead"></span><span class="rl-price">&#3647;30.00</span>', 'rl-sum'],
+      ['<div class="stamp">Delivered</div><div class="stamp stamp-small">Paid</div>', 'rl-stamp'],
+      sep(),
+      [barcode(427), 'rl-barcode'],
+      ['0427 0021 1049 NOK', 'rl-center fade'],
+      ['THANK YOU / ขอบคุณครับ<br>no refunds on hunger', 'rl-center'],
+    ], 220);
+    chip.textContent = 'Delivered';
+  } catch (e) {
+    if (e !== CANCEL) throw e;
+  }
+}
+
+$('replay').addEventListener('click', () => { if (ready) play(); });
+map.on('error', (e) => { chip.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown'); });
+</script>
+</body>
+</html>

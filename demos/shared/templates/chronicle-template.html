@@ -1,0 +1,439 @@
+<!--
+  Working EXAMPLE of the Chronicle style pack (chronicle.css, in this same
+  folder). Open this file directly to see the pattern working with 42 famous
+  bridges on a globe, then copy the markup and script into your own demo and
+  link chronicle.css from its <head> -- see the class/id contract documented
+  at the top of that CSS file for what to build.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (a museum-exhibit timeline: plum, saffron, ivory, a
+  globe above a histogram + range brush). The bridge list, years, lengths
+  and coordinates are illustrative and approximate, not authoritative --
+  swap in your own dated events.
+
+  What's NOT included: a real data source (events are an inline array), a
+  build step, or an event list for screen readers beyond the keyboard-
+  accessible brush handles. The histogram is hand-written SVG, no charting
+  library.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Spans of Time</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..700,0..100;1,9..144,400..600,0..100&family=Commissioner:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="chronicle.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: the map fills the stage, which ends above the timeline. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<div class="chronicle">
+  <div class="stage">
+    <div id="map"></div>
+    <div class="status-note loading" id="status-note">Loading the collection</div>
+    <div class="hud">
+      <div class="readout">
+        <div class="eyebrow">Spans of Time &middot; Bridges</div>
+        <div class="years" aria-live="polite"><span class="year" id="year-a">1860</span><span class="dash">&mdash;</span><span class="year" id="year-b">1930</span></div>
+        <div class="count" id="count"></div>
+      </div>
+      <aside class="event-card hidden" id="card" aria-live="polite">
+        <button class="card-close" id="card-close" aria-label="Close details">&times;</button>
+        <div class="card-kicker" id="card-kicker"></div>
+        <h2 class="card-title" id="card-title"></h2>
+        <div class="card-meta" id="card-meta"></div>
+        <p class="card-body" id="card-body"></p>
+      </aside>
+    </div>
+  </div>
+
+  <section class="timeline" aria-label="Timeline">
+    <div class="tl-controls">
+      <button class="btn btn-primary btn-play" id="play" aria-pressed="false"></button>
+      <div class="tl-note" id="tl-note"></div>
+    </div>
+    <div class="tl-chart-wrap">
+      <div class="tl-chart" id="chart">
+        <svg class="tl-bars" id="bars" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div class="tl-window" id="win"></div>
+        <div class="handle" id="h-a" data-h="a" role="slider" tabindex="0" aria-label="Window start year"></div>
+        <div class="handle" id="h-b" data-h="b" role="slider" tabindex="0" aria-label="Window end year"></div>
+      </div>
+      <div class="tl-axis" id="axis"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+// name, place, opened, lng, lat, length (m), kind, blurb  (illustrative, approximate)
+const RAW = [
+  ['Iron Bridge', 'Shropshire, England', 1779, -2.485, 52.627, 30, 'Arch', 'The first major bridge cast in iron, and an emblem of the Industrial Revolution.'],
+  ['Menai Suspension Bridge', 'Wales', 1826, -4.161, 53.222, 417, 'Suspension', 'Telford’s road link to Anglesey, then the longest span in the world.'],
+  ['Chain Bridge', 'Budapest, Hungary', 1849, 19.043, 47.499, 380, 'Suspension', 'The first permanent crossing of the Danube in the city, guarded by stone lions.'],
+  ['Clifton Suspension Bridge', 'Bristol, England', 1864, -2.627, 51.455, 214, 'Suspension', 'Brunel’s elegant span high above the Avon Gorge, finished after his death.'],
+  ['Brooklyn Bridge', 'New York, USA', 1883, -73.997, 40.706, 1825, 'Cable-stayed hybrid', 'Granite towers and a web of steel cables, the grandest bridge of its century.'],
+  ['Forth Bridge', 'Scotland', 1890, -3.388, 56.000, 2467, 'Cantilever', 'A red steel giant that still carries trains across the Firth of Forth.'],
+  ['Tower Bridge', 'London, England', 1894, -0.075, 51.506, 244, 'Bascule', 'A Victorian drawbridge dressed as a castle, lifted for ships on the Thames.'],
+  ['Pont Alexandre III', 'Paris, France', 1900, 2.314, 48.864, 107, 'Arch', 'The most ornate bridge on the Seine, built for the 1900 World’s Fair.'],
+  ['Victoria Falls Bridge', 'Zambia / Zimbabwe', 1905, 25.859, -17.929, 198, 'Arch', 'A steel arch spanning the Zambezi gorge within sight of the falls.'],
+  ['Hohenzollern Bridge', 'Cologne, Germany', 1911, 6.965, 50.941, 409, 'Arch', 'A railway bridge beside the cathedral, hung with thousands of love locks.'],
+  ['Quebec Bridge', 'Quebec, Canada', 1919, -71.282, 46.750, 987, 'Cantilever', 'The longest cantilever span ever built, after two disasters in construction.'],
+  ['George Washington Bridge', 'New York, USA', 1931, -73.953, 40.852, 1451, 'Suspension', 'The busiest motor-vehicle bridge in the world, doubling the span record.'],
+  ['Sydney Harbour Bridge', 'Sydney, Australia', 1932, 151.211, -33.852, 1149, 'Arch', 'The “Coathanger”, a steel arch that frames the harbour and the opera house.'],
+  ['Golden Gate Bridge', 'San Francisco, USA', 1937, -122.478, 37.820, 2737, 'Suspension', 'International Orange towers rising out of the fog at the mouth of the bay.'],
+  ['Lions Gate Bridge', 'Vancouver, Canada', 1938, -123.139, 49.315, 1517, 'Suspension', 'A green suspension link from downtown through Stanley Park to the North Shore.'],
+  ['Howrah Bridge', 'Kolkata, India', 1943, 88.347, 22.585, 705, 'Cantilever', 'A riveted steel bridge with no nuts or bolts, carrying the city’s daily crowds.'],
+  ['Mackinac Bridge', 'Michigan, USA', 1957, -84.733, 45.817, 8038, 'Suspension', 'Joins two peninsulas across the straits between Lake Michigan and Lake Huron.'],
+  ['Verrazzano-Narrows Bridge', 'New York, USA', 1964, -74.045, 40.607, 2039, 'Suspension', 'The longest span in the world for nearly two decades after it opened.'],
+  ['25 de Abril Bridge', 'Lisbon, Portugal', 1966, -9.178, 38.690, 2277, 'Suspension', 'A red suspension bridge over the Tagus, built by the makers of the Bay Bridge.'],
+  ['Bosphorus Bridge', 'Istanbul, Türkiye', 1973, 29.034, 41.045, 1560, 'Suspension', 'Links Europe to Asia, lit each night in shifting colours.'],
+  ['Rio–Niterói Bridge', 'Rio de Janeiro, Brazil', 1974, -43.150, -22.870, 13290, 'Box girder', 'Thirteen kilometres across Guanabara Bay, long the longest in the southern hemisphere.'],
+  ['Humber Bridge', 'Hull, England', 1981, -0.450, 53.706, 2220, 'Suspension', 'The longest single-span suspension bridge in the world until 1998.'],
+  ['Sunshine Skyway', 'Florida, USA', 1987, -82.657, 27.620, 6900, 'Cable-stayed', 'Yellow stay-cables fan out over the mouth of Tampa Bay like a ship’s sails.'],
+  ['Pont de Normandie', 'Le Havre, France', 1995, 0.275, 49.435, 2141, 'Cable-stayed', 'A slender cable-stayed span across the Seine estuary.'],
+  ['Tsing Ma Bridge', 'Hong Kong', 1997, 114.080, 22.350, 2200, 'Suspension', 'Carries both road and rail on the way to the island airport.'],
+  ['Vasco da Gama Bridge', 'Lisbon, Portugal', 1998, -9.000, 38.770, 17185, 'Cable-stayed', 'Europe’s longest bridge, striding across the Tagus estuary.'],
+  ['Akashi Kaikyō Bridge', 'Kobe–Awaji', 1998, 135.022, 34.616, 3911, 'Suspension', 'Holds the record for the longest central span ever completed.'],
+  ['Øresund Bridge', 'Denmark / Sweden', 2000, 12.830, 55.570, 7845, 'Cable-stayed', 'A bridge that dives into a tunnel, joining Copenhagen and Malmö.'],
+  ['Millennium Bridge', 'London, England', 2000, -0.099, 51.510, 325, 'Suspension', 'A blade of light for pedestrians between St Paul’s and Bankside.'],
+  ['Gateshead Millennium Bridge', 'England', 2001, -1.597, 54.969, 126, 'Tilting', 'A pedestrian arch that tilts like an eyelid to let boats pass.'],
+  ['Millau Viaduct', 'Occitanie, France', 2004, 3.023, 44.078, 2460, 'Cable-stayed', 'The tallest bridge in the world, floating above a river valley.'],
+  ['Rion–Antirion Bridge', 'Greece', 2004, 21.773, 38.320, 2252, 'Cable-stayed', 'Four towers on a seabed that shakes, linking the Peloponnese to the mainland.'],
+  ['Hangzhou Bay Bridge', 'Zhejiang, China', 2008, 121.200, 30.350, 35673, 'Cable-stayed', 'An S-shaped crossing of more than thirty-five kilometres over the bay.'],
+  ['Sutong Bridge', 'Jiangsu, China', 2008, 120.990, 31.770, 8206, 'Cable-stayed', 'Spans the Yangtze with one of the longest stayed main spans.'],
+  ['Stonecutters Bridge', 'Hong Kong', 2009, 114.120, 22.330, 1596, 'Cable-stayed', 'Two slender towers guard the entrance to Victoria Harbour’s container port.'],
+  ['Bandra–Worli Sea Link', 'Mumbai, India', 2009, 72.820, 19.040, 5600, 'Cable-stayed', 'Eight lanes of sea link that cut the city’s western crossing to minutes.'],
+  ['Helix Bridge', 'Singapore', 2010, 103.861, 1.288, 280, 'Pedestrian', 'A double helix of steel and glass at the edge of Marina Bay.'],
+  ['Russky Bridge', 'Vladivostok, Russia', 2012, 131.900, 43.040, 3100, 'Cable-stayed', 'Holds the record for the longest cable-stayed central span.'],
+  ['Hong Kong–Zhuhai–Macau Bridge', 'Pearl River Delta', 2018, 113.800, 22.300, 55000, 'Bridge-tunnel', 'A chain of bridges and an undersea tunnel across the delta.'],
+  ['1915 Çanakkale Bridge', 'Dardanelles, Türkiye', 2022, 26.660, 40.380, 4608, 'Suspension', 'The longest suspension span in the world at its opening.'],
+  ['Padma Bridge', 'Bangladesh', 2022, 90.260, 23.450, 6150, 'Truss', 'A two-level crossing of one of the world’s great rivers.'],
+  ['Chenab Bridge', 'Jammu & Kashmir, India', 2025, 74.890, 33.150, 1315, 'Arch', 'The highest railway arch in the world, set in the Himalayan foothills.'],
+];
+
+const MIN = 1770, MAX = 2030, DEC = 10, MIN_SPAN = 10, PLAY_SPEED = 14; // years per second
+const PLUM = '#24152F', LAND = '#43295A', DEEP = '#140A1C', SAFFRON = '#F4A259', ROSE = '#E26D5C', IVORY = '#F6EEE3', LILAC = '#9C88B0', LILAC_HI = '#B9A6CC';
+const EVENTS = RAW.map(([name, place, year, lng, lat, len, kind, blurb], id) => ({ id, name, place, year, lng, lat, len, kind, blurb }));
+const NDEC = (MAX - MIN) / DEC;
+const DECADE_IDS = Array.from({ length: NDEC }, () => []);
+EVENTS.forEach((e) => DECADE_IDS[Math.floor((e.year - MIN) / DEC)].push(e.id));
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const isPhone = () => window.matchMedia('(max-width: 640px)').matches;
+const $ = (id) => document.getElementById(id);
+const ZERO = { top: 0, right: 0, bottom: 0, left: 0 };
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/dark-v11',
+  projection: 'globe',
+  center: [10, 25],
+  zoom: isPhone() ? 0.9 : 1.9,
+});
+
+let ready = false, selected = null, hovered = -1;
+const win = { a: 1860, b: 1930 };
+
+/* ---------- Basemap: recolour dark-v11 to plum tones ---------- */
+function recolour() {
+  const set = (id, prop, val) => { try { map.setPaintProperty(id, prop, val); } catch (e) { /* layer lacks prop */ } };
+  map.getStyle().layers.forEach((l) => {
+    if (l.type === 'background') set(l.id, 'background-color', LAND);
+    else if (l.type === 'fill') set(l.id, 'fill-color', /water/.test(l.id) ? DEEP : LAND);
+    else if (l.type === 'line') {
+      if (/admin|boundary/.test(l.id)) { set(l.id, 'line-color', LILAC); set(l.id, 'line-opacity', 0.5); set(l.id, 'line-width', 0.6); }
+      else set(l.id, 'line-color', /water/.test(l.id) ? DEEP : '#3A2449');
+    } else if (l.type === 'symbol') {
+      set(l.id, 'text-color', IVORY); set(l.id, 'text-halo-color', PLUM); set(l.id, 'text-opacity', 0.7); set(l.id, 'icon-opacity', 0.4);
+    }
+  });
+  map.setFog({
+    color: 'rgb(58, 36, 73)', 'high-color': '#7A3B55', 'horizon-blend': 0.07,
+    'space-color': '#150B1E', 'star-intensity': 0.12,
+  });
+}
+
+/* ---------- Event layers ---------- */
+const lenRadius = (a, b, c, d, m = 1) => ['interpolate', ['linear'], ['get', 'len'], 0, a * m, 500, b * m, 3000, c * m, 40000, d * m];
+const radiusExpr = (m) => ['interpolate', ['linear'], ['zoom'], 1, lenRadius(5, 6.5, 8, 11, m), 6, lenRadius(7, 9, 13, 20, m)];
+const fs = (key) => ['boolean', ['feature-state', key], false];
+
+function addLayers() {
+  map.addSource('events', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: EVENTS.map((e) => ({
+      type: 'Feature', id: e.id,
+      properties: { id: e.id, name: e.name, year: e.year, len: e.len },
+      geometry: { type: 'Point', coordinates: [e.lng, e.lat] } })) },
+  });
+  map.addLayer({ id: 'events-ghost', type: 'circle', source: 'events',
+    paint: { 'circle-radius': 2.5, 'circle-color': LILAC, 'circle-opacity': 0.35 } });
+  map.addLayer({ id: 'events-halo', type: 'circle', source: 'events',
+    paint: { 'circle-radius': 20, 'circle-color': SAFFRON, 'circle-blur': 0.8,
+      'circle-opacity': ['case', ['any', fs('hl'), fs('sel')], 0.3, 0] } });
+  map.addLayer({ id: 'events-glow', type: 'circle', source: 'events',
+    paint: { 'circle-radius': radiusExpr(2.5), 'circle-color': SAFFRON, 'circle-blur': 1, 'circle-opacity': 0.25 } });
+  map.addLayer({ id: 'events-pulse', type: 'circle', source: 'events',
+    paint: { 'circle-radius': ['+', 8, ['*', 26, ['coalesce', ['feature-state', 'pulse'], 0]]],
+      'circle-opacity': 0, 'circle-stroke-width': 2, 'circle-stroke-color': ROSE,
+      'circle-stroke-opacity': ['*', 0.85, ['-', 1, ['coalesce', ['feature-state', 'pulse'], 1]]] } });
+  map.addLayer({ id: 'events', type: 'circle', source: 'events',
+    paint: {
+      'circle-radius': radiusExpr(1),
+      'circle-color': SAFFRON, 'circle-opacity': 0.92,
+      'circle-stroke-width': ['case', fs('sel'), 3, fs('hl'), 2.5, 1],
+      'circle-stroke-color': ['case', ['any', fs('sel'), fs('hl')], IVORY, PLUM] } });
+}
+
+let mapPending = false;
+function applyMap() {
+  if (!ready || mapPending) return;
+  mapPending = true;
+  requestAnimationFrame(() => {
+    mapPending = false;
+    const { a, b } = win;
+    const f = ['all', ['>=', ['get', 'year'], a], ['<=', ['get', 'year'], b]];
+    map.setFilter('events', f);
+    map.setFilter('events-pulse', f);
+    map.setFilter('events-glow', f);
+    // Older events fade toward lilac, the newest in the window glow saffron.
+    map.setPaintProperty('events', 'circle-color', ['interpolate', ['linear'], ['get', 'year'], a, LILAC_HI, Math.max(b, a + 1), SAFFRON]);
+  });
+}
+
+/* ---------- Timeline UI ---------- */
+const chart = $('chart'), bars = $('bars');
+const SVGNS = 'http://www.w3.org/2000/svg';
+const maxCount = Math.max(...DECADE_IDS.map((d) => d.length));
+bars.setAttribute('viewBox', '0 0 ' + NDEC + ' 100');
+DECADE_IDS.forEach((ids, i) => {
+  const h = ids.length ? 8 + (ids.length / (maxCount + 0.5)) * 88 : 1.5;
+  const r = document.createElementNS(SVGNS, 'rect');
+  r.setAttribute('class', 'bar');
+  r.setAttribute('x', i + 0.14); r.setAttribute('width', 0.72);
+  r.setAttribute('y', 100 - h); r.setAttribute('height', h);
+  bars.appendChild(r);
+});
+const barEls = bars.querySelectorAll('.bar');
+
+for (let y = 1780; y <= 2020; y += 20) {
+  const t = document.createElement('span');
+  t.className = 'tick' + (y % 40 === 0 ? ' major' : '');
+  t.style.left = ((y - MIN) / (MAX - MIN)) * 100 + '%';
+  t.textContent = y;
+  $('axis').appendChild(t);
+}
+
+const pct = (y) => ((y - MIN) / (MAX - MIN)) * 100 + '%';
+const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+const pulses = new Map();
+let pulseRaf = 0;
+
+function pulse(ids) {
+  if (reduceMotion.matches || !ready) return;
+  const t = performance.now();
+  ids.forEach((id) => pulses.set(id, t));
+  if (!pulseRaf) pulseRaf = requestAnimationFrame(tickPulse);
+}
+function tickPulse(now) {
+  pulses.forEach((t0, id) => {
+    const p = Math.min((now - t0) / 1200, 1);
+    map.setFeatureState({ source: 'events', id }, { pulse: p });
+    if (p >= 1) pulses.delete(id);
+  });
+  pulseRaf = pulses.size ? requestAnimationFrame(tickPulse) : 0;
+}
+
+// pulseFrom: previous end year during Play, so only newly entered events pulse.
+function setWindow(a, b, pulseFrom) {
+  a = clamp(a, MIN, MAX - MIN_SPAN); b = clamp(b, a + MIN_SPAN, MAX);
+  win.a = a; win.b = b;
+  const ra = Math.round(a), rb = Math.round(b);
+  $('year-a').textContent = ra; $('year-b').textContent = rb;
+  $('win').style.left = pct(a); $('win').style.width = ((b - a) / (MAX - MIN)) * 100 + '%';
+  [['h-a', a, ra], ['h-b', b, rb]].forEach(([id, y, r]) => {
+    $(id).style.left = pct(y);
+    $(id).setAttribute('aria-valuemin', MIN); $(id).setAttribute('aria-valuemax', MAX);
+    $(id).setAttribute('aria-valuenow', r); $(id).setAttribute('aria-valuetext', String(r));
+  });
+  barEls.forEach((el, i) => el.classList.toggle('on', MIN + (i + 1) * DEC > a && MIN + i * DEC <= b));
+  const inView = EVENTS.filter((e) => e.year >= a && e.year <= b);
+  $('count').innerHTML = '<b>' + inView.length + '</b> of ' + EVENTS.length + ' bridges in view';
+  if (pulseFrom != null) {
+    const fresh = inView.filter((e) => e.year > pulseFrom);
+    pulse(fresh.map((e) => e.id));
+    follow(fresh);
+  }
+  applyMap();
+}
+
+// During Play, ease the globe toward newly arrived events so their pulses are seen.
+let lastFollow = 0;
+function follow(fresh) {
+  const now = performance.now();
+  if (!ready || !fresh.length || selected !== null || reduceMotion.matches || now - lastFollow < 1600) return;
+  lastFollow = now;
+  const rad = Math.PI / 180;
+  const x = fresh.reduce((s, e) => s + Math.cos(e.lng * rad), 0), y = fresh.reduce((s, e) => s + Math.sin(e.lng * rad), 0);
+  const lat = fresh.reduce((s, e) => s + e.lat, 0) / fresh.length;
+  map.easeTo({ center: [Math.atan2(y, x) / rad, lat], duration: 1500, essential: true });
+}
+
+function hoverDecade(d) {
+  if (d === hovered) return;
+  if (ready && hovered >= 0) DECADE_IDS[hovered].forEach((id) => map.setFeatureState({ source: 'events', id }, { hl: false }));
+  hovered = d;
+  barEls.forEach((el, i) => el.classList.toggle('hl', i === d));
+  if (d >= 0) {
+    if (ready) DECADE_IDS[d].forEach((id) => map.setFeatureState({ source: 'events', id }, { hl: true }));
+    const n = DECADE_IDS[d].length;
+    $('tl-note').textContent = (MIN + d * DEC) + 's: ' + n + (n === 1 ? ' bridge' : ' bridges');
+  } else $('tl-note').textContent = 'Bridges opened, by decade';
+}
+
+/* Brush: drag a handle, drag the window, or click outside to move the nearest edge. */
+let drag = null;
+const yearAt = (x) => {
+  const r = chart.getBoundingClientRect();
+  return MIN + clamp((x - r.left) / r.width, 0, 1) * (MAX - MIN);
+};
+function dragTo(y) {
+  y = Math.round(y);
+  if (drag.mode === 'a') setWindow(Math.min(y, win.b - MIN_SPAN), win.b);
+  else if (drag.mode === 'b') setWindow(win.a, Math.max(y, win.a + MIN_SPAN));
+  else { const span = win.b - win.a, a = clamp(y - drag.off, MIN, MAX - span); setWindow(a, a + span); }
+}
+chart.addEventListener('pointerdown', (e) => {
+  setPlaying(false);
+  const y = yearAt(e.clientX), h = e.target.closest('.handle');
+  const mode = h ? h.dataset.h : y > win.a && y < win.b ? 'win' : Math.abs(y - win.a) < Math.abs(y - win.b) ? 'a' : 'b';
+  drag = { mode, off: y - win.a };
+  chart.setPointerCapture(e.pointerId);
+  hoverDecade(-1);
+  if (mode !== 'win') dragTo(y);
+});
+chart.addEventListener('pointermove', (e) => {
+  const y = yearAt(e.clientX);
+  if (drag) dragTo(y); else hoverDecade(Math.min(Math.floor((y - MIN) / DEC), NDEC - 1));
+});
+chart.addEventListener('pointerup', () => { drag = null; });
+chart.addEventListener('pointercancel', () => { drag = null; });
+chart.addEventListener('pointerleave', () => { if (!drag) hoverDecade(-1); });
+
+['a', 'b'].forEach((k) => $('h-' + k).addEventListener('keydown', (e) => {
+  const step = (e.shiftKey ? 10 : 1) * ({ ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[e.key] || 0);
+  let v = win[k];
+  if (step) v += step;
+  else if (e.key === 'Home') v = MIN;
+  else if (e.key === 'End') v = MAX;
+  else return;
+  e.preventDefault();
+  setPlaying(false);
+  if (k === 'a') setWindow(Math.min(Math.round(v), win.b - MIN_SPAN), win.b);
+  else setWindow(win.a, Math.max(Math.round(v), win.a + MIN_SPAN));
+}));
+
+/* ---------- Play: sweep the window forward ---------- */
+const PLAY = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1l9 5-9 5z"/></svg> Play';
+const PAUSE = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg> Pause';
+let playing = false, playRaf = 0, last = 0;
+
+function setPlaying(on) {
+  playing = on;
+  $('play').innerHTML = on ? PAUSE : PLAY;
+  $('play').setAttribute('aria-pressed', on);
+  cancelAnimationFrame(playRaf);
+  if (!on) return;
+  if (win.b >= MAX) setWindow(MIN, MIN + (win.b - win.a));
+  last = performance.now();
+  playRaf = requestAnimationFrame(frame);
+}
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.1), span = win.b - win.a, prev = win.b;
+  last = now;
+  const b = Math.min(win.b + PLAY_SPEED * dt, MAX);
+  setWindow(b - span, b, prev);
+  if (b >= MAX) setPlaying(false); else playRaf = requestAnimationFrame(frame);
+}
+$('play').addEventListener('click', () => setPlaying(!playing));
+
+/* ---------- Detail card ---------- */
+const place = (e) => e.place + ' · ' + (e.len >= 1000 ? (e.len / 1000).toFixed(1) + ' km' : e.len + ' m') + ' long';
+
+function select(id) {
+  if (selected !== null) map.setFeatureState({ source: 'events', id: selected }, { sel: false });
+  selected = id;
+  const e = EVENTS[id];
+  map.setFeatureState({ source: 'events', id }, { sel: true });
+  $('card-kicker').textContent = 'Opened ' + e.year + ' · ' + e.kind;
+  $('card-title').textContent = e.name;
+  $('card-meta').textContent = place(e);
+  $('card-body').textContent = e.blurb;
+  $('card').classList.remove('hidden');
+  const cam = { center: [e.lng, e.lat], zoom: Math.max(map.getZoom(), 4.4),
+    padding: isPhone() ? { ...ZERO, top: 230 } : { ...ZERO, right: 340 } };
+  if (reduceMotion.matches) map.jumpTo(cam); else map.flyTo({ ...cam, duration: 2200, essential: true });
+}
+function closeCard() {
+  if (selected === null) return;
+  map.setFeatureState({ source: 'events', id: selected }, { sel: false });
+  selected = null;
+  $('card').classList.add('hidden');
+  const cam = { padding: ZERO, zoom: isPhone() ? 0.9 : 1.6 };
+  if (reduceMotion.matches) map.jumpTo(cam); else map.easeTo({ ...cam, duration: 1200 });
+}
+$('card-close').addEventListener('click', closeCard);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCard(); });
+
+const popup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, offset: 12, className: 'chron-pop' });
+map.on('mousemove', 'events', (e) => {
+  map.getCanvas().style.cursor = 'pointer';
+  const f = e.features[0];
+  popup.setLngLat(f.geometry.coordinates).setText(f.properties.name + ' · ' + f.properties.year).addTo(map);
+});
+map.on('mouseleave', 'events', () => { map.getCanvas().style.cursor = ''; popup.remove(); });
+map.on('click', 'events', (e) => select(Number(e.features[0].properties.id)));
+
+/* ---------- Idle globe rotation ---------- */
+let interacting = false, resumeTimer = 0;
+function hold() { interacting = true; clearTimeout(resumeTimer); }
+function release() { clearTimeout(resumeTimer); resumeTimer = setTimeout(() => { interacting = false; spin(); }, 2000); }
+function spin() {
+  if (reduceMotion.matches || interacting || selected !== null || map.getZoom() >= 3.6) return;
+  const c = map.getCenter();
+  c.lng -= 6;
+  map.easeTo({ center: c, duration: 1000, easing: (n) => n, essential: true });
+}
+['mousedown', 'touchstart'].forEach((t) => map.on(t, hold));
+['mouseup', 'touchend', 'dragend'].forEach((t) => map.on(t, release));
+map.on('wheel', () => { hold(); release(); });
+map.on('moveend', spin);
+
+/* ---------- Boot ---------- */
+map.on('style.load', () => {
+  recolour();
+  addLayers();
+  ready = true;
+  $('status-note').classList.add('hidden');
+  setWindow(win.a, win.b);
+  map.once('idle', spin);
+});
+map.on('error', (e) => {
+  const n = $('status-note');
+  n.className = 'status-note error';
+  n.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+$('play').innerHTML = PLAY;
+$('tl-note').textContent = 'Bridges opened, by decade';
+setWindow(win.a, win.b);
+</script>
+</body>
+</html>

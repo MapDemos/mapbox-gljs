@@ -1,0 +1,362 @@
+<!--
+  Working EXAMPLE of the Bottom Sheet style pack (bottom-sheet.css, in this
+  same folder). Open this file directly to see the pattern working as a
+  fictional neighbourhood guide, "Wander", with 18 places in Copenhagen, then
+  copy the markup and script into your own demo and link bottom-sheet.css
+  from its <head> -- see the class/id contract documented at the top of that
+  CSS file for what to build.
+
+  This is a brand-new style, not extracted from an existing demo. Cafes and
+  bakeries are invented; the parks are real. Names, copy and hours are
+  illustrative placeholders.
+
+  Notes: only the handle + header start a sheet drag (the list scrolls
+  natively). The script writes --sheet-offset so the CSS keeps the Mapbox
+  logo / attribution above the sheet, and pads the camera by the sheet's
+  coverage so a selected place is never hidden under it.
+
+  What's NOT included: real opening hours, routing (Directions is just a
+  toast), a backend, persistence of saved places, or a build step.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Wander</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;800&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="bottom-sheet.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map { position: fixed; inset: 0; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="status-note loading" id="status-note" role="status">Loading map</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<section class="sheet" id="sheet" data-snap="half" aria-label="Places nearby">
+  <header class="sheet-head" id="sheet-head">
+    <button class="sheet-handle" id="handle" type="button" aria-label="Resize sheet"><span class="sheet-handle-bar"></span></button>
+    <div id="head-list">
+      <label class="search-field">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+        <input class="search-input" id="search" type="search" placeholder="Search places" autocomplete="off" aria-label="Search places by name" />
+      </label>
+      <div class="segmented" id="segmented" role="group" aria-label="Category">
+        <button class="segment" type="button" data-cat="cafe" aria-pressed="true">Caf&eacute;s</button>
+        <button class="segment" type="button" data-cat="bakery" aria-pressed="false">Bakeries</button>
+        <button class="segment" type="button" data-cat="park" aria-pressed="false">Parks</button>
+      </div>
+    </div>
+    <div class="detail-bar hidden" id="head-detail">
+      <button class="back-btn" id="back" type="button" aria-label="Back to list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <h2 class="detail-title" id="detail-title"></h2>
+    </div>
+  </header>
+  <div class="sheet-body" id="sheet-body">
+    <div id="list-view">
+      <div class="group-label"><span id="group-title"></span><span id="group-count"></span></div>
+      <ul class="place-list" id="place-list"></ul>
+      <p class="empty-state hidden" id="empty"></p>
+    </div>
+    <div class="detail hidden" id="detail"></div>
+  </div>
+</section>
+
+<script>
+// [name, category, area, lng, lat, opens, closes, tags]
+const DATA = [
+  ['Kernel & Co.', 'cafe', 'Nørrebro', 12.5528, 55.6930, 7.5, 18, ['Flat white', 'Oat milk']],
+  ['Slow Bean Room', 'cafe', 'Nørrebro', 12.5470, 55.6905, 8, 17, ['Filter coffee', 'Quiet']],
+  ['Tidewater Coffee', 'cafe', 'Vesterbro', 12.5560, 55.6700, 7, 19, ['Espresso bar', 'Pastries']],
+  ['Copper Kettle', 'cafe', 'Vesterbro', 12.5520, 55.6680, 9, 21, ['Tea', 'Brunch']],
+  ['Little Anchor Café', 'cafe', 'Christianshavn', 12.5935, 55.6735, 8, 18, ['Canal view', 'Cold brew']],
+  ['Hygge Hour', 'cafe', 'Indre By', 12.5740, 55.6790, 8, 20, ['Hot chocolate', 'Candlelit']],
+  ['Rye & Ember', 'bakery', 'Nørrebro', 12.5560, 55.6950, 6.5, 17, ['Rye bread', 'Wood oven']],
+  ['Kanel Corner', 'bakery', 'Nørrebro', 12.5505, 55.6915, 7, 16, ['Cinnamon rolls', 'Cash free']],
+  ['Morgenbrød', 'bakery', 'Vesterbro', 12.5445, 55.6715, 6, 15, ['Early opener', 'Sourdough']],
+  ['Salt & Sourdough', 'bakery', 'Vesterbro', 12.5575, 55.6685, 7, 18, ['Sourdough', 'Savoury']],
+  ['Butter Tide Bageri', 'bakery', 'Christianshavn', 12.5920, 55.6720, 7, 17, ['Croissants', 'Laminated']],
+  ['The Cardamom Loft', 'bakery', 'Indre By', 12.5790, 55.6810, 8, 18, ['Cardamom buns', 'Sit in']],
+  ['Fælledparken', 'park', 'Nørrebro', 12.5707, 55.7015, 0, 24, ['Large lawns', 'Sports pitches']],
+  ['Superkilen', 'park', 'Nørrebro', 12.5393, 55.7005, 0, 24, ['Public art', 'Playground']],
+  ['Enghaveparken', 'park', 'Vesterbro', 12.5490, 55.6670, 0, 24, ['Pond', 'Shady']],
+  ['Ørstedsparken', 'park', 'Indre By', 12.5614, 55.6823, 0, 24, ['Lake', 'Quiet']],
+  ['Kongens Have', 'park', 'Indre By', 12.5775, 55.6850, 0, 24, ['Gardens', 'Castle view']],
+  ['Christianshavn Ramparts', 'park', 'Christianshavn', 12.5900, 55.6700, 0, 24, ['Walking loop', 'Water views']],
+];
+const CATS = {
+  cafe: { label: 'Cafés', one: 'Café', icon: '<path d="M5 9h11v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V9z"/><path d="M16 10h1.5a2 2 0 0 1 0 4H16M8 3.5v2M12 3.5v2"/>' },
+  bakery: { label: 'Bakeries', one: 'Bakery', icon: '<path d="M4 17v-4c0-3 3.5-6 8-6s8 3 8 6v4z"/><path d="M9 10.5l1.2 2.3M13.5 10l1.2 2.3"/>' },
+  park: { label: 'Parks', one: 'Park', icon: '<circle cx="12" cy="9" r="5"/><path d="M12 14v6M8.5 20h7"/>' },
+};
+const REF = [12.5696, 55.6761]; // Raadhuspladsen, distances are measured from here
+const rad = Math.PI / 180;
+function metres(a, b) {
+  const h = Math.sin((b[1] - a[1]) * rad / 2) ** 2 +
+    Math.cos(a[1] * rad) * Math.cos(b[1] * rad) * Math.sin((b[0] - a[0]) * rad / 2) ** 2;
+  return 12742000 * Math.asin(Math.sqrt(h));
+}
+const hhmm = (h) => String(Math.floor(h)).padStart(2, '0') + ':' + (h % 1 ? '30' : '00');
+const PLACES = DATA.map(([name, cat, area, lng, lat, open, close, tags], i) => {
+  const d = metres(REF, [lng, lat]);
+  const always = open === 0 && close === 24;
+  return { id: 'p' + i, name, cat, area, lng, lat, open, close, tags, always, d,
+    dist: d < 1000 ? Math.round(d / 10) * 10 + ' m' : (d / 1000).toFixed(1) + ' km',
+    walk: Math.max(1, Math.round(d / 80)),
+    until: always ? 'Open 24 hours' : 'Open until ' + hhmm(close) };
+}).sort((a, b) => a.d - b.d);
+
+const $ = (id) => document.getElementById(id);
+const sheet = $('sheet'), head = $('sheet-head'), body = $('sheet-body'), search = $('search');
+const phone = matchMedia('(max-width: 768px)');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+const svg = (inner, extra) => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"' + (extra || '') + '>' + inner + '</svg>';
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [12.5683, 55.6785],
+  zoom: 12.9,
+  config: { basemap: { lightPreset: 'day', showPointOfInterestLabels: false } },
+});
+map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
+
+// ---- Sheet geometry: translateY snapping with velocity ----
+const TOP_GAP = 88, PEEK = 132, ORDER = ['peek', 'half', 'full'];
+let snap = 'half', H = 0, total = 0, drag = null, lastDragEnd = 0;
+const cover = (s) => s === 'peek' ? PEEK : s === 'half' ? Math.round(total / 2) : H;
+const yFor = (s) => H - cover(s);
+const setOffset = (px) => document.documentElement.style.setProperty('--sheet-offset', px + 'px');
+
+function applySnap(s) {
+  snap = s;
+  sheet.dataset.snap = s;
+  $('handle').setAttribute('aria-label', 'Resize sheet, currently ' + s + '. Activate to change.');
+  if (!phone.matches) { sheet.style.transform = ''; sheet.style.setProperty('--sheet-y', '0px'); setOffset(0); return; }
+  sheet.style.transform = 'translateY(' + yFor(s) + 'px)';
+  sheet.style.setProperty('--sheet-y', yFor(s) + 'px');
+  setOffset(cover(s));
+}
+function layout() { H = sheet.offsetHeight; total = H + TOP_GAP; applySnap(snap); }
+function setSnap(s) { applySnap(s); if (selected) focusPlace(selected); }
+
+head.addEventListener('pointerdown', (e) => {
+  if (!phone.matches || e.button > 0) return;
+  drag = { id: e.pointerId, y0: e.clientY, t0: yFor(snap), moved: false, pts: [[e.timeStamp, e.clientY]], y: yFor(snap) };
+});
+head.addEventListener('pointermove', (e) => {
+  if (!drag || e.pointerId !== drag.id) return;
+  const dy = e.clientY - drag.y0;
+  if (!drag.moved) {
+    if (Math.abs(dy) < 6) return;
+    drag.moved = true;
+    head.setPointerCapture(e.pointerId);
+    sheet.classList.add('is-dragging');
+    document.body.classList.add('sheet-dragging');
+  }
+  drag.y = Math.min(Math.max(drag.t0 + dy, 0), yFor('peek'));
+  drag.pts.push([e.timeStamp, e.clientY]);
+  if (drag.pts.length > 6) drag.pts.shift();
+  sheet.style.transform = 'translateY(' + drag.y + 'px)';
+  setOffset(H - drag.y);
+});
+function endDrag(e) {
+  if (!drag || e.pointerId !== drag.id) return;
+  const d = drag; drag = null;
+  if (!d.moved) return;
+  sheet.classList.remove('is-dragging');
+  document.body.classList.remove('sheet-dragging');
+  lastDragEnd = Date.now();
+  const [t1, y1] = d.pts[0], [t2, y2] = d.pts[d.pts.length - 1];
+  const v = t2 > t1 ? (y2 - y1) / (t2 - t1) : 0; // px per ms, positive = downwards
+  const target = d.y + v * 200;
+  setSnap(ORDER.reduce((best, s) => Math.abs(yFor(s) - target) < Math.abs(yFor(best) - target) ? s : best));
+}
+head.addEventListener('pointerup', endDrag);
+head.addEventListener('pointercancel', endDrag);
+$('handle').addEventListener('click', () => {
+  if (Date.now() - lastDragEnd < 350) return;
+  setSnap(ORDER[(ORDER.indexOf(snap) + 1) % 3]);
+});
+search.addEventListener('focus', () => { if (phone.matches && snap === 'peek') setSnap('full'); });
+phone.addEventListener('change', layout);
+addEventListener('resize', layout);
+
+// ---- Toast ----
+let toastTimer;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('is-visible');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('is-visible'), 2200);
+}
+
+// ---- List ----
+let cat = 'cafe', query = '', selected = null, listScroll = 0;
+const saved = new Set();
+const COLORS = ['match', ['get', 'cat'], 'cafe', '#E4572E', 'bakery', '#E39A00', '#00A86B'];
+const isSel = ['boolean', ['feature-state', 'selected'], false];
+
+function visible() {
+  const q = query.trim().toLowerCase();
+  return PLACES.filter((p) => p.cat === cat && p.name.toLowerCase().includes(q));
+}
+function syncFilter() {
+  if (!map.getLayer('places')) return;
+  const ids = visible().map((p) => p.id);
+  if (selected) ids.push(selected.id);
+  map.setFilter('places', ['in', ['get', 'id'], ['literal', ids]]);
+}
+function renderList() {
+  const items = visible();
+  $('group-title').textContent = CATS[cat].label + ' near Raadhuspladsen';
+  $('group-count').textContent = items.length + (items.length === 1 ? ' place' : ' places');
+  $('empty').classList.toggle('hidden', items.length > 0);
+  $('empty').textContent = 'No ' + CATS[cat].label.toLowerCase() + ' match “' + query.trim() + '”.';
+  $('place-list').innerHTML = items.map((p) =>
+    '<li><button class="place-row' + (selected && selected.id === p.id ? ' is-selected' : '') + '" type="button" data-id="' + p.id + '">' +
+    '<span class="row-icon cat-' + p.cat + '">' + svg(CATS[p.cat].icon) + '</span>' +
+    '<span class="row-text"><span class="row-name">' + p.name + '</span>' +
+    '<span class="row-meta">' + p.walk + ' min walk · ' + p.until + '</span></span>' +
+    '<span class="row-dist">' + p.dist + '</span></button></li>').join('');
+  syncFilter();
+}
+$('place-list').addEventListener('click', (e) => {
+  const row = e.target.closest('.place-row');
+  if (row) select(PLACES.find((p) => p.id === row.dataset.id));
+});
+document.querySelectorAll('.segment').forEach((b) => b.addEventListener('click', () => {
+  cat = b.dataset.cat;
+  document.querySelectorAll('.segment').forEach((s) => s.setAttribute('aria-pressed', String(s === b)));
+  body.scrollTop = 0;
+  renderList();
+  fitVisible();
+}));
+search.addEventListener('input', () => { query = search.value; renderList(); fitVisible(); });
+
+// ---- Detail ----
+function hoursBar(p) {
+  const x = (h) => (h / 24 * 300).toFixed(1), now = new Date(), nh = now.getHours() + now.getMinutes() / 60;
+  let s = '<svg class="hours-bar" viewBox="0 0 300 40" role="img" aria-label="Opening hours ' + (p.always ? 'all day' : hhmm(p.open) + ' to ' + hhmm(p.close)) + '">' +
+    '<rect x="0" y="6" width="300" height="10" rx="5" fill="#E3E3E8"/>' +
+    '<rect x="' + x(p.open) + '" y="6" width="' + (x(p.close) - x(p.open)) + '" height="10" rx="5" fill="#00A86B"/>' +
+    '<rect x="' + (x(nh) - 1.5) + '" y="2" width="3" height="18" rx="1.5" fill="#111114"/>';
+  [0, 6, 12, 18, 24].forEach((h) => {
+    s += '<text x="' + x(h) + '" y="36" font-size="10" fill="#6B6B76" text-anchor="' + (h === 0 ? 'start' : h === 24 ? 'end' : 'middle') + '">' + String(h).padStart(2, '0') + '</text>';
+  });
+  return s + '</svg>';
+}
+function select(p) {
+  if (selected) map.setFeatureState({ source: 'places', id: selected.id }, { selected: false });
+  selected = p;
+  listScroll = body.scrollTop;
+  $('detail-title').textContent = p.name;
+  $('detail').innerHTML =
+    '<p class="detail-sub">' + CATS[p.cat].one + ' · ' + p.area + '</p>' +
+    '<div class="chips">' + p.tags.map((t) => '<span class="chip">' + t + '</span>').join('') + '</div>' +
+    '<div class="actions"><button class="btn btn-primary" id="go" type="button">' + svg('<path d="M4 11l16-7-7 16-2-7z"/>') + 'Directions</button>' +
+    '<button class="btn btn-secondary" id="save" type="button" aria-pressed="' + saved.has(p.id) + '">' + svg('<path d="M7 4h10v16l-5-4-5 4z"/>') + '<span>' + (saved.has(p.id) ? 'Saved' : 'Save') + '</span></button></div>' +
+    '<div class="hours"><div class="hours-head"><span>Opening hours</span><span>' + (p.always ? 'Open 24 hours' : hhmm(p.open) + ' – ' + hhmm(p.close)) + '</span></div>' + hoursBar(p) + '</div>' +
+    '<div class="info-group"><div class="info-row"><span>Distance</span><span>' + p.dist + '</span></div>' +
+    '<div class="info-row"><span>On foot</span><span>' + p.walk + ' min</span></div>' +
+    '<div class="info-row"><span>Neighbourhood</span><span>' + p.area + '</span></div></div>';
+  $('go').addEventListener('click', () => toast('Directions to ' + p.name + ' would start here'));
+  $('save').addEventListener('click', (e) => {
+    const on = !saved.has(p.id);
+    on ? saved.add(p.id) : saved.delete(p.id);
+    e.currentTarget.setAttribute('aria-pressed', String(on));
+    e.currentTarget.querySelector('span').textContent = on ? 'Saved' : 'Save';
+    toast(on ? 'Saved ' + p.name : 'Removed ' + p.name);
+  });
+  $('list-view').classList.add('hidden');
+  $('detail').classList.remove('hidden');
+  $('head-list').classList.add('hidden');
+  $('head-detail').classList.remove('hidden');
+  head.classList.add('is-detail');
+  body.scrollTop = 0;
+  if (map.getLayer('places')) map.setFeatureState({ source: 'places', id: p.id }, { selected: true });
+  syncFilter();
+  setSnap('half');
+  $('back').focus({ preventScroll: true });
+}
+function back() {
+  if (!selected) return;
+  if (map.getLayer('places')) map.setFeatureState({ source: 'places', id: selected.id }, { selected: false });
+  selected = null;
+  $('detail').classList.add('hidden');
+  $('list-view').classList.remove('hidden');
+  $('head-detail').classList.add('hidden');
+  $('head-list').classList.remove('hidden');
+  head.classList.remove('is-detail');
+  renderList();
+  body.scrollTop = listScroll;
+}
+$('back').addEventListener('click', back);
+addEventListener('keydown', (e) => { if (e.key === 'Escape') back(); });
+
+// ---- Camera: pad by whatever the sheet covers ----
+function padding() {
+  const p = { top: 0, right: 0, bottom: 0, left: 0 };
+  if (phone.matches) p.bottom = cover(snap); else p.left = 396;
+  return p;
+}
+function fitVisible(instant) {
+  const items = visible();
+  if (!items.length) return;
+  const b = new mapboxgl.LngLatBounds();
+  items.forEach((p) => b.extend([p.lng, p.lat]));
+  const pad = phone.matches
+    ? { top: 40, left: 32, right: 32, bottom: Math.min(cover(snap) + 48, innerHeight - 160) }
+    : { top: 40, left: 396 + 32, right: 32, bottom: 72 };
+  const opts = { padding: pad, maxZoom: 15, duration: instant || reduce.matches ? 0 : 500, essential: true };
+  map.fitBounds(b, opts);
+}
+function focusPlace(p) {
+  const cam = { center: [p.lng, p.lat], zoom: Math.max(map.getZoom(), 14.2), padding: padding() };
+  if (reduce.matches) map.jumpTo(cam); else map.easeTo({ ...cam, duration: 900, essential: true });
+}
+
+// ---- Map layers ----
+map.on('style.load', () => {
+  map.addSource('places', {
+    type: 'geojson', promoteId: 'id',
+    data: { type: 'FeatureCollection', features: PLACES.map((p) => ({
+      type: 'Feature', properties: { id: p.id, cat: p.cat }, geometry: { type: 'Point', coordinates: [p.lng, p.lat] } })) },
+  });
+  map.addLayer({
+    id: 'places', type: 'circle', source: 'places', slot: 'top',
+    paint: {
+      'circle-radius': ['case', isSel, 12, 7],
+      'circle-color': COLORS,
+      'circle-stroke-color': '#FFFFFF',
+      'circle-stroke-width': ['case', isSel, 4, 2],
+      'circle-emissive-strength': 1,
+    },
+  });
+  if (selected) map.setFeatureState({ source: 'places', id: selected.id }, { selected: true });
+  syncFilter();
+  $('status-note').classList.add('hidden');
+});
+map.on('click', 'places', (e) => select(PLACES.find((p) => p.id === e.features[0].properties.id)));
+map.on('mouseenter', 'places', () => { map.getCanvas().style.cursor = 'pointer'; });
+map.on('mouseleave', 'places', () => { map.getCanvas().style.cursor = ''; });
+map.on('error', (e) => {
+  const n = $('status-note');
+  n.className = 'status-note error';
+  n.textContent = 'Map error: ' + (e.error && e.error.message || 'unknown');
+});
+
+layout();
+renderList();
+fitVisible(true);
+</script>
+</body>
+</html>

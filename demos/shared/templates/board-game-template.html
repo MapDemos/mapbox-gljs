@@ -1,0 +1,422 @@
+<!--
+  Working EXAMPLE of the Board Game style pack (board-game.css, in this same
+  folder). Open this file directly to see the pattern working with a
+  fictional family game, "Canal Dash", played on a real map of Amsterdam: the
+  map sits inside a wooden-edged board, a ring of 16 coloured stop tiles
+  (real places) surrounds it, and the same 16 stops are numbered tile
+  markers on the map joined by a dotted loop. Pick 2-4 players, press Roll!
+  (a CSS 3D dice tumbles), and the pawn hops tile by tile -- on the ring and
+  as a marker on the map, with the camera following. Each landing shows a
+  fun-fact card and sometimes a bonus. The first pawn to lap the board wins
+  (confetti, then play again). Copy the markup below into your own demo and
+  link board-game.css from its <head> -- see the class/id contract
+  documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (cream board, canal blue, tulip red, sunflower and leaf
+  green, chunky tiles, pawn tokens) at the user's request for something
+  distinct from every other pack in this folder. "Canal Dash", the player
+  names and the bonus rules are fictional placeholders; the places are real
+  and their coordinates are approximate -- swap in your own.
+
+  What's NOT included: networking or saved games, sound, routing between
+  stops (the dotted loop is a straight-line board track), search/geocoding,
+  popups, or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Canal Dash</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Karla:wght@400;600;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="board-game.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <main class="board-wrap">
+    <div class="board">
+      <div class="track" id="track" role="list" aria-label="The 16 stops"></div>
+      <div class="map-slot">
+        <div id="map"></div>
+        <button class="btn btn-ghost btn-fit" id="fit-btn" type="button">Whole board</button>
+      </div>
+    </div>
+  </main>
+
+  <aside class="side" aria-label="Game panel">
+    <header class="brand">
+      <h1 class="brand-title">Canal Dash</h1>
+      <p class="brand-sub">Race once around Amsterdam. First pawn back at Centraal wins!</p>
+    </header>
+
+    <section>
+      <div class="panel-head">
+        <h2 class="section-label">Players</h2>
+        <div class="seg" id="seg" role="group" aria-label="Number of players">
+          <button class="seg-btn" type="button" data-n="2" aria-pressed="true">2</button>
+          <button class="seg-btn" type="button" data-n="3" aria-pressed="false">3</button>
+          <button class="seg-btn" type="button" data-n="4" aria-pressed="false">4</button>
+        </div>
+      </div>
+      <div class="players" id="players"></div>
+    </section>
+
+    <div class="turn-banner" id="turn" aria-live="polite"></div>
+
+    <section class="dice-area">
+      <div class="dice-stage">
+        <div class="dice" id="dice" role="img" aria-label="Dice showing 1"></div>
+      </div>
+      <div class="dice-side">
+        <button class="btn btn-roll" id="roll-btn" type="button">Roll!</button>
+        <p class="dice-hint" id="dice-hint">Roll to hop along the canals.</p>
+      </div>
+    </section>
+
+    <div class="win-card hidden" id="win">
+      <h2 id="win-title">Winner!</h2>
+      <p>A full lap of Amsterdam, done.</p>
+      <button class="btn" id="again-btn" type="button">Play again</button>
+    </div>
+
+    <article class="fact-card hidden" id="fact" aria-live="polite">
+      <p class="fact-tag" id="fact-tag"></p>
+      <h2 class="fact-title" id="fact-title"></h2>
+      <p class="fact-text" id="fact-text"></p>
+      <p class="fact-bonus hidden" id="fact-bonus"></p>
+    </article>
+
+    <section class="log-wrap">
+      <h2 class="section-label">Move log</h2>
+      <ol class="log" id="log" aria-live="polite"></ol>
+    </section>
+  </aside>
+</div>
+
+<script>
+// 16 stops, in loop order [lng, lat]; approximate positions on land.
+const STOPS = [
+  { n: 'Centraal', c: [4.9003, 52.3789], f: 'Amsterdam Centraal opened in 1889 and stands on three artificial islands.' },
+  { n: 'Dam Square', c: [4.8932, 52.3731], f: 'The Royal Palace on Dam Square rests on more than 13,000 wooden piles.' },
+  { n: 'Begijnhof', c: [4.8895, 52.3695], f: 'Begijnhof is a quiet hidden courtyard that dates back to the 14th century.' },
+  { n: 'Bloemenmarkt', c: [4.8912, 52.3668], f: 'The Bloemenmarkt is a floating flower market, its stalls sit on barges.' },
+  { n: 'Magere Brug', c: [4.9029, 52.3636], f: 'Magere Brug opens for boats several times a day.' },
+  { n: 'Artis', c: [4.9161, 52.3660], f: 'Artis opened in 1838 and is the oldest zoo in the Netherlands.' },
+  { n: 'Oosterpark', c: [4.9192, 52.3605], f: 'Oosterpark has a pond, a theatre and the national monument to the history of slavery.' },
+  { n: 'Albert Cuyp Market', c: [4.8945, 52.3555], f: 'Albert Cuyp is one of the biggest street markets in the Netherlands. Try a warm stroopwafel!' },
+  { n: 'Rijksmuseum', c: [4.8852, 52.3600], f: "Rembrandt's giant Night Watch hangs in the Rijksmuseum." },
+  { n: 'Museumplein', c: [4.8795, 52.3580], f: 'In winter the Museumplein pond turns into a free ice rink.' },
+  { n: 'Vondelpark', c: [4.8680, 52.3580], f: 'Vondelpark welcomes around ten million visitors a year.' },
+  { n: 'Prinsengracht', c: [4.8840, 52.3747], f: 'Prinsengracht is the outermost of the three big canals in the canal ring.' },
+  { n: 'Jordaan', c: [4.8775, 52.3770], f: 'Many Jordaan streets are named after flowers, from roses to eglantines.' },
+  { n: 'Westerpark', c: [4.8745, 52.3870], f: 'Westerpark grew around the old Westergasfabriek gasworks.' },
+  { n: "A'DAM Toren", c: [4.9021, 52.3836], f: "A'DAM Toren has a rooftop swing that dangles right over the edge." },
+  { n: 'NEMO', c: [4.9122, 52.3741], f: "NEMO's sloping green roof is a public square you can climb for free." },
+];
+const N = STOPS.length;
+const COLORS = ['red', 'blue', 'yellow', 'green'];
+const HEX = { red: '#E8484B', blue: '#3BA7E0', yellow: '#FFC93C', green: '#4CB76A' };
+const PLAYERS = [
+  { name: 'Tulip', hex: HEX.red }, { name: 'Canal', hex: HEX.blue },
+  { name: 'Sunny', hex: HEX.yellow }, { name: 'Leafy', hex: HEX.green },
+];
+const BONUSES = [
+  { t: 'Canal shortcut! Move ahead 2', d: 2 },
+  { t: 'Tailwind on the towpath! Move ahead 1', d: 1 },
+  { t: 'Drawbridge is up! Back 1', d: -1 },
+];
+const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+// Cube rotation that brings each face to the front.
+const SHOW = { 1: [0, 0], 6: [0, 180], 3: [0, -90], 4: [0, 90], 2: [-90, 0], 5: [90, 0] };
+const OFFSETS = [-15, -5, 5, 15];
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const HOP = reduce ? 150 : 360;
+const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const phone = () => window.matchMedia('(max-width: 900px)').matches;
+const pad = () => (phone()
+  ? { top: 32, bottom: 64, left: 28, right: 28 }
+  : { top: 48, bottom: 72, left: 48, right: 48 });
+
+function pawnSVG(hex) {
+  return `<svg class="token" viewBox="0 0 32 40" aria-hidden="true">` +
+    `<path d="M7 35C7 27 13 25 13.5 18H18.5C19 25 25 27 25 35Z" fill="${hex}" stroke="#222" stroke-width="2.5" stroke-linejoin="round"/>` +
+    `<circle cx="16" cy="10" r="7.5" fill="${hex}" stroke="#222" stroke-width="2.5"/>` +
+    `<ellipse cx="13.5" cy="8" rx="2" ry="2.6" fill="#fff" opacity="0.6"/></svg>`;
+}
+
+/* ---- Map ---- */
+const BOUNDS = STOPS.reduce((b, s) => b.extend(s.c), new mapboxgl.LngLatBounds(STOPS[0].c, STOPS[0].c));
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  projection: 'mercator',
+  bounds: BOUNDS,
+  fitBoundsOptions: { padding: pad() },
+  config: { basemap: { theme: 'faded', lightPreset: 'day', showPointOfInterestLabels: false } },
+});
+
+map.on('style.load', () => {
+  const loop = { type: 'Feature', geometry: { type: 'LineString', coordinates: [...STOPS.map((s) => s.c), STOPS[0].c] } };
+  map.addSource('loop', { type: 'geojson', data: loop });
+  const layout = { 'line-cap': 'round', 'line-join': 'round' };
+  map.addLayer({ id: 'loop-casing', type: 'line', source: 'loop', slot: 'middle', layout,
+    paint: { 'line-color': '#FFFFFF', 'line-width': 9, 'line-opacity': 0.8 } });
+  map.addLayer({ id: 'loop-dots', type: 'line', source: 'loop', slot: 'middle',
+    layout, paint: { 'line-color': '#222222', 'line-width': 4.5, 'line-dasharray': [0.01, 2.2] } });
+});
+
+map.on('error', (e) => log(`<b>Map hiccup:</b> ${(e.error && e.error.message) || 'unknown error'}`));
+
+STOPS.forEach((s, i) => {
+  const root = document.createElement('div');
+  root.innerHTML = `<div class="stop-pin" style="--tc:${HEX[COLORS[i % 4]]}" title="${s.n}"><span class="stop-pin-num">${i + 1}</span></div>`;
+  root.addEventListener('click', () => goTo(i));
+  new mapboxgl.Marker({ element: root }).setLngLat(s.c).addTo(map);
+});
+
+function goTo(i) {
+  const o = { center: STOPS[i].c, zoom: 14, padding: pad() };
+  if (reduce) map.jumpTo(o); else map.flyTo({ ...o, duration: 1200 });
+}
+
+function fitAll() {
+  const o = { padding: pad() };
+  if (reduce) map.fitBounds(BOUNDS, { ...o, duration: 0 }); else map.fitBounds(BOUNDS, { ...o, duration: 1200 });
+}
+$('fit-btn').addEventListener('click', fitAll);
+
+/* ---- Tile ring ---- */
+// Clockwise around a 5x5 grid: top row, right column, bottom row, left column.
+const RING = [[1, 1], [1, 2], [1, 3], [1, 4], [1, 5], [2, 5], [3, 5], [4, 5],
+              [5, 5], [5, 4], [5, 3], [5, 2], [5, 1], [4, 1], [3, 1], [2, 1]];
+const tiles = STOPS.map((s, i) => {
+  const t = document.createElement('button');
+  t.type = 'button';
+  t.setAttribute('role', 'listitem');
+  t.className = `tile tile-${COLORS[i % 4]}`;
+  t.style.setProperty('--r', RING[i][0]);
+  t.style.setProperty('--c', RING[i][1]);
+  t.innerHTML = `<span class="tile-num">${i + 1}</span><span class="tile-name">${s.n}</span><span class="tile-pawns"></span>`;
+  t.addEventListener('click', () => goTo(i));
+  $('track').appendChild(t);
+  return t;
+});
+
+/* ---- Game state ---- */
+let nPlayers = 2, state = [], turn = 0, busy = false, over = false, spinX = 0, spinY = 0;
+const markers = PLAYERS.map((p, i) => {
+  const el = document.createElement('div');
+  el.innerHTML = `<div class="pawn-pin" style="--ox:${OFFSETS[i]}px"><div class="pawn-body">${pawnSVG(p.hex)}</div></div>`;
+  return new mapboxgl.Marker({ element: el, anchor: 'bottom' });
+});
+
+function log(html) {
+  const li = document.createElement('li');
+  li.innerHTML = html;
+  const ol = $('log');
+  ol.prepend(li);
+  while (ol.children.length > 40) ol.lastChild.remove();
+}
+
+function renderTiles(hopper) {
+  tiles.forEach((t, i) => {
+    const here = state.filter((p) => p.progress % N === i);
+    t.querySelector('.tile-pawns').innerHTML = here.map((p) => pawnSVG(p.hex)).join('');
+    if (hopper && hopper.progress % N === i) {
+      const tok = t.querySelector(`.tile-pawns .token:nth-child(${here.indexOf(hopper) + 1})`);
+      if (tok) tok.classList.add('is-hop');
+    }
+    t.classList.toggle('is-current', !over && state[turn] && state[turn].progress % N === i);
+  });
+}
+
+function renderPlayers() {
+  $('players').innerHTML = state.map((p, i) => `
+    <div class="player${i === turn && !over ? ' is-turn' : ''}" style="--pc:${p.hex}">
+      ${pawnSVG(p.hex)}<span class="player-name">${p.name}</span>
+      <span class="player-pos">${STOPS[p.progress % N].n} &middot; ${p.progress}/${N}</span>
+      <span class="player-meter"><i style="width:${(p.progress / N) * 100}%"></i></span>
+    </div>`).join('');
+  const cur = state[turn];
+  const banner = $('turn');
+  banner.style.setProperty('--pc', cur.hex);
+  banner.innerHTML = over ? `${pawnSVG(cur.hex)}${cur.name} wins!` : `${pawnSVG(cur.hex)}${cur.name}'s turn`;
+}
+
+function newGame() {
+  state = PLAYERS.slice(0, nPlayers).map((p) => ({ ...p, progress: 0 }));
+  turn = 0; busy = false; over = false;
+  markers.forEach((m, i) => {
+    if (i < nPlayers) m.setLngLat(STOPS[0].c).addTo(map); else m.remove();
+  });
+  $('win').classList.add('hidden');
+  $('fact').classList.add('hidden');
+  $('log').innerHTML = '';
+  $('roll-btn').disabled = false;
+  $('dice-hint').textContent = 'Roll to hop along the canals.';
+  renderTiles(); renderPlayers();
+  log(`New game: ${nPlayers} players start at <b>Centraal</b>.`);
+}
+
+/* ---- Dice ---- */
+const dice = $('dice');
+for (let v = 1; v <= 6; v++) {
+  const f = document.createElement('div');
+  f.className = `face face-${v}`;
+  for (let k = 0; k < 9; k++) f.innerHTML += PIPS[v].includes(k) ? '<i class="pip"></i>' : '<i></i>';
+  dice.appendChild(f);
+}
+
+async function tumble(v) {
+  if (!reduce) { spinX += 720; spinY += 1080; }
+  dice.style.setProperty('--rx', `${SHOW[v][0] + spinX}deg`);
+  dice.style.setProperty('--ry', `${SHOW[v][1] + spinY}deg`);
+  dice.setAttribute('aria-label', `Dice showing ${v}`);
+  await sleep(reduce ? 0 : 900);
+}
+
+/* ---- Movement ---- */
+function follow(i) {
+  const o = { center: STOPS[i].c, zoom: 13.2, padding: pad() };
+  if (reduce) map.jumpTo(o); else map.easeTo({ ...o, duration: HOP });
+}
+
+function tween(m, to) {
+  const from = m.getLngLat();
+  if (reduce) { m.setLngLat(to); return Promise.resolve(); }
+  return new Promise((res) => {
+    let t0 = null;
+    (function f(t) {
+      t0 = t0 ?? t;
+      const k = Math.min(1, (t - t0) / HOP);
+      m.setLngLat([from.lng + (to[0] - from.lng) * k, from.lat + (to[1] - from.lat) * k]);
+      if (k < 1) requestAnimationFrame(f); else res();
+    })(performance.now());
+  });
+}
+
+function scrollStrip(i) {
+  const tr = $('track');
+  if (tr.scrollWidth > tr.clientWidth + 4) {
+    tr.scrollTo({ left: tiles[i].offsetLeft - tr.offsetLeft - (tr.clientWidth - tiles[i].offsetWidth) / 2, behavior: reduce ? 'auto' : 'smooth' });
+  }
+}
+
+async function move(p, delta) {
+  const idx = state.indexOf(p);
+  const dir = Math.sign(delta);
+  for (let s = 0; s < Math.abs(delta); s++) {
+    p.progress += dir;
+    const i = p.progress % N;
+    const body = markers[idx].getElement().querySelector('.pawn-body');
+    body.classList.remove('hop');
+    void body.offsetWidth;
+    body.classList.add('hop');
+    renderTiles(p); renderPlayers(); scrollStrip(i); follow(i);
+    await Promise.all([tween(markers[idx], STOPS[i].c), sleep(HOP)]);
+  }
+}
+
+function showFact(i, bonus) {
+  $('fact').classList.remove('hidden');
+  $('fact').style.setProperty('--fc', HEX[COLORS[i % 4]]);
+  $('fact-tag').textContent = `Stop ${i + 1} of ${N}`;
+  $('fact-title').textContent = STOPS[i].n;
+  $('fact-text').textContent = STOPS[i].f;
+  $('fact-bonus').textContent = bonus || '';
+  $('fact-bonus').classList.toggle('hidden', !bonus);
+  const card = $('fact');
+  card.style.animation = 'none'; void card.offsetWidth; card.style.animation = '';
+}
+
+function confetti() {
+  if (reduce) return;
+  const layer = document.createElement('div');
+  layer.className = 'confetti';
+  for (let k = 0; k < 70; k++) {
+    const c = document.createElement('i');
+    c.className = 'confetti-piece';
+    c.style.left = `${Math.random() * 100}%`;
+    c.style.background = Object.values(HEX)[k % 4];
+    c.style.setProperty('--dx', `${(Math.random() - 0.5) * 240}px`);
+    c.style.setProperty('--dur', `${2 + Math.random() * 1.6}s`);
+    c.style.setProperty('--delay', `${Math.random() * 0.6}s`);
+    layer.appendChild(c);
+  }
+  document.body.appendChild(layer);
+  setTimeout(() => layer.remove(), 4500);
+}
+
+function win(p) {
+  over = true;
+  renderTiles(); renderPlayers();
+  $('win-title').textContent = `${p.name} wins!`;
+  $('win').classList.remove('hidden');
+  $('dice-hint').textContent = 'Lap complete!';
+  log(`<b>${p.name}</b> completes the lap and wins!`);
+  confetti();
+}
+
+async function roll() {
+  if (busy || over) return;
+  busy = true;
+  $('roll-btn').disabled = true;
+  const p = state[turn];
+  const v = 1 + Math.floor(Math.random() * 6);
+  $('dice-hint').textContent = 'Rolling...';
+  await tumble(v);
+  const steps = Math.min(v, N - p.progress);
+  $('dice-hint').textContent = `${p.name} rolled a ${v}.`;
+  log(`<b>${p.name}</b> rolled a ${v}.`);
+  await move(p, steps);
+
+  let bonus = null;
+  if (p.progress < N && Math.random() < 0.3) {
+    bonus = BONUSES[Math.floor(Math.random() * BONUSES.length)];
+  }
+  showFact(p.progress % N, bonus && bonus.t);
+  log(`<b>${p.name}</b> lands on ${STOPS[p.progress % N].n}.`);
+  if (p.progress >= N) { win(p); return; }
+
+  if (bonus) {
+    await sleep(reduce ? 600 : 1600);
+    const d = bonus.d > 0 ? Math.min(bonus.d, N - p.progress) : -Math.min(1, p.progress);
+    log(`<b>${p.name}</b>: ${bonus.t}`);
+    await move(p, d);
+    showFact(p.progress % N, bonus.t);
+    if (p.progress >= N) { win(p); return; }
+  }
+  turn = (turn + 1) % state.length;
+  renderTiles(); renderPlayers();
+  $('dice-hint').textContent = `${state[turn].name}, your roll!`;
+  busy = false;
+  $('roll-btn').disabled = false;
+}
+
+$('roll-btn').addEventListener('click', roll);
+$('again-btn').addEventListener('click', () => { newGame(); fitAll(); });
+$('seg').addEventListener('click', (e) => {
+  const b = e.target.closest('.seg-btn');
+  if (!b || busy) return;
+  nPlayers = Number(b.dataset.n);
+  $('seg').querySelectorAll('.seg-btn').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  newGame();
+});
+
+newGame();
+</script>
+</body>
+</html>

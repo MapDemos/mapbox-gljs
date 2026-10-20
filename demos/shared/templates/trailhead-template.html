@@ -1,0 +1,440 @@
+<!--
+  Working EXAMPLE of the Trailhead style pack (trailhead.css, in this same
+  folder). Open this file directly to see the pattern working with one
+  hiking route (Grindelwald First to Bachalpsee to Faulhorn, Bernese
+  Oberland) on the Outdoors style with 3D terrain. A full-width elevation
+  profile sits under the map: the page measures the terrain along the
+  route with map.queryTerrainElevation(), draws the profile as inline SVG,
+  and links it to the map -- hover or drag the profile to move a dot along
+  the trail, hover the trail to move the profile cursor, click a waypoint
+  chip to fly there, or press "Fly the trail". Copy the markup below into
+  your own demo and link trailhead.css from its <head> -- see the
+  class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (rugged outdoor-gear brand: olive, forest, safety
+  orange, sand, topographic contours) at the user's request for something
+  distinct from every other pack in this folder. The place and the trail
+  are real but the route coordinates are hand-approximated, and "Ridgeline
+  Supply", the trail number, the difficulty grade and the hut name are
+  fictional placeholders -- swap in your own.
+
+  What's NOT included: a real GPX track, search/geocoding, routing,
+  popups, or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Trailhead</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="trailhead.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stage">
+    <div id="map"></div>
+
+    <div class="trail-card">
+      <p class="brand-stamp">Ridgeline Supply &middot; Trail No. 07</p>
+      <h1 class="trail-name">First &ndash; Bachalpsee &ndash; Faulhorn</h1>
+      <div class="trail-meta">
+        <span class="tag tag-diff"><i class="tag-hole"></i>Moderate</span>
+        <span class="tag"><i class="tag-hole"></i>One way</span>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="stat-value" id="st-dist">&mdash;</span><span class="stat-label">Distance</span></div>
+        <div class="stat"><span class="stat-value" id="st-up">&mdash;</span><span class="stat-label">Ascent</span></div>
+        <div class="stat" data-opt><span class="stat-value" id="st-down">&mdash;</span><span class="stat-label">Descent</span></div>
+        <div class="stat" data-opt><span class="stat-value" id="st-max">&mdash;</span><span class="stat-label">Max elev.</span></div>
+        <div class="stat" data-opt><span class="stat-value" id="st-time">&mdash;</span><span class="stat-label">Est. time</span></div>
+      </div>
+    </div>
+
+    <div class="stage-actions">
+      <button class="btn btn-primary" id="fly-btn" disabled>Fly the trail</button>
+    </div>
+  </div>
+
+  <section class="profile-panel" aria-label="Elevation profile">
+    <div class="panel-head">
+      <span class="panel-title">Waypoints</span>
+      <div class="wp-chips" id="wp-chips"></div>
+    </div>
+    <div class="profile-body" id="profile-body">
+      <svg id="profile" role="img" aria-label="Elevation profile of the trail"></svg>
+      <div class="profile-readout hidden" id="readout">
+        <span id="ro-km"></span><span id="ro-m"></span><span id="ro-gr"></span>
+      </div>
+      <div class="profile-status" id="profile-status">
+        <div class="status-note loading" id="status-note">Measuring terrain&hellip;</div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+// Approximate trail line [lng, lat], First (east) to Faulhorn (west).
+// Trail geometry: Mapbox Directions (walking) along the marked path, simplified.
+const ROUTE = [
+  [8.05426, 46.65973], [8.05401, 46.66013], [8.05388, 46.66011], [8.05385, 46.66036],
+  [8.05366, 46.66055], [8.05313, 46.66082], [8.05200, 46.66166], [8.05136, 46.66240],
+  [8.04994, 46.66297], [8.04982, 46.66324], [8.04885, 46.66354], [8.04873, 46.66399],
+  [8.04906, 46.66440], [8.04930, 46.66442], [8.04933, 46.66453], [8.04820, 46.66469],
+  [8.04764, 46.66529], [8.04703, 46.66562], [8.04620, 46.66582], [8.04584, 46.66606],
+  [8.04559, 46.66694], [8.04530, 46.66734], [8.04395, 46.66683], [8.04280, 46.66710],
+  [8.04228, 46.66708], [8.04135, 46.66686], [8.04053, 46.66691], [8.03720, 46.66758],
+  [8.03666, 46.66756], [8.03620, 46.66776], [8.03540, 46.66785], [8.03510, 46.66800],
+  [8.03459, 46.66795], [8.03323, 46.66832], [8.03184, 46.66852], [8.03055, 46.66856],
+  [8.03003, 46.66868], [8.02941, 46.66865], [8.02782, 46.66799], [8.02665, 46.66810],
+  [8.02614, 46.66832], [8.02462, 46.66846], [8.02416, 46.66919], [8.02319, 46.66954],
+  [8.02280, 46.67000], [8.02168, 46.67063], [8.02139, 46.67129], [8.02119, 46.67142],
+  [8.01885, 46.67170], [8.01824, 46.67206], [8.01688, 46.67195], [8.01678, 46.67177],
+  [8.01535, 46.67182], [8.01516, 46.67160], [8.01473, 46.67161], [8.01447, 46.67173],
+  [8.01371, 46.67155], [8.01335, 46.67164], [8.01313, 46.67143], [8.01321, 46.67124],
+  [8.01292, 46.67110], [8.01148, 46.67124], [8.01118, 46.67142], [8.01090, 46.67137],
+  [8.01077, 46.67157], [8.01053, 46.67164], [8.00938, 46.67160], [8.00755, 46.67110],
+  [8.00690, 46.67106], [8.00696, 46.67080], [8.00657, 46.67092], [8.00632, 46.67070],
+  [8.00619, 46.67081], [8.00601, 46.67070], [8.00582, 46.67084], [8.00563, 46.67079],
+  [8.00561, 46.67092], [8.00539, 46.67095], [8.00542, 46.67117], [8.00526, 46.67127],
+  [8.00465, 46.67106], [8.00324, 46.67102], [8.00160, 46.67200], [8.00110, 46.67366],
+  [8.00044, 46.67387], [8.00080, 46.67399], [8.00057, 46.67403], [8.00056, 46.67417],
+  [8.00023, 46.67416], [8.00034, 46.67440], [7.99992, 46.67435], [8.00015, 46.67474],
+  [7.99943, 46.67458],
+];
+const WAYPOINTS = [
+  { name: 'First', sub: 'Trailhead', coord: [8.05427, 46.65973] },
+  { name: 'Alpweide Hut', sub: 'Rest stop', coord: [8.04538, 46.66729] },
+  { name: 'Bachalpsee', sub: 'Lake', coord: [8.02498, 46.66842] },
+  { name: 'Faulhorn', sub: 'Summit', coord: [7.99943, 46.67458] },
+];
+const N = 200;
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/outdoors-v12',
+  center: [8.025, 46.668],
+  zoom: 12.5,
+  pitch: 60,
+});
+
+const $ = (id) => document.getElementById(id);
+const statusEl = $('status-note');
+let pts = [];          // resampled points {lng, lat, d (km), e (m)}
+let measured = false;
+let chart = null;      // scale info for pointer mapping
+let flying = false;
+
+/* ---- Geometry ---- */
+function hav(a, b) {
+  const R = 6371, rad = Math.PI / 180;
+  const dLat = (b[1] - a[1]) * rad, dLng = (b[0] - a[0]) * rad;
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * rad) * Math.cos(b[1] * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+function resample() {
+  const cum = [0];
+  for (let i = 1; i < ROUTE.length; i++) cum.push(cum[i - 1] + hav(ROUTE[i - 1], ROUTE[i]));
+  const total = cum[cum.length - 1];
+  let seg = 0;
+  pts = [];
+  for (let k = 0; k < N; k++) {
+    const d = (total * k) / (N - 1);
+    while (seg < ROUTE.length - 2 && cum[seg + 1] < d) seg++;
+    const t = (d - cum[seg]) / (cum[seg + 1] - cum[seg] || 1);
+    pts.push({
+      lng: ROUTE[seg][0] + (ROUTE[seg + 1][0] - ROUTE[seg][0]) * t,
+      lat: ROUTE[seg][1] + (ROUTE[seg + 1][1] - ROUTE[seg][1]) * t,
+      d, e: null,
+    });
+  }
+}
+
+function nearestIndex(coord) {
+  let best = 0, bd = Infinity;
+  pts.forEach((p, i) => {
+    const d = (p.lng - coord[0]) ** 2 + (p.lat - coord[1]) ** 2;
+    if (d < bd) { bd = d; best = i; }
+  });
+  return best;
+}
+
+/* ---- Terrain sampling ---- */
+let tries = 0;
+function measure() {
+  tries++;
+  let nulls = 0;
+  pts.forEach((p) => {
+    const v = map.queryTerrainElevation([p.lng, p.lat], { exaggerated: false });
+    if (v == null) nulls++; else p.e = v;
+  });
+  if (nulls > 0 && tries < 5) {
+    map.once('idle', measure);
+    map.triggerRepaint();
+    return;
+  }
+  if (nulls === pts.length) {
+    statusEl.className = 'status-note error';
+    statusEl.textContent = 'Terrain unavailable';
+    return;
+  }
+  // Fill remaining gaps by linear interpolation between known neighbours.
+  for (let i = 0; i < pts.length; i++) {
+    if (pts[i].e != null) continue;
+    let a = i - 1, b = i + 1;
+    while (a >= 0 && pts[a].e == null) a--;
+    while (b < pts.length && pts[b].e == null) b++;
+    if (a < 0) pts[i].e = pts[b].e;
+    else if (b >= pts.length) pts[i].e = pts[a].e;
+    else pts[i].e = pts[a].e + ((pts[b].e - pts[a].e) * (i - a)) / (b - a);
+  }
+  measured = true;
+  $('profile-status').classList.add('hidden');
+  $('fly-btn').disabled = false;
+  fillStats();
+  drawProfile();
+}
+
+function fillStats() {
+  let up = 0, down = 0, max = -Infinity;
+  for (let i = 1; i < pts.length; i++) {
+    const diff = pts[i].e - pts[i - 1].e;
+    if (diff > 0) up += diff; else down -= diff;
+  }
+  pts.forEach((p) => { max = Math.max(max, p.e); });
+  const km = pts[pts.length - 1].d;
+  const hrs = km / 4.5 + up / 500;
+  const h = Math.floor(hrs), m = Math.round((hrs - h) * 60 / 5) * 5;
+  $('st-up').innerHTML = `<span class="up">&uarr;</span> ${Math.round(up)}<small>m</small>`;
+  $('st-down').innerHTML = `&darr; ${Math.round(down)}<small>m</small>`;
+  $('st-max').innerHTML = `${Math.round(max)}<small>m</small>`;
+  $('st-time').innerHTML = `${m === 60 ? h + 1 : h}<small>h</small> ${String(m === 60 ? 0 : m).padStart(2, '0')}<small>min</small>`;
+}
+
+/* ---- Elevation profile (inline SVG) ---- */
+function drawProfile() {
+  const svg = $('profile');
+  if (!measured) return;
+  const w = svg.clientWidth, h = svg.clientHeight;
+  const m = { l: 52, r: 18, t: 30, b: 24 };
+  const total = pts[pts.length - 1].d;
+  const es = pts.map((p) => p.e);
+  const yMin = Math.floor((Math.min(...es) - 30) / 50) * 50;
+  const yMax = Math.ceil((Math.max(...es) + 30) / 50) * 50;
+  const x = (d) => m.l + (d / total) * (w - m.l - m.r);
+  const y = (e) => m.t + (1 - (e - yMin) / (yMax - yMin)) * (h - m.t - m.b);
+  chart = { x, y, m, w };
+
+  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.d).toFixed(1)} ${y(p.e).toFixed(1)}`).join('');
+  const area = `${line}L${x(total).toFixed(1)} ${y(yMin)}L${x(0).toFixed(1)} ${y(yMin)}Z`;
+  const step = yMax - yMin > 500 ? 200 : 100;
+  let g = '';
+  for (let v = Math.ceil(yMin / step) * step; v <= yMax; v += step) {
+    g += `<line class="pf-grid" x1="${m.l}" x2="${w - m.r}" y1="${y(v)}" y2="${y(v)}"/>` +
+         `<text class="pf-axis" x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end">${v.toLocaleString('en')}m</text>`;
+  }
+  for (let k = 0; k <= Math.floor(total); k++) {
+    g += `<text class="pf-axis" x="${x(k)}" y="${h - 6}" text-anchor="${k === 0 ? 'start' : 'middle'}">${k}${k === 0 ? ' km' : ''}</text>`;
+  }
+  let wps = '';
+  WAYPOINTS.forEach((wp, i) => {
+    const p = pts[nearestIndex(wp.coord)];
+    wps += `<line class="pf-tick" x1="${x(p.d)}" x2="${x(p.d)}" y1="${y(p.e)}" y2="${y(yMin)}"/>` +
+           `<g class="pf-wp"><circle cx="${x(p.d)}" cy="${y(p.e)}" r="9"/><text x="${x(p.d)}" y="${y(p.e)}">${i + 1}</text></g>`;
+  });
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.innerHTML =
+    `<defs><linearGradient id="pf-fill" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="#E9E1CF" stop-opacity="0.6"/><stop offset="1" stop-color="#E9E1CF" stop-opacity="0.05"/></linearGradient></defs>` +
+    g + `<path class="pf-area" d="${area}" fill="url(#pf-fill)"/><path class="pf-line" d="${line}"/>` + wps +
+    `<g class="pf-cursor hidden" id="pf-cursor"><line y1="${m.t - 6}" y2="${h - m.b}"/><circle r="6"/></g>`;
+}
+
+/* ---- Cursor: shared by profile hover, map hover and the fly-through ---- */
+const dotEl = document.createElement('div');
+dotEl.innerHTML = '<span class="cursor-dot"></span>';
+const dotMarker = new mapboxgl.Marker({ element: dotEl });
+
+function setCursor(i) {
+  if (!measured || !chart) return;
+  const p = pts[i];
+  const cur = $('pf-cursor');
+  cur.classList.remove('hidden');
+  cur.querySelector('line').setAttribute('x1', chart.x(p.d));
+  cur.querySelector('line').setAttribute('x2', chart.x(p.d));
+  cur.querySelector('circle').setAttribute('cx', chart.x(p.d));
+  cur.querySelector('circle').setAttribute('cy', chart.y(p.e));
+  const a = pts[Math.max(0, i - 3)], b = pts[Math.min(pts.length - 1, i + 3)];
+  const grade = ((b.e - a.e) / ((b.d - a.d) * 1000 || 1)) * 100;
+  $('readout').classList.remove('hidden');
+  $('ro-km').innerHTML = `${p.d.toFixed(2)}<small>km</small>`;
+  $('ro-m').innerHTML = `${Math.round(p.e)}<small>m</small>`;
+  $('ro-gr').innerHTML = `${grade > 0 ? '+' : ''}${grade.toFixed(1)}<small>%</small>`;
+  dotMarker.setLngLat([p.lng, p.lat]).addTo(map);
+}
+
+function clearCursor() {
+  if (flying) return;
+  const cur = $('pf-cursor');
+  if (cur) cur.classList.add('hidden');
+  $('readout').classList.add('hidden');
+  dotMarker.remove();
+}
+
+const svgEl = $('profile');
+function onProfilePointer(e) {
+  if (!chart) return;
+  const r = svgEl.getBoundingClientRect();
+  const frac = (e.clientX - r.left - chart.m.l) / (chart.w - chart.m.l - chart.m.r);
+  setCursor(Math.round(Math.min(1, Math.max(0, frac)) * (pts.length - 1)));
+}
+svgEl.addEventListener('pointermove', onProfilePointer);
+svgEl.addEventListener('pointerdown', onProfilePointer);
+svgEl.addEventListener('pointerleave', clearCursor);
+window.addEventListener('resize', drawProfile);
+
+/* ---- Waypoint chips and map markers ---- */
+function goTo(wp) {
+  stopFly();
+  const opts = { center: wp.coord, zoom: 14.5, pitch: 65 };
+  if (reduce) map.jumpTo(opts); else map.flyTo({ ...opts, duration: 2200 });
+}
+
+WAYPOINTS.forEach((wp, i) => {
+  const chip = document.createElement('button');
+  chip.className = 'wp-chip';
+  chip.innerHTML = `<span class="wp-num">${i + 1}</span>${wp.name} <small>${wp.sub}</small>`;
+  chip.addEventListener('click', () => goTo(wp));
+  $('wp-chips').appendChild(chip);
+
+  const root = document.createElement('div');
+  root.innerHTML = `<div class="wp-tag"><span class="wp-tag-label"><i></i>${wp.name}</span></div>`;
+  root.addEventListener('click', () => goTo(wp));
+  new mapboxgl.Marker({ element: root, anchor: 'bottom' }).setLngLat(wp.coord).addTo(map);
+});
+
+/* ---- Fly the trail ---- */
+const flyBtn = $('fly-btn');
+if (reduce) flyBtn.classList.add('hidden');
+
+function bearingTo(a, b) {
+  const rad = Math.PI / 180;
+  const y = Math.sin((b.lng - a.lng) * rad) * Math.cos(b.lat * rad);
+  const x = Math.cos(a.lat * rad) * Math.sin(b.lat * rad) -
+            Math.sin(a.lat * rad) * Math.cos(b.lat * rad) * Math.cos((b.lng - a.lng) * rad);
+  return Math.atan2(y, x) / rad;
+}
+
+function flyStep(i) {
+  if (!flying) return;
+  if (i >= pts.length) { stopFly(); return; }
+  const look = pts[Math.min(pts.length - 1, i + 25)];
+  const b = i + 25 >= pts.length ? bearingTo(pts[Math.max(0, i - 25)], pts[i]) : bearingTo(pts[i], look);
+  map.once('moveend', () => flyStep(i + 10));
+  map.easeTo({
+    center: [pts[i].lng, pts[i].lat], bearing: b, pitch: 65, zoom: 14.2,
+    duration: i === 0 ? 1800 : 1500, easing: i === 0 ? undefined : (t) => t,
+  });
+}
+
+function stopFly() {
+  if (!flying) return;
+  flying = false;
+  flyBtn.textContent = 'Fly the trail';
+  map.stop();
+}
+
+flyBtn.addEventListener('click', () => {
+  if (flying) { stopFly(); return; }
+  flying = true;
+  flyBtn.textContent = 'Stop';
+  flyStep(0);
+});
+['mousedown', 'touchstart', 'wheel'].forEach((ev) => map.on(ev, () => stopFly()));
+map.on('move', () => {
+  if (flying) setCursor(nearestIndex([map.getCenter().lng, map.getCenter().lat]));
+});
+
+/* ---- Map: terrain, tint, route ---- */
+function tintStyle() {
+  // Light touch: cool slate water, slightly warmer land. Guarded per layer.
+  map.getStyle().layers.forEach((l) => {
+    try {
+      if (l.id === 'water' && l.type === 'fill') map.setPaintProperty(l.id, 'fill-color', '#5E7787');
+      else if (l.id === 'waterway' && l.type === 'line') map.setPaintProperty(l.id, 'line-color', '#5E7787');
+      else if (l.id === 'land' && l.type === 'background') map.setPaintProperty(l.id, 'background-color', '#E6E0CC');
+    } catch (err) { /* layer shape differs; skip */ }
+  });
+}
+
+map.on('style.load', () => {
+  tintStyle();
+  map.addSource('mapbox-dem', { type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14 });
+  map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.4 });
+  // Alpine daylight haze
+  map.setFog({
+    color: 'rgb(222, 229, 232)', 'high-color': '#6F9BC4', 'horizon-blend': 0.08,
+    'space-color': '#2A3A55', 'star-intensity': 0,
+  });
+
+  const data = { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE } };
+  map.addSource('route', { type: 'geojson', data });
+  const join = { 'line-join': 'round', 'line-cap': 'round' };
+  map.addLayer({ id: 'route-casing', type: 'line', source: 'route', layout: join,
+    paint: { 'line-color': '#1D1F1A', 'line-width': 10 } });
+  map.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: join,
+    paint: { 'line-color': '#FF6B1A', 'line-width': 5 } });
+  map.addLayer({ id: 'route-hit', type: 'line', source: 'route', layout: join,
+    paint: { 'line-color': '#000000', 'line-width': 26, 'line-opacity': 0 } });
+
+  map.on('mousemove', 'route-hit', (e) => {
+    if (!measured || flying) return;
+    map.getCanvas().style.cursor = 'crosshair';
+    let best = 0, bd = Infinity;
+    pts.forEach((p, i) => {
+      const s = map.project([p.lng, p.lat]);
+      const d = (s.x - e.point.x) ** 2 + (s.y - e.point.y) ** 2;
+      if (d < bd) { bd = d; best = i; }
+    });
+    setCursor(best);
+  });
+  map.on('mouseleave', 'route-hit', () => {
+    map.getCanvas().style.cursor = '';
+    clearCursor();
+  });
+
+  // Whole route in view, then sample elevations once the DEM tiles settle.
+  const bounds = ROUTE.reduce((b, c) => b.extend(c), new mapboxgl.LngLatBounds(ROUTE[0], ROUTE[0]));
+  const phone = window.matchMedia('(max-width: 640px)').matches;
+  map.fitBounds(bounds, {
+    padding: phone ? { top: 110, bottom: 50, left: 24, right: 24 } : { top: 80, bottom: 60, left: 380, right: 60 },
+    pitch: 60, bearing: 200, duration: 0,
+  });
+  map.once('idle', measure);
+});
+
+map.on('error', (e) => {
+  if (measured) return;
+  statusEl.className = 'status-note error';
+  statusEl.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+resample();
+$('st-dist').innerHTML = `${pts[pts.length - 1].d.toFixed(1)}<small>km</small>`;
+</script>
+</body>
+</html>

@@ -1,0 +1,557 @@
+<!--
+  Working EXAMPLE of the Fleet Ops style pack (fleet-ops.css, in this same
+  folder). Open this file directly to see the pattern working with a
+  fictional delivery fleet ("Meridian Fleet", 12 vans out of a Jurong depot
+  in Singapore) on Mapbox Standard in the monochrome theme. The map card
+  shows four real driving routes (CBD, Sentosa, Woodlands, Bishan, Punggol,
+  Tampines, Changi) with the completed part of each trip drawn darker; the
+  vehicles move along them, and the four KPI cards (each with an inline-SVG
+  sparkline), the status filter chips, the vehicles table and the alerts
+  drawer all update from the same simulation. Hover or click a table row or
+  a vehicle on the map to highlight and fly to it; click an alert to focus
+  its vehicle. Copy the markup below into your own demo and link
+  fleet-ops.css from its <head> -- see the class/id contract documented at
+  the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (a clean light enterprise SaaS operations dashboard)
+  at the user's request for something distinct from every other pack in
+  this folder. "Meridian Fleet", the driver names, vehicle IDs, delays and
+  alerts are fictional placeholders and the movement is a simulation -- swap
+  in your own data. The route lines come from the Mapbox Directions API
+  (driving), simplified and embedded as plain coordinates.
+
+  What's NOT included: live telematics, a real ETA engine, search/geocoding,
+  routing calls at runtime, or a hard-coded access token (demo-kit.js sets
+  that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fleet Ops</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="fleet-ops.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail" aria-label="Primary">
+    <div class="rail-logo" aria-hidden="true">M</div>
+    <button class="rail-btn" data-tip="Overview" aria-label="Overview"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="nav-label">Overview</span></button>
+    <button class="rail-btn active" data-tip="Live fleet" aria-label="Live fleet" aria-current="page"><svg viewBox="0 0 24 24"><path d="M3 6h11v10H3z"/><path d="M14 9h4l3 3v4h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg><span class="nav-label">Fleet</span></button>
+    <button class="rail-btn" data-tip="Routes" aria-label="Routes"><svg viewBox="0 0 24 24"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></svg><span class="nav-label">Routes</span></button>
+    <button class="rail-btn" data-tip="Alerts" aria-label="Alerts"><svg viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 21h4"/></svg><span class="nav-label">Alerts</span></button>
+    <button class="rail-btn" data-tip="Reports" aria-label="Reports"><svg viewBox="0 0 24 24"><path d="M5 20V11M11 20V4M17 20v-6M3 21h18"/></svg><span class="nav-label">Reports</span></button>
+    <span class="rail-spacer"></span>
+    <button class="rail-btn rail-end" data-tip="Settings" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span class="nav-label">Settings</span></button>
+  </nav>
+
+  <header class="topbar">
+    <button class="ws-switch" aria-label="Switch workspace"><span class="ws-mark">M</span>Meridian Fleet<svg class="ws-caret" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+    <button class="date-range" aria-label="Date range"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg><span id="date-text">Today</span></button>
+    <span class="topbar-spacer"></span>
+    <label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.2-4.2"/></svg><input id="q-top" type="search" placeholder="Search vehicles, drivers, routes" aria-label="Search vehicles" autocomplete="off" /><span class="kbd">/</span></label>
+    <div class="avatar" title="Signed in as Operations Lead">OL</div>
+  </header>
+
+  <main class="main">
+    <section class="kpis" aria-label="Key metrics">
+      <article class="card kpi" data-tone="brand"><span class="kpi-label">Active vehicles</span><span class="kpi-value" id="k-active">&mdash;</span><span class="kpi-delta"><b>+1</b> vs. 1h ago</span><svg class="spark" id="s-active" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"></svg></article>
+      <article class="card kpi" data-tone="ok"><span class="kpi-label">On-time rate</span><span class="kpi-value" id="k-ontime">&mdash;</span><span class="kpi-delta down"><b>&minus;0.8 pt</b> vs. yesterday</span><svg class="spark" id="s-ontime" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"></svg></article>
+      <article class="card kpi" data-tone="brand"><span class="kpi-label">Stops completed</span><span class="kpi-value" id="k-stops">&mdash;</span><span class="kpi-delta" id="k-stops-d">&nbsp;</span><svg class="spark" id="s-stops" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"></svg></article>
+      <article class="card kpi" data-tone="warn"><span class="kpi-label">Avg. delay</span><span class="kpi-value" id="k-delay">&mdash;</span><span class="kpi-delta down"><b>+0.6 min</b> vs. yesterday</span><svg class="spark" id="s-delay" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"></svg></article>
+    </section>
+
+    <div class="work">
+      <section class="card map-card" aria-label="Live map">
+        <div class="card-head map-head">
+          <h2 class="card-title">Live map</h2>
+          <span class="card-sub" id="clock">&mdash;</span>
+          <div class="chips" id="chips" role="group" aria-label="Filter by status">
+            <button class="chip active" data-status="all"><span class="dot"></span>All <span class="count" id="c-all">12</span></button>
+            <button class="chip" data-status="ontime"><span class="dot"></span>On time <span class="count" id="c-ontime">0</span></button>
+            <button class="chip" data-status="risk"><span class="dot"></span>At risk <span class="count" id="c-risk">0</span></button>
+            <button class="chip" data-status="late"><span class="dot"></span>Late <span class="count" id="c-late">0</span></button>
+            <button class="chip" data-status="idle"><span class="dot"></span>Idle <span class="count" id="c-idle">0</span></button>
+          </div>
+        </div>
+        <div class="map-wrap">
+          <div id="map"></div>
+          <div class="map-legend"><span><i></i>Planned</span><span><i class="done"></i>Completed</span></div>
+          <div class="status-note loading" id="status-note">Loading map&hellip;</div>
+        </div>
+      </section>
+
+      <section class="card veh-card" aria-label="Vehicles">
+        <div class="card-head"><h2 class="card-title">Vehicles</h2><span class="card-sub" id="veh-count">12</span></div>
+        <div class="veh-tools">
+          <label class="search search-sm"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.2-4.2"/></svg><input id="q" type="search" placeholder="Search ID, driver or route" aria-label="Search vehicles" autocomplete="off" /></label>
+        </div>
+        <div class="veh-list" id="veh-list">
+          <div class="veh-head"><span>ID</span><span>Driver</span><span>Status</span><span style="text-align:right">ETA</span><span>Trip</span></div>
+          <div id="rows"></div>
+          <div class="veh-empty hidden" id="veh-empty">No vehicles match.</div>
+        </div>
+      </section>
+    </div>
+
+    <section class="card alerts" id="alerts" aria-label="Alerts">
+      <button class="alerts-head" id="alerts-toggle" aria-expanded="true">Alerts <span class="alerts-count" id="alerts-count">0</span><span class="hint">Click an alert to focus its vehicle</span><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div class="alerts-body" id="alerts-body"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+// Driving routes from the Mapbox Directions API (Jurong depot -> destinations),
+// simplified. dur = seconds of drive time. Stops are vertices of each route.
+const DEPOT = [103.7075, 1.334];
+const ROUTES = [
+  { id: 'R1', name: 'Bishan – Punggol', dur: 3040,
+    coords: [[103.7074,1.334],[103.7071,1.3331],[103.7084,1.3328],[103.7096,1.3376],[103.7093,1.3405],[103.7225,1.3451],[103.7302,1.3442],[103.7348,1.3414],[103.7374,1.3459],[103.7429,1.3448],[103.7643,1.3329],[103.7672,1.3323],[103.7747,1.3353],[103.777,1.3372],[103.7794,1.3416],[103.7873,1.3447],[103.7895,1.3482],[103.7922,1.3495],[103.7948,1.3495],[103.7974,1.3484],[103.8114,1.3348],[103.8151,1.3337],[103.8175,1.3341],[103.8277,1.3401],[103.834,1.3408],[103.8408,1.3451],[103.8461,1.3442],[103.8484,1.3539],[103.8523,1.3605],[103.855,1.3566],[103.8564,1.3562],[103.8608,1.3683],[103.8583,1.377],[103.8579,1.3935],[103.8573,1.3956],[103.8555,1.3976],[103.8558,1.3996],[103.8604,1.4012],[103.8851,1.4014],[103.8966,1.4002],[103.9036,1.3976],[103.9061,1.4028],[103.9036,1.4044],[103.9037,1.4051],[103.9022,1.4054]],
+    stops: [[103.7643,1.3329,'Clementi'],[103.7948,1.3495,'Bukit Timah'],[103.8277,1.3401,'Novena'],[103.8484,1.3539,'Bishan'],[103.8608,1.3683,'Ang Mo Kio'],[103.8579,1.3935,'Seletar Rd'],[103.8851,1.4014,'Sengkang'],[103.9022,1.4054,'Punggol']] },
+  { id: 'R2', name: 'CBD – Sentosa', dur: 2821,
+    coords: [[103.7074,1.334],[103.7071,1.3331],[103.7084,1.3328],[103.7095,1.3364],[103.7081,1.3305],[103.7107,1.3219],[103.7368,1.3274],[103.7394,1.3267],[103.7438,1.3239],[103.7542,1.3212],[103.7688,1.3057],[103.7831,1.2975],[103.7879,1.2926],[103.8002,1.2845],[103.8124,1.2833],[103.8198,1.2793],[103.8267,1.2775],[103.8312,1.2812],[103.8361,1.2834],[103.8422,1.2899],[103.8462,1.2874],[103.8456,1.2863],[103.8512,1.2827],[103.8504,1.2851],[103.8495,1.284],[103.8504,1.2827],[103.852,1.2822],[103.8453,1.2725],[103.8323,1.2721],[103.8265,1.2667],[103.824,1.2655],[103.8239,1.2563],[103.8259,1.2528],[103.8247,1.2514],[103.8201,1.2539],[103.8188,1.2527],[103.8195,1.2509],[103.8216,1.2502],[103.8239,1.2479]],
+    stops: [[103.7368,1.3274,'Jurong East'],[103.765,1.3099,'Kent Ridge'],[103.7879,1.2926,'Buona Vista'],[103.8124,1.2833,'Tiong Bahru'],[103.8267,1.2775,'Chinatown'],[103.8504,1.2827,'Raffles Place'],[103.824,1.2655,'Telok Blangah'],[103.8239,1.2479,'Sentosa']] },
+  { id: 'R3', name: 'Woodlands – Bishan', dur: 3061,
+    coords: [[103.7074,1.334],[103.7071,1.3331],[103.7084,1.3328],[103.7096,1.3376],[103.7093,1.3405],[103.7027,1.3514],[103.6979,1.3549],[103.698,1.3556],[103.707,1.3651],[103.7103,1.3669],[103.7233,1.3712],[103.7448,1.389],[103.7484,1.3898],[103.7566,1.3888],[103.7642,1.391],[103.7735,1.3909],[103.7735,1.4012],[103.7716,1.4094],[103.7713,1.4176],[103.7698,1.4201],[103.7771,1.4255],[103.7863,1.427],[103.7889,1.4381],[103.7872,1.4376],[103.7875,1.4361],[103.7853,1.4347],[103.7886,1.435],[103.7869,1.4267],[103.7979,1.421],[103.8048,1.4157],[103.8143,1.3971],[103.8162,1.3953],[103.8215,1.3936],[103.8266,1.3931],[103.8425,1.3965],[103.8508,1.3966],[103.8543,1.3978],[103.856,1.3975],[103.8574,1.3963],[103.8583,1.3895],[103.8585,1.3771],[103.8608,1.3705],[103.8609,1.3678],[103.8576,1.3582],[103.8574,1.3558],[103.8554,1.356],[103.8531,1.3595],[103.8521,1.3598],[103.8488,1.3545],[103.8479,1.351]],
+    stops: [[103.7233,1.3712,'Tengah'],[103.7431,1.388,'Choa Chu Kang'],[103.7716,1.4094,'Woodlands West'],[103.7889,1.4368,'Woodlands'],[103.8048,1.4157,'Sembawang'],[103.8125,1.4015,'Mandai'],[103.8508,1.3966,'Yio Chu Kang'],[103.8479,1.351,'Bishan']] },
+  { id: 'R4', name: 'CBD – Tampines – Changi', dur: 3931,
+    coords: [[103.7074,1.334],[103.7071,1.3331],[103.7084,1.3328],[103.7095,1.3364],[103.7081,1.3305],[103.7107,1.3219],[103.7368,1.3274],[103.7394,1.3267],[103.7438,1.3239],[103.7542,1.3212],[103.7688,1.3057],[103.7831,1.2975],[103.7879,1.2926],[103.7997,1.2847],[103.8124,1.2833],[103.8198,1.2793],[103.8267,1.2775],[103.8312,1.2812],[103.8361,1.2834],[103.8423,1.2899],[103.8462,1.2874],[103.8456,1.2863],[103.8491,1.2843],[103.8504,1.2827],[103.8512,1.2827],[103.8513,1.2837],[103.8501,1.2852],[103.8495,1.284],[103.8503,1.2828],[103.8522,1.2828],[103.8549,1.2915],[103.8584,1.2969],[103.8716,1.3065],[103.8759,1.3077],[103.8745,1.3167],[103.8759,1.3199],[103.9074,1.3267],[103.9259,1.3352],[103.9396,1.3355],[103.9459,1.3415],[103.9458,1.3427],[103.9423,1.347],[103.9416,1.3498],[103.9414,1.3518],[103.9456,1.3524],[103.9449,1.3532],[103.9433,1.3528],[103.9433,1.3517],[103.9415,1.3514],[103.9417,1.3497],[103.9426,1.347],[103.9454,1.344],[103.9495,1.344],[103.9566,1.3497],[103.9611,1.3508],[103.9657,1.3487],[103.9716,1.3407],[103.9784,1.3378],[103.9797,1.3379],[103.9887,1.3578],[103.9887,1.3599]],
+    stops: [[103.8124,1.2833,'Tiong Bahru'],[103.8504,1.2827,'Raffles Place'],[103.8633,1.3009,'Kallang'],[103.8759,1.3199,'Paya Lebar'],[103.9074,1.3267,'Bedok'],[103.9454,1.3404,'Tampines'],[103.9716,1.3407,'Changi Biz Park'],[103.9887,1.3599,'Changi']] },
+];
+
+// Fictional fleet. base = typical delay in minutes (status derives from it),
+// p = start position along the route (0-1), vf = speed factor, idle = parked.
+const FLEET = [
+  { id: 'MF-101', driver: 'Aiden Lim',   r: 0, p: 0.18, vf: 1.00, base: 0.8 },
+  { id: 'MF-102', driver: 'Priya Nair',  r: 0, p: 0.52, vf: 0.90, base: 6.5 },
+  { id: 'MF-103', driver: 'Marcus Chua', r: 0, p: 0.80, vf: 1.00, base: 2.0, idle: true },
+  { id: 'MF-104', driver: 'Siti Rahman', r: 1, p: 0.15, vf: 1.10, base: 1.2 },
+  { id: 'MF-105', driver: 'Daniel Ong',  r: 1, p: 0.42, vf: 0.80, base: 14.0 },
+  { id: 'MF-106', driver: 'Mei Ling Koh',r: 1, p: 0.74, vf: 1.00, base: 0.4 },
+  { id: 'MF-107', driver: 'Ravi Kumar',  r: 2, p: 0.12, vf: 1.05, base: 1.5 },
+  { id: 'MF-108', driver: 'Hui Min Teo', r: 2, p: 0.38, vf: 0.90, base: 7.5 },
+  { id: 'MF-109', driver: 'Jared Goh',   r: 2, p: 0.68, vf: 1.00, base: 0.9 },
+  { id: 'MF-110', driver: 'Nur Aisyah',  r: 3, p: 0.54, vf: 0.95, base: 5.5 },
+  { id: 'MF-111', driver: 'Kelvin Ng',   r: 3, p: 0.76, vf: 0.85, base: 13.0 },
+  { id: 'MF-112', driver: 'Farah Ismail',r: 3, p: 0.92, vf: 1.00, base: 2.0, idle: true },
+];
+
+// Fictional alerts (time = HH:MM on the simulated clock, before it starts).
+const ALERTS = [
+  { sev: 'late', veh: 'MF-105', time: '10:38', text: '<b>MF-105</b> is 14 min behind schedule on R2 CBD – Sentosa' },
+  { sev: 'late', veh: 'MF-111', time: '10:31', text: '<b>MF-111</b> delayed by heavy traffic on R4 towards Changi' },
+  { sev: 'risk', veh: 'MF-108', time: '10:27', text: '<b>MF-108</b> ETA slipping, next three stops at risk' },
+  { sev: 'idle', veh: 'MF-103', time: '10:21', text: '<b>MF-103</b> idle for 12 min (driver break)' },
+  { sev: 'risk', veh: 'MF-102', time: '10:12', text: '<b>MF-102</b> running 6 min late, customer notified' },
+  { sev: 'info', veh: 'MF-112', time: '09:58', text: '<b>MF-112</b> parked at Changi Biz Park, dwell above 10 min' },
+];
+
+const ST = {
+  ontime: { label: 'On time', color: '#12A150' },
+  risk:   { label: 'At risk', color: '#E08A00' },
+  late:   { label: 'Late',    color: '#D92D20' },
+  idle:   { label: 'Idle',    color: '#98A2B3' },
+};
+const RT = 120;          // real seconds for a speed-1 vehicle to drive its route
+const CLOCK_X = 25;      // simulated seconds per real second
+const CLOCK_START = 10 * 3600 + 42 * 60;
+const STOPS_BASE = 148, STOPS_PLAN = 312, ONTIME_BASE = 138, DONE_BASE = 146;
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = () => window.matchMedia('(max-width: 760px)').matches;
+const $ = (id) => document.getElementById(id);
+
+/* ---------- Route geometry ---------- */
+ROUTES.forEach((rt) => {
+  const cum = [0];
+  for (let i = 1; i < rt.coords.length; i++) {
+    const a = rt.coords[i - 1], b = rt.coords[i];
+    cum.push(cum[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1]));
+  }
+  rt.cum = cum;
+  rt.total = cum[cum.length - 1];
+  // stop fractions = position of the nearest route vertex
+  rt.stops = rt.stops.map(([x, y, name]) => {
+    let best = 0, bd = Infinity;
+    rt.coords.forEach((c, i) => {
+      const d = (c[0] - x) ** 2 + (c[1] - y) ** 2;
+      if (d < bd) { bd = d; best = i; }
+    });
+    return { name, f: rt.cum[best] / rt.total };
+  }).sort((a, b) => a.f - b.f);
+});
+
+function posAt(rt, f) {
+  const d = f * rt.total;
+  let i = 1;
+  while (i < rt.cum.length - 1 && rt.cum[i] < d) i++;
+  const t = (d - rt.cum[i - 1]) / (rt.cum[i] - rt.cum[i - 1] || 1);
+  const a = rt.coords[i - 1], b = rt.coords[i];
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+}
+
+function slice(rt, f0, f1) {
+  const out = [posAt(rt, f0)];
+  rt.cum.forEach((c, i) => {
+    const f = c / rt.total;
+    if (f > f0 && f < f1) out.push(rt.coords[i]);
+  });
+  out.push(posAt(rt, f1));
+  return out;
+}
+
+/* ---------- Simulation ---------- */
+let elapsed = 0;
+FLEET.forEach((v, i) => { v.dir = 1; v.legs = 0; v.ph = i * 1.7; });
+
+const delayOf = (v) => v.idle ? 0 : Math.max(0, v.base + 1.2 * Math.sin(elapsed / 17 + v.ph));
+function statusOf(v) {
+  if (v.idle) return 'idle';
+  const d = delayOf(v);
+  return d <= 3 ? 'ontime' : d <= 10 ? 'risk' : 'late';
+}
+
+function nextStop(v) {
+  const rt = ROUTES[v.r];
+  if (v.dir > 0) return rt.stops.find((s) => s.f > v.p + 1e-6) || rt.stops[rt.stops.length - 1];
+  const back = rt.stops.filter((s) => s.f < v.p - 1e-6);
+  return back.length ? back[back.length - 1] : { name: 'Jurong Depot', f: 0 };
+}
+function stopsDone(v) {
+  const rt = ROUTES[v.r];
+  const n = rt.stops.filter((s) => (v.dir > 0 ? s.f <= v.p : s.f >= v.p)).length;
+  return v.legs * rt.stops.length + n;
+}
+
+const hhmm = (sec) => {
+  const s = Math.floor(sec) % 86400;
+  return String(Math.floor(s / 3600)).padStart(2, '0') + ':' + String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+};
+function etaOf(v) {
+  if (v.idle) return '--:--';
+  const rt = ROUTES[v.r], ns = nextStop(v);
+  return hhmm(CLOCK_START + elapsed * CLOCK_X + (Math.abs(ns.f - v.p) * rt.dur) / v.vf + delayOf(v) * 60);
+}
+
+function step(dt) {
+  elapsed += dt;
+  FLEET.forEach((v) => {
+    if (v.idle) return;
+    v.p += (v.dir * dt * v.vf) / RT;
+    if (v.p >= 1) { v.p = 1; v.dir = -1; v.legs++; }
+    else if (v.p <= 0) { v.p = 0; v.dir = 1; v.legs++; }
+  });
+}
+
+/* ---------- Vehicles table ---------- */
+let filter = 'all', query = '', hoverId = null, selId = null;
+const rowEls = {};
+FLEET.forEach((v) => {
+  const el = document.createElement('button');
+  el.className = 'veh-row';
+  el.dataset.id = v.id;
+  el.innerHTML = `<span class="veh-id">${v.id}</span><span class="veh-driver">${v.driver}<small></small></span>` +
+    `<span class="pill"></span><span class="veh-eta"></span><span class="bar"><i></i></span>`;
+  el.addEventListener('mouseenter', () => setHover(v.id));
+  el.addEventListener('mouseleave', () => setHover(null));
+  el.addEventListener('click', () => select(v.id, true));
+  $('rows').appendChild(el);
+  rowEls[v.id] = { el, sub: el.querySelector('small'), pill: el.querySelector('.pill'), eta: el.querySelector('.veh-eta'), bar: el.querySelector('.bar') };
+});
+
+function isVisible(v) {
+  const s = statusOf(v);
+  if (filter !== 'all' && s !== filter) return false;
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return [v.id, v.driver, ROUTES[v.r].name, ROUTES[v.r].id, ST[s].label].join(' ').toLowerCase().includes(q);
+}
+
+function updateTable() {
+  const counts = { ontime: 0, risk: 0, late: 0, idle: 0 };
+  let shown = 0;
+  FLEET.forEach((v) => {
+    const s = statusOf(v), r = rowEls[v.id], rt = ROUTES[v.r];
+    counts[s]++;
+    r.el.dataset.status = s;
+    const ns = nextStop(v);
+    const sub = `${rt.id} · ${v.idle ? 'parked' : (v.dir > 0 ? 'next ' : 'return via ') + ns.name}`;
+    if (r.sub.textContent !== sub) r.sub.textContent = sub;
+    const cls = 'pill ' + s;
+    if (r.pill.className !== cls) { r.pill.className = cls; r.pill.textContent = ST[s].label; }
+    r.eta.textContent = etaOf(v);
+    r.bar.style.setProperty('--p', ((v.dir > 0 ? v.p : 1 - v.p) * 100).toFixed(0));
+    const vis = isVisible(v);
+    r.el.classList.toggle('hidden', !vis);
+    if (vis) shown++;
+  });
+  $('veh-empty').classList.toggle('hidden', shown > 0);
+  $('veh-count').textContent = shown === FLEET.length ? FLEET.length : `${shown} of ${FLEET.length}`;
+  Object.keys(counts).forEach((k) => { $('c-' + k).textContent = counts[k]; });
+  return counts;
+}
+
+/* ---------- KPIs + sparklines ---------- */
+// Seed history: 24 points easing towards today's values (decorative).
+const seed = (from, to, wobble) => Array.from({ length: 24 }, (_, i) =>
+  from + (to - from) * (i / 23) + Math.sin(i * 2.3) * wobble * (1 - i / 23));
+const hist = { active: seed(9, 10, 0.8), ontime: seed(95.2, 94.0, 0.25), stops: seed(92, 148, 0), delay: seed(4.2, 5.4, 0.4) };
+
+function drawSpark(key) {
+  const d = hist[key], w = 100, h = 40, pad = 4;
+  const lo = Math.min(...d), hi = Math.max(...d), span = hi - lo || 1;
+  const xy = d.map((v, i) => [(i / (d.length - 1)) * w, pad + (1 - (v - lo) / span) * (h - pad * 2)]);
+  const line = xy.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('');
+  const last = xy[xy.length - 1];
+  $('s-' + key).innerHTML = `<path class="spark-area" d="${line}L${w} ${h}L0 ${h}Z"/><path class="spark-line" d="${line}"/>` +
+    `<circle class="spark-dot" cx="${last[0]}" cy="${last[1].toFixed(1)}" r="3.5"/>`;
+}
+
+function kpis(counts) {
+  const moving = FLEET.filter((v) => !v.idle);
+  const done = FLEET.reduce((n, v) => n + stopsDone(v), 0);
+  const w = { ontime: 1, risk: 0.6, late: 0.2, idle: 1 };
+  const onTimeN = FLEET.reduce((n, v) => n + stopsDone(v) * w[statusOf(v)], 0);
+  const cur = {
+    active: moving.length,
+    ontime: (100 * (ONTIME_BASE + onTimeN)) / (DONE_BASE + done),
+    stops: STOPS_BASE + done,
+    delay: moving.reduce((n, v) => n + delayOf(v), 0) / moving.length,
+  };
+  $('k-active').innerHTML = `${cur.active}<small>/ ${FLEET.length}</small>`;
+  $('k-ontime').innerHTML = `${cur.ontime.toFixed(1)}<small>%</small>`;
+  $('k-stops').innerHTML = `${cur.stops}<small>/ ${STOPS_PLAN}</small>`;
+  $('k-stops-d').innerHTML = `<b>${Math.round((100 * cur.stops) / STOPS_PLAN)}%</b> of today’s plan`;
+  $('k-delay').innerHTML = `${cur.delay.toFixed(1)}<small>min</small>`;
+  return cur;
+}
+
+let lastPush = 0;
+function pushSpark(cur) {
+  Object.keys(hist).forEach((k) => { hist[k].push(cur[k]); hist[k].shift(); drawSpark(k); });
+}
+
+/* ---------- Alerts drawer ---------- */
+const ICONS = {
+  late: '<path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17.5v.1"/>',
+  risk: '<path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17.5v.1"/>',
+  idle: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8v.1"/>',
+};
+ALERTS.forEach((a) => {
+  const el = document.createElement('button');
+  el.className = 'alert sev-' + a.sev;
+  el.innerHTML = `<svg class="alert-ico" viewBox="0 0 24 24">${ICONS[a.sev]}</svg><span class="alert-text">${a.text}</span>` +
+    `<span class="alert-veh">${a.veh}</span><span class="alert-time">${a.time}</span>`;
+  el.addEventListener('click', () => select(a.veh, true));
+  $('alerts-body').appendChild(el);
+});
+$('alerts-count').textContent = ALERTS.length;
+$('alerts-toggle').addEventListener('click', () => {
+  const c = $('alerts').classList.toggle('collapsed');
+  $('alerts-toggle').setAttribute('aria-expanded', String(!c));
+});
+if (phone()) { $('alerts').classList.add('collapsed'); $('alerts-toggle').setAttribute('aria-expanded', 'false'); }
+
+/* ---------- Filters ---------- */
+document.querySelectorAll('.chip').forEach((c) => c.addEventListener('click', () => {
+  filter = c.dataset.status;
+  document.querySelectorAll('.chip').forEach((x) => x.classList.toggle('active', x === c));
+  refresh(true);
+}));
+['q', 'q-top'].forEach((id) => $(id).addEventListener('input', (e) => {
+  query = e.target.value;
+  $('q').value = $('q-top').value = query;
+  refresh(true);
+}));
+document.addEventListener('keydown', (e) => {
+  if (e.key === '/' && !/INPUT/.test(document.activeElement.tagName)) {
+    e.preventDefault();
+    (phone() ? $('q') : $('q-top')).focus();
+  }
+});
+$('date-text').textContent = 'Today, ' + new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+/* ---------- Map ---------- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [103.82, 1.34],
+  zoom: 10.4,
+  config: { basemap: { theme: 'monochrome', lightPreset: 'day', showPointOfInterestLabels: false, showTransitLabels: false } },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+let ready = false;
+
+const tip = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, offset: 16, className: 'fo-tip', maxWidth: '260px' });
+
+function pad() {
+  // The cards sit beside the map (not over it): clear the legend (top) and
+  // keep points off the logo / attribution corners (bottom >= 64).
+  return { top: 56, bottom: 72, left: 40, right: 40 };
+}
+
+function fitAll(duration) {
+  const b = new mapboxgl.LngLatBounds();
+  ROUTES.forEach((rt) => rt.coords.forEach((c) => b.extend(c)));
+  map.fitBounds(b, { padding: pad(), duration: reduce ? 0 : duration });
+}
+
+function vehPoint(v) {
+  return {
+    type: 'Feature',
+    properties: { id: v.id, status: statusOf(v) },
+    geometry: { type: 'Point', coordinates: posAt(ROUTES[v.r], v.p) },
+  };
+}
+function donePart(v) {
+  const rt = ROUTES[v.r];
+  const a = v.dir > 0 ? 0 : v.p, b = v.dir > 0 ? v.p : 1;
+  return { type: 'Feature', properties: { id: v.id, status: statusOf(v) }, geometry: { type: 'LineString', coordinates: slice(rt, a, Math.max(b, a + 1e-4)) } };
+}
+
+const statusColor = ['match', ['get', 'status'], 'ontime', ST.ontime.color, 'risk', ST.risk.color, 'late', ST.late.color, ST.idle.color];
+const sel = (a, b) => ['case', ['boolean', ['feature-state', 'selected'], false], a, ['boolean', ['feature-state', 'hover'], false], (a + b) / 2, b];
+
+map.on('style.load', () => {
+  const lineW = ['interpolate', ['linear'], ['zoom'], 9, 2.5, 14, 6];
+  const join = { 'line-join': 'round', 'line-cap': 'round' };
+  map.addSource('routes', { type: 'geojson', data: { type: 'FeatureCollection', features: ROUTES.map((rt) => ({ type: 'Feature', properties: { id: rt.id }, geometry: { type: 'LineString', coordinates: rt.coords } })) } });
+  map.addSource('done', { type: 'geojson', data: { type: 'FeatureCollection', features: FLEET.map(donePart) } });
+  map.addSource('veh', { type: 'geojson', promoteId: 'id', data: { type: 'FeatureCollection', features: FLEET.map(vehPoint) } });
+  map.addSource('depot', { type: 'geojson', data: { type: 'Feature', properties: { name: 'Meridian Depot' }, geometry: { type: 'Point', coordinates: DEPOT } } });
+
+  map.addLayer({ id: 'routes-casing', type: 'line', source: 'routes', slot: 'middle', layout: join, paint: { 'line-color': '#FFFFFF', 'line-opacity': 0.9, 'line-width': ['interpolate', ['linear'], ['zoom'], 9, 5, 14, 8.5] } });
+  map.addLayer({ id: 'routes-plan', type: 'line', source: 'routes', slot: 'middle', layout: join, paint: { 'line-color': '#9DB8F5', 'line-width': lineW } });
+  map.addLayer({ id: 'routes-done', type: 'line', source: 'done', slot: 'middle', layout: join, paint: { 'line-color': '#2F5BEA', 'line-width': lineW } });
+  map.addLayer({ id: 'depot', type: 'circle', source: 'depot', slot: 'top', paint: { 'circle-radius': 7, 'circle-color': '#0B1220', 'circle-stroke-color': '#FFFFFF', 'circle-stroke-width': 2.5 } });
+  map.addLayer({ id: 'depot-label', type: 'symbol', source: 'depot', slot: 'top', minzoom: 9,
+    layout: { 'text-field': ['get', 'name'], 'text-size': 12, 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'], 'text-variable-anchor': ['left', 'top', 'bottom'], 'text-radial-offset': 0.9 },
+    paint: { 'text-color': '#0B1220', 'text-halo-color': '#FFFFFF', 'text-halo-width': 1.6 } });
+  map.addLayer({ id: 'veh-halo', type: 'circle', source: 'veh', slot: 'top', paint: {
+    'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 16, 14, 22],
+    'circle-color': '#2F5BEA',
+    'circle-opacity': ['case', ['boolean', ['feature-state', 'selected'], false], 0.22, ['boolean', ['feature-state', 'hover'], false], 0.14, 0] } });
+  map.addLayer({ id: 'veh', type: 'circle', source: 'veh', slot: 'top', paint: {
+    'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, sel(10, 7.5), 14, sel(14, 11)],
+    'circle-color': statusColor, 'circle-stroke-color': '#FFFFFF', 'circle-stroke-width': 2.5 } });
+  map.addLayer({ id: 'veh-label', type: 'symbol', source: 'veh', slot: 'top', minzoom: 11,
+    layout: { 'text-field': ['get', 'id'], 'text-size': 11, 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'], 'text-variable-anchor': ['top', 'bottom', 'right', 'left'], 'text-radial-offset': 1.1 },
+    paint: { 'text-color': '#0B1220', 'text-halo-color': '#FFFFFF', 'text-halo-width': 1.6 } });
+
+  map.on('mouseenter', 'veh', (e) => { map.getCanvas().style.cursor = 'pointer'; setHover(e.features[0].properties.id); });
+  map.on('mouseleave', 'veh', () => { map.getCanvas().style.cursor = ''; setHover(null); });
+  map.on('click', 'veh', (e) => { e.originalEvent.cancelBubble = true; select(e.features[0].properties.id, false); });
+  map.on('click', (e) => { if (!e.originalEvent.cancelBubble) select(null, false); });
+
+  ready = true;
+  applyMapFilter();
+  setHover(hoverId);
+  if (selId) map.setFeatureState({ source: 'veh', id: selId }, { selected: true });
+  fitAll(0);
+  $('status-note').classList.add('hidden');
+});
+
+map.on('error', (e) => {
+  if (ready) return;
+  const n = $('status-note');
+  n.className = 'status-note error';
+  n.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+let filterKey = '';
+function applyMapFilter() {
+  if (!ready) return;
+  const ids = FLEET.filter(isVisible).map((v) => v.id);
+  if (ids.join() === filterKey) return;
+  filterKey = ids.join();
+  const f = ids.length === FLEET.length ? null : ['in', ['get', 'id'], ['literal', ids]];
+  ['routes-done', 'veh-halo', 'veh', 'veh-label'].forEach((l) => map.setFilter(l, f));
+}
+
+function setHover(id) {
+  if (ready && hoverId && hoverId !== id) map.setFeatureState({ source: 'veh', id: hoverId }, { hover: false });
+  if (hoverId && hoverId !== id) rowEls[hoverId].el.classList.remove('hover');
+  hoverId = id;
+  if (id) rowEls[id].el.classList.add('hover');
+  if (ready && id) map.setFeatureState({ source: 'veh', id }, { hover: true });
+  if (!id) tip.remove(); else updateTip();
+}
+
+function updateTip() {
+  const v = FLEET.find((x) => x.id === hoverId);
+  if (!v || !ready) return;
+  const s = statusOf(v), rt = ROUTES[v.r], ns = nextStop(v);
+  tip.setLngLat(posAt(rt, v.p)).setHTML(
+    `<div class="tip-id">${v.id}<span class="pill ${s}">${ST[s].label}</span></div>` +
+    `<div class="tip-row">Driver<b>${v.driver}</b></div>` +
+    `<div class="tip-row">Route<b>${rt.id} · ${rt.name}</b></div>` +
+    `<div class="tip-row">${v.dir > 0 ? 'Next stop' : 'Returning via'}<b>${v.idle ? '—' : ns.name}</b></div>` +
+    `<div class="tip-row">ETA<b class="mono">${etaOf(v)}</b></div>` +
+    `<div class="tip-row">Delay<b class="mono">${v.idle ? '—' : '+' + delayOf(v).toFixed(0) + ' min'}</b></div>`);
+  if (!tip.isOpen()) tip.addTo(map);
+}
+
+function select(id, fly) {
+  if (ready && selId && selId !== id) map.setFeatureState({ source: 'veh', id: selId }, { selected: false });
+  if (selId && selId !== id) rowEls[selId].el.classList.remove('selected');
+  selId = id;
+  if (!id) return;
+  rowEls[id].el.classList.add('selected');
+  if (ready) map.setFeatureState({ source: 'veh', id }, { selected: true });
+  if (fly && ready) {
+    if (phone()) document.querySelector('.map-card').scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
+    const v = FLEET.find((x) => x.id === id);
+    const opts = { center: posAt(ROUTES[v.r], v.p), zoom: Math.max(map.getZoom(), 12.6), padding: pad() };
+    if (reduce) map.jumpTo(opts); else map.flyTo({ ...opts, duration: 1600, essential: false });
+  }
+  if (!phone()) rowEls[id].el.scrollIntoView({ block: 'nearest' });
+}
+
+/* ---------- Main loop ---------- */
+let last = 0, tUi = 0, tDone = 0;
+function refresh(force) {
+  const counts = updateTable();
+  const cur = kpis(counts);
+  applyMapFilter();
+  if (force) return;
+  if (elapsed - lastPush > 4) { lastPush = elapsed; pushSpark(cur); }
+}
+
+function frame(ts) {
+  const dt = last ? Math.min(0.1, (ts - last) / 1000) : 0;
+  last = ts;
+  step(reduce ? 1 : dt);
+  if (ready) {
+    map.getSource('veh').setData({ type: 'FeatureCollection', features: FLEET.map(vehPoint) });
+    if (elapsed - tDone > 0.3) { tDone = elapsed; map.getSource('done').setData({ type: 'FeatureCollection', features: FLEET.map(donePart) }); }
+    if (hoverId) updateTip();
+  }
+  if (elapsed - tUi > 0.5) {
+    tUi = elapsed;
+    refresh(false);
+    $('clock').textContent = 'Live · ' + hhmm(CLOCK_START + elapsed * CLOCK_X);
+  }
+  if (reduce) setTimeout(() => requestAnimationFrame(frame), 1000); else requestAnimationFrame(frame);
+}
+
+Object.keys(hist).forEach(drawSpark);
+refresh(true);
+$('clock').textContent = 'Live · ' + hhmm(CLOCK_START);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

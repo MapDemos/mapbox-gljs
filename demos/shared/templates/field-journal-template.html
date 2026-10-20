@@ -1,0 +1,330 @@
+<!--
+  Working EXAMPLE of the Field Journal style pack (field-journal.css, in this
+  same folder). Open this file directly to see the pattern working with eight
+  illustrative wildlife sightings on the Isle of Skye, then copy the markup
+  and script into your own demo and link field-journal.css from its <head> --
+  see the class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (a naturalist's field notebook: graph paper, ink green,
+  sepia sketches, rust stamps, masking tape). The sightings, notes and
+  coordinates are illustrative placeholders, not real records.
+
+  What's NOT included: real wildlife data, photos, user accounts or a
+  server. Added sightings live only in this browser's localStorage (the page
+  works fine if storage is blocked); all sketches, the compass and the
+  hand-drawn ring are inline SVG.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Field Notes — Isle of Skye</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@300;400;700&family=Cutive+Mono&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="field-journal.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: the map fills the taped-in frame, inside its white border. */
+  #map {
+    position: absolute;
+    inset: 6px;
+  }
+</style>
+</head>
+<body>
+<div class="desk">
+  <div class="notebook">
+    <div class="binding" aria-hidden="true"></div>
+
+    <section class="page page-left">
+      <header class="journal-head">
+        <h1>Field Notes</h1>
+        <div class="vol">Isle of Skye, Vol. III</div>
+      </header>
+      <div class="entries" id="entries"></div>
+    </section>
+
+    <section class="page page-right">
+      <div class="plate-head">
+        <div class="plate-title">Plate IV &mdash; the Isle<small>pencilled from memory</small></div>
+        <svg class="compass" viewBox="0 0 80 80" aria-hidden="true">
+          <circle cx="40" cy="40" r="30" />
+          <circle cx="40.5" cy="39.5" r="26" stroke-dasharray="3 4" />
+          <g class="compass-star" id="compass-star">
+            <path class="north" d="M40 8 L45 40 L35 40 Z" />
+            <path d="M40 72 L45 40 L35 40 Z" />
+            <path d="M8 40 L40 35 L40 45 Z" />
+            <path d="M72 40 L40 35 L40 45 Z" />
+            <text x="40" y="4" text-anchor="middle">N</text>
+          </g>
+        </svg>
+      </div>
+
+      <div class="map-frame" id="frame">
+        <span class="tape tape-l" aria-hidden="true"></span>
+        <span class="tape tape-r" aria-hidden="true"></span>
+        <div id="map"></div>
+      </div>
+
+      <div class="toolbar">
+        <select class="field" id="species-select" aria-label="Species"></select>
+        <button class="btn btn-primary" id="add-btn" aria-pressed="false">+ Add sighting</button>
+        <button class="link-btn hidden" id="clear-btn">Clear my additions</button>
+        <div class="status-note loading" id="status-note" role="status">Opening the notebook</div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+// Tiny sepia line drawings (48x48), one per species type.
+const SKETCH = {
+  bird: '<path d="M6 30C12 17 28 15 36 21c3-2 7 0 8 3l-6 2c-2 8-13 14-24 12z"/><path d="M14 36l-6 6M22 38l-3 6"/><circle cx="37" cy="21.5" r=".8"/>',
+  flower: '<circle cx="24" cy="14" r="4"/><circle cx="24" cy="6" r="3"/><circle cx="32" cy="12" r="3"/><circle cx="16" cy="12" r="3"/><circle cx="29" cy="20" r="3"/><circle cx="19" cy="20" r="3"/><path d="M24 24c0 10-2 16-2 22M22 38c-6-2-9-6-9-9 5 0 8 3 9 9"/>',
+  seal: '<path d="M5 34C9 22 24 20 32 24c5-4 11 0 10 5 3 5-5 9-16 9-10 2-19 1-21-4z"/><path d="M40 31l6-3M40 33l6 1"/><circle cx="33" cy="26" r=".9"/><path d="M5 34l-3 5 7-2"/>',
+  deer: '<path d="M18 44l2-16c0-7 10-7 10 0l2 16"/><path d="M20 24L13 8M13 8l-4 3M16 15l-5 1M28 24l7-16M35 8l4 3M32 15l5 1"/><path d="M19 27l-4-2M29 27l4-2"/><circle cx="22.5" cy="30" r=".8"/><circle cx="27.5" cy="30" r=".8"/>',
+  fern: '<path d="M24 46C24 30 26 18 35 6"/><path d="M24 40l-9-4M24 40l9-3M24.5 33l-9-5M25 33l9-3M26 26l-8-5M27 26l8-4M29 19l-6-5M30 19l6-4M32 12l-4-3M33 12l4-2"/>',
+};
+
+// species key -> label, sketch type
+const SPECIES = {
+  eagle: { label: 'Golden eagle', sketch: 'bird' },
+  puffin: { label: 'Puffin', sketch: 'bird' },
+  seal: { label: 'Grey seal', sketch: 'seal' },
+  deer: { label: 'Red deer', sketch: 'deer' },
+  thrift: { label: 'Sea pink', sketch: 'flower' },
+  bracken: { label: 'Bracken', sketch: 'fern' },
+};
+
+const SIGHTINGS = [
+  { id: 's1', sp: 'eagle', date: '03 Apr 2026', place: 'The Quiraing', lng: -6.2705, lat: 57.6336,
+    note: 'Pair riding the thermals above the Table. Wingspan wider than the gate.' },
+  { id: 's2', sp: 'deer', date: '09 Apr 2026', place: 'Old Man of Storr', lng: -6.1826, lat: 57.5072,
+    note: 'Stag and four hinds grazing below the pinnacle, unbothered by walkers.' },
+  { id: 's3', sp: 'thrift', date: '22 Apr 2026', place: 'Kilt Rock', lng: -6.1706, lat: 57.6137,
+    note: 'Sea pink in pink cushions along the cliff edge. First flowers of the year.' },
+  { id: 's4', sp: 'seal', date: '30 Apr 2026', place: 'Portree harbour', lng: -6.1946, lat: 57.4125,
+    note: 'One grey seal hauled out on the slip, watching the fishing boats.' },
+  { id: 's5', sp: 'puffin', date: '14 May 2026', place: 'Neist Point', lng: -6.7880, lat: 57.4237,
+    note: 'Three puffins on the grass slope. Beaks full of sand eels.' },
+  { id: 's6', sp: 'seal', date: '21 May 2026', place: 'Loch Dunvegan', lng: -6.5985, lat: 57.4540,
+    note: 'A dozen seals on the skerries, pups calling like small dogs.' },
+  { id: 's7', sp: 'bracken', date: '02 Jun 2026', place: 'Fairy Pools', lng: -6.2640, lat: 57.2500,
+    note: 'Bracken uncurling, waist high already. Tick check tonight.' },
+  { id: 's8', sp: 'thrift', date: '17 Jun 2026', place: 'Elgol shore', lng: -6.1076, lat: 57.1459,
+    note: 'Sea pink thick on the shingle; the Cuillin sharp behind it.' },
+];
+
+const STORE_KEY = 'field-journal-additions-v1';
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const $ = (id) => document.getElementById(id);
+const entriesEl = $('entries');
+const statusEl = $('status-note');
+const addBtn = $('add-btn');
+const clearBtn = $('clear-btn');
+const frame = $('frame');
+const select = $('species-select');
+const items = []; // { data, el, marker, mine }
+let adding = false;
+
+Object.keys(SPECIES).forEach((k) => {
+  const o = document.createElement('option');
+  o.value = k;
+  o.textContent = SPECIES[k].label;
+  select.appendChild(o);
+});
+
+function setStatus(text, kind) {
+  statusEl.className = 'status-note ' + (kind || '');
+  statusEl.textContent = text;
+  statusEl.classList.toggle('hidden', !text);
+}
+
+function fmtCoord(v, pos, neg) {
+  return Math.abs(v).toFixed(3) + '° ' + (v >= 0 ? pos : neg);
+}
+
+// ---- Map ----------------------------------------------------------------
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  center: [-6.35, 57.35],
+  zoom: 8.3,
+  attributionControl: true,
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');
+
+// Recolour light-v11 into pencil / sepia tones. Every call is guarded, since
+// layer ids differ between style versions.
+function paint(id, prop, value) {
+  try { map.setPaintProperty(id, prop, value); } catch (e) { /* layer lacks this property */ }
+}
+
+function recolour() {
+  const layers = (map.getStyle() || {}).layers || [];
+  layers.forEach((l) => {
+    const id = l.id;
+    if (l.type === 'background') paint(id, 'background-color', '#F1E8D2');
+    else if (l.type === 'fill') {
+      if (/water/.test(id)) paint(id, 'fill-color', '#C9D4CF');
+      else if (/park|wood|grass|scrub|landuse|national|pitch/.test(id)) paint(id, 'fill-color', '#DCDFCB');
+      else if (/building/.test(id)) paint(id, 'fill-color', '#E4D9C0');
+      else paint(id, 'fill-color', '#EAE0C8');
+    } else if (l.type === 'line') {
+      if (/waterway|water/.test(id)) paint(id, 'line-color', '#B3C3BE');
+      else if (/admin/.test(id)) paint(id, 'line-color', '#B59A78');
+      else if (/road|bridge|tunnel|street|motorway|trunk|primary|secondary|tertiary|path|ferry/.test(id)) paint(id, 'line-color', '#9A7B57');
+    } else if (l.type === 'symbol' && l.layout && l.layout['text-field']) {
+      paint(id, 'text-color', '#5E4630');
+      paint(id, 'text-halo-color', '#F1E8D2');
+      if (/poi|transit|airport/.test(id)) {
+        try { map.setLayoutProperty(id, 'visibility', 'none'); } catch (e) { /* ignore */ }
+      }
+    }
+  });
+}
+
+map.on('style.load', () => { recolour(); setStatus('Tap an entry, or add your own sighting.'); });
+map.on('error', (e) => setStatus('Map error: ' + ((e.error && e.error.message) || 'unknown'), 'error'));
+map.on('rotate', () => { $('compass-star').style.transform = 'rotate(' + (-map.getBearing()) + 'deg)'; });
+
+// The hand-drawn ring: a marker whose inner SVG path draws itself on.
+const ringEl = document.createElement('div');
+ringEl.className = 'circle-wrap';
+ringEl.innerHTML = '<svg class="circle-mark" viewBox="0 0 78 58" aria-hidden="true"><path pathLength="100" d="M40 5C60 3 74 14 72 29C70 44 52 54 32 52C13 50 3 38 6 24C9 10 28 4 48 9"/></svg>';
+const ringMarker = new mapboxgl.Marker({ element: ringEl }).setLngLat([0, 0]);
+let ringOnMap = false;
+
+function drawRing(lng, lat) {
+  ringMarker.setLngLat([lng, lat]);
+  if (!ringOnMap) { ringMarker.addTo(map); ringOnMap = true; }
+  const svg = ringEl.firstChild;
+  svg.classList.remove('draw');
+  void svg.getBoundingClientRect(); // restart the animation
+  svg.classList.add('draw');
+}
+
+// ---- Entries ------------------------------------------------------------
+function select_(item) {
+  items.forEach((i) => i.el.classList.remove('is-active'));
+  item.el.classList.add('is-active');
+  item.el.classList.add('observed');
+  item.el.scrollIntoView({ block: 'nearest', behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+  const cam = { center: [item.data.lng, item.data.lat], zoom: 10 };
+  if (reduceMotion.matches) map.jumpTo(cam);
+  else map.flyTo({ ...cam, duration: 1800, essential: true });
+  drawRing(item.data.lng, item.data.lat);
+}
+
+function addItem(data, mine) {
+  const sp = SPECIES[data.sp];
+  const el = document.createElement('div');
+  el.className = 'entry' + (mine ? ' mine' : '');
+  el.tabIndex = 0;
+  el.setAttribute('role', 'button');
+  el.innerHTML =
+    '<div class="entry-sketch"><svg viewBox="0 0 48 48" aria-hidden="true">' + SKETCH[sp.sketch] + '</svg></div>' +
+    '<div class="entry-body"><div class="entry-date"></div><h3 class="species"></h3>' +
+    '<p class="note"></p><div class="entry-place"></div></div>' +
+    '<div class="tag"><span class="tag-text"></span></div>' +
+    '<span class="stamp">Observed</span>';
+  el.querySelector('.entry-date').textContent = data.date;
+  el.querySelector('.species').textContent = sp.label;
+  el.querySelector('.note').textContent = data.note;
+  el.querySelector('.entry-place').textContent = data.place;
+  el.querySelector('.tag-text').innerHTML = fmtCoord(data.lat, 'N', 'S') + '<br>' + fmtCoord(data.lng, 'E', 'W');
+  entriesEl.appendChild(el);
+
+  const dot = document.createElement('div');
+  dot.className = 'sight-marker';
+  dot.innerHTML = '<span class="ink-dot' + (mine ? ' mine' : '') + '"></span>';
+  const marker = new mapboxgl.Marker({ element: dot }).setLngLat([data.lng, data.lat]).addTo(map);
+
+  const item = { data, el, marker, mine };
+  items.push(item);
+  el.setAttribute('aria-label', sp.label + ', ' + data.place);
+  el.addEventListener('click', () => select_(item));
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select_(item); }
+  });
+  dot.addEventListener('click', (e) => { e.stopPropagation(); select_(item); });
+  return item;
+}
+
+// ---- Persistence (all optional: the page works without storage) -----------
+function saveMine() {
+  try {
+    const mine = items.filter((i) => i.mine).map((i) => i.data);
+    if (mine.length) localStorage.setItem(STORE_KEY, JSON.stringify(mine));
+    else localStorage.removeItem(STORE_KEY);
+  } catch (e) { /* storage unavailable */ }
+  clearBtn.classList.toggle('hidden', !items.some((i) => i.mine));
+}
+
+function loadMine() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(list)) return [];
+    return list.filter((d) => d && SPECIES[d.sp] && Number.isFinite(d.lng) && Number.isFinite(d.lat) &&
+      typeof d.date === 'string' && typeof d.note === 'string' && typeof d.place === 'string');
+  } catch (e) { return []; }
+}
+
+SIGHTINGS.forEach((d) => addItem(d, false));
+loadMine().forEach((d) => addItem(d, true));
+clearBtn.classList.toggle('hidden', !items.some((i) => i.mine));
+
+// Fit all sightings once, so the spread opens on the whole island.
+const bounds = new mapboxgl.LngLatBounds();
+SIGHTINGS.forEach((d) => bounds.extend([d.lng, d.lat]));
+map.fitBounds(bounds, { padding: 50, duration: 0 });
+
+// ---- Add mode --------------------------------------------------------------
+function setAdding(on) {
+  adding = on;
+  frame.classList.toggle('is-adding', on);
+  addBtn.classList.toggle('is-on', on);
+  addBtn.setAttribute('aria-pressed', String(on));
+  addBtn.textContent = on ? 'Cancel' : '+ Add sighting';
+  setStatus(on ? 'Click the map where you saw it.' : '');
+}
+
+addBtn.addEventListener('click', () => setAdding(!adding));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && adding) setAdding(false); });
+
+map.on('click', (e) => {
+  if (!adding) return;
+  const d = new Date();
+  const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()];
+  const data = {
+    id: 'u' + Date.now(), sp: select.value,
+    date: String(d.getDate()).padStart(2, '0') + ' ' + month + ' ' + d.getFullYear(),
+    place: 'My sighting', lng: e.lngLat.lng, lat: e.lngLat.lat,
+    note: 'Noted in the field today.',
+  };
+  const item = addItem(data, true);
+  saveMine();
+  setAdding(false);
+  select_(item);
+  setStatus('Sighting added to the notebook.', 'success');
+});
+
+clearBtn.addEventListener('click', () => {
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (!items[i].mine) continue;
+    items[i].marker.remove();
+    items[i].el.remove();
+    items.splice(i, 1);
+  }
+  if (ringOnMap) { ringMarker.remove(); ringOnMap = false; }
+  saveMine();
+  setStatus('My additions cleared.', 'success');
+});
+</script>
+</body>
+</html>

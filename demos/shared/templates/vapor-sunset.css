@@ -1,0 +1,833 @@
+/*
+  Vapor Sunset -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: an 80s synthwave / vaporwave sunset
+  drive -- deep violet sky, a big striped sun, palm silhouettes, a neon
+  perspective grid floor, chrome lettering, a CRT television frame and a
+  cassette-style playlist, deliberately distinct from every other style
+  pack in this folder: Arena, Editorial Paper, Highway Sign, Slate Console,
+  Storefront, Tarmac Glass, Vintage Chart, Weather Console, Riso Zine,
+  Swiss Grid, Neon HUD, Pastel Bento, Blueprint, Story Scroll, Retro OS,
+  Aurora Command, Deco Voyage, Washi Seasons, Raw Web, Case Board, Line
+  Diagram, Aero Gadgets, Chat Concierge, Chronicle, Broadcast, Bottom
+  Sheet, Trailhead and Field Journal. Neon HUD is a cyan sci-fi
+  instrument panel; this is a pastel-sunset, chrome-type, palm-and-VHS
+  mood piece).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/vapor-sunset.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Monoton for the one huge retro
+  wordmark -- display only -- and Chakra Petch for all UI text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Monoton&family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  Signature touch: chrome type -- a layered linear-gradient clipped to the
+  text (white sky, a hard dark horizon line at the midpoint, then a
+  gold-to-pink sunset below it) -- over a scrolling neon grid floor that
+  runs to a glowing horizon, with a striped sun sinking behind the panel.
+
+  Layout archetype: retro TV + playlist. On desktop the page is one
+  viewport tall (no scroll): wordmark on top, the map inside a rounded
+  CRT bezel on the left, a cassette deck with a track list on the right
+  and a chrome transport bar underneath. At phone width the TV goes full
+  width (52dvh), the playlist stacks below and the transport sticks to the
+  bottom of the page. The map stays a plain rectangle inside the bezel, so
+  the Mapbox logo and attribution sit unobstructed in the screen corners.
+  Nothing is drawn over the map; the TV's on-screen readout lives in the
+  bezel "chin" below it.
+
+  Class/id contract (see vapor-sunset-template.html in this same folder
+  for a full working example):
+
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here); put
+                               it inside .tv-screen as position:absolute;
+                               inset:0
+  - .scene                    fixed decorative backdrop (aria-hidden,
+                               pointer-events:none, z-index 0) --
+    .scene .sun                 striped sun (inline SVG inside)
+    .scene .floor > .floor-plane  neon perspective grid, scrolls toward
+                                 the viewer
+    .scene .palm (+.palm-right) palm silhouette SVG, bottom corners
+    .scene .stars               faint star dots in the upper sky
+  - .stage                    page wrapper above the scene (z-index 1);
+                               desktop grid: .wordmark / .tv + .deck /
+                               .transport
+  - .wordmark                 header block --
+    .wordmark .wm-title         Monoton display title in chrome text
+    .wordmark .wm-tag           small tracked tagline
+  - .tv                       CRT television bezel --
+    .tv-screen                  rounded screen, holds #map (position:
+                                 relative; overflow hidden)
+    .tv-chin                    bezel strip under the screen with
+      .tv-brand, .tv-osd          brand plate, on-screen-display readout,
+      .tv-vhs, .tv-led, .knob     VHS tracking strip (animates while
+                                 body.playing), LED, dials
+  - .deck                     cassette-deck panel (translucent violet) --
+    .cassette                   cassette-tape SVG; its .reel elements spin
+                                 while body.playing
+    .now-playing                .np-label small caps + .np-title chrome
+                                 title (add .flip to animate a change)
+    .playlist                   <ol> of .track buttons --
+    .track                        grid: .track-num, .track-body
+                                   (.track-name + .track-sub),
+                                   .track-time, .eq (equalizer bars, shown
+                                   on the active track while playing);
+                                   active = [aria-current="true"]
+  - .transport                chrome transport bar (sticky at the bottom
+                               on phones) --
+    .t-btn                      round chrome button (.t-play is the large
+                                 centre one); disabled state supported
+    .t-readout                  small mono-ish readout (track counter,
+                                 clock)
+  - .car-dot                  inner child of a mapboxgl.Marker element: a
+                               pink dot with a mint halo (style the child,
+                               never the marker root)
+  - .chrome-text              utility: chrome gradient text
+  - .btn, .btn-primary,       chrome pill buttons for secondary actions
+    .btn-secondary
+  - .status-note (+.loading/  small status line (mint / pink / spinner)
+    .success/.error)
+  - body.playing              state class the demo toggles; drives the
+                               reel spin, LED, VHS strip and equalizer
+  - .hidden                   utility: display: none !important
+
+  All loops (grid scroll, reels, VHS strip, equalizer, title flip,
+  spinner) are switched off under prefers-reduced-motion.
+*/
+
+:root {
+  --sky-top: #2B1055;
+  --sky-mid: #5A2A8C;
+  --pink: #FF6EC7;
+  --orange: #FF9E5E;
+  --gold: #FFD36E;
+  --lavender: #B79CFF;
+  --mint: #7DF9D5;
+  --night: #14052E;
+  --panel: rgba(30, 10, 62, 0.88);
+  --panel-line: rgba(183, 156, 255, 0.45);
+  --text: #F1E9FF;
+  --text-dim: #BBA8E8;
+  --success: #7DF9D5;
+  --error: #FF7A9C;
+  --floor-h: 34dvh;
+
+  --chrome-text: linear-gradient(180deg, #FFFFFF 0%, #E9DDFF 42%, #9F8BE0 47%, #2B1055 49%, #2B1055 51%, #FFD36E 53%, #FF9E5E 72%, #FF6EC7 100%);
+  --chrome-metal: linear-gradient(180deg, #FFFFFF 0%, #E4D8FF 44%, #8D79D6 49%, #C8B8FF 52%, #FFFFFF 100%);
+
+  --font-display: 'Monoton', 'Impact', sans-serif;
+  --font-ui: 'Chakra Petch', 'Trebuchet MS', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--night);
+  color: var(--text);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 2px;
+}
+
+/* ---------- Scene (decorative backdrop) ---------- */
+.scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(180deg, #2B1055 0%, #3A1670 28%, #6D2A98 50%, #B23FA2 64%, #FF6EC7 calc(100% - var(--floor-h)));
+}
+
+.scene .stars {
+  position: absolute;
+  inset: 0 0 var(--floor-h) 0;
+  opacity: 0.8;
+  background:
+    radial-gradient(1.5px 1.5px at 8% 12%, #fff, transparent),
+    radial-gradient(1px 1px at 18% 30%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 33% 8%, #fff, transparent),
+    radial-gradient(1px 1px at 47% 22%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 61% 10%, #fff, transparent),
+    radial-gradient(1px 1px at 72% 34%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 88% 16%, #fff, transparent),
+    radial-gradient(1px 1px at 94% 40%, #fff, transparent);
+}
+
+.scene .sun {
+  position: absolute;
+  top: 2dvh;
+  right: 6vw;
+  width: clamp(150px, 34dvh, 320px);
+  aspect-ratio: 1;
+  filter: drop-shadow(0 0 40px rgba(255, 110, 199, 0.55));
+}
+
+.scene .sun svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Neon grid floor: a tilted plane of crossing lines scrolling toward the viewer */
+.scene .floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--floor-h);
+  overflow: hidden;
+  perspective: 400px;
+  perspective-origin: 50% 0;
+  background: linear-gradient(180deg, #2A0B52 0%, #14052E 55%);
+  box-shadow: 0 -2px 26px 2px rgba(255, 110, 199, 0.75);
+}
+
+.scene .floor-plane {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 300%;
+  height: 300px;
+  transform-origin: 50% 0;
+  transform: rotateX(60deg);
+  background-image:
+    linear-gradient(rgba(255, 110, 199, 0.85) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(183, 156, 255, 0.75) 2px, transparent 2px);
+  background-size: 64px 64px;
+  animation: vs-grid 1.4s linear infinite;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 22%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 22%);
+}
+
+@keyframes vs-grid {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: 0 64px, 0 0; }
+}
+
+.scene .palm {
+  position: absolute;
+  bottom: 0;
+  left: -3vw;
+  height: 46dvh;
+  width: auto;
+  aspect-ratio: 2 / 3;
+  fill: #12042B;
+}
+
+.scene .palm-right {
+  left: auto;
+  right: -3vw;
+  transform: scaleX(-1);
+}
+
+/* ---------- Stage ---------- */
+.stage {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "head head"
+    "tv deck"
+    "bar bar";
+  gap: 14px 22px;
+  height: 100dvh;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px 28px 18px;
+}
+
+.wordmark {
+  grid-area: head;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.wordmark .wm-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(34px, 7.5dvh, 64px);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  filter: drop-shadow(0 0 14px rgba(255, 110, 199, 0.6));
+}
+
+.wordmark .wm-tag {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--lavender);
+}
+
+.chrome-text {
+  background: var(--chrome-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ---------- CRT television ---------- */
+.tv {
+  grid-area: tv;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 16px 16px 0;
+  border-radius: 30px;
+  background: linear-gradient(150deg, #7C6BB8 0%, #3A2B73 38%, #231650 62%, #54438F 100%);
+  border: 2px solid #CDBFFF;
+  box-shadow: 0 0 0 3px #12042B, 0 22px 50px rgba(8, 0, 24, 0.6), 0 0 60px rgba(255, 110, 199, 0.3);
+}
+
+.tv-screen {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #1A0A3A;
+  box-shadow: 0 0 0 3px #0B0220, 0 0 22px rgba(255, 110, 199, 0.5);
+}
+
+.tv-chin {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 6px 10px;
+}
+
+.tv-brand {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #E6DCFF;
+}
+
+.tv-osd {
+  flex: none;
+  display: flex;
+  gap: 10px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: #0B0220;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--mint);
+  text-shadow: 0 0 8px rgba(125, 249, 213, 0.7);
+  white-space: nowrap;
+}
+
+.tv-vhs {
+  flex: 1;
+  min-width: 24px;
+  height: 8px;
+  border-radius: 4px;
+  opacity: 0.45;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.55) 0 3px, transparent 3px 8px, rgba(255, 110, 199, 0.6) 8px 10px, transparent 10px 19px);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent);
+}
+
+body.playing .tv-vhs {
+  animation: vs-vhs 0.7s steps(7) infinite;
+}
+
+@keyframes vs-vhs {
+  from { background-position: 0 0; }
+  to { background-position: 19px 0; }
+}
+
+.tv-led {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #5B3A6E;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+body.playing .tv-led {
+  background: var(--pink);
+  box-shadow: 0 0 10px 2px var(--pink);
+}
+
+.knob {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--chrome-metal);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- Cassette deck ---------- */
+.deck {
+  grid-area: deck;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  padding: 14px;
+  border-radius: 22px;
+  background: var(--panel);
+  border: 1.5px solid var(--panel-line);
+  box-shadow: 0 0 34px rgba(255, 110, 199, 0.28), 0 18px 40px rgba(8, 0, 24, 0.5);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.cassette {
+  display: block;
+  flex: none;
+  width: 100%;
+  max-width: 300px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.cassette .reel {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+body.playing .cassette .reel {
+  animation: vs-spin 1.6s linear infinite;
+}
+
+@keyframes vs-spin {
+  to { transform: rotate(360deg); }
+}
+
+.now-playing {
+  flex: none;
+  perspective: 500px;
+}
+
+.np-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--mint);
+}
+
+.np-title {
+  margin: 2px 0 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: var(--chrome-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  overflow-wrap: break-word;
+}
+
+.np-title.flip {
+  animation: vs-flip 0.5s ease-out;
+}
+
+@keyframes vs-flip {
+  from { transform: rotateX(90deg); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+.playlist {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--lavender) transparent;
+}
+
+.track {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.track:hover {
+  background: rgba(183, 156, 255, 0.14);
+}
+
+.track[aria-current="true"] {
+  border-color: var(--pink);
+  background: linear-gradient(90deg, rgba(255, 110, 199, 0.34), rgba(125, 249, 213, 0.1));
+  box-shadow: 0 0 14px rgba(255, 110, 199, 0.35);
+}
+
+.track-num {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--lavender);
+  font-variant-numeric: tabular-nums;
+}
+
+.track[aria-current="true"] .track-num {
+  color: var(--mint);
+  text-shadow: 0 0 8px rgba(125, 249, 213, 0.7);
+}
+
+.track-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.track-name {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+}
+
+.track-sub {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--text-dim);
+  overflow-wrap: break-word;
+}
+
+.track-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.eq {
+  display: none;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+}
+
+.eq i {
+  display: block;
+  width: 3px;
+  height: 100%;
+  background: var(--mint);
+  transform-origin: bottom;
+  transform: scaleY(0.4);
+}
+
+body.playing .track[aria-current="true"] .eq {
+  display: flex;
+}
+
+body.playing .track[aria-current="true"] .eq i {
+  animation: vs-eq 0.9s ease-in-out infinite alternate;
+}
+
+.eq i:nth-child(2) { animation-delay: -0.3s !important; }
+.eq i:nth-child(3) { animation-delay: -0.6s !important; }
+
+@keyframes vs-eq {
+  from { transform: scaleY(0.25); }
+  to { transform: scaleY(1); }
+}
+
+/* ---------- Transport ---------- */
+.transport {
+  grid-area: bar;
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 22px;
+  border-radius: 999px;
+  background: rgba(30, 10, 62, 0.82);
+  border: 1.5px solid var(--panel-line);
+  box-shadow: 0 0 26px rgba(255, 110, 199, 0.3);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.t-readout {
+  min-width: 74px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.t-readout:last-child {
+  text-align: right;
+}
+
+.t-btn {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 2px solid #5B4AA0;
+  border-radius: 50%;
+  background: var(--chrome-metal);
+  color: #2B1055;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #3A2B73, 0 6px 14px rgba(8, 0, 24, 0.5);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.t-btn svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+.t-btn:hover:not(:disabled) {
+  box-shadow: 0 3px 0 #3A2B73, 0 0 18px rgba(255, 110, 199, 0.8);
+}
+
+.t-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #3A2B73;
+}
+
+.t-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.t-play {
+  width: 62px;
+  height: 62px;
+  border-color: var(--pink);
+}
+
+.t-play svg {
+  width: 28px;
+  height: 28px;
+}
+
+/* ---------- Map marker ---------- */
+.car-dot {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--pink);
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 5px rgba(125, 249, 213, 0.55), 0 0 18px 4px var(--pink);
+}
+
+/* ---------- Buttons + status ---------- */
+.btn {
+  display: inline-block;
+  padding: 9px 20px;
+  border: 2px solid #5B4AA0;
+  border-radius: 999px;
+  background: var(--chrome-metal);
+  color: #2B1055;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #3A2B73;
+  transition: box-shadow 0.15s ease;
+}
+
+.btn:hover {
+  box-shadow: 0 3px 0 #3A2B73, 0 0 16px rgba(255, 110, 199, 0.8);
+}
+
+.btn-primary {
+  border-color: var(--pink);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--panel-line);
+  box-shadow: none;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.status-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.status-note.loading::before {
+  content: '';
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--lavender);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: vs-rotate 0.8s linear infinite;
+}
+
+@keyframes vs-rotate {
+  to { transform: rotate(360deg); }
+}
+
+.status-note.success {
+  color: var(--success);
+}
+
+.status-note.error {
+  color: var(--error);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---------- Phone / narrow ---------- */
+@media (max-width: 860px) {
+  .scene {
+    --floor-h: 22dvh;
+  }
+
+  .scene .palm {
+    height: 30dvh;
+  }
+
+  .stage {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 100dvh;
+    gap: 12px;
+    padding: 12px 16px 0;
+  }
+
+  .wordmark .wm-title {
+    font-size: 36px;
+  }
+
+  .wordmark .wm-tag {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+  }
+
+  .tv {
+    flex: none;
+    height: 52dvh;
+    padding: 8px 8px 0;
+    border-radius: 22px;
+  }
+
+  .tv-screen {
+    border-radius: 10px;
+  }
+
+  .tv-chin {
+    gap: 8px;
+    min-height: 36px;
+    padding: 6px 4px 8px;
+  }
+
+  .tv-brand,
+  .knob {
+    display: none;
+  }
+
+  .deck {
+    flex: none;
+  }
+
+  .playlist {
+    overflow: visible;
+  }
+
+  .transport {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    align-self: stretch;
+    justify-content: space-between;
+    gap: 8px;
+    margin: auto -16px 0;
+    padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
+    border-radius: 18px 18px 0 0;
+    border-bottom: 0;
+  }
+
+  .t-readout {
+    min-width: 0;
+    flex: 1;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene .floor-plane,
+  body.playing .tv-vhs,
+  body.playing .cassette .reel,
+  body.playing .track[aria-current="true"] .eq i,
+  .np-title.flip,
+  .status-note.loading::before {
+    animation: none !important;
+  }
+
+  .eq i {
+    transform: none;
+  }
+}

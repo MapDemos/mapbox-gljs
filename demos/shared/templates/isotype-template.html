@@ -1,0 +1,359 @@
+<!--
+  Working EXAMPLE of the Isotype style pack (isotype.css, in this same
+  folder). Open this file directly to see the pattern working with ten
+  inner districts of Vienna: the map shows each district as a flat circular
+  "token" coloured by its dominant travel mode, and the poster beside it
+  draws the selected district as rows of repeated pictograms (one row per
+  mode, each figure = 10 000 trips, the last figure clipped to show a
+  fraction). Click a token or a district name to restamp the rows and ease
+  the map; the mode buttons recolour every token by that mode's share and
+  highlight its row. Copy the markup below into your own demo and link
+  isotype.css from its <head> -- see the class/id contract documented at
+  the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (1930s Vienna-method pictorial statistics: off-white
+  paper, five flat muted inks, geometric pictograms) at the user's request
+  for something distinct from every other pack in this folder. The city and
+  district names are real and the tokens sit at approximate district
+  centres, but every trip figure is an ILLUSTRATIVE placeholder, not real
+  mobility data -- swap in your own.
+
+  What's NOT included: real mobility statistics, district boundary
+  polygons, routing, search, popups, or a hard-coded access token
+  (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Isotype &mdash; How Vienna Moves</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@500;700;800&family=Kumbh+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="isotype.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map (inside .map-frame). */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- Pictogram sprite: every symbol spans x 2..22 so a clipped fraction reads true -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="pic-walk" viewBox="2 0 20 24">
+    <circle cx="12" cy="4" r="3.6"/>
+    <path d="M4 9H20V16H16.5V24H13V17H11V24H7.5V16H4Z"/>
+  </symbol>
+  <symbol id="pic-tram" viewBox="2 0 20 24">
+    <path d="M12 5V2M8 2H16" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <rect x="3" y="5" width="18" height="14"/>
+    <rect x="5" y="8" width="4" height="4" style="fill:var(--paper)"/>
+    <rect x="10" y="8" width="4" height="4" style="fill:var(--paper)"/>
+    <rect x="15" y="8" width="4" height="4" style="fill:var(--paper)"/>
+    <rect x="6" y="19" width="4" height="2.4"/>
+    <rect x="14" y="19" width="4" height="2.4"/>
+    <rect x="2" y="22" width="20" height="1.6"/>
+  </symbol>
+  <symbol id="pic-bike" viewBox="2 0 20 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.7">
+      <circle cx="6.5" cy="16.5" r="4.2"/>
+      <circle cx="17.5" cy="16.5" r="4.2"/>
+      <path d="M6.5 16.5L10 9H16L17.5 16.5M10 9L12.3 16.5H6.5M16 9L12.3 16.5M15 6.5H18.5M8.5 7.5H11.5"/>
+    </g>
+  </symbol>
+  <symbol id="pic-car" viewBox="2 0 20 24">
+    <rect x="2" y="12" width="20" height="6"/>
+    <path d="M6 12L8.5 6.5H15.5L18 12Z"/>
+    <path d="M8 11L9.4 8H11.6V11ZM12.6 8H14.6L16 11H12.6Z" style="fill:var(--paper)"/>
+    <circle cx="7" cy="18.5" r="2.8" stroke="#F4EFE4" stroke-width="1.2"/>
+    <circle cx="17" cy="18.5" r="2.8" stroke="#F4EFE4" stroke-width="1.2"/>
+  </symbol>
+  <symbol id="pic-house" viewBox="2 0 20 24">
+    <path d="M2 12L12 3L22 12V22H2Z"/>
+    <rect x="10" y="15" width="4" height="7" style="fill:var(--paper)"/>
+  </symbol>
+</svg>
+
+<div class="poster">
+  <header class="title-band">
+    <div class="titles">
+      <h1>How Vienna Moves</h1>
+      <p class="subtitle">Daily trips by district</p>
+    </div>
+    <div class="key" aria-label="Key: each figure equals 10 000 trips">
+      <svg class="pic" aria-hidden="true"><use href="#pic-walk"/></svg>
+      <span>= 10 000 trips</span>
+    </div>
+  </header>
+
+  <div class="poster-body">
+    <section class="map-pane" aria-label="Map of districts">
+      <div class="map-frame"><div id="map"></div></div>
+      <div class="map-key" id="map-key"></div>
+    </section>
+
+    <section class="rows-pane" aria-label="Pictogram rows">
+      <div class="section-label">Colour map by</div>
+      <div class="mode-toggle" id="mode-toggle" role="group" aria-label="Map highlight mode">
+        <button class="mode-btn active" data-mode="all" aria-pressed="true">All</button>
+        <button class="mode-btn" data-mode="walk" aria-pressed="false">Walking</button>
+        <button class="mode-btn" data-mode="tram" aria-pressed="false">Tram</button>
+        <button class="mode-btn" data-mode="bike" aria-pressed="false">Bicycle</button>
+        <button class="mode-btn" data-mode="car" aria-pressed="false">Car</button>
+      </div>
+
+      <div class="section-label">District</div>
+      <div class="district-list" id="district-list"></div>
+
+      <div class="district-head">
+        <div class="district-no" id="d-no">1</div>
+        <div>
+          <h2 class="district-name" id="d-name">Innere Stadt</h2>
+          <p class="district-total" id="d-total"></p>
+        </div>
+      </div>
+      <div class="iso-rows" id="iso-rows"></div>
+
+      <p class="footnote">All figures are illustrative placeholders, not real mobility data. District tokens mark approximate centres, not boundaries. Each figure stands for 10 000 trips; a clipped figure is a fraction.</p>
+      <div class="status-note error hidden" id="status-note"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+// Illustrative data: trips per day in units of 10 000, [walk, tram, bike, car].
+const DISTRICTS = [
+  { id: 1,  name: 'Innere Stadt', c: [16.3731, 48.2085], v: [14.5, 6.5, 3.5, 3.0] },
+  { id: 2,  name: 'Leopoldstadt', c: [16.4030, 48.2180], v: [9.0, 4.5, 5.5, 8.0] },
+  { id: 3,  name: 'Landstraße',   c: [16.3950, 48.1990], v: [8.5, 5.5, 4.0, 8.5] },
+  { id: 4,  name: 'Wieden',       c: [16.3700, 48.1910], v: [10.0, 5.0, 4.5, 5.0] },
+  { id: 5,  name: 'Margareten',   c: [16.3560, 48.1880], v: [9.5, 4.0, 5.0, 5.5] },
+  { id: 6,  name: 'Mariahilf',    c: [16.3480, 48.1950], v: [11.5, 3.5, 5.5, 4.0] },
+  { id: 7,  name: 'Neubau',       c: [16.3420, 48.2030], v: [11.0, 3.0, 6.0, 4.0] },
+  { id: 8,  name: 'Josefstadt',   c: [16.3460, 48.2110], v: [9.0, 6.0, 4.0, 4.5] },
+  { id: 9,  name: 'Alsergrund',   c: [16.3590, 48.2250], v: [8.5, 5.0, 4.5, 6.0] },
+  { id: 10, name: 'Favoriten',    c: [16.3750, 48.1700], v: [7.5, 4.5, 3.0, 12.5] },
+];
+const MODES = ['walk', 'tram', 'bike', 'car'];
+const MODE_META = {
+  walk: { label: 'Walking', sym: 'pic-walk', color: '#7D9467' },
+  tram: { label: 'Tram', sym: 'pic-tram', color: '#B8432F' },
+  bike: { label: 'Bicycle', sym: 'pic-bike', color: '#D29B2E' },
+  car:  { label: 'Car', sym: 'pic-car', color: '#3B5B7A' },
+};
+const PAPER = '#F4EFE4', INK = '#2B2B2B';
+const COLS = 15; // grid columns: fits the largest row (14.5 figures)
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+
+// Percent shares per district, used for the map fills.
+const sum = (a) => a.reduce((x, y) => x + y, 0);
+DISTRICTS.forEach((d) => {
+  const t = sum(d.v);
+  d.share = Object.fromEntries(MODES.map((m, i) => [m, Math.round((d.v[i] / t) * 100)]));
+  d.dom = MODES[d.v.indexOf(Math.max(...d.v))];
+});
+
+function mix(hex, amount) { // mix with paper: amount 0 = paper, 1 = full colour
+  const p = (h, i) => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16);
+  return '#' + [0, 1, 2].map((i) =>
+    Math.round(p(PAPER, i) + (p(hex, i) - p(PAPER, i)) * amount).toString(16).padStart(2, '0')).join('');
+}
+
+/* ---- Map ---- */
+const bounds = DISTRICTS.reduce((b, d) => b.extend(d.c), new mapboxgl.LngLatBounds(DISTRICTS[0].c, DISTRICTS[0].c));
+const phone = window.matchMedia('(max-width: 900px)').matches;
+const PAD = phone ? { top: 44, bottom: 70, left: 36, right: 36 } : { top: 56, bottom: 76, left: 56, right: 56 };
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  bounds,
+  fitBoundsOptions: { padding: PAD, maxZoom: 13 },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+// Recolour light-v11 flat to the paper palette. Every call is guarded.
+function recolour() {
+  map.getStyle().layers.forEach((l) => {
+    const set = (prop, val) => { try { map.setPaintProperty(l.id, prop, val); } catch (e) { /* skip */ } };
+    try {
+      if (l.type === 'background') set('background-color', PAPER);
+      else if (l.id === 'water' && l.type === 'fill') set('fill-color', '#C9D6E0');
+      else if (l.id === 'waterway' && l.type === 'line') set('line-color', '#C9D6E0');
+      else if (l.id === 'landuse' && l.type === 'fill') {
+        set('fill-color', ['match', ['get', 'class'],
+          ['park', 'grass', 'pitch', 'cemetery', 'wood', 'scrub', 'agriculture'], '#D5DDC3', '#ECE6D6']);
+        set('fill-opacity', 1);
+      } else if (/park/.test(l.id) && l.type === 'fill') set('fill-color', '#D5DDC3');
+      else if (l.id === 'building' && l.type === 'fill') { set('fill-color', '#E8E1D0'); set('fill-opacity', 1); }
+      else if (l.type === 'line' && /^(road|bridge|tunnel)/.test(l.id)) {
+        set('line-color', /case|link-case/.test(l.id) ? '#D9D0BB' : '#FFFFFF');
+      } else if (l.type === 'symbol') {
+        if (/poi|transit|airport|motorway-junction/.test(l.id)) map.setLayoutProperty(l.id, 'visibility', 'none');
+        else { set('text-color', INK); set('text-halo-color', PAPER); }
+      }
+    } catch (e) { /* layer shape differs; skip */ }
+  });
+}
+
+const geojson = {
+  type: 'FeatureCollection',
+  features: DISTRICTS.map((d) => ({
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: d.c },
+    properties: { id: d.id, name: d.name, dom: d.dom, walk: d.share.walk, tram: d.share.tram, bike: d.share.bike, car: d.share.car },
+  })),
+};
+
+// Fill expression: dominant mode, or four flat steps of one mode's share.
+function fillFor(mode) {
+  if (mode === 'all') {
+    return ['match', ['get', 'dom'], 'walk', MODE_META.walk.color, 'tram', MODE_META.tram.color,
+      'bike', MODE_META.bike.color, MODE_META.car.color];
+  }
+  const vals = DISTRICTS.map((d) => d.share[mode]);
+  const lo = Math.min(...vals), hi = Math.max(...vals), q = (hi - lo) / 4 || 1;
+  const col = MODE_META[mode].color;
+  return ['step', ['get', mode], mix(col, 0.3), lo + q, mix(col, 0.52), lo + 2 * q, mix(col, 0.76), lo + 3 * q, col];
+}
+
+map.on('style.load', () => {
+  recolour();
+  map.addSource('districts', { type: 'geojson', data: geojson, promoteId: 'id' });
+  map.addLayer({
+    id: 'tokens', type: 'circle', source: 'districts',
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 8, 11, 10, 12, 14, 13, 20, 14, 32],
+      'circle-color': fillFor('all'),
+      'circle-stroke-color': INK,
+      'circle-stroke-width': ['case', ['boolean', ['feature-state', 'sel'], false], 4, 1.5],
+    },
+  });
+  map.addLayer({
+    id: 'token-labels', type: 'symbol', source: 'districts',
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+      'text-size': 12,
+      'text-variable-anchor': ['top', 'bottom', 'right', 'left'],
+      'text-radial-offset': ['interpolate', ['linear'], ['zoom'], 10, 0.9, 11, 1.3, 12, 1.8, 13, 2.4, 14, 3.3],
+      'text-max-width': 7,
+    },
+    paint: { 'text-color': INK, 'text-halo-color': PAPER, 'text-halo-width': 2 },
+  });
+  map.on('click', 'tokens', (e) => select(e.features[0].properties.id));
+  map.on('mouseenter', 'tokens', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'tokens', () => { map.getCanvas().style.cursor = ''; });
+  styleReady = true;
+  setMode(mode);
+  select(current, false);
+});
+let styleReady = false;
+
+map.on('error', (e) => {
+  const n = $('status-note');
+  n.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+  n.classList.remove('hidden');
+});
+
+/* ---- Poster rows ---- */
+let current = 1;
+let mode = 'all';
+
+function iconsHTML(sym, value) {
+  const full = Math.floor(value), frac = value - full;
+  let h = '';
+  for (let i = 0; i < full; i++) {
+    h += `<span class="cell" style="--i:${i}"><svg class="pic" aria-hidden="true"><use href="#${sym}"/></svg></span>`;
+  }
+  if (frac >= 0.05) {
+    h += `<span class="cell" style="--i:${full}"><svg class="pic partial" style="clip-path:inset(0 ${((1 - frac) * 100).toFixed(0)}% 0 0)" aria-hidden="true"><use href="#${sym}"/></svg></span>`;
+  }
+  return h;
+}
+
+function renderRows() {
+  const d = DISTRICTS.find((x) => x.id === current);
+  $('d-no').textContent = d.id;
+  $('d-name').textContent = d.name;
+  $('d-total').textContent = `${Math.round(sum(d.v) * 10000).toLocaleString('en').replace(/,/g, ' ')} trips a day (illustrative)`;
+  $('iso-rows').innerHTML = MODES.map((m, i) => {
+    const v = d.v[i], meta = MODE_META[m];
+    const dim = mode !== 'all' && mode !== m ? ' dim' : '';
+    return `<div class="iso-row m-${m}${dim}" style="--row:${i}" role="group" aria-label="${meta.label}: ${v.toFixed(1)} figures">
+      <div class="iso-head">
+        <span class="iso-mode"><svg class="pic" aria-hidden="true"><use href="#${meta.sym}"/></svg>${meta.label}</span>
+        <span class="iso-count"><b>${v.toFixed(1)}</b> &times; 10k &middot; ${d.share[m]}%</span>
+      </div>
+      <div class="iso-icons" style="--cols:${COLS}">${iconsHTML(meta.sym, v)}</div>
+    </div>`;
+  }).join('');
+}
+
+function select(id, ease = true) {
+  if (styleReady) {
+    map.setFeatureState({ source: 'districts', id: current }, { sel: false });
+    map.setFeatureState({ source: 'districts', id }, { sel: true });
+  }
+  current = id;
+  document.querySelectorAll('.district-chip').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.id === id)));
+  renderRows();
+  if (!ease || !styleReady) return;
+  // Only move the camera if the token drifted toward an edge or the logo corner.
+  const d = DISTRICTS.find((x) => x.id === id);
+  const p = map.project(d.c), cv = map.getCanvas();
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (p.x < 70 || p.x > w - 70 || p.y < 60 || p.y > h - 90) {
+    const opts = { center: d.c, padding: { top: 0, bottom: 0, left: 0, right: 0 } };
+    if (reduce) map.jumpTo(opts); else map.easeTo({ ...opts, duration: 600 });
+  }
+}
+
+/* ---- Mode toggle + map key ---- */
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.mode-btn').forEach((b) => {
+    const on = b.dataset.mode === m;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+  if (styleReady && map.getLayer('tokens')) map.setPaintProperty('tokens', 'circle-color', fillFor(m));
+  document.querySelectorAll('.iso-row').forEach((r) => r.classList.toggle('dim', m !== 'all' && !r.classList.contains('m-' + m)));
+  const key = $('map-key');
+  if (m === 'all') {
+    key.innerHTML = '<span class="key-title">Token = most used mode</span>' + MODES.map((k) =>
+      `<span class="key-item"><i class="swatch m-${k}"></i>${MODE_META[k].label}</span>`).join('');
+  } else {
+    const col = MODE_META[m].color;
+    key.innerHTML = `<span class="key-title">${MODE_META[m].label} share</span><span class="key-item">low` +
+      [0.3, 0.52, 0.76, 1].map((a) => `<i class="swatch" style="background:${mix(col, a)}"></i>`).join('') + 'high</span>';
+  }
+}
+
+$('mode-toggle').addEventListener('click', (e) => {
+  const b = e.target.closest('.mode-btn');
+  if (b) setMode(b.dataset.mode);
+});
+
+DISTRICTS.forEach((d) => {
+  const b = document.createElement('button');
+  b.className = 'district-chip';
+  b.dataset.id = d.id;
+  b.textContent = `${d.id} ${d.name}`;
+  b.addEventListener('click', () => select(d.id));
+  $('district-list').appendChild(b);
+});
+
+setMode('all');
+select(1, false);
+</script>
+</body>
+</html>

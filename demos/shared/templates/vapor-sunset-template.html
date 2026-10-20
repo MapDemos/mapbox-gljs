@@ -1,0 +1,465 @@
+<!--
+  Working EXAMPLE of the Vapor Sunset style pack (vapor-sunset.css, in this
+  same folder). Open this file directly to see the pattern working as a
+  "night drive" mixtape across Miami Beach on Mapbox Standard (dusk preset,
+  violet/pink colour config): the map sits in a retro TV, the seven stops
+  are the tracks on a cassette-style playlist, and the chrome transport
+  (back / play / forward) drives a camera along a real road route. Play
+  starts the drive -- the camera follows the route, the hot-pink line with
+  a mint glow is revealed as you go, the cassette reels spin and the
+  "now playing" title flips at every stop. Click a track or a numbered stop
+  on the map to jump there. With prefers-reduced-motion the camera never
+  follows; play just hops from stop to stop. Copy the markup below into
+  your own demo and link vapor-sunset.css from its <head> -- see the
+  class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (80s synthwave sunset, chrome type, palms, VHS) at
+  the user's request for something distinct from every other pack in this
+  folder. The places are real; the route is a Mapbox Directions driving
+  route between them, simplified. "WAVE 88.8 FM", the "Vaporvision" TV, the
+  track blurbs and the durations are fictional placeholders -- swap in
+  your own.
+
+  What's NOT included: live routing (the route is embedded), audio, search,
+  or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vapor Sunset</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Monoton&family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="vapor-sunset.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="palm" viewBox="0 0 200 300">
+      <path d="M104 300C100 220 96 150 112 70L121 70C108 150 112 220 119 300Z"/>
+      <path d="M116 68C90 40 50 40 10 70C50 55 90 58 116 72Z"/>
+      <path d="M116 68C140 38 180 38 198 72C170 56 140 58 116 72Z"/>
+      <path d="M116 68C96 30 70 12 30 14C66 26 92 44 116 72Z"/>
+      <path d="M116 68C138 28 160 12 190 16C160 30 138 46 116 72Z"/>
+      <path d="M116 68C112 36 116 14 128 0C128 26 124 46 116 72Z"/>
+      <path d="M116 68C80 70 52 90 36 130C60 98 90 84 116 74Z"/>
+      <path d="M116 68C150 70 178 92 190 134C170 100 142 84 116 74Z"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="scene" aria-hidden="true">
+  <div class="stars"></div>
+  <div class="sun">
+    <svg viewBox="0 0 200 200">
+      <defs>
+        <linearGradient id="sun-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#FFD36E"/><stop offset="0.5" stop-color="#FF9E5E"/><stop offset="1" stop-color="#FF6EC7"/>
+        </linearGradient>
+        <mask id="sun-stripes">
+          <rect width="200" height="200" fill="#fff"/>
+          <rect y="112" width="200" height="3"/><rect y="127" width="200" height="5"/>
+          <rect y="144" width="200" height="7"/><rect y="162" width="200" height="9"/>
+          <rect y="181" width="200" height="11"/>
+        </mask>
+      </defs>
+      <circle cx="100" cy="100" r="100" fill="url(#sun-fill)" mask="url(#sun-stripes)"/>
+    </svg>
+  </div>
+  <div class="floor"><div class="floor-plane"></div></div>
+  <svg class="palm" viewBox="0 0 200 300"><use href="#palm"/></svg>
+  <svg class="palm palm-right" viewBox="0 0 200 300"><use href="#palm"/></svg>
+</div>
+
+<div class="stage">
+  <header class="wordmark">
+    <h1 class="wm-title chrome-text">WAVE 88.8</h1>
+    <p class="wm-tag">FM &middot; The Miami Beach Night Drive</p>
+  </header>
+
+  <section class="tv" aria-label="Map screen">
+    <div class="tv-screen" id="map-wrap"><div id="map"></div></div>
+    <div class="tv-chin">
+      <span class="tv-brand">Vaporvision</span>
+      <span class="tv-osd"><span id="osd-mode">STOP</span><span id="osd-count">--/07</span></span>
+      <span class="tv-vhs" aria-hidden="true"></span>
+      <span class="tv-led" aria-hidden="true"></span>
+      <span class="knob" aria-hidden="true"></span><span class="knob" aria-hidden="true"></span>
+    </div>
+  </section>
+
+  <aside class="deck" aria-label="Playlist">
+    <svg class="cassette" viewBox="0 0 300 190" role="img" aria-label="Cassette tape">
+      <defs>
+        <linearGradient id="cas-body" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#5B3FA8"/><stop offset="1" stop-color="#2B1055"/>
+        </linearGradient>
+        <linearGradient id="cas-label" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#FF6EC7"/><stop offset="0.5" stop-color="#FF9E5E"/><stop offset="1" stop-color="#FFD36E"/>
+        </linearGradient>
+      </defs>
+      <rect x="4" y="6" width="292" height="178" rx="14" fill="url(#cas-body)" stroke="#CDBFFF" stroke-width="3"/>
+      <rect x="22" y="20" width="256" height="84" rx="8" fill="url(#cas-label)"/>
+      <rect x="22" y="44" width="256" height="3" fill="#2B1055" opacity="0.5"/>
+      <text x="34" y="38" font-family="Chakra Petch, sans-serif" font-weight="700" font-size="13" letter-spacing="2" fill="#2B1055">WAVE 88.8 FM &#183; SIDE A</text>
+      <text x="34" y="96" font-family="Chakra Petch, sans-serif" font-weight="600" font-size="11" letter-spacing="3" fill="#2B1055">NIGHT DRIVE MIX</text>
+      <rect x="86" y="54" width="128" height="40" rx="20" fill="#14052E"/>
+      <g class="reel"><circle cx="106" cy="74" r="15" fill="#E9DDFF"/><circle cx="106" cy="74" r="5" fill="#14052E"/>
+        <path d="M106 59V69M106 79V89M91 74H101M111 74H121" stroke="#14052E" stroke-width="3"/></g>
+      <g class="reel"><circle cx="194" cy="74" r="15" fill="#E9DDFF"/><circle cx="194" cy="74" r="5" fill="#14052E"/>
+        <path d="M194 59V69M194 79V89M179 74H189M199 74H209" stroke="#14052E" stroke-width="3"/></g>
+      <path d="M60 184L84 128H216L240 184Z" fill="#14052E" opacity="0.85"/>
+      <circle cx="104" cy="156" r="6" fill="#7DF9D5"/><circle cx="196" cy="156" r="6" fill="#7DF9D5"/>
+      <rect x="130" y="148" width="40" height="16" rx="3" fill="#2B1055"/>
+    </svg>
+
+    <div class="now-playing" aria-live="polite">
+      <div class="np-label" id="np-label">Ready</div>
+      <h2 class="np-title" id="np-title">Press play to start the drive</h2>
+    </div>
+
+    <ol class="playlist" id="playlist"></ol>
+    <div class="status-note hidden" id="status"></div>
+  </aside>
+
+  <nav class="transport" aria-label="Transport">
+    <span class="t-readout" id="t-count">Track --/07</span>
+    <button class="t-btn" id="btn-prev" aria-label="Previous stop" disabled>
+      <svg viewBox="0 0 24 24"><path d="M11 5v14L2 12zM21 5v14l-9-7z"/></svg>
+    </button>
+    <button class="t-btn t-play" id="btn-play" aria-label="Play">
+      <svg viewBox="0 0 24 24" id="ico-play"><path d="M7 4v16l13-8z"/></svg>
+      <svg viewBox="0 0 24 24" id="ico-pause" class="hidden"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+    </button>
+    <button class="t-btn" id="btn-next" aria-label="Next stop">
+      <svg viewBox="0 0 24 24"><path d="M13 5v14l9-7zM3 5v14l9-7z"/></svg>
+    </button>
+    <span class="t-readout" id="t-clock">00:00</span>
+  </nav>
+</div>
+
+<script>
+// Driving route [lng, lat]: Mapbox Directions (driving) through the seven stops, simplified.
+const ROUTE = [
+  [-80.16295,25.69291],[-80.16277,25.69383],[-80.16277,25.69463],[-80.16298,25.6964],[-80.16291,25.69716],
+  [-80.16269,25.69807],[-80.16244,25.69869],[-80.16152,25.70038],[-80.16069,25.70152],[-80.16016,25.70283],
+  [-80.15089,25.71966],[-80.15058,25.72067],[-80.15057,25.72189],[-80.15087,25.72298],[-80.15141,25.7239],
+  [-80.15216,25.72469],[-80.155,25.72721],[-80.15591,25.72792],[-80.17446,25.7446],[-80.1756,25.7456],
+  [-80.17629,25.74605],[-80.17732,25.74644],[-80.17852,25.74658],[-80.19065,25.74641],[-80.19452,25.74609],
+  [-80.19683,25.74607],[-80.19779,25.74617],[-80.19869,25.74639],[-80.19952,25.74669],[-80.20094,25.7475],
+  [-80.2015,25.74796],[-80.20233,25.74888],[-80.20326,25.74971],[-80.20453,25.75122],[-80.2045,25.75145],
+  [-80.20441,25.75152],[-80.19431,25.75851],[-80.19405,25.7586],[-80.19316,25.76203],[-80.19334,25.76738],
+  [-80.19913,25.76721],[-80.19909,25.76625],[-80.19923,25.76496],[-80.19946,25.76479],[-80.1997,25.76482],
+  [-80.19997,25.76524],[-80.20019,25.76682],[-80.20013,25.76804],[-80.19978,25.76925],[-80.1987,25.77178],
+  [-80.19859,25.77249],[-80.19866,25.77333],[-80.1986,25.77346],[-80.1987,25.77394],[-80.19947,25.77601],
+  [-80.20002,25.79148],[-80.20031,25.79338],[-80.20038,25.79536],[-80.19888,25.79543],[-80.19909,25.80073],
+  [-80.195,25.80086],[-80.19466,25.78939],[-80.18654,25.78962],[-80.1757,25.79008],[-80.17066,25.79037],
+  [-80.16937,25.79005],[-80.16772,25.79012],[-80.16724,25.79019],[-80.16663,25.79048],[-80.16614,25.79059],
+  [-80.1554,25.79105],[-80.1449,25.79162],[-80.14447,25.7917],[-80.14374,25.79205],[-80.1432,25.79212],
+  [-80.14249,25.79201],[-80.14003,25.79208],[-80.13994,25.78894],[-80.13188,25.78915],[-80.13183,25.78656],
+  [-80.13238,25.78295],[-80.13287,25.78073],[-80.13065,25.78038],[-80.13091,25.77917],[-80.13196,25.77936],
+  [-80.13298,25.77468],[-80.1342,25.77461],[-80.13583,25.76724],[-80.13408,25.76649],[-80.13408,25.76619],
+];
+const STOPS = [
+  { name: 'Key Biscayne', sub: 'Crandon Boulevard, sea-grape sunset', time: '3:42', coord: [-80.16295, 25.69291] },
+  { name: 'Brickell', sub: 'Glass towers, neon canyon', time: '4:05', coord: [-80.19325, 25.76499] },
+  { name: 'Wynwood', sub: 'Murals after midnight', time: '3:18', coord: [-80.19907, 25.8003] },
+  { name: 'Venetian Causeway', sub: 'Island hopping across the bay', time: '3:56', coord: [-80.17401, 25.79016] },
+  { name: 'Lincoln Road', sub: 'Pastel pedestrian mall', time: '4:21', coord: [-80.13999, 25.79051] },
+  { name: 'Ocean Drive', sub: 'Art deco neon row', time: '3:34', coord: [-80.13072, 25.78006] },
+  { name: 'South Pointe', sub: 'Last light at the jetty', time: '4:48', coord: [-80.13408, 25.76619] },
+];
+const LAST = STOPS.length - 1;
+const PINK = '#FF6EC7', MINT = '#7DF9D5';
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+/* ---- Route geometry: cumulative metres, point-at-distance, stop projection ---- */
+const rad = Math.PI / 180;
+const cum = [0];
+const mx = (c) => c[0] * Math.cos(25.75 * rad) * 111320;
+const my = (c) => c[1] * 110540;
+for (let i = 1; i < ROUTE.length; i++) {
+  cum.push(cum[i - 1] + Math.hypot(mx(ROUTE[i]) - mx(ROUTE[i - 1]), my(ROUTE[i]) - my(ROUTE[i - 1])));
+}
+const TOTAL = cum[cum.length - 1];
+
+function posAt(d) {
+  d = clamp(d, 0, TOTAL);
+  let i = 1;
+  while (i < ROUTE.length - 1 && cum[i] < d) i++;
+  const t = (d - cum[i - 1]) / (cum[i] - cum[i - 1] || 1);
+  return [ROUTE[i - 1][0] + (ROUTE[i][0] - ROUTE[i - 1][0]) * t, ROUTE[i - 1][1] + (ROUTE[i][1] - ROUTE[i - 1][1]) * t];
+}
+
+// Distance along the route of each stop, searching forward so the order stays monotonic.
+const stopDist = [];
+(function () {
+  let from = 0;
+  STOPS.forEach((s) => {
+    let best = Infinity, bd = 0, bi = from;
+    for (let i = from; i < ROUTE.length - 1; i++) {
+      const ax = mx(ROUTE[i]), ay = my(ROUTE[i]), bx = mx(ROUTE[i + 1]), by = my(ROUTE[i + 1]);
+      const px = mx(s.coord), py = my(s.coord);
+      const l2 = (bx - ax) ** 2 + (by - ay) ** 2 || 1;
+      const t = clamp(((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / l2, 0, 1);
+      const d = Math.hypot(px - (ax + t * (bx - ax)), py - (ay + t * (by - ay)));
+      if (d < best) { best = d; bd = cum[i] + t * (cum[i + 1] - cum[i]); bi = i; }
+    }
+    stopDist.push(bd);
+    from = bi;
+  });
+})();
+
+function bearingBetween(a, b) {
+  const y = Math.sin((b[0] - a[0]) * rad) * Math.cos(b[1] * rad);
+  const x = Math.cos(a[1] * rad) * Math.sin(b[1] * rad) - Math.sin(a[1] * rad) * Math.cos(b[1] * rad) * Math.cos((b[0] - a[0]) * rad);
+  return Math.atan2(y, x) / rad;
+}
+
+/* ---- Map ---- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [-80.165, 25.745],
+  zoom: 10,
+  config: {
+    basemap: {
+      lightPreset: 'dusk',
+      show3dObjects: true,
+      showPointOfInterestLabels: false,
+      // Push the palette toward violet / pink (documented Standard colour keys)
+      colorWater: '#4B2DB8',
+      colorLand: '#6A4A9E',
+      colorGreenspace: '#2FA58B',
+      colorMotorways: '#FF6EC7',
+      colorTrunks: '#FF9E5E',
+      colorRoads: '#C9B6FF',
+      colorBuildings: '#D8B8FF',
+    },
+  },
+});
+
+function overview(duration) {
+  const b = ROUTE.reduce((bb, c) => bb.extend(c), new mapboxgl.LngLatBounds(ROUTE[0], ROUTE[0]));
+  map.fitBounds(b, { padding: { top: 48, bottom: 72, left: 80, right: 80 }, pitch: 0, bearing: 0, duration });
+}
+
+const carEl = document.createElement('div');
+carEl.innerHTML = '<span class="car-dot"></span>';
+const car = new mapboxgl.Marker({ element: carEl });
+let carOn = false;
+
+map.on('style.load', () => {
+  map.addSource('route', { type: 'geojson', lineMetrics: true, data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE } } });
+  map.addSource('stops', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: STOPS.map((s, i) => ({
+      type: 'Feature', properties: { i, label: `${i + 1}  ${s.name}` }, geometry: { type: 'Point', coordinates: s.coord } })) },
+  });
+  const join = { 'line-join': 'round', 'line-cap': 'round' };
+  const width = ['interpolate', ['linear'], ['zoom'], 10, 3, 16, 8];
+  // Whole route, faint lavender; then a mint glow and the hot-pink line revealed by progress.
+  map.addLayer({ id: 'route-base', type: 'line', source: 'route', slot: 'middle', layout: join,
+    paint: { 'line-color': '#C9B6FF', 'line-opacity': 0.5, 'line-width': width, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'route-glow', type: 'line', source: 'route', slot: 'middle', layout: join,
+    paint: { 'line-gradient': progressGradient(MINT, 0), 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 9, 16, 22],
+      'line-blur': 8, 'line-opacity': 0.85, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'route-line', type: 'line', source: 'route', slot: 'middle', layout: join,
+    paint: { 'line-gradient': progressGradient(PINK, 0), 'line-width': width, 'line-emissive-strength': 1 } });
+
+  map.addLayer({ id: 'stops-halo', type: 'circle', source: 'stops', slot: 'top', filter: ['==', ['get', 'i'], -1],
+    paint: { 'circle-radius': 20, 'circle-color': MINT, 'circle-opacity': 0.4, 'circle-blur': 0.4, 'circle-emissive-strength': 1 } });
+  map.addLayer({ id: 'stops', type: 'circle', source: 'stops', slot: 'top',
+    paint: { 'circle-radius': 9, 'circle-color': PINK, 'circle-stroke-color': '#FFF4FB', 'circle-stroke-width': 3,
+      'circle-emissive-strength': 1 } });
+  map.addLayer({ id: 'stops-label', type: 'symbol', source: 'stops', slot: 'top',
+    layout: { 'text-field': ['get', 'label'], 'text-size': 13, 'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+      'text-variable-anchor': ['top', 'bottom', 'left', 'right'], 'text-radial-offset': 1.2, 'text-justify': 'auto' },
+    paint: { 'text-color': '#FFFFFF', 'text-halo-color': '#2B1055', 'text-halo-width': 2, 'text-emissive-strength': 1 } });
+
+  map.on('click', 'stops', (e) => goStop(e.features[0].properties.i));
+  map.on('mouseenter', 'stops', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'stops', () => { map.getCanvas().style.cursor = ''; });
+
+  overview(0);
+  renderUI();
+});
+
+map.on('error', (e) => {
+  const el = $('status');
+  el.className = 'status-note error';
+  el.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+new ResizeObserver(() => map.resize()).observe($('map-wrap'));
+
+// Step gradient: colour up to progress p along the line, transparent after.
+function progressGradient(color, p) {
+  return ['step', ['line-progress'], color, clamp(p, 0.0001, 1), 'rgba(0,0,0,0)'];
+}
+
+/* ---- Playback state ---- */
+let cur = -1;          // current stop index (-1 = not started)
+let curDist = 0;       // metres along the route
+let playing = false;
+let runId = 0;         // bumped to cancel any running drive loop
+let camBearing = 0;
+let elapsed = 0, clockTimer = null;
+
+function setDist(d) {
+  curDist = d;
+  car.setLngLat(posAt(d));
+  if (!carOn) { car.addTo(map); carOn = true; }
+  const g = progressGradient(PINK, d / TOTAL), g2 = progressGradient(MINT, d / TOTAL);
+  if (map.getLayer('route-line')) map.setPaintProperty('route-line', 'line-gradient', g);
+  if (map.getLayer('route-glow')) map.setPaintProperty('route-glow', 'line-gradient', g2);
+}
+
+function smoothBearing(d) {
+  const a = d + 350 > TOTAL ? posAt(d - 350) : posAt(d);
+  const b = d + 350 > TOTAL ? posAt(d) : posAt(d + 350);
+  const diff = ((bearingBetween(a, b) - camBearing + 540) % 360) - 180;
+  camBearing += clamp(diff, -40, 40);
+  return camBearing;
+}
+
+/* ---- UI ---- */
+const list = $('playlist');
+STOPS.forEach((s, i) => {
+  const li = document.createElement('li');
+  li.innerHTML = `<button class="track" data-i="${i}"><span class="track-num">${String(i + 1).padStart(2, '0')}</span>` +
+    `<span class="track-body"><span class="track-name">${s.name}</span><span class="track-sub">${s.sub}</span></span>` +
+    `<span class="track-time"><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>${s.time}</span></button>`;
+  li.firstChild.addEventListener('click', () => goStop(i));
+  list.appendChild(li);
+});
+
+function renderUI(flip) {
+  const n = cur < 0 ? '--' : String(cur + 1).padStart(2, '0');
+  list.querySelectorAll('.track').forEach((b, i) => {
+    if (i === cur) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
+  });
+  $('np-label').textContent = playing ? 'Now playing' : cur < 0 ? 'Ready' : 'Paused';
+  if (cur >= 0) $('np-title').textContent = STOPS[cur].name;
+  if (flip && !reduce) {
+    $('np-title').classList.remove('flip');
+    void $('np-title').offsetWidth;
+    $('np-title').classList.add('flip');
+  }
+  $('osd-mode').textContent = playing ? 'PLAY ▶' : cur < 0 ? 'STOP' : 'PAUSE';
+  $('osd-count').textContent = `${n}/07`;
+  $('t-count').textContent = `Track ${n}/07`;
+  $('btn-prev').disabled = cur <= 0;
+  $('btn-next').disabled = cur === LAST;
+  $('ico-play').classList.toggle('hidden', playing);
+  $('ico-pause').classList.toggle('hidden', !playing);
+  $('btn-play').setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  document.body.classList.toggle('playing', playing);
+  if (map.getLayer('stops-halo')) map.setFilter('stops-halo', ['==', ['get', 'i'], cur]);
+}
+
+function tickClock() {
+  elapsed++;
+  $('t-clock').textContent = `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`;
+}
+
+/* ---- Drive ---- */
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function stepTo(id, to, dur, zoom) {
+  return new Promise((resolve) => {
+    const from = curDist, t0 = performance.now();
+    smoothBearing(to);
+    map.easeTo({ center: posAt(to), bearing: camBearing, pitch: 60, zoom, duration: dur, easing: (t) => t });
+    (function tick() {
+      if (id !== runId) { resolve(); return; }
+      const k = Math.min(1, (performance.now() - t0) / dur);
+      setDist(from + (to - from) * k);
+      if (k < 1) requestAnimationFrame(tick); else resolve();
+    })();
+  });
+}
+
+async function driveTo(id, target) {
+  const from = curDist, to = stopDist[target];
+  const steps = clamp(Math.round((to - from) / 700), 6, 14);
+  const stepLen = (to - from) / steps;
+  // Longer hops pull the camera back so the road keeps up with it.
+  const zoom = clamp(15.3 - Math.log2(Math.max(stepLen, 250) / 250), 11.8, 15.3);
+  for (let k = 1; k <= steps; k++) {
+    if (id !== runId) return false;
+    await stepTo(id, from + stepLen * k, 1000, zoom);
+  }
+  return id === runId;
+}
+
+async function run(id) {
+  while (playing && id === runId) {
+    // Dwell at the stop (skipped when resuming mid-road).
+    if (Math.abs(curDist - stopDist[cur]) < 1) await sleep(3000);
+    if (id !== runId || !playing) return;
+    if (cur === LAST) { pause(); return; }
+    if (reduce) {
+      cur++; curDist = stopDist[cur]; setDist(curDist);
+      map.jumpTo({ center: STOPS[cur].coord, zoom: 15.3, pitch: 60 });
+      renderUI(false);
+      continue;
+    }
+    if (!(await driveTo(id, cur + 1))) return;
+    cur++;
+    renderUI(true);
+    map.easeTo({ center: STOPS[cur].coord, zoom: 15.3, duration: 1200 });
+  }
+}
+
+function goStop(i) {
+  runId++;
+  map.stop();
+  cur = i;
+  setDist(stopDist[i]);
+  const ahead = posAt(stopDist[i] + 350);
+  camBearing = i === LAST ? map.getBearing() : bearingBetween(STOPS[i].coord, ahead);
+  const cam = { center: STOPS[i].coord, zoom: 15.3, pitch: 60, bearing: camBearing };
+  if (reduce) map.jumpTo(cam); else map.flyTo({ ...cam, duration: 2000 });
+  renderUI(true);
+  if (playing) run(runId);
+}
+
+function pause() {
+  playing = false;
+  runId++;
+  map.stop();
+  clearInterval(clockTimer);
+  renderUI(false);
+}
+
+function play() {
+  if (playing) { pause(); return; }
+  playing = true;
+  clearInterval(clockTimer);
+  clockTimer = setInterval(tickClock, 1000);
+  if (cur < 0 || cur === LAST) goStop(0);
+  else { renderUI(false); run(++runId); }
+}
+
+$('btn-play').addEventListener('click', play);
+$('btn-prev').addEventListener('click', () => goStop(Math.max(0, cur - 1)));
+$('btn-next').addEventListener('click', () => goStop(Math.min(LAST, cur + 1)));
+// Grabbing the map takes the wheel: pause the drive.
+['mousedown', 'touchstart', 'wheel'].forEach((ev) => map.on(ev, () => { if (playing) pause(); }));
+</script>
+</body>
+</html>

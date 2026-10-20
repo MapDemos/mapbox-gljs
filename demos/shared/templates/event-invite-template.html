@@ -1,0 +1,428 @@
+<!--
+  Working EXAMPLE of the Event Invite style pack (event-invite.css, in this
+  same folder). Open this file directly to see the pattern working with a
+  fictional wedding weekend in Tuscany: a centred invitation card, a vertical
+  schedule timeline whose items fly the map to each venue, a "Getting there"
+  list that draws a real driving route (Directions API geometry, fetched once
+  and embedded -- no network calls at runtime) with a travel-time chip, a
+  "Where to stay" list, and an RSVP form with a gracious "Grazie!" seal
+  confirmation. The map is light-v11 recoloured to cotton / sage / blush
+  paper tones. Copy the markup below into your own demo and link
+  event-invite.css from its <head> -- see the class/id contract documented at
+  the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built from
+  a design brief (letterpress wedding invitation: cotton paper, sage, blush,
+  gold hairline, deckled edges, olive branches) at the user's request for
+  something distinct from every other pack in this folder. The towns, the
+  airport and the station are real; the hosts, venues and hotels ("Elena &
+  Matteo", Villa Ulivi, Pieve di San Lorenzo ...) are fictional placeholders
+  placed at plausible countryside spots -- swap in your own.
+
+  What's NOT included: a real RSVP backend (the form only shows the
+  confirmation state), live routing (the two routes are embedded), search,
+  or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Elena &amp; Matteo &middot; Event Invite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Italiana&family=Mulish:wght@300;400;600;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="event-invite.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map (inside the framed card). */
+  #map {
+    position: absolute;
+    inset: 10px;
+  }
+</style>
+</head>
+<body>
+<!-- olive branch, drawn once and reused -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <path id="leaf" d="M0 0 C4 -5 12 -5 16 0 C12 5 4 5 0 0Z" />
+    <symbol id="olive" viewBox="0 0 168 32">
+      <g fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 18 C40 6 110 6 164 17" />
+        <g transform="translate(28 13) rotate(-38)"><use href="#leaf" /></g>
+        <g transform="translate(28 13) rotate(32)"><use href="#leaf" /></g>
+        <g transform="translate(52 9.6) rotate(-42)"><use href="#leaf" /></g>
+        <g transform="translate(52 9.6) rotate(28)"><use href="#leaf" /></g>
+        <g transform="translate(76 8.2) rotate(-40)"><use href="#leaf" /></g>
+        <g transform="translate(76 8.2) rotate(30)"><use href="#leaf" /></g>
+        <g transform="translate(100 8.4) rotate(-36)"><use href="#leaf" /></g>
+        <g transform="translate(100 8.4) rotate(34)"><use href="#leaf" /></g>
+        <g transform="translate(124 10.2) rotate(-34)"><use href="#leaf" /></g>
+        <g transform="translate(124 10.2) rotate(36)"><use href="#leaf" /></g>
+        <g transform="translate(148 13.2) rotate(-30)"><use href="#leaf" /></g>
+        <g transform="translate(148 13.2) rotate(38)"><use href="#leaf" /></g>
+      </g>
+      <g fill="currentColor"><ellipse cx="8" cy="19" rx="3.2" ry="2.2" transform="rotate(-18 8 19)" /></g>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="invite">
+  <header class="card hero">
+    <svg class="olive" aria-hidden="true"><use href="#olive" /></svg>
+    <p class="hero-kicker">Together with their families</p>
+    <h1 class="couple">Elena <span class="amp">&amp;</span> Matteo</h1>
+    <p class="hero-line">request the pleasure of your company</p>
+    <p class="hero-date">Saturday 14 June 2027</p>
+    <p class="hero-place">Chianti &middot; Tuscany &middot; Italy</p>
+    <a class="btn btn-primary" href="#rsvp">Kindly reply</a>
+    <svg class="olive olive-flip" style="margin-top:26px" aria-hidden="true"><use href="#olive" /></svg>
+  </header>
+
+  <main class="layout">
+    <section class="card">
+      <p class="card-eyebrow">The weekend</p>
+      <h2 class="card-title">Schedule</h2>
+      <ol class="timeline" id="timeline"></ol>
+    </section>
+
+    <aside class="map-card" aria-label="Map of the wedding weekend">
+      <div id="map"></div>
+    </aside>
+
+    <section class="card">
+      <p class="card-eyebrow">Arriving</p>
+      <h2 class="card-title">Getting there</h2>
+      <p class="card-note">Choose a starting point to see the drive to Villa Ulivi. A shuttle runs from the villa to the Pieve on Saturday afternoon.</p>
+      <ul class="route-list" id="route-list"></ul>
+    </section>
+
+    <section class="card">
+      <p class="card-eyebrow">Resting</p>
+      <h2 class="card-title">Where to stay</h2>
+      <ul class="stay-list" id="stay-list"></ul>
+    </section>
+
+    <section class="card" id="rsvp">
+      <p class="card-eyebrow">Répondez s'il vous plaît</p>
+      <h2 class="card-title">Your reply</h2>
+      <form class="rsvp-form" id="rsvp-form" novalidate>
+        <div class="field">
+          <label class="field-label" for="rsvp-name">Your name</label>
+          <input class="input" id="rsvp-name" type="text" autocomplete="name" placeholder="Full name" required />
+        </div>
+        <fieldset class="field">
+          <legend class="field-label">Will you join us?</legend>
+          <div class="choice-row">
+            <label class="choice"><input type="radio" name="attend" value="yes" checked /><span>Joyfully accepts</span></label>
+            <label class="choice"><input type="radio" name="attend" value="no" /><span>Regretfully declines</span></label>
+          </div>
+        </fieldset>
+        <div class="field" id="guests-field">
+          <span class="field-label" id="guests-label">Number of guests</span>
+          <div class="stepper" role="group" aria-labelledby="guests-label">
+            <button type="button" class="step-btn" id="guests-minus" aria-label="Fewer guests">&minus;</button>
+            <span class="step-value" id="guests-value" aria-live="polite">1</span>
+            <button type="button" class="step-btn" id="guests-plus" aria-label="More guests">+</button>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label" for="rsvp-diet">Dietary notes</label>
+          <textarea class="input" id="rsvp-diet" placeholder="Allergies, vegetarian, anything we should know"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Send reply</button>
+        <p class="status-note hidden" id="rsvp-error" role="alert">Please tell us your name.</p>
+      </form>
+      <div class="rsvp-done hidden" id="rsvp-done">
+        <div class="seal" aria-hidden="true">Grazie!</div>
+        <p id="rsvp-message"></p>
+        <button type="button" class="btn" id="rsvp-edit">Change reply</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+// ---- Data (fictional venues at plausible countryside spots; route geometry
+// is real Mapbox Directions output, simplified and embedded) ----
+const VENUES = {
+  terrazza: { name: 'Terrazza Ortensia', place: 'Siena', coord: [11.3306, 43.3188], zoom: 14.2 },
+  pieve:    { name: 'Pieve di San Lorenzo', place: 'near Monteriggioni', coord: [11.2105, 43.3772], zoom: 14 },
+  villa:    { name: 'Villa Ulivi', place: 'near Castellina in Chianti', coord: [11.2693, 43.4443], zoom: 14 },
+};
+
+const STOPS = [
+  { day: 'Fri', time: '19:00', name: 'Welcome aperitivo', venue: 'terrazza' },
+  { day: 'Sat', time: '16:00', name: 'Ceremony', venue: 'pieve' },
+  { day: 'Sat', time: '19:30', name: 'Dinner &amp; dancing', venue: 'villa' },
+  { day: 'Sun', time: '11:00', name: 'Farewell brunch', venue: 'villa' },
+];
+
+const HOTELS = [
+  { name: 'Albergo del Cipresso', meta: 'Siena · walk to the aperitivo', coord: [11.3290, 43.3135], off: [24, 24] },
+  { name: 'Locanda dei Mandorli', meta: 'Castellina in Chianti · 10 min to the villa', coord: [11.2905, 43.4655] },
+  { name: 'Fattoria Bellavista', meta: 'San Gimignano · farmhouse rooms', coord: [11.0450, 43.4650] },
+];
+
+const ROUTES = [
+  { key: 'flr', name: 'From Florence Airport (FLR)', label: 'FLR', origin: [11.2051, 43.81], mins: 66, km: 59.7,
+    coords: [[11.2065,43.8089],[11.2027,43.8065],[11.2013,43.8035],[11.1989,43.803],[11.192,43.8072],[11.1911,43.8094],[11.1881,43.8061],[11.1811,43.8104],[11.1826,43.8116],[11.1846,43.8113],[11.204,43.7991],[11.203,43.7962],[11.1991,43.7939],[11.1935,43.7866],[11.189,43.784],[11.186,43.7805],[11.1867,43.7709],[11.1781,43.7704],[11.1671,43.7721],[11.1649,43.7731],[11.1647,43.7756],[11.1631,43.7778],[11.161,43.7781],[11.1597,43.7771],[11.1617,43.7753],[11.1635,43.7709],[11.1692,43.7625],[11.1726,43.7471],[11.1802,43.743],[11.1853,43.7376],[11.189,43.7318],[11.1995,43.7272],[11.2167,43.7261],[11.2213,43.7236],[11.2228,43.7204],[11.2205,43.7195],[11.2197,43.7158],[11.2153,43.7129],[11.213,43.7092],[11.2139,43.7016],[11.2114,43.6966],[11.213,43.6917],[11.211,43.6873],[11.2121,43.6806],[11.2101,43.6766],[11.2103,43.6713],[11.2091,43.6658],[11.2033,43.6592],[11.1974,43.6567],[11.1815,43.6473],[11.1786,43.6444],[11.1781,43.642],[11.1829,43.6317],[11.1836,43.6247],[11.1903,43.6131],[11.1915,43.6049],[11.1938,43.5988],[11.1991,43.5922],[11.2048,43.5765],[11.2074,43.5718],[11.2131,43.5654],[11.2125,43.5588],[11.2103,43.5551],[11.2099,43.5522],[11.2132,43.5521],[11.2191,43.5481],[11.2266,43.547],[11.2297,43.5432],[11.2318,43.5387],[11.236,43.5382],[11.2408,43.5352],[11.242,43.532],[11.2385,43.5249],[11.2419,43.5223],[11.2455,43.5213],[11.2482,43.5175],[11.2467,43.5143],[11.2438,43.5126],[11.2443,43.5107],[11.2428,43.5091],[11.2435,43.505],[11.2466,43.5026],[11.2496,43.502],[11.2509,43.4975],[11.2506,43.496],[11.2556,43.4944],[11.2558,43.4934],[11.2605,43.4901],[11.2642,43.4848],[11.268,43.4819],[11.2684,43.4784],[11.2737,43.475],[11.2768,43.4747],[11.2819,43.4721],[11.2855,43.4715],[11.2862,43.469],[11.289,43.4663],[11.2895,43.4644],[11.288,43.4628],[11.2901,43.458],[11.2875,43.4538],[11.2854,43.453],[11.2836,43.4503],[11.2807,43.4483],[11.2743,43.4455],[11.2704,43.4424],[11.2693,43.4443]] },
+  { key: 'siena', name: 'From Siena station', label: 'Siena', origin: [11.3225, 43.3283], mins: 28, km: 23.1,
+    coords: [[11.3225,43.3283],[11.3202,43.3285],[11.3115,43.3327],[11.306,43.3389],[11.3059,43.3432],[11.3079,43.3459],[11.3063,43.3485],[11.3031,43.3638],[11.2994,43.3668],[11.289,43.3698],[11.2839,43.3794],[11.2758,43.3835],[11.272,43.3874],[11.2683,43.3892],[11.2492,43.3907],[11.2437,43.3923],[11.2378,43.3921],[11.2294,43.3945],[11.2192,43.3939],[11.2167,43.3958],[11.2144,43.402],[11.2106,43.4052],[11.2068,43.4108],[11.2041,43.4127],[11.2241,43.4213],[11.2349,43.4246],[11.239,43.4242],[11.2427,43.4283],[11.2517,43.4297],[11.254,43.4323],[11.2595,43.4336],[11.2654,43.4333],[11.2714,43.438],[11.2715,43.4395],[11.2693,43.4443]] },
+];
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const PAD = { top: 56, bottom: 80, left: 52, right: 52 };
+const INTRO_PAD = { top: 48, bottom: 72, left: 56, right: 72 };
+const fmtTime = (m) => (m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`);
+
+// ---- Map ----
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  center: [11.2, 43.5],
+  zoom: 8.6,
+  attributionControl: true,
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+// On phones the map card is a block in the page flow: scroll it into view first.
+function showMap() {
+  if (!window.matchMedia('(max-width: 899px)').matches) return;
+  const card = document.querySelector('.map-card');
+  const r = card.getBoundingClientRect();
+  if (r.top < 0 || r.bottom > window.innerHeight) {
+    card.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+}
+
+function camera(opts) {
+  showMap();
+  if (reduceMotion) map.jumpTo({ center: opts.center, zoom: opts.zoom });
+  else map.flyTo({ ...opts, duration: 1800, essential: false });
+}
+
+function fitTo(coords) {
+  showMap();
+  const b = coords.reduce((bb, c) => bb.extend(c), new mapboxgl.LngLatBounds(coords[0], coords[0]));
+  map.fitBounds(b, { padding: PAD, duration: reduceMotion ? 0 : 1600, maxZoom: 13 });
+}
+
+// Recolour light-v11 to paper tones; every change is guarded by layer lookup.
+function paperStyle() {
+  const set = (id, kind, prop, val) => {
+    if (!map.getLayer(id)) return;
+    try { (kind === 'paint' ? map.setPaintProperty : map.setLayoutProperty).call(map, id, prop, val); } catch (e) { /* ignore */ }
+  };
+  map.getStyle().layers.forEach((l) => {
+    const id = l.id;
+    if (l.type === 'background') set(id, 'paint', 'background-color', '#FBF7F1');
+    else if (l.type === 'fill') {
+      if (/water/.test(id)) set(id, 'paint', 'fill-color', '#D3E0DF');
+      else if (/park|wood|forest|landcover|grass|scrub|pitch/.test(id)) { set(id, 'paint', 'fill-color', '#DCE5D6'); set(id, 'paint', 'fill-opacity', 0.9); }
+      else if (/building/.test(id)) set(id, 'paint', 'fill-color', '#EFE5D8');
+      else if (/landuse|land-structure|aeroway/.test(id)) set(id, 'paint', 'fill-color', '#F3ECE0');
+    } else if (l.type === 'line') {
+      if (/waterway/.test(id)) set(id, 'paint', 'line-color', '#D3E0DF');
+      else if (/admin/.test(id)) set(id, 'paint', 'line-color', '#C6A96B');
+      else if (/case/.test(id)) set(id, 'paint', 'line-color', '#E9D2CC');
+      else if (/road|bridge|tunnel|street|motorway|trunk|primary|secondary|path|ferry/.test(id)) set(id, 'paint', 'line-color', '#FFFFFF');
+    } else if (l.type === 'symbol') {
+      if (/poi|transit|shield|exit/.test(id)) set(id, 'layout', 'visibility', 'none');
+      else {
+        set(id, 'paint', 'text-color', '#4A433C');
+        set(id, 'paint', 'text-halo-color', '#FBF7F1');
+        if (/water/.test(id)) set(id, 'paint', 'text-color', '#6F8C8A');
+      }
+    }
+  });
+}
+
+// DOM markers: the root is a bare div, all styling lives on the inner child.
+function makeMarker(inner, coord, anchor, offset) {
+  const root = document.createElement('div');
+  root.appendChild(inner);
+  return new mapboxgl.Marker({ element: root, anchor: anchor || 'center', offset: offset || [0, 0] }).setLngLat(coord).addTo(map);
+}
+
+const venueEls = {};
+let originMarker = null;
+let chipMarker = null;
+
+function addVenueMarkers() {
+  HOTELS.forEach((h) => {
+    const el = document.createElement('div');
+    el.className = 'hotel-mark';
+    el.title = h.name;
+    el.addEventListener('click', () => flyHotel(h));
+    makeMarker(el, h.coord, 'center', h.off);
+  });
+  Object.entries(VENUES).forEach(([key, v]) => {
+    const el = document.createElement('div');
+    el.className = 'venue-mark';
+    el.title = v.name;
+    el.innerHTML = 'E&amp;M<span class="venue-label"></span>';
+    el.lastChild.textContent = v.name;
+    el.addEventListener('click', () => {
+      const i = STOPS.findIndex((s) => s.venue === key);
+      if (i >= 0) selectStop(i);
+    });
+    venueEls[key] = el;
+    makeMarker(el, v.coord);
+  });
+}
+
+function flyHotel(h) {
+  clearRoute();
+  camera({ center: h.coord, zoom: 13.4 });
+}
+
+// ---- Schedule ----
+const timelineEl = document.getElementById('timeline');
+const routeListEl = document.getElementById('route-list');
+
+STOPS.forEach((s, i) => {
+  const li = document.createElement('li');
+  const v = VENUES[s.venue];
+  li.innerHTML =
+    '<button type="button" class="tl-item">' +
+    `<span class="tl-when"><span class="tl-day">${s.day}</span><span class="tl-time">${s.time}</span></span>` +
+    '<span class="tl-dot"></span>' +
+    `<span class="tl-body"><span class="tl-name">${s.name}</span><span class="tl-venue">${v.name} &middot; ${v.place}</span></span>` +
+    '</button>';
+  li.firstChild.addEventListener('click', () => selectStop(i));
+  timelineEl.appendChild(li);
+});
+
+function setActive(listEl, selector, index) {
+  listEl.querySelectorAll(selector).forEach((b, i) => b.classList.toggle('is-active', i === index));
+}
+
+function selectStop(i) {
+  const v = VENUES[STOPS[i].venue];
+  setActive(timelineEl, '.tl-item', i);
+  setActive(routeListEl, '.route-item', -1);
+  clearRoute();
+  Object.entries(venueEls).forEach(([k, el]) => el.classList.toggle('is-active', k === STOPS[i].venue));
+  camera({ center: v.coord, zoom: v.zoom });
+}
+
+// ---- Getting there ----
+ROUTES.forEach((r, i) => {
+  const li = document.createElement('li');
+  li.innerHTML =
+    '<button type="button" class="route-item"><span><span class="ri-name"></span>' +
+    `<span class="ri-meta">${r.km.toFixed(0)} km by car</span></span><span class="ri-time">${fmtTime(r.mins)}</span></button>`;
+  li.querySelector('.ri-name').textContent = r.name;
+  li.firstChild.addEventListener('click', () => showRoute(i));
+  routeListEl.appendChild(li);
+});
+
+function clearRoute() {
+  const src = map.getSource('route');
+  if (src) src.setData({ type: 'FeatureCollection', features: [] });
+  if (originMarker) { originMarker.remove(); originMarker = null; }
+  if (chipMarker) { chipMarker.remove(); chipMarker = null; }
+}
+
+// point at half the route length (by planar degrees, close enough for a chip)
+function midpoint(coords) {
+  const d = [0];
+  for (let i = 1; i < coords.length; i++) d.push(d[i - 1] + Math.hypot(coords[i][0] - coords[i - 1][0], coords[i][1] - coords[i - 1][1]));
+  const half = d[d.length - 1] / 2;
+  const k = d.findIndex((x) => x >= half);
+  return coords[Math.max(k, 0)];
+}
+
+function showRoute(i) {
+  const r = ROUTES[i];
+  clearRoute();
+  setActive(timelineEl, '.tl-item', -1);
+  setActive(routeListEl, '.route-item', i);
+  Object.values(venueEls).forEach((el) => el.classList.remove('is-active'));
+  venueEls.villa.classList.add('is-active');
+
+  map.getSource('route').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: r.coords } });
+
+  const o = document.createElement('div');
+  o.className = 'origin-mark';
+  o.innerHTML = '<span class="origin-label"></span>';
+  o.firstChild.textContent = r.label;
+  originMarker = makeMarker(o, r.origin);
+
+  const chip = document.createElement('div');
+  chip.className = 'route-chip';
+  chip.textContent = `${fmtTime(r.mins)} · ${r.km.toFixed(0)} km`;
+  chipMarker = makeMarker(chip, midpoint(r.coords));
+
+  fitTo(r.coords.concat([r.origin]));
+}
+
+// ---- RSVP ----
+const form = document.getElementById('rsvp-form');
+const doneEl = document.getElementById('rsvp-done');
+const errEl = document.getElementById('rsvp-error');
+const guestsValue = document.getElementById('guests-value');
+const guestsField = document.getElementById('guests-field');
+const minus = document.getElementById('guests-minus');
+const plus = document.getElementById('guests-plus');
+let guests = 1;
+
+function renderGuests() {
+  guestsValue.textContent = guests;
+  minus.disabled = guests <= 1;
+  plus.disabled = guests >= 4;
+}
+minus.addEventListener('click', () => { guests = Math.max(1, guests - 1); renderGuests(); });
+plus.addEventListener('click', () => { guests = Math.min(4, guests + 1); renderGuests(); });
+renderGuests();
+
+form.addEventListener('change', () => {
+  guestsField.classList.toggle('hidden', form.attend.value === 'no');
+});
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const name = document.getElementById('rsvp-name').value.trim();
+  errEl.classList.toggle('hidden', !!name);
+  if (!name) { document.getElementById('rsvp-name').focus(); return; }
+  const yes = form.attend.value === 'yes';
+  document.getElementById('rsvp-message').textContent = yes
+    ? `Thank you, ${name}. We have saved ${guests === 1 ? 'a place' : guests + ' places'} for you and cannot wait to celebrate together.`
+    : `Thank you, ${name}. You will be missed, and we are grateful you let us know.`;
+  form.classList.add('hidden');
+  doneEl.classList.remove('hidden');
+});
+
+document.getElementById('rsvp-edit').addEventListener('click', () => {
+  doneEl.classList.add('hidden');
+  form.classList.remove('hidden');
+});
+
+// ---- Wire up ----
+map.on('load', () => {
+  paperStyle();
+
+  // draw route layers beneath the first label so place names stay readable
+  const firstSymbol = map.getStyle().layers.find((l) => l.type === 'symbol');
+  const before = firstSymbol ? firstSymbol.id : undefined;
+  map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({ id: 'route-casing', type: 'line', source: 'route',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#FFFDF9', 'line-width': 8 } }, before);
+  map.addLayer({ id: 'route-line', type: 'line', source: 'route',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#B9817A', 'line-width': 4 } }, before);
+
+  addVenueMarkers();
+
+  // opening view: all three venues and the hotels, clear of the logo corners
+  const all = Object.values(VENUES).map((v) => v.coord).concat(HOTELS.map((h) => h.coord));
+  const b = all.reduce((bb, c) => bb.extend(c), new mapboxgl.LngLatBounds(all[0], all[0]));
+  map.fitBounds(b, { padding: INTRO_PAD, duration: 0, maxZoom: 11 });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,433 @@
+/*
+  E-Ink -- a new style pack, not extracted from an existing demo (built from
+  a fresh design brief: an e-paper reader device -- strictly greyscale
+  paper and ink, dithered dot/checker fills instead of gradients, a matte
+  graphite bezel, a two-page "spread" of text and map, and a page-turn
+  refresh flash), deliberately distinct from every other pack in this folder:
+  Arena, Editorial Paper, Highway Sign, Slate Console, Storefront, Tarmac
+  Glass, Vintage Chart, Weather Console, Riso Zine, Swiss Grid, Neon HUD,
+  Pastel Bento, Blueprint, Story Scroll, Retro OS, Aurora Command, Deco
+  Voyage, Washi Seasons, Raw Web, Case Board, Line Diagram, Aero Gadgets,
+  Chat Concierge, Chronicle, Broadcast, Bottom Sheet, Trailhead and Field
+  Journal. (Editorial Paper is warm colour print; this is a device with a
+  bezel, zero colour, no animation but one flash.)
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/e-ink.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Literata for reading text and
+  chapter titles, Bitter for UI chrome):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=Bitter:wght@400;600&display=swap" rel="stylesheet" />
+
+  Signature touch: E-INK REFRESH. On every page turn the screen (only the
+  screen, not the bezel) flashes to its inverse for ~250 ms via a
+  mix-blend-mode:difference layer (.eink-flash.flash), and the page
+  re-renders underneath. Skipped under prefers-reduced-motion. Maps behave
+  the same way: jumpTo, never flyTo.
+
+  Class/id contract (see e-ink-template.html in this same folder for a full
+  working example):
+
+  - .desk                     full-viewport soft desk background, centres
+                               the device
+  - .device                   the bezel (max 1100x760, matte graphite);
+                               on phones the bezel disappears
+    .device-btn               physical page-turn side button on the bezel
+                               (.prev / .next)
+  - .screen                   the e-paper area; data-size="s|m|l" sets the
+                               reading size (--rs)
+    .eink-flash               empty overlay div inside .screen; add and
+                               remove .flash to refresh
+  - .statusbar                top strip: .sb-left (device name + time),
+                               .sb-chapter ("Ch. 3 - 42%"), .battery (inline
+                               SVG), .aa-btn + .aa-menu (.aa-opt[aria-pressed])
+    .progress                 dithered reading-progress hairline (child
+                               <i> width set inline)
+  - .spread                   two-pane grid: .page-text | .page-map
+  - .page-text                the guide page: .running-head,
+                               .chapter-title, .stop-title (+ .num),
+                               .walk-note, .passage (.drop-cap on its first
+                               letter's span), .refs-title, .refs > .ref
+                               ([n] buttons; [aria-current="true"] inverts),
+                               .folio (page number)
+  - .page-map                 map page; #map is demo-owned and fills it
+  - .pin                      inner child of a mapboxgl.Marker element:
+                               numbered square; [aria-current="true"] inverts
+  - .pager                    bottom strip: .pg-btn (previous / next),
+                               .dots > .dot ([aria-current="true"])
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --paper: #EDEDE8;
+  --paper-hi: #F5F5F1;
+  --ink: #1C1C1C;
+  --grey-1: #BDBDB8;
+  --grey-2: #8E8E8A;
+  --grey-3: #5E5E5B;
+  --bezel: #3A3A38;
+  --bezel-hi: #4A4A47;
+  --desk: #D9D7D0;
+  --rs: 16px;
+
+  --font-read: 'Literata', Georgia, 'Times New Roman', serif;
+  --font-ui: 'Bitter', Georgia, 'Times New Roman', serif;
+
+  /* dither fills: tiny dot / checker patterns in place of gradients */
+  --dither-dot: radial-gradient(circle, var(--grey-2) 0.7px, transparent 0.9px) 0 0 / 3px 3px;
+  --dither-check: repeating-conic-gradient(var(--grey-2) 0 25%, transparent 0 50%) 0 0 / 4px 4px;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  background: var(--desk);
+  color: var(--ink);
+  font-family: var(--font-read);
+  overflow: hidden;
+}
+
+button { font-family: var(--font-ui); color: inherit; cursor: pointer; }
+
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.desk {
+  height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 16px 28px;
+  background:
+    radial-gradient(circle, rgba(0,0,0,.05) 0.6px, transparent 0.8px) 0 0 / 4px 4px,
+    var(--desk);
+}
+
+/* ---------- device bezel ---------- */
+.device {
+  position: relative;
+  width: min(100%, 1100px);
+  height: min(100%, 760px);
+  padding: 22px 22px 26px;
+  border-radius: 30px;
+  background:
+    radial-gradient(circle, rgba(255,255,255,.05) 0.6px, transparent 0.8px) 0 0 / 3px 3px,
+    var(--bezel);
+  box-shadow: 0 2px 0 var(--bezel-hi) inset, 0 18px 40px rgba(40,38,32,.28), 0 2px 6px rgba(40,38,32,.3);
+  display: flex;
+}
+
+.device-btn {
+  position: absolute;
+  right: -9px;
+  width: 9px;
+  height: 74px;
+  padding: 0;
+  border: 0;
+  border-radius: 0 5px 5px 0;
+  background: var(--bezel);
+  box-shadow: 1px 0 0 var(--bezel-hi) inset;
+}
+.device-btn.prev { top: 34%; }
+.device-btn.next { top: 50%; }
+.device-btn:active { background: var(--ink); }
+
+/* ---------- screen ---------- */
+.screen {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px #2a2a28 inset;
+}
+.screen[data-size="s"] { --rs: 14px; }
+.screen[data-size="m"] { --rs: 16px; }
+.screen[data-size="l"] { --rs: 19px; }
+
+.eink-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: #fff;
+  mix-blend-mode: difference;
+  opacity: 0;
+  pointer-events: none;
+}
+.eink-flash.flash { animation: eink-refresh 250ms steps(1, end); }
+@keyframes eink-refresh {
+  0%   { opacity: 1; }
+  45%  { opacity: 0; }
+  60%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ---------- status bar ---------- */
+.statusbar {
+  position: relative;
+  z-index: 10;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 14px;
+  height: 34px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  letter-spacing: .04em;
+  border-bottom: 1px solid var(--ink);
+}
+.sb-left, .sb-right { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.sb-left { font-weight: 600; }
+.sb-chapter { color: var(--grey-3); white-space: nowrap; }
+.battery { display: block; width: 26px; height: 12px; }
+
+.aa-btn {
+  background: none;
+  border: 1px solid var(--ink);
+  border-radius: 3px;
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.aa-btn[aria-expanded="true"] { background: var(--ink); color: var(--paper); }
+
+.aa-menu {
+  position: absolute;
+  top: 38px;
+  right: 10px;
+  display: flex;
+  gap: 0;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--grey-2);
+}
+.aa-opt {
+  background: none;
+  border: 0;
+  border-right: 1px solid var(--ink);
+  padding: 6px 14px;
+  line-height: 1;
+}
+.aa-opt:last-child { border-right: 0; }
+.aa-opt:nth-child(1) { font-size: 12px; }
+.aa-opt:nth-child(2) { font-size: 16px; }
+.aa-opt:nth-child(3) { font-size: 21px; }
+.aa-opt[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
+.progress {
+  flex: none;
+  height: 3px;
+  background: var(--grey-1);
+}
+.progress > i { display: block; height: 100%; background: var(--ink); }
+
+/* ---------- spread ---------- */
+.spread {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+}
+
+.page-text {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 26px 14px;
+  border-right: 1px solid var(--ink);
+  font-size: var(--rs);
+  line-height: 1.55;
+  scrollbar-width: thin;
+  scrollbar-color: var(--grey-2) transparent;
+}
+
+.running-head {
+  margin: 0;
+  padding-bottom: 6px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--grey-3);
+  border-bottom: 3px double var(--grey-2);
+}
+
+.chapter-title {
+  margin: 14px 0 12px;
+  font-family: var(--font-read);
+  font-weight: 600;
+  font-size: calc(var(--rs) * 1.45);
+  line-height: 1.2;
+  letter-spacing: -.01em;
+}
+
+.stop-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 2px;
+  font-size: calc(var(--rs) * 1.15);
+  font-weight: 600;
+}
+.stop-title .num {
+  font-family: var(--font-ui);
+  font-size: .8em;
+  padding: 0 6px;
+  border: 1px solid var(--ink);
+}
+
+.walk-note {
+  margin: 0 0 8px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: .06em;
+  color: var(--grey-3);
+}
+
+.passage { margin: 0 0 12px; hyphens: auto; text-align: left; }
+.passage .drop-cap {
+  float: left;
+  margin: 3px 8px 0 0;
+  font-weight: 600;
+  font-size: 3.1em;
+  line-height: .8;
+  padding: 2px 3px 0 0;
+}
+
+.refs-title {
+  margin: 10px 0 6px;
+  padding-top: 8px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--grey-3);
+  border-top: 1px dotted var(--grey-2);
+}
+.refs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ref {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 4px;
+  background: none;
+  border: 0;
+  text-align: left;
+  font-family: var(--font-read);
+  font-size: .86em;
+  line-height: 1.3;
+}
+.ref b { font-family: var(--font-ui); font-weight: 600; }
+.ref:hover { text-decoration: underline; }
+.ref[aria-current="true"] { background: var(--ink); color: var(--paper); }
+
+.folio {
+  margin: 12px 0 0;
+  text-align: center;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--grey-3);
+}
+
+/* ---------- map page ---------- */
+.page-map {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: var(--dither-check), var(--grey-1);
+}
+
+.pin {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 var(--grey-2);
+}
+.pin[aria-current="true"] { background: var(--ink); color: var(--paper); box-shadow: 2px 2px 0 var(--paper); }
+
+/* ---------- pager ---------- */
+.pager {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 46px;
+  padding: 0 14px;
+  border-top: 1px solid var(--ink);
+}
+.pg-btn {
+  min-width: 52px;
+  height: 30px;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  border-radius: 3px;
+  font-size: 20px;
+  line-height: 1;
+  padding: 0 12px 3px;
+}
+.pg-btn:active { background: var(--ink); color: var(--paper); }
+.pg-btn:disabled { color: var(--grey-2); border-color: var(--grey-2); cursor: default; }
+
+.dots { display: flex; gap: 9px; align-items: center; }
+.dot {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  background: none;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+}
+.dot[aria-current="true"] { background: var(--ink); }
+
+.hidden { display: none !important; }
+
+/* ---------- phone: no bezel, single pane ---------- */
+@media (max-width: 720px) {
+  body { overflow: auto; }
+  .desk { padding: 0; background: var(--paper); display: block; }
+  .device {
+    width: 100%;
+    height: 100dvh;
+    padding: 0;
+    border-radius: 0;
+    background: var(--paper);
+    box-shadow: none;
+  }
+  .device-btn { display: none; }
+  .screen { border-radius: 0; box-shadow: none; }
+  .spread { grid-template-columns: minmax(0, 1fr); grid-template-rows: 45dvh minmax(0, 1fr); }
+  .page-map { order: -1; border-bottom: 1px solid var(--ink); }
+  .page-text { order: 0; border-right: 0; padding: 14px 16px 10px; }
+  .refs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pager { padding: 0 16px; }
+  .sb-chapter { font-size: 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eink-flash.flash { animation: none; }
+}

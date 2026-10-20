@@ -1,0 +1,963 @@
+/*
+  Estate Luxe -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: quiet-luxury real-estate listings --
+  bone paper, warm black ink, taupe, champagne hairlines and one deep olive,
+  high-contrast Bodoni Moda for names and prices, Jost small caps with wide
+  tracking for everything functional, square corners and almost no shadow --
+  deliberately distinct from every other style pack in this folder: Arena,
+  Editorial Paper, Highway Sign, Slate Console, Storefront, Tarmac Glass,
+  Vintage Chart, Weather Console, Riso Zine, Swiss Grid, Neon HUD, Pastel
+  Bento, Blueprint, Story Scroll, Retro OS, Aurora Command, Deco Voyage,
+  Washi Seasons, Raw Web, Case Board, Line Diagram, Aero Gadgets, Chat
+  Concierge, Chronicle, Broadcast, Bottom Sheet, Trailhead and Field
+  Journal). It is generic listings chrome: it does not imitate any real
+  agency or property portal.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/estate-luxe.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Bodoni Moda for property names and
+  prices, Jost for UI, specs and small-caps labels):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;1,6..96,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  Signature touch: every CSS-only "photo" placeholder is mounted like a
+  framed print -- a champagne hairline inset 8px from the edge (a mat), over
+  layered gradients that suggest sky, sea and a flat-roofed house. The
+  wordmark gets the same restraint: a hairline and one small diamond.
+
+  Layout: LISTINGS SPLIT VIEW. Desktop (>= 860px): .app is a 100dvh grid --
+  .topbar above, then .split with the scrolling .list-pane (46%) and the
+  sticky, full-height .map-pane. The map pane ends at its own edges, so the
+  Mapbox logo and attribution are never covered. Phone: the page scrolls;
+  .map-pane becomes a sticky 40dvh strip on top and the cards follow in a
+  single column. If you add a raster-dem source (terrain), GL JS hides the
+  logo; the rule near the bottom of this file forces it back.
+
+  Class/id contract (see estate-luxe-template.html in this same folder for a
+  full working example):
+
+  - .app                      page shell (grid on desktop, block on phone)
+  - .topbar                   wordmark + filters row, hairline underneath
+    .wordmark                   Bodoni caps title; .wm-amp = italic "&",
+                                 .wm-sub = tiny small-caps line beneath
+    .filters                    flex-wrap row holding the pills + draw btn
+    .chip                       filter pill (square, hairline, small caps);
+                                 [aria-pressed="true"] or .is-set = inked
+  - .btn, .btn-primary,       small-caps buttons: square, hairline;
+    .btn-ghost                  primary = warm black fill, ghost = outline
+  - .split                    holds .list-pane and .map-pane
+  - .list-pane                scrolling listings column (desktop: own
+                               scroller; phone: part of the page)
+    .list-head                  sticky strip: .count, .sort select and the
+                                 inline #filter-panel
+      .filter-panel               inline panel (price selects / beds seg)
+        .fp-row, .field             labelled controls; .field > label+select
+        .seg                        segmented buttons, [aria-pressed]
+    .grid                       2-column (desktop) / 1-column card grid
+      .card                       listing card; .is-hot = hovered pair of
+                                   its map pin, .is-active = selected
+        .photo                      CSS-only placeholder; data-scene="sea|
+                                     mountain|garden|city" picks the backdrop;
+                                     children .ph-r
+                                     (roof) .ph-b (body) .ph-w (windows);
+                                     custom props --sa --sb (sky) --ga --gb
+                                     (sea/ground) --bl --bw --bh (house)
+        .tag, .tag-sold             small tag top-left of the photo
+        .heart                      save button, [aria-pressed]
+        .card-body                  .c-suburb .c-name (Bodoni) .c-price
+                                     (Bodoni) .c-specs
+    .empty                      "nothing matches" paragraph
+  - .map-pane                 map holder (position: relative; the demo's
+                               own #map fills it)
+    .map-chip                   top-left chip: count + reset button
+    .price-pin                  inner child of a mapboxgl.Marker root: the
+                                 bone price pill; .is-hot/.is-active =
+                                 warm black + larger, .is-sold = olive,
+                                 .is-saved = champagne dot. Below zoom ~11
+                                 add .is-far to #map and pins become dots
+    .estate-popup               className for mapboxgl.Popup (square,
+                                 bone, hairline): .pp-sub .pp-name .pp-price
+                                 .pp-specs and a .btn-primary
+  - .drawer                   viewing-request panel; .is-open slides it in
+    .drawer-head, .drawer-form  header / form (.field, .btn-primary)
+  - .toast                    transient warm-black note, fixed top centre;
+                               add .is-visible (aria-live region)
+  - .status-note (+.loading/  small map-status note, top centre of the map
+    .error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --bone: #F5F1EA;
+  --bone-deep: #ECE6DA;
+  --paper: #FAF7F1;
+  --ink: #1B1A17;
+  --taupe: #8C8273;
+  --champagne: #CBB891;
+  --champagne-soft: #E4DBC8;
+  --olive: #3B4032;
+  --error: #8A3B2E;
+  --soft-shadow: 0 22px 44px -22px rgba(27, 26, 23, 0.32);
+  --gutter: 28px;
+
+  --font-display: 'Bodoni Moda', 'Didot', 'Bodoni 72', Georgia, serif;
+  --font-ui: 'Jost', 'Futura', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bone);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-weight: 400;
+  -webkit-text-size-adjust: 100%;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+  border-radius: 0;
+}
+
+button { -webkit-tap-highlight-color: transparent; }
+
+:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/* ---- Shell ---- */
+.app {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 46fr) minmax(0, 54fr);
+  min-height: 0;
+}
+
+/* ---- Top bar ---- */
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 28px;
+  min-height: 64px;
+  padding: 10px var(--gutter);
+  box-sizing: border-box;
+  background: var(--bone);
+  border-bottom: 1px solid var(--champagne);
+}
+
+.wordmark {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.wm-amp {
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0;
+  padding: 0 0.15em;
+}
+
+.wm-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.34em;
+  color: var(--taupe);
+}
+
+.wm-sub::before {
+  content: '';
+  width: 22px;
+  height: 1px;
+  background: var(--champagne);
+}
+
+.wm-sub::after {
+  content: '';
+  width: 5px;
+  height: 5px;
+  background: var(--champagne);
+  transform: rotate(45deg);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.chip,
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  border: 1px solid var(--champagne);
+  background: transparent;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.chip:hover,
+.btn:hover {
+  border-color: var(--ink);
+}
+
+.chip[aria-pressed="true"],
+.chip.is-set,
+.btn-primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bone);
+}
+
+.btn-primary:hover {
+  background: var(--olive);
+  border-color: var(--olive);
+}
+
+.btn-ghost {
+  border-color: var(--taupe);
+  color: var(--ink);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---- List pane ---- */
+.list-pane {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--gutter) 56px;
+}
+
+.list-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 18px 0 14px;
+  background: var(--bone);
+  border-bottom: 1px solid var(--champagne-soft);
+}
+
+.list-head-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.count {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--taupe);
+}
+
+.sort {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--taupe);
+}
+
+.sort select,
+.field select,
+.field input,
+.field textarea {
+  border: 0;
+  border-bottom: 1px solid var(--taupe);
+  background: transparent;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 400;
+  padding: 4px 18px 4px 0;
+}
+
+.sort select {
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: none;
+}
+
+.filter-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px 28px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--champagne-soft);
+}
+
+.fp-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px 24px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field label,
+.fp-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--taupe);
+}
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--champagne);
+}
+
+.seg button {
+  min-width: 44px;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-left: 1px solid var(--champagne);
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+
+.seg button:first-child { border-left: 0; }
+
+.seg button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--bone);
+}
+
+/* ---- Cards ---- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+  align-items: start;
+  padding-top: 22px;
+}
+
+.card {
+  position: relative;
+  padding: 10px 10px 16px;
+  background: var(--paper);
+  border: 1px solid var(--champagne-soft);
+  scroll-margin-top: 130px;
+  transition: border-color 0.25s ease, box-shadow 0.3s ease;
+}
+
+.card.is-hot { border-color: var(--champagne); }
+
+.card.is-active {
+  border-color: var(--ink);
+  box-shadow: var(--soft-shadow);
+}
+
+.photo {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 60% 40% at 72% 58%, rgba(255, 240, 210, 0.75), transparent 70%),
+    linear-gradient(180deg, var(--sa) 0, var(--sb) 58%, var(--ga) 58%, var(--gb) 100%);
+}
+
+/* scene layers (::before) behind the house */
+.photo::before { content: ''; position: absolute; inset: 0; pointer-events: none; }
+.photo[data-scene="sea"]::before {
+  inset: 58% 0 0 0;
+  background: repeating-linear-gradient(180deg, transparent 0 7px, rgba(255, 255, 255, 0.16) 7px 8px);
+}
+.photo[data-scene="mountain"]::before {
+  background: linear-gradient(180deg, #A5AEAC, #7F8B89);
+  clip-path: polygon(0 58%, 0 46%, 9% 40%, 20% 24%, 50% 22%, 62% 27%, 80% 42%, 100% 48%, 100% 58%);
+}
+.photo[data-scene="garden"]::before {
+  background:
+    radial-gradient(circle at 10% 60%, #4C5840 0 15%, transparent 16%),
+    radial-gradient(circle at 24% 66%, #5C6A4C 0 9%, transparent 10%),
+    radial-gradient(circle at 91% 58%, #4C5840 0 16%, transparent 17%),
+    radial-gradient(circle at 78% 66%, #6A7A58 0 9%, transparent 10%);
+}
+.photo[data-scene="city"]::before {
+  inset: 0 0 42% 0;
+  background:
+    linear-gradient(#B7B2A6, #B7B2A6) 4% 100% / 9% 46% no-repeat,
+    linear-gradient(#C6C1B5, #C6C1B5) 15% 100% / 7% 70% no-repeat,
+    linear-gradient(#ADA89C, #ADA89C) 76% 100% / 10% 58% no-repeat,
+    linear-gradient(#C2BDB0, #C2BDB0) 89% 100% / 7% 38% no-repeat,
+    linear-gradient(#B1ACA0, #B1ACA0) 98% 100% / 6% 78% no-repeat;
+}
+
+/* the mat: a champagne hairline inset from the edge */
+.photo::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border: 1px solid rgba(203, 184, 145, 0.7);
+  pointer-events: none;
+}
+
+.photo i {
+  position: absolute;
+  display: block;
+}
+
+.ph-b {
+  left: var(--bl);
+  width: var(--bw);
+  bottom: 0;
+  height: var(--bh);
+  background: linear-gradient(90deg, #F3EEE4, #E2DACB);
+}
+
+.ph-r {
+  left: calc(var(--bl) - 4%);
+  width: calc(var(--bw) + 8%);
+  bottom: var(--bh);
+  height: 4%;
+  background: #2A2825;
+}
+
+.ph-w {
+  left: calc(var(--bl) + 5%);
+  width: calc(var(--bw) - 10%);
+  bottom: calc(var(--bh) * 0.38);
+  height: calc(var(--bh) * 0.32);
+  background: repeating-linear-gradient(90deg, rgba(245, 214, 150, 0.92) 0 14%, transparent 14% 20%);
+}
+
+.tag {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 1;
+  padding: 4px 9px;
+  background: var(--bone);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.tag-sold {
+  background: var(--olive);
+  color: var(--bone);
+}
+
+.heart {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.heart svg {
+  width: 18px;
+  height: 18px;
+  fill: transparent;
+  stroke: currentColor;
+  stroke-width: 1.4;
+}
+
+.heart[aria-pressed="true"] svg {
+  fill: var(--ink);
+}
+
+.card-body { padding: 14px 4px 0; }
+
+.c-suburb {
+  margin: 0 0 6px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--taupe);
+}
+
+.c-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 21px;
+  line-height: 1.15;
+  overflow-wrap: break-word;
+}
+
+.c-name button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.c-price {
+  margin: 8px 0 12px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 18px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.c-specs {
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--champagne-soft);
+  font-size: 12px;
+  font-weight: 300;
+  letter-spacing: 0.08em;
+  color: var(--taupe);
+}
+
+.empty {
+  grid-column: 1 / -1;
+  margin: 40px 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 18px;
+  text-align: center;
+  color: var(--taupe);
+}
+
+/* ---- Map pane ---- */
+.map-pane {
+  position: relative;
+  min-height: 0;
+  border-left: 1px solid var(--champagne);
+}
+
+.map-chip {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 4px 0 12px;
+  height: 32px;
+  background: var(--bone);
+  border: 1px solid var(--champagne);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.map-chip button {
+  height: 100%;
+  padding: 0 8px;
+  border: 0;
+  border-left: 1px solid var(--champagne);
+  background: transparent;
+  color: var(--taupe);
+  font: inherit;
+  cursor: pointer;
+}
+
+.map-chip button:hover { color: var(--ink); }
+
+#map.is-drawing .mapboxgl-canvas-container { cursor: crosshair; touch-action: none; }
+
+.draw-rect {
+  position: absolute;
+  z-index: 2;
+  border: 1px dashed var(--ink);
+  background: rgba(203, 184, 145, 0.18);
+  pointer-events: none;
+}
+
+/* Price pills: the inner child of a mapboxgl.Marker root (never style the root) */
+.price-pin {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--champagne);
+  border-radius: 999px;
+  background: var(--bone);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.price-pin.is-sold {
+  background: var(--olive);
+  border-color: var(--olive);
+  color: var(--bone);
+}
+
+.price-pin.is-hot,
+.price-pin.is-active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bone);
+  transform: scale(1.14);
+}
+
+.price-pin.is-saved::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  background: var(--champagne);
+}
+
+/* Zoomed far out the pills collapse to dots so neighbours never overlap */
+#map.is-far .price-pin {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 2px solid var(--ink);
+  font-size: 0;
+}
+
+#map.is-far .price-pin.is-sold { background: var(--olive); }
+
+#map.is-far .price-pin.is-hot,
+#map.is-far .price-pin.is-active { transform: scale(1.45); }
+
+/* Popup */
+.estate-popup .mapboxgl-popup-content {
+  min-width: 210px;
+  padding: 18px 20px 16px;
+  border: 1px solid var(--champagne);
+  border-radius: 0;
+  background: var(--bone);
+  box-shadow: 0 18px 36px -20px rgba(27, 26, 23, 0.35);
+  font-family: var(--font-ui);
+  color: var(--ink);
+}
+
+.estate-popup .mapboxgl-popup-close-button {
+  top: 2px;
+  right: 2px;
+  width: 30px;
+  height: 30px;
+  font-size: 20px;
+  color: var(--taupe);
+}
+
+.estate-popup.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip,
+.estate-popup.mapboxgl-popup-anchor-bottom-left .mapboxgl-popup-tip,
+.estate-popup.mapboxgl-popup-anchor-bottom-right .mapboxgl-popup-tip { border-top-color: var(--bone); }
+.estate-popup.mapboxgl-popup-anchor-top .mapboxgl-popup-tip,
+.estate-popup.mapboxgl-popup-anchor-top-left .mapboxgl-popup-tip,
+.estate-popup.mapboxgl-popup-anchor-top-right .mapboxgl-popup-tip { border-bottom-color: var(--bone); }
+.estate-popup.mapboxgl-popup-anchor-left .mapboxgl-popup-tip { border-right-color: var(--bone); }
+.estate-popup.mapboxgl-popup-anchor-right .mapboxgl-popup-tip { border-left-color: var(--bone); }
+
+.pp-sub {
+  margin: 0 0 6px;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--taupe);
+}
+
+.pp-name {
+  margin: 0;
+  padding-right: 14px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 22px;
+  line-height: 1.12;
+}
+
+.pp-price {
+  margin: 6px 0 4px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 17px;
+}
+
+.pp-specs {
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 300;
+  letter-spacing: 0.08em;
+  color: var(--taupe);
+}
+
+.estate-popup .btn { width: 100%; }
+
+.mapboxgl-ctrl-group {
+  border: 1px solid var(--champagne);
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* ---- Viewing drawer ---- */
+.drawer {
+  position: fixed;
+  top: 64px;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  width: min(400px, 100%);
+  box-sizing: border-box;
+  padding: 28px var(--gutter);
+  overflow-y: auto;
+  background: var(--paper);
+  border-right: 1px solid var(--champagne);
+  transform: translateX(-102%);
+  visibility: hidden;
+  transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1), visibility 0s linear 0.4s;
+}
+
+.drawer.is-open {
+  transform: none;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--champagne);
+}
+
+.drawer-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.drawer-head p {
+  margin: 8px 0 0;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--taupe);
+}
+
+.drawer-close {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--champagne);
+  background: transparent;
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.drawer-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+
+.drawer-form .field input,
+.drawer-form .field select,
+.drawer-form .field textarea { width: 100%; box-sizing: border-box; }
+
+.drawer-form .btn { height: 44px; }
+
+/* ---- Toast + status ---- */
+.toast,
+.status-note {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  z-index: 20;
+  max-width: calc(100% - 32px);
+  box-sizing: border-box;
+  padding: 11px 20px;
+  background: var(--ink);
+  color: var(--bone);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  line-height: 1.4;
+  text-align: center;
+  text-transform: uppercase;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.toast {
+  opacity: 0;
+  transform: translate(-50%, -8px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.status-note {
+  position: absolute;
+  top: 56px;
+  z-index: 3;
+  background: var(--bone);
+  color: var(--ink);
+  border: 1px solid var(--champagne);
+}
+
+.status-note.error {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* A raster-dem source makes GL JS hide the Mapbox logo; keep it visible */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+/* ---- Phone: map strip on top (sticky), cards in one column below ---- */
+@media (max-width: 859px) {
+  :root { --gutter: 16px; }
+
+  html, body { height: auto; }
+
+  .app {
+    display: block;
+    height: auto;
+    overflow: visible;
+  }
+
+  .split {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .map-pane {
+    order: -1;
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    height: 40vh;
+    height: 40dvh;
+    border-left: 0;
+    border-bottom: 1px solid var(--champagne);
+  }
+
+  .list-pane { overflow: visible; }
+
+  .list-head { top: 40vh; top: 40dvh; padding-top: 12px; }
+
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .card { scroll-margin-top: calc(40dvh + 120px); }
+
+  .topbar { gap: 12px; }
+
+  .wordmark { font-size: 18px; }
+
+  .map-chip { top: 8px; left: 8px; height: 24px; gap: 8px; padding-left: 8px; font-size: 9px; letter-spacing: 0.14em; }
+  .map-chip button { padding: 0 6px; }
+
+  #map.is-far .price-pin { width: 14px; height: 14px; }
+
+  .chip, .btn { padding: 0 12px; letter-spacing: 0.16em; }
+
+  .filters { gap: 6px; }
+
+  .mapboxgl-ctrl-zoom-in, .mapboxgl-ctrl-zoom-out { display: none !important; }
+
+  .drawer { width: 100%; border-right: 0; border-top: 1px solid var(--champagne); transform: translateY(102%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .price-pin,
+  .card,
+  .drawer,
+  .toast { transition: none; }
+}

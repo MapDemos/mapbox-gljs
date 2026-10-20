@@ -1,0 +1,439 @@
+<!--
+  Working EXAMPLE of the Sticker Book style pack (sticker-book.css, in this
+  same folder). Open this file directly to see the pattern working with a
+  children's explorer sticker activity, "Pip & Puddle's Big London Day Out",
+  on the Mapbox Standard style (faded theme, day light). The map is the
+  activity page, with dotted "stick here" circles at eight London places;
+  the sheet on the right holds eight die-cut inline-SVG stickers. DRAG a
+  sticker onto its matching place (clock tower -> Big Ben, ferris wheel ->
+  London Eye, ...) and it snaps on as a marker with a tilt, a bounce and
+  confetti; a wrong drop bounces back. On touch screens, tap a sticker and
+  then tap its dotted spot instead. Fill all eight to earn the certificate;
+  "Peel all off" starts over. Copy the markup below into your own demo and
+  link sticker-book.css from its <head> -- see the class/id contract
+  documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (children's sticker activity book: sky, grass,
+  sunshine, tomato and grape on page-white, die-cut stickers, dotted
+  outlines) at the user's request for something distinct from every other
+  pack in this folder. The landmarks are real but the pin positions are
+  approximate (two are nudged apart so they stay tappable), and "Pip &
+  Puddle", "Puddle's Tea Room" and the certificate wording are fictional
+  placeholders -- swap in your own.
+
+  What's NOT included: saving progress, sound, search/geocoding, routing,
+  popups, or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sticker Book</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Gochi+Hand&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="sticker-book.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- Sticker art: one <symbol> each, reused by the sheet, the drag ghost and the map -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="st-bus" viewBox="0 0 100 100"><g stroke="#3B2F5C" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+      <rect x="8" y="20" width="84" height="58" rx="10" fill="#FF6B57"/>
+      <path d="M9 48h82" stroke="#FFD23F" stroke-width="5"/>
+      <rect x="14" y="27" width="15" height="14" rx="3" fill="#BDE7FF"/><rect x="33" y="27" width="15" height="14" rx="3" fill="#BDE7FF"/>
+      <rect x="52" y="27" width="15" height="14" rx="3" fill="#BDE7FF"/><rect x="71" y="27" width="15" height="14" rx="3" fill="#BDE7FF"/>
+      <rect x="14" y="55" width="15" height="14" rx="3" fill="#BDE7FF"/><rect x="33" y="55" width="15" height="14" rx="3" fill="#BDE7FF"/>
+      <rect x="52" y="55" width="15" height="14" rx="3" fill="#BDE7FF"/><rect x="72" y="53" width="14" height="25" rx="3" fill="#BDE7FF"/>
+      <circle cx="28" cy="80" r="9" fill="#3B2F5C"/><circle cx="72" cy="80" r="9" fill="#3B2F5C"/>
+      <circle cx="28" cy="80" r="3" fill="#fff" stroke="none"/><circle cx="72" cy="80" r="3" fill="#fff" stroke="none"/>
+    </g></symbol>
+    <symbol id="st-clock" viewBox="0 0 100 100"><g stroke="#3B2F5C" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+      <rect x="36" y="42" width="28" height="50" rx="2" fill="#F2D08A"/>
+      <rect x="31" y="28" width="38" height="18" rx="2" fill="#E8C77A"/>
+      <path d="M29 28L50 4l21 24z" fill="#8E7DFF"/>
+      <path d="M38 33v8M50 33v8M62 33v8" stroke-width="2.5"/>
+      <circle cx="50" cy="63" r="11" fill="#FFFDF7"/>
+      <path d="M50 63v-7M50 63l5 3" stroke-width="2.5" fill="none"/>
+      <rect x="26" y="90" width="48" height="6" rx="2" fill="#9BE07A"/>
+      <path d="M41 74v10" stroke="#fff" opacity=".6" stroke-width="3" fill="none"/>
+    </g></symbol>
+    <symbol id="st-wheel" viewBox="0 0 100 100"><g stroke="#3B2F5C" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M30 94L50 44l20 50" fill="none"/>
+      <circle cx="50" cy="44" r="34" fill="#BDE7FF"/>
+      <circle cx="50" cy="44" r="22" fill="none" stroke-width="2"/>
+      <path d="M16 44h68M50 10v68M26 20l48 48M74 20L26 68" fill="none" stroke-width="2"/>
+      <circle cx="84" cy="44" r="6" fill="#FFD23F"/><circle cx="74" cy="68" r="6" fill="#FF6B57"/>
+      <circle cx="50" cy="78" r="6" fill="#8E7DFF"/><circle cx="26" cy="68" r="6" fill="#FFD23F"/>
+      <circle cx="16" cy="44" r="6" fill="#FF6B57"/><circle cx="26" cy="20" r="6" fill="#8E7DFF"/>
+      <circle cx="50" cy="10" r="6" fill="#FFD23F"/><circle cx="74" cy="20" r="6" fill="#FF6B57"/>
+      <circle cx="50" cy="44" r="5" fill="#9BE07A"/>
+      <rect x="22" y="92" width="56" height="6" rx="3" fill="#8E7DFF"/>
+    </g></symbol>
+    <symbol id="st-hat" viewBox="0 0 100 100"><g stroke="#3B2F5C" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M24 80C18 42 28 12 50 12s32 30 26 68z" fill="#5B4A72"/>
+      <path d="M34 30q4 4 0 8M46 24q4 4 0 8M58 32q4 4 0 8M38 52q4 4 0 8M60 52q4 4 0 8M48 42q4 4 0 8" fill="none" stroke="#8E7DFF" stroke-width="2.5"/>
+      <rect x="62" y="20" width="9" height="26" rx="4.5" fill="#FF6B57"/>
+      <rect x="20" y="78" width="60" height="12" rx="6" fill="#FFD23F"/>
+      <circle cx="50" cy="84" r="3" fill="#FF6B57" stroke-width="2"/>
+    </g></symbol>
+    <symbol id="st-swan" viewBox="0 0 100 100"><g stroke="#3B2F5C" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M12 86q9-6 18 0t18 0 18 0 18 0" fill="none" stroke="#5BB8F0" stroke-width="4"/>
+      <path d="M66 62C86 54 80 28 64 28c-8-2-8-10-2-14" fill="none" stroke-width="15"/>
+      <path d="M66 62C86 54 80 28 64 28c-8-2-8-10-2-14" fill="none" stroke="#fff" stroke-width="9"/>
+      <ellipse cx="48" cy="68" rx="32" ry="18" fill="#fff"/>
+      <circle cx="62" cy="14" r="8" fill="#fff"/>
+      <path d="M69 12l14 4-14 5z" fill="#FF8A3D"/>
+      <circle cx="63" cy="12" r="2" fill="#3B2F5C" stroke="none"/>
+      <path d="M30 66c10-12 30-10 38 2-12 8-28 8-38-2z" fill="#E1EEFF" stroke-width="2.5"/>
+    </g></symbol>
+    <symbol id="st-dino" viewBox="0 0 100 100"><g stroke="#3B2F5C" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M26 54l4-16 8 10zM38 46l8-14 6 12z" fill="#FF6B57"/>
+      <path d="M6 74C14 72 20 56 34 46c10-6 18-4 22-6 4-10 10-18 20-20 12-2 20 6 16 16-2 6-8 8-12 8-2 8 0 20 2 34H68l-4-12c-8 4-20 4-26 0l-2 12H22V68c-6 6-12 8-16 6z" fill="#9BE07A"/>
+      <circle cx="46" cy="58" r="4" fill="#7BC95F" stroke="none"/><circle cx="30" cy="62" r="3" fill="#7BC95F" stroke="none"/><circle cx="58" cy="52" r="3" fill="#7BC95F" stroke="none"/>
+      <circle cx="84" cy="28" r="2.5" fill="#3B2F5C" stroke="none"/>
+      <path d="M90 36q-5 4-10 1" fill="none" stroke-width="2.5"/>
+      <path d="M62 24q4-4 9-4" fill="none" stroke="#fff" opacity=".7" stroke-width="3"/>
+    </g></symbol>
+    <symbol id="st-rocket" viewBox="0 0 100 100"><g stroke="#3B2F5C" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M40 72L50 96l10-24z" fill="#FFD23F"/>
+      <path d="M34 54L18 76l16-4zM66 54l16 22-16-4z" fill="#FF6B57"/>
+      <path d="M50 6c18 16 20 40 16 64H34C30 46 32 22 50 6z" fill="#F4F1FF"/>
+      <path d="M50 6c8 8 13 16 15 24H35c2-8 7-16 15-24z" fill="#FF6B57"/>
+      <circle cx="50" cy="48" r="9" fill="#BDE7FF"/>
+      <rect x="38" y="68" width="24" height="7" rx="3" fill="#8E7DFF"/>
+      <path d="M40 40v16" fill="none" stroke="#fff" opacity=".7" stroke-width="3"/>
+    </g></symbol>
+    <symbol id="st-teapot" viewBox="0 0 100 100"><g stroke="#3B2F5C" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+      <ellipse cx="46" cy="87" rx="36" ry="7" fill="#FFD23F"/>
+      <path d="M22 50C2 46 2 74 22 72" fill="none" stroke-width="10"/>
+      <path d="M22 50C2 46 2 74 22 72" fill="none" stroke="#8E7DFF" stroke-width="4"/>
+      <path d="M72 56C86 54 88 40 94 36c2 12-2 32-20 36z" fill="#8E7DFF"/>
+      <ellipse cx="46" cy="58" rx="29" ry="24" fill="#8E7DFF"/>
+      <ellipse cx="46" cy="36" rx="14" ry="6" fill="#B2A6FF"/>
+      <circle cx="46" cy="28" r="5" fill="#FFD23F"/>
+      <circle cx="34" cy="58" r="3" fill="#fff" stroke="none"/><circle cx="48" cy="66" r="3" fill="#fff" stroke="none"/><circle cx="58" cy="52" r="3" fill="#fff" stroke="none"/>
+      <path d="M28 48q4-8 12-10" fill="none" stroke="#fff" opacity=".7" stroke-width="3"/>
+    </g></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+  <div class="stage">
+    <div id="map"></div>
+
+    <div class="stage-bar">
+      <h2 class="page-title"><span class="pt-long">Stick them where they belong!</span><span class="pt-short">Stick them on!</span></h2>
+      <button class="btn btn-ghost" id="home-btn" type="button">All spots</button>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <section class="certificate hidden" id="cert" aria-label="Certificate">
+      <svg class="cert-stars" viewBox="0 0 130 36" aria-hidden="true">
+        <path d="M20 3l4.4 9 9.9 1.3-7.2 6.9 1.8 9.8L20 25.4 11.1 30l1.8-9.8L5.7 13.3l9.9-1.3z" fill="#FFD23F" stroke="#3B2F5C" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M65 1l5.2 10.6 11.6 1.6-8.4 8.2 2 11.6L65 27.6l-10.4 5.4 2-11.6-8.4-8.2 11.6-1.6z" fill="#FF6B57" stroke="#3B2F5C" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M110 3l4.4 9 9.9 1.3-7.2 6.9 1.8 9.8-8.9-4.6-8.9 4.6 1.8-9.8-7.2-6.9 9.9-1.3z" fill="#9BE07A" stroke="#3B2F5C" stroke-width="2" stroke-linejoin="round"/>
+      </svg>
+      <p class="cert-kicker">Pip &amp; Puddle say</p>
+      <h2 class="cert-title">You did it!</h2>
+      <p class="cert-line">All 8 stickers are stuck on the map. This certificate makes you an official London Day Out Explorer!</p>
+      <span class="cert-name">Explorer: ______________</span>
+      <div class="cert-actions">
+        <button class="btn btn-primary" id="cert-reset" type="button">Peel all off</button>
+        <button class="btn btn-ghost" id="cert-close" type="button">Keep exploring</button>
+      </div>
+    </section>
+  </div>
+
+  <aside class="sheet" aria-label="Sticker sheet">
+    <h1 class="sheet-title"><span>Pip &amp; Puddle's</span> Big London Day Out</h1>
+    <p class="sheet-sub">Drag each sticker to its dotted spot. Or tap a sticker, then tap the spot!</p>
+    <div class="progress-row">
+      <span class="progress-count" aria-live="polite"><span id="count">0</span>/8 stickers!</span>
+      <button class="btn" id="reset-btn" type="button" disabled>Peel all off</button>
+    </div>
+    <div class="progress-bar" aria-hidden="true"><i id="bar"></i></div>
+    <div class="stickers" id="stickers"></div>
+  </aside>
+</div>
+
+<script>
+// Eight places [lng, lat] and the sticker that belongs on each. Real landmarks,
+// positions approximate; the museums are nudged apart so they stay tappable.
+const SPOTS = [
+  { id: 'bus',    name: 'Red bus',    place: 'Trafalgar Square',       coord: [-0.1281, 51.5080] },
+  { id: 'clock',  name: 'Clock tower', place: 'Big Ben',                coord: [-0.1246, 51.5007] },
+  { id: 'wheel',  name: 'Ferris wheel', place: 'London Eye',            coord: [-0.1196, 51.5033] },
+  { id: 'hat',    name: 'Guard hat',  place: 'Buckingham Palace',      coord: [-0.1419, 51.5014] },
+  { id: 'swan',   name: 'Swan',       place: "St James's Park",        coord: [-0.1340, 51.5028] },
+  { id: 'dino',   name: 'Dinosaur',   place: 'Natural History Museum', coord: [-0.1785, 51.4961] },
+  { id: 'rocket', name: 'Rocket',     place: 'Science Museum',         coord: [-0.1735, 51.4985] },
+  { id: 'teapot', name: 'Teapot',     place: "Puddle's Tea Room",      coord: [-0.1240, 51.5117] },
+];
+const TOL = 44;                       // snap distance in px
+const COLORS = ['#FFD23F', '#FF6B57', '#8E7DFF', '#9BE07A', '#5BB8F0'];
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const art = (id) => `<svg viewBox="0 0 100 100" aria-hidden="true"><use href="#st-${id}"/></svg>`;
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [-0.15, 51.504],
+  zoom: 13,
+  config: {
+    basemap: { theme: 'faded', lightPreset: 'day', showPointOfInterestLabels: false, show3dObjects: false },
+  },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');
+
+const bounds = SPOTS.reduce((b, s) => b.extend(s.coord), new mapboxgl.LngLatBounds(SPOTS[0].coord, SPOTS[0].coord));
+function frame(animate) {
+  const phone = window.matchMedia('(max-width: 760px)').matches;
+  const opts = {
+    padding: phone ? { top: 56, bottom: 56, left: 24, right: 24 } : { top: 96, bottom: 72, left: 72, right: 60 },
+    maxZoom: 15,
+  };
+  if (animate && !reduce) map.fitBounds(bounds, { ...opts, duration: 1200 });
+  else map.fitBounds(bounds, { ...opts, duration: 0 });
+}
+frame(false);
+// Re-fit once the map is ready and on resize, until the player moves the map themselves
+let userMoved = false;
+map.on('load', () => frame(false));
+map.on('dragstart', () => { userMoved = true; });
+map.on('zoomstart', (e) => { if (e.originalEvent) userMoved = true; });
+window.addEventListener('resize', () => { if (!userMoved) frame(false); });
+$('home-btn').addEventListener('click', () => frame(true));
+
+/* ---- Toast ---- */
+let toastTimer;
+function toast(msg, oops) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.toggle('oops', !!oops);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ---- State ---- */
+const placed = new Map();   // id -> Marker
+let armed = null;           // spot picked by tapping
+
+function setArmed(s) {
+  armed = s;
+  SPOTS.forEach((p) => {
+    p.slot.classList.toggle('armed', p === s && !p.slot.classList.contains('dragging'));
+    p.target.classList.toggle('hint', p === s);
+    if (p !== s) p.target.classList.remove('near');
+  });
+}
+
+function update() {
+  const n = placed.size;
+  $('count').textContent = n;
+  $('bar').style.width = (n / SPOTS.length) * 100 + '%';
+  $('reset-btn').disabled = n === 0;
+  if (n === SPOTS.length) {
+    setTimeout(() => {
+      if (placed.size !== SPOTS.length) return;
+      $('cert').classList.remove('hidden');
+      burst($('cert'), 90, 150);
+    }, 750);
+  } else {
+    $('cert').classList.add('hidden');
+  }
+}
+
+/* ---- Confetti ---- */
+function burst(host, spread, count) {
+  if (reduce) return;
+  const box = document.createElement('div');
+  box.className = 'confetti-box';
+  for (let i = 0; i < count; i++) {
+    const a = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+    const r = spread * (0.5 + Math.random() * 0.6);
+    const c = document.createElement('i');
+    c.style.cssText = `--dx:${Math.cos(a) * r}px;--dy:${Math.sin(a) * r - 24}px;` +
+      `--rot:${Math.round(Math.random() * 720 - 360)}deg;--c:${COLORS[i % COLORS.length]}`;
+    box.appendChild(c);
+  }
+  host.appendChild(box);
+  setTimeout(() => box.remove(), 1100);
+}
+
+/* ---- Stick / peel ---- */
+function stick(s) {
+  const root = document.createElement('div');
+  const tilt = (Math.random() * 18 - 9).toFixed(1);
+  root.innerHTML = `<div class="stuck" title="Tap to peel off" style="--tilt:${tilt}deg"><div class="stuck-art">${art(s.id)}</div></div>`;
+  const stuck = root.firstChild;
+  stuck.addEventListener('click', () => unstick(s));
+  placed.set(s.id, new mapboxgl.Marker({ element: root }).setLngLat(s.coord).addTo(map));
+  burst(stuck, 70, 18);
+  s.slot.classList.add('used');
+  s.target.classList.add('done');
+  setArmed(null);
+  update();
+  toast(`${s.place}! You found it!`);
+}
+
+function unstick(s) {
+  const m = placed.get(s.id);
+  if (!m) return;
+  m.remove();
+  placed.delete(s.id);
+  s.slot.classList.remove('used');
+  s.target.classList.remove('done');
+  update();
+}
+
+function resetAll() {
+  SPOTS.forEach(unstick);
+  setArmed(null);
+  toast('All peeled off. Let\'s play again!');
+}
+$('reset-btn').addEventListener('click', resetAll);
+$('cert-reset').addEventListener('click', resetAll);
+$('cert-close').addEventListener('click', () => $('cert').classList.add('hidden'));
+
+/* ---- Drop test: the sticker's own place must be the nearest open one, within TOL ---- */
+function attempt(s, pt) {
+  let best = null, bd = Infinity;
+  SPOTS.forEach((p) => {
+    if (placed.has(p.id)) return;
+    const q = map.project(p.coord);
+    const d = Math.hypot(q.x - pt.x, q.y - pt.y);
+    if (d < bd) { bd = d; best = p; }
+  });
+  if (best === s && bd <= TOL) { stick(s); return true; }
+  toast('Not quite. Try again!', true);
+  return false;
+}
+
+/* ---- Targets: dotted "stick here" circles ---- */
+SPOTS.forEach((s) => {
+  const root = document.createElement('div');
+  root.innerHTML = `<button class="target" type="button" aria-label="Stick here: ${s.place}">` +
+    `<span class="target-ring"></span><span class="target-label">${s.place}</span></button>`;
+  s.target = root.firstChild;
+  s.target.addEventListener('click', () => {
+    if (armed) attempt(armed, map.project(s.coord)); else toast('Pick a sticker first!');
+  });
+  new mapboxgl.Marker({ element: root }).setLngLat(s.coord).addTo(map);
+});
+
+// Tap fallback: armed sticker + tap anywhere on the map (targets handle themselves)
+map.on('click', (e) => {
+  if (!armed || (e.originalEvent.target.closest && e.originalEvent.target.closest('.target, .stuck'))) return;
+  const s = armed;
+  if (!attempt(s, e.point)) s.slot.classList.add('shake');
+  setArmed(null);
+  setTimeout(() => s.slot.classList.remove('shake'), 450);
+});
+
+/* ---- Sticker sheet + drag with pointer events ---- */
+function bindDrag(el, s) {
+  let start = null, ghost = null, lift = 0;
+
+  const ghostAt = (x, y) => {
+    ghost.style.left = x - 48 + 'px';
+    ghost.style.top = y - lift - 48 + 'px';
+    const q = map.project(s.coord), r = map.getContainer().getBoundingClientRect();
+    s.target.classList.toggle('near', Math.hypot(x - r.left - q.x, y - lift - r.top - q.y) <= TOL);
+  };
+
+  function finish(e, cancelled) {
+    if (!start) return;
+    const wasDrag = !!ghost;
+    start = null;
+    map.dragPan.enable();
+    el.classList.remove('dragging');
+    s.target.classList.remove('near');
+    if (!wasDrag) {
+      if (!cancelled) {
+        // A tap: arm (or disarm) this sticker
+        if (armed === s) setArmed(null);
+        else { setArmed(s); toast(`Now tap the dotted spot for the ${s.name.toLowerCase()}!`); }
+      }
+      return;
+    }
+    const r = map.getContainer().getBoundingClientRect();
+    const x = e.clientX, y = e.clientY - lift;
+    const inside = !cancelled && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+    const g = ghost;
+    ghost = null;
+    if (inside && attempt(s, { x: x - r.left, y: y - r.top })) { g.remove(); return; }
+    if (!inside && !cancelled) toast('Drop it on the map!', true);
+    // Bounce back to the sheet
+    setArmed(null);
+    const b = el.getBoundingClientRect();
+    if (reduce) { g.remove(); return; }
+    g.classList.add('back');
+    g.style.left = b.left + b.width / 2 - 48 + 'px';
+    g.style.top = b.top + 8 + 'px';
+    setTimeout(() => { g.remove(); el.classList.add('shake'); setTimeout(() => el.classList.remove('shake'), 450); }, 400);
+  }
+
+  el.addEventListener('pointerdown', (e) => {
+    if (s.slot.classList.contains('used') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    start = { x: e.clientX, y: e.clientY };
+    lift = e.pointerType === 'mouse' ? 0 : 44;   // keep the sticker above a finger
+    el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!start) return;
+    if (!ghost) {
+      if (Math.hypot(e.clientX - start.x, e.clientY - start.y) < 8) return;
+      ghost = document.createElement('div');
+      ghost.className = 'ghost';
+      ghost.innerHTML = art(s.id);
+      document.body.appendChild(ghost);
+      el.classList.add('dragging');
+      map.dragPan.disable();
+      setArmed(s);
+    }
+    ghostAt(e.clientX, e.clientY);
+  });
+  el.addEventListener('pointerup', (e) => finish(e, false));
+  el.addEventListener('pointercancel', (e) => finish(e, true));
+  el.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    if (s.slot.classList.contains('used')) return;
+    if (armed === s) setArmed(null); else { setArmed(s); toast(`Now pick the dotted spot for the ${s.name.toLowerCase()}!`); }
+  });
+}
+
+SPOTS.forEach((s) => {
+  const el = document.createElement('div');
+  el.className = 'sticker-slot';
+  el.tabIndex = 0;
+  el.setAttribute('role', 'button');
+  el.setAttribute('aria-label', `${s.name} sticker`);
+  el.innerHTML = `<span class="sticker">${art(s.id)}</span><span class="sticker-label">${s.name}</span>`;
+  $('stickers').appendChild(el);
+  s.slot = el;
+  bindDrag(el, s);
+});
+
+map.on('error', (e) => {
+  toast('Map problem: ' + ((e.error && e.error.message) || 'unknown'), true);
+});
+</script>
+</body>
+</html>

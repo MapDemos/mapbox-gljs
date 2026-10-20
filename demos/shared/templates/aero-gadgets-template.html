@@ -1,0 +1,361 @@
+<!--
+  Working EXAMPLE of the Aero Gadgets style pack (aero-gadgets.css, in this
+  same folder). Open this file directly to see the pattern working: a
+  Mapbox Standard Satellite map of Oahu in a glass window, beside a sidebar
+  of four desktop-style gadgets -- an analog clock (local island time), a
+  compass that follows the map bearing (drag or click it to reset north), a
+  Sky gadget that switches the light preset, and a Places slideshow whose
+  arrows fly the map. Click a bubble marker to sync the slideshow; close a
+  gadget with its x and bring it back with "+ Add gadgets". Copy the markup
+  below into your own demo and link aero-gadgets.css from its <head> -- see
+  the class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (glossy mid-2000s aero: sky, glass, bubbles, grass)
+  at the user's request for something distinct from every other pack in
+  this folder. "SkyDock" is a fictional app and the place blurbs are
+  illustrative placeholders -- swap in your own.
+
+  What's NOT included: any real dataset, search/geocoding, routing,
+  popups, or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Aero Gadgets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Varela+Round&family=Exo+2:wght@500;700;800&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="aero-gadgets.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body data-preset="day">
+<!-- shared gradients for the clock and compass -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="clock-rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" /><stop offset="0.5" stop-color="#8fdcf8" /><stop offset="1" stop-color="#00A6CF" />
+    </linearGradient>
+    <linearGradient id="compass-rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" /><stop offset="0.5" stop-color="#b6e8a0" /><stop offset="1" stop-color="#4AA82F" />
+    </linearGradient>
+    <radialGradient id="clock-dial" cx="0.4" cy="0.3" r="0.9">
+      <stop offset="0" stop-color="#ffffff" /><stop offset="1" stop-color="#d4f0ff" />
+    </radialGradient>
+    <linearGradient id="clock-gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.75" /><stop offset="1" stop-color="#fff" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+</svg>
+
+<div class="bubbles" aria-hidden="true">
+  <span class="bubble" style="left:2%;top:14%;width:70px;height:70px"></span>
+  <span class="bubble" style="left:46%;top:-20px;width:110px;height:110px;animation-delay:-3s"></span>
+  <span class="bubble" style="right:3%;top:58%;width:84px;height:84px;animation-delay:-5s"></span>
+  <span class="bubble" style="left:30%;bottom:9%;width:52px;height:52px;animation-delay:-7s"></span>
+</div>
+
+<div class="app">
+  <section class="window" aria-label="Map window">
+    <div class="window-bar">
+      <h1 class="window-title"><span class="window-glyph"></span>SkyDock &mdash; O&#699;ahu</h1>
+      <button class="btn btn-secondary add-gadgets hidden" id="add-gadgets">+ Add gadgets</button>
+    </div>
+    <div class="window-body">
+      <div id="map-frame">
+        <div id="map"></div>
+        <div class="status-note loading" id="status-note"><span id="status-text">Loading map&hellip;</span></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="sidebar" id="sidebar" aria-label="Gadgets">
+    <section class="gadget" data-gadget="clock">
+      <div class="gadget-head">
+        <h2 class="gadget-title">Clock</h2>
+        <button class="gadget-close" aria-label="Close Clock gadget">&times;</button>
+      </div>
+      <div class="gadget-body gadget-row">
+        <svg class="clock-face" viewBox="0 0 120 120" role="img" aria-label="Analog clock">
+          <circle class="rim" cx="60" cy="60" r="57" />
+          <circle class="dial" cx="60" cy="60" r="51" />
+          <circle class="tick" cx="60" cy="60" r="46" stroke-width="5" stroke-dasharray="1.6 24.58" stroke-dashoffset="0.8" transform="rotate(-90 60 60)" />
+          <circle class="tick" cx="60" cy="60" r="48" stroke-width="2" stroke-dasharray="0.7 4.54" stroke-dashoffset="0.35" opacity="0.5" transform="rotate(-90 60 60)" />
+          <g id="hand-hour"><line class="hand-hour" x1="60" y1="64" x2="60" y2="34" stroke-width="4.5" /></g>
+          <g id="hand-min"><line class="hand-min" x1="60" y1="66" x2="60" y2="20" stroke-width="3" /></g>
+          <g id="hand-sec"><line class="hand-sec" x1="60" y1="70" x2="60" y2="14" stroke-width="1.5" /></g>
+          <circle class="hub" cx="60" cy="60" r="4.5" />
+          <path class="gloss" d="M12 58 A48 48 0 0 1 108 58 Q60 40 12 58 Z" />
+        </svg>
+        <div class="gadget-text">
+          <div class="readout" id="clock-digital">--:--<small id="clock-ampm"></small></div>
+          <p class="caption" id="clock-caption">Island time</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="gadget" data-gadget="compass">
+      <div class="gadget-head">
+        <h2 class="gadget-title">Compass</h2>
+        <button class="gadget-close" aria-label="Close Compass gadget">&times;</button>
+      </div>
+      <div class="gadget-body gadget-row">
+        <div class="compass" id="compass" role="button" tabindex="0" aria-label="Compass: click to reset north, drag to rotate the map">
+          <svg viewBox="0 0 120 120">
+            <circle class="rim" cx="60" cy="60" r="57" />
+            <circle class="dial" cx="60" cy="60" r="51" />
+            <text class="letter north" x="60" y="22">N</text>
+            <text class="letter" x="98" y="64">E</text>
+            <text class="letter" x="60" y="106">S</text>
+            <text class="letter" x="22" y="64">W</text>
+            <g class="compass-needle" id="compass-needle">
+              <polygon class="needle-n" points="60,28 67,60 53,60" />
+              <polygon class="needle-s" points="60,92 67,60 53,60" />
+            </g>
+            <circle class="hub" cx="60" cy="60" r="4.5" />
+            <path class="gloss" d="M12 58 A48 48 0 0 1 108 58 Q60 40 12 58 Z" />
+          </svg>
+        </div>
+        <div class="gadget-text">
+          <div class="readout" id="compass-heading">0&deg;<small id="compass-card">N</small></div>
+          <p class="caption" id="compass-tilt">Tilt 0&deg; &middot; tap to face north</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="gadget" data-gadget="sky">
+      <div class="gadget-head">
+        <h2 class="gadget-title">Sky</h2>
+        <button class="gadget-close" aria-label="Close Sky gadget">&times;</button>
+      </div>
+      <div class="gadget-body">
+        <div class="btn-grid" id="sky-buttons">
+          <button class="btn" data-preset="dawn" aria-pressed="false">Dawn</button>
+          <button class="btn" data-preset="day" aria-pressed="true">Day</button>
+          <button class="btn" data-preset="dusk" aria-pressed="false">Dusk</button>
+          <button class="btn" data-preset="night" aria-pressed="false">Night</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="gadget" data-gadget="places">
+      <div class="gadget-head">
+        <h2 class="gadget-title">Places</h2>
+        <button class="gadget-close" aria-label="Close Places gadget">&times;</button>
+      </div>
+      <div class="gadget-body">
+        <div class="slide" id="slide">
+          <div class="slide-art" id="slide-art">
+            <svg viewBox="0 0 200 64" preserveAspectRatio="none" aria-hidden="true">
+              <circle class="sun" cx="150" cy="22" r="11" />
+              <path class="hill" d="M0 44 Q40 18 84 38 T200 34 V64 H0 Z" />
+              <path class="sea" d="M0 52 Q25 46 50 52 T100 52 T150 52 T200 52 V64 H0 Z" />
+            </svg>
+          </div>
+          <h3 class="slide-title" id="slide-title"></h3>
+          <p class="slide-text" id="slide-text"></p>
+        </div>
+        <div class="slide-nav">
+          <button class="btn btn-round" id="prev" aria-label="Previous place">&#9664;</button>
+          <div class="dots" id="dots"></div>
+          <button class="btn btn-round" id="next" aria-label="Next place">&#9654;</button>
+        </div>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<script>
+const REGION_TZ = 'Pacific/Honolulu';
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const PLACES = [
+  { name: 'Diamond Head', center: [-157.8059, 21.2620], zoom: 14.2, bearing: 20, a: '#5BC0F8', b: '#CFF1FF',
+    text: 'A volcanic crater turned lookout, with the whole of Waikiki laid out below.' },
+  { name: 'Hanauma Bay', center: [-157.6940, 21.2693], zoom: 14.4, bearing: -30, a: '#00B4D8', b: '#D8F7FF',
+    text: 'A drowned crater curled around a protected, turquoise reef.' },
+  { name: 'Kailua Beach', center: [-157.7240, 21.4000], zoom: 14.2, bearing: 60, a: '#7FD6F5', b: '#F4FCFF',
+    text: 'Soft white sand, steady trade winds and a lagoon of pale blue.' },
+  { name: 'North Shore', center: [-158.0405, 21.6780], zoom: 13.8, bearing: 160, a: '#3AA6E8', b: '#BFEAFF',
+    text: 'Winter swells roll in here and draw the big-wave crowd.' },
+  { name: 'Waimea Valley', center: [-158.0545, 21.6390], zoom: 14.2, bearing: -20, a: '#6CC24A', b: '#E3F8D2',
+    text: 'A green valley of gardens, a waterfall and an old riverside trail.' },
+  { name: 'Kualoa', center: [-157.8370, 21.5230], zoom: 13.8, bearing: -70, a: '#5BC0F8', b: '#DDF7E4',
+    text: 'Sharp green ridges drop to the bay; a small islet sits just offshore.' },
+];
+
+const els = (id) => document.getElementById(id);
+const statusEl = els('status-note');
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard-satellite',
+  center: [-157.95, 21.46],
+  zoom: 9.3,
+  pitch: 35,
+  config: { basemap: { lightPreset: 'day', showPointOfInterestLabels: false, showTransitLabels: false, showRoadLabels: false } },
+});
+
+map.on('load', () => {
+  statusEl.classList.add('hidden');
+  go(0);
+});
+
+map.on('error', (e) => {
+  statusEl.className = 'status-note error';
+  els('status-text').textContent = (e.error && e.error.message) || 'Map error';
+});
+
+function move(opts) {
+  if (reduceMotion) map.jumpTo(opts);
+  else map.flyTo({ ...opts, duration: 2600, essential: false });
+}
+
+/* ---------- Clock ---------- */
+const timeFmt = new Intl.DateTimeFormat('en-US', { timeZone: REGION_TZ, hour12: false, hour: 'numeric', minute: 'numeric', second: 'numeric' });
+const dateFmt = new Intl.DateTimeFormat('en-US', { timeZone: REGION_TZ, weekday: 'long', month: 'short', day: 'numeric' });
+
+function tick() {
+  const now = new Date();
+  const p = {};
+  timeFmt.formatToParts(now).forEach((x) => { p[x.type] = x.value; });
+  const h = Number(p.hour) % 24, m = Number(p.minute), s = Number(p.second);
+  els('hand-sec').setAttribute('transform', `rotate(${s * 6} 60 60)`);
+  els('hand-min').setAttribute('transform', `rotate(${m * 6 + s * 0.1} 60 60)`);
+  els('hand-hour').setAttribute('transform', `rotate(${(h % 12) * 30 + m * 0.5} 60 60)`);
+  els('clock-digital').firstChild.nodeValue = `${(h % 12) || 12}:${String(m).padStart(2, '0')}`;
+  els('clock-ampm').textContent = h < 12 ? 'AM' : 'PM';
+  els('clock-caption').textContent = `${dateFmt.format(now)} · Honolulu`;
+}
+tick();
+setInterval(tick, 1000);
+
+/* ---------- Compass ---------- */
+const compass = els('compass');
+const CARDS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+
+function syncCompass() {
+  const b = map.getBearing();
+  els('compass-needle').setAttribute('transform', `rotate(${-b} 60 60)`);
+  const heading = (Math.round(b) + 360) % 360;
+  els('compass-heading').firstChild.nodeValue = `${heading}°`;
+  els('compass-card').textContent = CARDS[Math.round(heading / 45) % 8];
+  els('compass-tilt').textContent = `Tilt ${Math.round(map.getPitch())}° · tap to face north`;
+}
+map.on('rotate', syncCompass);
+map.on('pitch', syncCompass);
+map.on('move', syncCompass);
+syncCompass();
+
+let drag = null;
+function dialAngle(e) {
+  const r = compass.getBoundingClientRect();
+  return Math.atan2(e.clientX - (r.left + r.width / 2), -(e.clientY - (r.top + r.height / 2))) * 180 / Math.PI;
+}
+compass.addEventListener('pointerdown', (e) => {
+  compass.setPointerCapture(e.pointerId);
+  drag = { x: e.clientX, y: e.clientY, moved: false };
+});
+compass.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 4) drag.moved = true;
+  if (drag.moved) map.jumpTo({ bearing: -dialAngle(e) });
+});
+compass.addEventListener('pointerup', () => {
+  if (drag && !drag.moved) map.easeTo({ bearing: 0, duration: reduceMotion ? 0 : 700 });
+  drag = null;
+});
+compass.addEventListener('pointercancel', () => { drag = null; });
+compass.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    map.easeTo({ bearing: 0, duration: reduceMotion ? 0 : 700 });
+  }
+});
+
+/* ---------- Sky (light preset) ---------- */
+function setPreset(preset) {
+  try { map.setConfigProperty('basemap', 'lightPreset', preset); } catch (err) { /* style not ready */ }
+  document.body.dataset.preset = preset;
+  document.querySelectorAll('#sky-buttons .btn').forEach((b) => {
+    b.setAttribute('aria-pressed', String(b.dataset.preset === preset));
+  });
+}
+els('sky-buttons').addEventListener('click', (e) => {
+  const btn = e.target.closest('.btn');
+  if (btn) setPreset(btn.dataset.preset);
+});
+
+/* ---------- Places slideshow + markers ---------- */
+let current = -1;
+const dotsEl = els('dots');
+const markers = PLACES.map((place, i) => {
+  const root = document.createElement('div');
+  root.className = 'bubble-marker';
+  const pin = document.createElement('span');
+  pin.className = 'bubble-pin';
+  pin.textContent = i + 1;
+  root.appendChild(pin);
+  root.addEventListener('click', (e) => { e.stopPropagation(); go(i); });
+  new mapboxgl.Marker({ element: root }).setLngLat(place.center).addTo(map);
+
+  const dot = document.createElement('button');
+  dot.className = 'dot';
+  dot.setAttribute('aria-label', place.name);
+  dot.addEventListener('click', () => go(i));
+  dotsEl.appendChild(dot);
+  return { pin, dot };
+});
+
+function go(i) {
+  current = (i + PLACES.length) % PLACES.length;
+  const p = PLACES[current];
+  els('slide-title').textContent = p.name;
+  els('slide-text').textContent = p.text;
+  const art = els('slide-art');
+  art.style.setProperty('--a', p.a);
+  art.style.setProperty('--b', p.b);
+  const slide = els('slide');
+  slide.classList.remove('swap');
+  void slide.offsetWidth;
+  slide.classList.add('swap');
+  markers.forEach((m, k) => {
+    m.pin.classList.toggle('is-active', k === current);
+    m.dot.classList.toggle('is-active', k === current);
+  });
+  move({ center: p.center, zoom: p.zoom, bearing: p.bearing, pitch: 55 });
+}
+els('prev').addEventListener('click', () => go(current - 1));
+els('next').addEventListener('click', () => go(current + 1));
+
+/* ---------- Gadgets: close and restore ---------- */
+const addBtn = els('add-gadgets');
+document.querySelectorAll('.gadget').forEach((g) => {
+  g.querySelector('.gadget-close').addEventListener('click', () => {
+    g.classList.add('is-closing');
+    setTimeout(() => {
+      g.classList.add('hidden');
+      addBtn.classList.remove('hidden');
+    }, reduceMotion ? 0 : 250);
+  });
+});
+addBtn.addEventListener('click', () => {
+  const closed = document.querySelectorAll('.gadget.hidden');
+  closed.forEach((g) => g.classList.remove('hidden'));
+  void document.body.offsetWidth;
+  document.querySelectorAll('.gadget.is-closing').forEach((g) => g.classList.remove('is-closing'));
+  addBtn.classList.add('hidden');
+});
+</script>
+</body>
+</html>

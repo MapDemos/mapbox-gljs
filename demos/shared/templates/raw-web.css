@@ -1,0 +1,545 @@
+/*
+  Raw Web -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a 1996 hand-coded HTML homepage, played
+  straight and a little tongue-in-cheek -- white page, black Times text,
+  real underlined blue links that turn purple, real <hr> rules, default-
+  looking outset table borders, <fieldset>/<legend> controls, a hit counter
+  and an "under construction" bar -- deliberately distinct from every other
+  style pack in this folder: Arena is a Linear-dark compare layout,
+  Editorial Paper is warm paper + serif magazine chrome, Highway Sign is
+  MUTCD cream/green, Slate Console is a dark cinematic globe, Storefront is
+  a sidebar of filters, Tarmac Glass is dark glass + amber, Vintage Chart is
+  navy/parchment/brass, Weather Console is a layer-explorer dock, Riso Zine
+  is two-ink misregistered print, Swiss Grid is white/black/red
+  International Style with a visible grid, Neon HUD is glowing cyberpunk
+  overlays, Pastel Bento is soft rounded tiles, Blueprint is white linework
+  on drafting blue, Story Scroll is a scrollytelling narrative, Retro OS is
+  a windowed desktop, Aurora Command is a dark gradient mission console,
+  Deco Voyage is gold-on-black Art Deco, and Washi Seasons is quiet paper
+  and seasonal colour -- Raw Web has no design at all, on purpose: it is
+  the browser's default stylesheet with a few honest choices).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/raw-web.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Tinos, the Times-metric serif, for body
+  and headings; Cousine, the Courier-metric mono, for data cells and
+  code-ish meta):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Tinos:ital,wght@0,400;0,700;1,400&family=Cousine:wght@400;700&display=swap" rel="stylesheet" />
+
+  Signature touch: the hit counter (.counter) -- odometer digit boxes built
+  from plain CSS -- next to a striped, animated "under construction" bar
+  (.construction). Everything else is deliberately unstyled-looking: outset
+  bevels, no border-radius, no shadows, no gradients except the hazard
+  stripes. The animations stop under prefers-reduced-motion.
+
+  Class/id contract (see raw-web-template.html in this same folder for a
+  full working example):
+
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here). Put it
+                               inside .map-frame and make it fill it
+  - .page                     centred page column, max 1100px, 16px gutters
+  - .site-header              page header block --
+    .site-header h1             big bold Times title
+    .updated                    "Last updated:" line (mono date in <time>)
+    .counter                    hit counter row: .counter-label + .digit
+                                 boxes (one <span class="digit"> per digit)
+    .construction               striped hazard bar (animated) with a
+                                 .construction-text label centred on it
+    .new                        red "NEW!" flag (blinks; static when reduced
+                                 motion is requested)
+  - hr                        real horizontal rules, styled as 2px inset
+  - .map-frame                map wrapper, border 3px inset like an embedded
+                               object; height 50vh (45vh on phones)
+    .map-caption                small italic line UNDER the frame (never
+                                 overlaying the map)
+  - fieldset.filter-box       the "Filter" fieldset (legend + controls) --
+    .field                      label + input/select pair
+    .btn                        default-looking bevelled grey button
+  - .row-count                "Showing 12 of 25 observatories" line
+  - .table-wrap               table scroll wrapper (x and y scroll; page
+                               itself never scrolls sideways), sticky header
+  - table.data                the data table --
+    th .sort-link               underlined header link; .sort-ind inside it
+                                 holds the ▲/▼ indicator
+    td.num                      right-aligned mono numeric cell
+    td.mono                     mono text cell
+    tr.is-hover                 hovered row (also set from the map)
+    tr.is-selected              selected row (red bar on its left edge)
+  - a.obs-link                real link (#0000EE); .visited (or :visited)
+                               turns it #551A8B
+  - .raw-popup                add as the mapboxgl.Popup className; the
+                               content is a .popup-table styled like a 90s
+                               table
+  - .footer-note              small closing paragraph under a final <hr>
+  - .status-note (+.loading/  one plain status line (mono), red when
+    .error)                    .error
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --page: #FFFFFF;
+  --text: #000000;
+  --link: #0000EE;
+  --visited: #551A8B;
+  --grey: #C0C0C0;
+  --grey-light: #E0E0E0;
+  --grey-dark: #808080;
+  --hover-row: #FFFFCC;
+  --select-row: #FFD6D6;
+  --new: #FF0000;
+  --construction: #FFDD00;
+  --success: #000000;
+  --error: #FF0000;
+
+  --font-body: 'Tinos', 'Times New Roman', Times, serif;
+  --font-mono: 'Cousine', 'Courier New', Courier, monospace;
+  --font-display: 'Tinos', 'Times New Roman', Times, serif;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+a {
+  color: var(--link);
+  text-decoration: underline;
+}
+
+a:visited,
+a.visited {
+  color: var(--visited);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px dotted var(--text);
+  outline-offset: 2px;
+}
+
+hr {
+  height: 0;
+  margin: 16px 0;
+  border: 0;
+  border-top: 1px solid var(--grey-dark);
+  border-bottom: 1px solid var(--page);
+  box-shadow: 0 -1px 0 var(--grey-dark) inset;
+  outline: 1px solid var(--grey);
+}
+
+/* Header ---------------------------------------------------------------- */
+.site-header h1 {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.updated {
+  margin: 0 0 10px;
+  font-style: italic;
+}
+
+.updated time {
+  font-family: var(--font-mono);
+  font-style: normal;
+  font-size: 14px;
+}
+
+.new {
+  color: var(--new);
+  font-weight: 700;
+  animation: raw-blink 1s steps(1, end) infinite;
+}
+
+@keyframes raw-blink {
+  50% { visibility: hidden; }
+}
+
+.counter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.counter-label {
+  font-size: 15px;
+}
+
+.counter .digits {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.digit {
+  display: inline-block;
+  min-width: 22px;
+  padding: 2px 4px;
+  background: #000000;
+  color: #FFFFFF;
+  border: 2px inset var(--grey-dark);
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.construction {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  border: 2px outset var(--grey);
+  background-color: var(--construction);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    #000000 0,
+    #000000 12px,
+    var(--construction) 12px,
+    var(--construction) 24px
+  );
+  background-size: 34px 34px;
+  animation: raw-stripes 1.2s linear infinite;
+}
+
+.construction-text {
+  padding: 0 10px;
+  background: var(--page);
+  border: 1px solid var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+@keyframes raw-stripes {
+  from { background-position: 0 0; }
+  to { background-position: 34px 0; }
+}
+
+/* Map -------------------------------------------------------------------- */
+.map-frame {
+  height: 50vh;
+  min-height: 280px;
+  border: 3px inset var(--grey);
+  background: var(--grey-light);
+}
+
+.map-frame #map {
+  width: 100%;
+  height: 100%;
+}
+
+.map-caption {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-style: italic;
+}
+
+/* Filter fieldset --------------------------------------------------------- */
+fieldset.filter-box {
+  margin: 0 0 12px;
+  padding: 8px 12px 12px;
+  border: 2px groove var(--grey);
+}
+
+fieldset.filter-box legend {
+  padding: 0 6px;
+  font-weight: 700;
+}
+
+.filter-box .controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+}
+
+.field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.field input,
+.field select {
+  padding: 2px 4px;
+  border: 2px inset var(--grey);
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  border-radius: 0;
+}
+
+.field input {
+  width: 200px;
+  max-width: 100%;
+}
+
+.btn {
+  padding: 3px 12px;
+  border: 2px outset var(--grey);
+  border-radius: 0;
+  background: var(--grey);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.btn:active {
+  border-style: inset;
+}
+
+.row-count {
+  margin: 0 0 8px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+/* Table ------------------------------------------------------------------- */
+.table-wrap {
+  max-height: 440px;
+  overflow: auto;
+  border: 2px outset var(--grey);
+  background: var(--grey-light);
+}
+
+table.data {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 15px;
+}
+
+table.data th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 5px 8px;
+  border: 2px outset var(--grey);
+  background: var(--grey);
+  text-align: left;
+  white-space: nowrap;
+}
+
+table.data th.num {
+  text-align: right;
+}
+
+.sort-link {
+  color: var(--link);
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.sort-ind {
+  display: inline-block;
+  min-width: 1.1em;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+table.data td {
+  padding: 4px 8px;
+  border-right: 1px solid var(--grey-dark);
+  border-bottom: 1px solid var(--grey-dark);
+  background: var(--grey-light);
+  vertical-align: baseline;
+}
+
+table.data tbody tr:nth-child(even) td {
+  background: var(--grey);
+}
+
+table.data td.num,
+table.data td.mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+table.data td.num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+table.data tbody tr.is-hover td {
+  background: var(--hover-row);
+}
+
+table.data tbody tr.is-selected td {
+  background: var(--select-row);
+}
+
+table.data tbody tr.is-selected td:first-child {
+  box-shadow: inset 5px 0 0 var(--new);
+}
+
+table.data td.empty {
+  padding: 16px;
+  font-style: italic;
+  text-align: center;
+}
+
+/* Popup ------------------------------------------------------------------- */
+.raw-popup .mapboxgl-popup-content {
+  padding: 0;
+  border: 2px outset var(--grey);
+  border-radius: 0;
+  background: var(--grey);
+  box-shadow: none;
+  color: var(--text);
+  font-family: var(--font-body);
+}
+
+.raw-popup .mapboxgl-popup-close-button {
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 2px outset var(--grey);
+  border-radius: 0;
+  background: var(--grey);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 14px;
+}
+
+.raw-popup.mapboxgl-popup-anchor-top .mapboxgl-popup-tip,
+.raw-popup.mapboxgl-popup-anchor-top-left .mapboxgl-popup-tip,
+.raw-popup.mapboxgl-popup-anchor-top-right .mapboxgl-popup-tip {
+  border-bottom-color: var(--grey);
+}
+
+.raw-popup.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip,
+.raw-popup.mapboxgl-popup-anchor-bottom-left .mapboxgl-popup-tip,
+.raw-popup.mapboxgl-popup-anchor-bottom-right .mapboxgl-popup-tip {
+  border-top-color: var(--grey);
+}
+
+.raw-popup.mapboxgl-popup-anchor-left .mapboxgl-popup-tip {
+  border-right-color: var(--grey);
+}
+
+.raw-popup.mapboxgl-popup-anchor-right .mapboxgl-popup-tip {
+  border-left-color: var(--grey);
+}
+
+.popup-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.popup-table caption {
+  padding: 4px 26px 4px 8px;
+  background: #000000;
+  color: #FFFFFF;
+  font-weight: 700;
+  text-align: left;
+}
+
+.popup-table th,
+.popup-table td {
+  padding: 3px 8px;
+  border: 1px solid var(--grey-dark);
+  text-align: left;
+}
+
+.popup-table th {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.popup-table td {
+  background: var(--grey-light);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+/* Misc ---------------------------------------------------------------------- */
+.footer-note {
+  margin: 0;
+  font-size: 14px;
+}
+
+.status-note {
+  margin: 8px 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.status-note.loading::before {
+  content: '[...] ';
+}
+
+.status-note.error {
+  color: var(--error);
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 16px;
+  }
+
+  .site-header h1 {
+    font-size: 30px;
+  }
+
+  .map-frame {
+    height: 45vh;
+    min-height: 240px;
+  }
+
+  .field {
+    flex: 1 1 100%;
+  }
+
+  .field input {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .new,
+  .construction {
+    animation: none;
+  }
+}

@@ -1,0 +1,777 @@
+/*
+  Line Diagram -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: the modernist transit strip map printed
+  above train doors -- white ground, near-black type, one thick rounded
+  coral line, white station ticks with black rings, interchanges as joined
+  double circles, names set at 45 degrees -- deliberately distinct from
+  every other style pack in this folder: Arena is a Linear-dark compare
+  layout, Editorial Paper is warm paper + serif, Highway Sign is MUTCD
+  cream/green, Slate Console is a dark cinematic globe, Storefront is a
+  sidebar of filters, Tarmac Glass is dark glass + amber, Vintage Chart is
+  navy/parchment/brass, Weather Console is a layer-explorer dock, Riso Zine
+  is two-ink misregistered print, Swiss Grid is a red/black 12-column split,
+  Neon HUD is dark glow + scanlines, Pastel Bento is a soft rounded tile
+  grid, Blueprint is cyan drafting lines on navy, Story Scroll is cinematic
+  scrollytelling, Retro OS is desktop windows, Aurora Command is a dark
+  aurora-gradient console, Deco Voyage is gold-on-black Art Deco, Washi
+  Seasons is paper-and-ink Japanese seasonal).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/line-diagram.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Schibsted Grotesk for station names,
+  headings and bold labels; Martian Mono for times, platforms and minutes):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Martian+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  Signature touch: the .strip band -- a schematic of the whole line with
+  equally spaced stations whatever the geography, names at 45 degrees above
+  the line -- and a small numbered train (.strip-train) that rides it in
+  sync with a matching dot on the geographic map. On phones the band scrolls
+  sideways on its own with scroll-snap and the names turn horizontal.
+
+  Class/id contract (see line-diagram-template.html in this same folder for
+  a full working example):
+
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here). Put it
+                               inside .map-wrap, absolutely filling it.
+  - .line-app                 root: a 100dvh column (head / strip / map),
+                               never taller than the viewport
+  - .line-head                header row, white, hairline rule beneath --
+    .line-badge                 round line badge (coral disc, bold numeral)
+    .line-title                 the <h1>; wrap the direction in .dir
+    .line-controls              right-aligned button group
+  - .btn, .btn-primary,       square-ish ink buttons: 2px ink border, bold,
+    .btn-secondary              ink fill on hover (primary = coral fill)
+  - .strip                    full-width schematic band --
+    .strip-scroll               its own horizontal scroller (scroll-snap)
+      .strip-track              relative wrapper sized by the items
+        .strip-line               the thick coral line with grey rail
+        .strip-train              the moving numbered train (JS sets its
+                                   transform: translate(x, -50%))
+        .strip-items              the <ol> of stations (flex row)
+          li > .stn               one <button> per station, width --stn-w:
+            .stn-dot                white tick/circle with black ring
+              .stn-chip              inner coloured dot per interchange
+                                      (set style="--c:#hex")
+            .stn-name               45-degree name (horizontal on phones)
+            .stn-min                minutes-from-origin, Martian Mono
+          modifiers on .stn:       .is-interchange (joined double circle,
+                                    taller pill), .is-train (train is
+                                    stopped here), .is-selected (clicked)
+  - .map-wrap                 relative area under the strip; holds #map and
+                               the overlay --
+    .map-overlay                top row of floating cards, pointer-events:
+                                 none (cards re-enable them); never touches
+                                 the bottom corners (Mapbox logo/attribution)
+  - .station-card             selected-station card (top-left of the map) --
+    .station-name, .station-sub, .card-close
+    .badges > .line-chip        small round coloured interchange badges
+                                 (style="--c:#hex"; add .on-light for dark
+                                 text on a light colour such as mustard)
+    .stepfree                   step-free marker: inline SVG + label
+    .station-min                big mono minutes figure + caption
+  - .depart-card              "next train" card (top-right of the map) --
+    .depart-title, .depart-status
+    .depart-row                 grid row (.is-next on the first; .is-later
+                                 on the third, hidden on phones): .depart-time .depart-dest
+                                 .depart-plat .depart-in
+  - .status-note (+.loading/  one-line status over the map, top-centre
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --white: #FFFFFF;
+  --ink: #1A1A1A;
+  --ink-muted: #5A5A5A;
+  --ink-faint: #8C8C8C;
+  --rail: #EDEDED;
+  --rail-dark: #D2D2D2;
+  --coral: #FF5F45;
+  --coral-ink: #1A1A1A;
+  --teal: #00A19A;
+  --violet: #6E3FD8;
+  --mustard: #F2B705;
+  --success: #00776F;
+  --error: #C23A22;
+
+  --font-body: 'Schibsted Grotesk', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-mono: 'Martian Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --stn-w: clamp(76px, calc((100vw - 170px) / 12), 110px);
+  --line-y: 124px;
+  --strip-h: 164px;
+  --gutter: 20px;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  overflow: hidden;
+}
+
+button { font-family: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* Root: head, strip, map stacked in exactly the viewport */
+.line-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--white);
+}
+
+/* Header line */
+.line-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px var(--gutter);
+  border-bottom: 2px solid var(--ink);
+  background: var(--white);
+}
+
+.line-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--coral);
+  color: var(--coral-ink);
+  font-weight: 800;
+  font-size: 21px;
+  line-height: 1;
+  box-shadow: 0 0 0 3px var(--ink);
+  margin: 3px;
+}
+
+.line-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.line-title .dir {
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.line-controls {
+  flex: none;
+  display: flex;
+  gap: 8px;
+}
+
+/* Buttons */
+.btn {
+  display: inline-block;
+  padding: 9px 14px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.btn:hover {
+  background: var(--ink);
+  color: var(--white);
+}
+
+.btn-primary {
+  background: var(--coral);
+  color: var(--coral-ink);
+}
+
+.btn-primary:hover {
+  background: var(--ink);
+  color: var(--white);
+}
+
+.btn-secondary {
+  border-color: var(--rail-dark);
+  color: var(--ink);
+}
+
+.btn-secondary:hover {
+  border-color: var(--ink);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Strip band */
+.strip {
+  flex: none;
+  position: relative;
+  background: var(--white);
+  border-bottom: 2px solid var(--ink);
+}
+
+.strip-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rail-dark) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.strip-track {
+  position: relative;
+  display: inline-block;
+  vertical-align: top;
+  min-width: 100%;
+  box-sizing: border-box;
+  height: var(--strip-h);
+  padding: 0 110px 0 var(--gutter);
+}
+
+/* Line runs from the first to the last station centre */
+.strip-line {
+  position: absolute;
+  top: var(--line-y);
+  left: calc(var(--gutter) + var(--stn-w) / 2);
+  right: calc(110px + var(--stn-w) / 2);
+  height: 10px;
+  margin-top: -5px;
+  border-radius: 5px;
+  background: var(--coral);
+  box-shadow: 0 0 0 4px var(--rail);
+  z-index: 1;
+}
+
+.strip-items {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  height: 100%;
+}
+
+.strip-items li {
+  flex: none;
+  width: var(--stn-w);
+  height: 100%;
+  scroll-snap-align: center;
+}
+
+.stn {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+/* White tick with black ring; interchanges become a taller joined pill */
+.stn-dot {
+  position: absolute;
+  left: 50%;
+  top: var(--line-y);
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 18px;
+  height: 18px;
+  border: 3px solid var(--ink);
+  border-radius: 9px;
+  background: var(--white);
+  transition: box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.stn.is-interchange .stn-dot {
+  width: 20px;
+  height: calc(14px + var(--n, 1) * 12px);
+  border-radius: 10px;
+}
+
+.stn-chip {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c, var(--ink));
+}
+
+.stn:hover .stn-dot { background: var(--rail); }
+
+.stn.is-selected .stn-dot {
+  box-shadow: 0 0 0 4px var(--white), 0 0 0 7px var(--ink);
+}
+
+.stn.is-train .stn-dot { background: var(--coral); }
+
+/* Names at 45 degrees, rising up-right from the tick */
+.stn-name {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--strip-h) - var(--line-y) + 26px);
+  margin-left: -2px;
+  padding-left: 2px;
+  transform-origin: 0 100%;
+  transform: rotate(-45deg);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.stn.is-selected .stn-name,
+.stn.is-train .stn-name { font-weight: 800; }
+
+.stn.is-selected .stn-name { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+
+.stn-min {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--line-y) + 28px);
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.stn-min::after { content: "'"; }
+
+/* The numbered train riding the strip */
+.strip-train {
+  position: absolute;
+  left: 0;
+  top: var(--line-y);
+  z-index: 4;
+  width: 30px;
+  height: 22px;
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 3px solid var(--ink);
+  border-radius: 11px;
+  background: var(--coral);
+  color: var(--coral-ink);
+  font-weight: 800;
+  font-size: 12px;
+  line-height: 1;
+  pointer-events: none;
+  transform: translate(0, -50%);
+  will-change: transform;
+}
+
+/* Map area */
+.map-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.map-overlay {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.map-overlay > * { pointer-events: auto; }
+
+.station-card,
+.depart-card {
+  box-sizing: border-box;
+  background: var(--white);
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.station-card {
+  position: relative;
+  width: 300px;
+  padding: 14px 16px 14px;
+}
+
+.station-name {
+  margin: 0 28px 2px 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+.station-sub {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--ink-muted);
+  line-height: 1.35;
+}
+
+.card-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid var(--rail-dark);
+  border-radius: 50%;
+  background: var(--white);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.card-close:hover { border-color: var(--ink); background: var(--ink); color: var(--white); }
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.line-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px 2px 2px;
+  border-radius: 999px;
+  background: var(--rail);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.line-chip b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--c, var(--ink));
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.line-chip.on-light b { color: var(--ink); }
+
+.stepfree {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.stepfree svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 2px;
+  box-sizing: border-box;
+  border-radius: 5px;
+  background: var(--ink);
+}
+
+.stepfree.no { color: var(--ink-faint); }
+.stepfree.no svg { background: var(--rail-dark); }
+
+.station-min {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 2px solid var(--rail);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.station-min strong {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1;
+}
+
+/* Next-train card */
+.depart-card {
+  width: 280px;
+  margin-left: auto;
+  padding: 12px 14px;
+}
+
+.depart-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.depart-title span {
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-muted);
+  text-align: right;
+}
+
+.depart-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 0;
+  border-top: 1px solid var(--rail-dark);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.depart-time {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.depart-dest {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.depart-plat,
+.depart-in {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.depart-row.is-next .depart-in { color: var(--ink); font-weight: 600; }
+
+.depart-status {
+  margin: 6px 0 0;
+  padding-top: 8px;
+  border-top: 2px solid var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.depart-status::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--coral);
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+/* Status note */
+.status-note {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  padding: 6px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--white);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-note.loading::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border: 2px solid var(--rail-dark);
+  border-top-color: var(--coral);
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: line-spin 0.9s linear infinite;
+}
+
+@keyframes line-spin { to { transform: rotate(360deg); } }
+
+.status-note.success { color: var(--success); border-color: var(--success); }
+.status-note.error { color: var(--error); border-color: var(--error); }
+
+.hidden {
+  display: none !important;
+}
+
+/* Mid widths: tighten the head */
+@media (max-width: 900px) {
+  .line-title { font-size: 18px; }
+}
+
+/* Phone: strip scrolls sideways, names horizontal and stacked */
+@media (max-width: 640px) {
+  :root {
+    --stn-w: 80px;
+    --gutter: 16px;
+    --line-y: 72px;
+    --strip-h: 116px;
+  }
+
+  .line-head {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 10px var(--gutter);
+  }
+
+  .line-title { font-size: 16px; flex-basis: calc(100% - 60px); }
+  .line-controls { width: 100%; }
+  .line-controls .btn { flex: 1; padding: 8px 10px; }
+
+  .strip-track { padding-right: var(--gutter); }
+  .strip-line { right: calc(var(--gutter) + var(--stn-w) / 2); }
+
+  .stn-name {
+    left: 0;
+    right: 0;
+    bottom: calc(var(--strip-h) - var(--line-y) + 24px);
+    margin: 0;
+    padding: 0;
+    transform: none;
+    transform-origin: 50% 100%;
+    font-size: 11px;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+  }
+
+  .stn-min { top: calc(var(--line-y) + 28px); }
+
+  .map-overlay {
+    left: 16px;
+    right: 16px;
+    top: 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  /* Compact one-line pill: dot, "Next", time, destination, minutes */
+  .depart-card {
+    order: 1;
+    width: auto;
+    margin-left: 0;
+    padding: 6px 14px;
+    border-radius: 999px;
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+
+  .depart-title,
+  .depart-status,
+  .depart-plat { display: none; }
+
+  .depart-row.is-next {
+    grid-template-columns: auto auto 1fr auto;
+    padding: 0;
+    border-top: 0;
+    align-items: center;
+  }
+
+  .depart-row.is-next::before {
+    content: "Next";
+    padding-left: 16px;
+    background: radial-gradient(circle, var(--coral) 3px, var(--ink) 3.5px, var(--ink) 5px, transparent 5.5px) no-repeat 0 50% / 12px 12px;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .station-card {
+    order: 2;
+    width: auto;
+    padding: 10px 12px;
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+
+  .depart-row.is-later { display: none; }
+  .station-name { font-size: 17px; }
+  .station-sub { display: none; }
+  .station-min { margin-top: 8px; padding-top: 8px; }
+  .station-min strong { font-size: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-note.loading::before { animation: none; }
+  .stn-dot, .btn { transition: none; }
+  .strip-scroll { scroll-behavior: auto; }
+}

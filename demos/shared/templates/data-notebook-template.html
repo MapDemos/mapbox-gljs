@@ -1,0 +1,494 @@
+<!--
+  Working EXAMPLE of the Data Notebook style pack (data-notebook.css, in
+  this same folder). Open this file directly to see the pattern working
+  with ~30 illustrative bike-share docks in Toronto: a notebook column with
+  a markdown title cell, a query cell whose parameters (min_docks,
+  neighbourhood) are editable inline in the code, and output cells holding
+  the map, an inline-SVG bar chart and a results table. Press the green
+  play button, "Run all" or Shift+Enter: the execution count increments,
+  the kernel goes busy for ~600 ms, then the map (setFilter, circle radius
+  by capacity, colour by bikes-available ratio), chart and table re-render.
+  Click a table row (or a dock) to highlight it with feature-state and fly
+  to it; hover a dock for a notebook-style text tooltip. Copy the markup
+  below into your own demo and link data-notebook.css from its <head> --
+  see the class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (a computational notebook for a data analyst) at the
+  user's request for something distinct from every other pack in this
+  folder. "Cellbook", the notebook file name and the dock data (names,
+  capacities, bikes available) are fictional placeholders on approximate
+  real Toronto street locations -- swap in your own.
+
+  What's NOT included: real bike-share data, a real code editor or kernel
+  (the "query" is a fixed filter driven by the two inputs), saving,
+  search/geocoding, routing, or a hard-coded access token (demo-kit.js
+  sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cellbook &middot; dock-audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="data-notebook.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    width: 100%;
+    height: 420px;
+  }
+  @media (max-width: 640px) {
+    #map { height: 360px; }
+  }
+</style>
+</head>
+<body>
+<header class="nb-toolbar">
+  <span class="nb-brand">Cellbook</span>
+  <span class="nb-file">dock-audit.cbk</span>
+  <button class="btn btn-run" id="run-all" type="button">
+    <svg viewBox="0 0 10 12" aria-hidden="true"><path d="M0 0l10 6-10 6z"/></svg>Run all
+  </button>
+  <span class="kernel idle" id="kernel" role="status" aria-live="polite"><i class="kernel-dot"></i><span id="kernel-text">Kernel idle</span></span>
+</header>
+
+<main class="nb">
+  <!-- Markdown cell -->
+  <section class="cell cell-md">
+    <div class="gutter"></div>
+    <div class="cell-body">
+      <h1>Downtown dock audit</h1>
+      <p>Which bike-share stations are big enough, and stocked well enough, for the morning rush? Edit the two parameters in the next cell, then run it with <code>Shift+Enter</code>.</p>
+      <p class="meta">Illustrative data &middot; 30 docks across six Toronto neighbourhoods</p>
+    </div>
+  </section>
+
+  <!-- Query cell -->
+  <section class="cell cell-code active" id="cell-query">
+    <div class="gutter"><span class="prompt" id="prompt-in">In [&nbsp;]:</span></div>
+    <div class="cell-body">
+      <span class="dirty-hint hidden" id="dirty-hint">modified &mdash; run to update</span>
+      <div class="code" role="group" aria-label="Query cell">
+<span class="l"><span class="tok-com"># Which docks can still serve the morning rush?</span></span>
+<span class="l"><span class="tok-kw">import</span> cellbook <span class="tok-kw">as</span> cb</span>
+<span class="l"></span>
+<span class="l">min_docks     = <input class="param-num" id="p-min" type="number" min="0" max="40" step="1" value="15" aria-label="min_docks" />  <span class="tok-com"># smallest station to keep</span></span>
+<span class="l">neighbourhood = <select class="param-select" id="p-hood" aria-label="neighbourhood">
+<option value="All">"All"</option>
+<option value="Downtown">"Downtown"</option>
+<option value="Kensington">"Kensington"</option>
+<option value="Liberty Village">"Liberty Village"</option>
+<option value="Distillery">"Distillery"</option>
+<option value="Yorkville">"Yorkville"</option>
+<option value="Harbourfront">"Harbourfront"</option>
+</select>  <span class="tok-com"># "All" skips the area test</span></span>
+<span class="l"></span>
+<span class="l">docks  = cb.<span class="tok-fn">read</span>(<span class="tok-str">"toronto_bike_docks.geojson"</span>)</span>
+<span class="l">subset = docks.<span class="tok-fn">where</span>(capacity &gt;= min_docks, area == neighbourhood)</span>
+<span class="l">cb.<span class="tok-fn">show</span>(subset, size=<span class="tok-str">"capacity"</span>, color=<span class="tok-str">"bikes / capacity"</span>)</span>
+      </div>
+      <div class="actions">
+        <button class="btn btn-run" id="run-cell" type="button" aria-label="Run cell">
+          <svg viewBox="0 0 10 12" aria-hidden="true" style="width:11px;height:11px;fill:currentColor"><path d="M0 0l10 6-10 6z"/></svg>Run
+        </button>
+        <span><kbd>Shift</kbd> + <kbd>Enter</kbd></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Output: map -->
+  <section class="cell cell-out">
+    <div class="gutter"><span class="prompt" id="prompt-map">Out [&nbsp;]:</span></div>
+    <div class="cell-body">
+      <div class="out-head">
+        <span><strong>Figure 1</strong> &middot; <span id="map-summary">waiting for first run</span></span>
+        <span class="out-meta" id="out-meta">not run yet</span>
+      </div>
+      <div class="out-frame"><div id="map"></div></div>
+      <div class="legend">
+        <span class="legend-item">bikes available <i class="legend-ramp"></i> 0% &rarr; 100%</span>
+        <span class="legend-item">size = capacity <span class="legend-dots"><i style="width:8px;height:8px"></i><i style="width:14px;height:14px"></i></span></span>
+        <span class="legend-item">grey = filtered out</span>
+      </div>
+      <div class="status-note hidden" id="status" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+  <!-- Output: chart -->
+  <section class="cell cell-out">
+    <div class="gutter"><span class="prompt" id="prompt-chart">Out [&nbsp;]:</span></div>
+    <div class="cell-body">
+      <div class="out-head">
+        <span><strong>Figure 2</strong> &middot; docks per neighbourhood</span>
+        <span class="out-meta">bikes available / capacity</span>
+      </div>
+      <div class="chart" id="chart"></div>
+      <div class="legend">
+        <span class="legend-item"><i style="width:14px;height:8px;background:#D6D6CE;border-radius:2px"></i> capacity</span>
+        <span class="legend-item"><i style="width:14px;height:8px;background:#4F46E5;border-radius:2px"></i> bikes available</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Output: table -->
+  <section class="cell cell-out">
+    <div class="gutter"><span class="prompt" id="prompt-table">Out [&nbsp;]:</span></div>
+    <div class="cell-body">
+      <div class="out-head">
+        <span><strong>subset</strong> &middot; <span id="table-count">0 rows</span> &middot; click a row to find it on the map</span>
+      </div>
+      <div class="table-wrap">
+        <table class="nb-table">
+          <thead>
+            <tr>
+              <th data-key="id" class="num">#</th>
+              <th data-key="name">name</th>
+              <th data-key="area">area</th>
+              <th data-key="cap" class="num">capacity</th>
+              <th data-key="bikes" class="num">bikes</th>
+              <th data-key="ratio" class="num">available</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+// Illustrative docks: [name, area, lng, lat, capacity, bikes available]
+const RAW = [
+  ['Union Station North', 'Downtown', -79.3806, 43.6453, 39, 6],
+  ['King & Bay', 'Downtown', -79.3797, 43.6480, 27, 19],
+  ['St Andrew Station', 'Downtown', -79.3846, 43.6477, 23, 14],
+  ['Queen & University', 'Downtown', -79.3865, 43.6507, 31, 9],
+  ['City Hall Square', 'Downtown', -79.3832, 43.6525, 35, 28],
+  ['Eaton Centre', 'Downtown', -79.3807, 43.6544, 33, 4],
+  ['Kensington Market', 'Kensington', -79.4005, 43.6547, 19, 11],
+  ['Augusta & Baldwin', 'Kensington', -79.4017, 43.6558, 15, 3],
+  ['Spadina & College', 'Kensington', -79.3996, 43.6579, 29, 22],
+  ['Dundas & Spadina', 'Kensington', -79.3985, 43.6528, 25, 7],
+  ['McCaul & Baldwin', 'Kensington', -79.3935, 43.6585, 17, 12],
+  ['Bellevue Square', 'Kensington', -79.4027, 43.6544, 13, 8],
+  ['Liberty St West', 'Liberty Village', -79.4195, 43.6372, 21, 5],
+  ['Hanna Avenue', 'Liberty Village', -79.4228, 43.6398, 17, 13],
+  ['Strachan & Liberty', 'Liberty Village', -79.4160, 43.6405, 26, 17],
+  ['Atlantic Avenue', 'Liberty Village', -79.4240, 43.6385, 14, 2],
+  ['Pirandello Park', 'Liberty Village', -79.4180, 43.6395, 19, 15],
+  ['Mill Street', 'Distillery', -79.3590, 43.6503, 23, 10],
+  ['Trinity Street', 'Distillery', -79.3580, 43.6517, 15, 6],
+  ['Cherry & Front', 'Distillery', -79.3611, 43.6510, 27, 21],
+  ['Parliament & Mill', 'Distillery', -79.3568, 43.6498, 12, 1],
+  ['Cooperage Walk', 'Distillery', -79.3625, 43.6525, 18, 9],
+  ['Yorkville Avenue', 'Yorkville', -79.3930, 43.6709, 21, 16],
+  ['Bay & Bloor', 'Yorkville', -79.3896, 43.6700, 37, 8],
+  ['Cumberland Street', 'Yorkville', -79.3948, 43.6706, 16, 11],
+  ['Hazelton Avenue', 'Yorkville', -79.3945, 43.6722, 12, 9],
+  ['Bloor & Yonge', 'Yorkville', -79.3860, 43.6710, 35, 12],
+  ['Queens Quay & Yonge', 'Harbourfront', -79.3753, 43.6410, 33, 25],
+  ['Harbourfront Centre', 'Harbourfront', -79.3830, 43.6388, 29, 3],
+  ['Sugar Beach', 'Harbourfront', -79.3695, 43.6440, 20, 14],
+];
+const AREAS = ['Downtown', 'Kensington', 'Liberty Village', 'Distillery', 'Yorkville', 'Harbourfront'];
+const FEATURES = RAW.map(([name, area, lng, lat, cap, bikes], id) => ({
+  type: 'Feature',
+  id,
+  properties: { id, name, area, cap, bikes },
+  geometry: { type: 'Point', coordinates: [lng, lat] },
+}));
+
+const $ = (id) => document.getElementById(id);
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = () => window.matchMedia('(max-width: 640px)').matches;
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  center: [-79.395, 43.655],
+  zoom: 11.6,
+  cooperativeGestures: true, // let the page scroll over the figure
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+let mapReady = false;
+let pendingSub = null;     // run finished before the style loaded
+let execCount = 0;
+let busy = false;
+let lastParams = null;
+let current = [];          // features in the last executed subset
+let selId = null;
+let sort = { key: 'cap', dir: -1 };
+const popup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, className: 'cb-tip', offset: 14 });
+
+/* ---- Parameters and filter ---- */
+function readParams() {
+  const n = parseInt($('p-min').value, 10);
+  return { min: Number.isFinite(n) ? n : 0, hood: $('p-hood').value };
+}
+
+function matches(f, p) {
+  return f.properties.cap >= p.min && (p.hood === 'All' || f.properties.area === p.hood);
+}
+
+function mapFilter(p) {
+  const conds = [['>=', ['get', 'cap'], p.min]];
+  if (p.hood !== 'All') conds.push(['==', ['get', 'area'], p.hood]);
+  return ['all', ...conds];
+}
+
+/* ---- Kernel / execution ---- */
+function setKernel(isBusy) {
+  const k = $('kernel');
+  k.classList.toggle('busy', isBusy);
+  k.classList.toggle('idle', !isBusy);
+  $('kernel-text').textContent = isBusy ? 'Kernel busy' : 'Kernel idle';
+  $('run-all').disabled = isBusy;
+  $('run-cell').disabled = isBusy;
+  document.querySelectorAll('.cell-out').forEach((c) => c.classList.toggle('is-stale', isBusy));
+}
+
+function setPrompts(label, cls) {
+  $('prompt-in').textContent = `In [${label}]:`;
+  $('prompt-in').classList.toggle('busy', cls);
+  ['map', 'chart', 'table'].forEach((k) => { $('prompt-' + k).textContent = `Out [${label === '*' ? ' ' : label}]:`; });
+}
+
+function run(first) {
+  if (busy) return;
+  busy = true;
+  const params = readParams();
+  const t0 = performance.now();
+  setKernel(true);
+  setPrompts('*', true);
+  setTimeout(() => {
+    execCount++;
+    lastParams = params;
+    current = FEATURES.filter((f) => matches(f, params));
+    if (selId != null && !current.some((f) => f.id === selId)) selectDock(null);
+    setPrompts(execCount, false);
+    updateMap(params);
+    renderChart();
+    renderTable();
+    const dt = ((performance.now() - t0) / 1000).toFixed(1);
+    $('out-meta').textContent = `${new Date().toLocaleTimeString('en-GB')} · ${dt} s`;
+    const cap = current.reduce((s, f) => s + f.properties.cap, 0);
+    const bikes = current.reduce((s, f) => s + f.properties.bikes, 0);
+    $('map-summary').textContent = current.length
+      ? `${current.length} docks · ${cap} capacity · ${Math.round((100 * bikes) / cap)}% bikes available`
+      : 'no docks match these parameters';
+    $('cell-query').classList.remove('dirty');
+    $('dirty-hint').classList.add('hidden');
+    busy = false;
+    setKernel(false);
+  }, first || reduce ? 0 : 600);
+}
+
+function markDirty() {
+  if (!lastParams) return;
+  const p = readParams();
+  const dirty = p.min !== lastParams.min || p.hood !== lastParams.hood;
+  $('cell-query').classList.toggle('dirty', dirty);
+  $('dirty-hint').classList.toggle('hidden', !dirty);
+}
+
+$('p-min').addEventListener('input', markDirty);
+$('p-hood').addEventListener('change', markDirty);
+$('run-all').addEventListener('click', () => run());
+$('run-cell').addEventListener('click', () => run());
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); run(); }
+});
+document.querySelectorAll('.cell').forEach((c) => c.addEventListener('pointerdown', () => {
+  document.querySelectorAll('.cell.active').forEach((a) => a.classList.remove('active'));
+  c.classList.add('active');
+}));
+
+/* ---- Map ---- */
+function fitTo(list, instant) {
+  if (!list.length) return;
+  const opts = {
+    padding: { top: 40, bottom: 64, left: 40, right: 40 },
+    maxZoom: 15,
+    duration: instant || reduce ? 0 : 800,
+  };
+  if (list.length === 1) {
+    map.easeTo({ center: list[0].geometry.coordinates, zoom: 14.5, duration: opts.duration });
+    return;
+  }
+  const b = new mapboxgl.LngLatBounds();
+  list.forEach((f) => b.extend(f.geometry.coordinates));
+  map.fitBounds(b, opts);
+}
+
+function updateMap(p) {
+  if (!mapReady) { pendingSub = p; return; }
+  const f = mapFilter(p);
+  map.setFilter('docks', f);
+  map.setFilter('docks-dim', ['!', f]);
+  fitTo(current, execCount === 1);
+}
+
+map.on('load', () => {
+  map.addSource('docks', { type: 'geojson', data: { type: 'FeatureCollection', features: FEATURES } });
+  // Filtered-out docks stay as small grey context dots
+  map.addLayer({
+    id: 'docks-dim', type: 'circle', source: 'docks',
+    paint: {
+      'circle-radius': 4, 'circle-color': '#9CA3AF', 'circle-opacity': 0.75,
+      'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff',
+    },
+  });
+  map.addLayer({
+    id: 'docks', type: 'circle', source: 'docks',
+    paint: {
+      // radius by capacity (11-39 docks), colour by bikes / capacity
+      'circle-radius': ['interpolate', ['linear'], ['get', 'cap'], 11, 7, 39, 15],
+      'circle-color': ['interpolate', ['linear'], ['/', ['get', 'bikes'], ['get', 'cap']],
+        0, '#B91C1C', 0.45, '#F59E0B', 1, '#16A34A'],
+      'circle-opacity': 0.92,
+      'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 3.5, 1.5],
+      'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#4F46E5', '#ffffff'],
+    },
+  });
+  mapReady = true;
+  if (selId != null) map.setFeatureState({ source: 'docks', id: selId }, { selected: true });
+  if (pendingSub) { updateMap(pendingSub); pendingSub = null; }
+
+  map.on('mousemove', 'docks', (e) => {
+    map.getCanvas().style.cursor = 'pointer';
+    showTip(e.features[0]);
+  });
+  map.on('mouseleave', 'docks', () => {
+    map.getCanvas().style.cursor = '';
+    popup.remove();
+  });
+  map.on('click', 'docks', (e) => {
+    selectDock(e.features[0].id, { scroll: true });
+    showTip(e.features[0]);
+  });
+});
+
+function showTip(feat) {
+  const p = feat.properties;
+  const ratio = (p.bikes / p.cap).toFixed(2);
+  popup.setLngLat(feat.geometry.coordinates).setHTML(
+    `<span class="c"># docks[${p.id}]</span><br>` +
+    `<b>${p.name}</b><br>` +
+    `<span class="k">area</span>&nbsp;&nbsp;&nbsp;= <span class="s">"${p.area}"</span><br>` +
+    `<span class="k">cap</span>&nbsp;&nbsp;&nbsp;&nbsp;= <span class="n">${p.cap}</span><br>` +
+    `<span class="k">bikes</span>&nbsp;&nbsp;= <span class="n">${p.bikes}</span><br>` +
+    `<span class="k">ratio</span>&nbsp;&nbsp;= <span class="n">${ratio}</span>`
+  ).addTo(map);
+}
+
+/* ---- Selection (map <-> table) ---- */
+function selectDock(id, opts = {}) {
+  if (mapReady && selId != null) map.setFeatureState({ source: 'docks', id: selId }, { selected: false });
+  selId = id;
+  document.querySelectorAll('#rows tr').forEach((tr) => tr.classList.toggle('sel', Number(tr.dataset.id) === id));
+  if (id == null) return;
+  if (mapReady) map.setFeatureState({ source: 'docks', id }, { selected: true });
+  if (opts.fly) {
+    const f = FEATURES[id];
+    // bring the figure on screen if the table row was clicked far below it
+    const r = $('map').getBoundingClientRect();
+    if (r.top < 56 || r.bottom > window.innerHeight) {
+      $('map').scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+    }
+    const cam = { center: f.geometry.coordinates, zoom: Math.max(map.getZoom(), 14.5), padding: { bottom: 40 } };
+    if (reduce) map.jumpTo(cam); else map.flyTo({ ...cam, duration: 1200 });
+    showTip(f);
+  }
+}
+
+/* ---- Bar chart (inline SVG, redrawn to the measured width) ---- */
+function renderChart() {
+  const host = $('chart');
+  const rows = AREAS.map((a) => {
+    const fs = current.filter((f) => f.properties.area === a);
+    return { area: a, n: fs.length, cap: fs.reduce((s, f) => s + f.properties.cap, 0), bikes: fs.reduce((s, f) => s + f.properties.bikes, 0) };
+  }).filter((r) => r.n > 0);
+  if (!rows.length) { host.innerHTML = '<div class="empty-note">Nothing to plot.</div>'; return; }
+
+  const w = Math.max(240, host.clientWidth - 8);
+  const ml = 100, mr = 74, top = 6, rowH = 34, axisH = 22;
+  const h = top + rows.length * rowH + axisH;
+  const max = Math.max(...rows.map((r) => r.cap));
+  const step = max > 120 ? 50 : max > 60 ? 20 : 10;
+  const top_ = Math.ceil(max / step) * step;
+  const x = (v) => ml + (v / top_) * (w - ml - mr);
+
+  let g = '';
+  for (let v = 0; v <= top_; v += step) {
+    g += `<line class="ax-grid" x1="${x(v)}" x2="${x(v)}" y1="${top}" y2="${h - axisH}"/>` +
+         `<text class="ax-text" x="${x(v)}" y="${h - 6}" text-anchor="middle">${v}</text>`;
+  }
+  rows.forEach((r, i) => {
+    const y = top + i * rowH + 7;
+    g += `<text class="bar-label" x="${ml - 10}" y="${y + 12}" text-anchor="end">${r.area}</text>` +
+         `<rect class="bar-cap" x="${ml}" y="${y}" width="${x(r.cap) - ml}" height="18" rx="2"/>` +
+         `<rect class="bar-val" x="${ml}" y="${y}" width="${Math.max(0, x(r.bikes) - ml)}" height="18" rx="2"/>` +
+         `<text class="bar-num" x="${w - 4}" y="${y + 13}" text-anchor="end">${r.bikes} / ${r.cap}</text>`;
+  });
+  host.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="Bikes available and capacity per neighbourhood">${g}</svg>`;
+}
+
+/* ---- Results table ---- */
+function renderTable() {
+  const val = (f) => {
+    const p = f.properties;
+    return sort.key === 'ratio' ? p.bikes / p.cap : p[sort.key];
+  };
+  const list = [...current].sort((a, b) => {
+    const x = val(a), y = val(b);
+    return (typeof x === 'string' ? x.localeCompare(y) : x - y) * sort.dir || a.id - b.id;
+  });
+  $('table-count').textContent = `${list.length} row${list.length === 1 ? '' : 's'}`;
+  $('rows').innerHTML = list.length ? list.map((f) => {
+    const p = f.properties, pct = Math.round((100 * p.bikes) / p.cap);
+    return `<tr data-id="${p.id}" tabindex="0" class="${p.id === selId ? 'sel' : ''}">` +
+      `<td class="num idx">${p.id}</td><td>${p.name}</td><td>${p.area}</td>` +
+      `<td class="num">${p.cap}</td><td class="num">${p.bikes}</td>` +
+      `<td class="num">${pct}%<span class="ratio-bar"><i class="ratio-fill" style="width:${pct}%"></i></span></td></tr>`;
+  }).join('') : '<tr><td colspan="6"><div class="empty-note">Empty DataFrame &mdash; loosen min_docks or pick another neighbourhood.</div></td></tr>';
+  document.querySelectorAll('.nb-table th').forEach((th) => {
+    if (th.dataset.key === sort.key) th.setAttribute('aria-sort', sort.dir > 0 ? 'ascending' : 'descending');
+    else th.removeAttribute('aria-sort');
+  });
+}
+
+$('rows').addEventListener('click', (e) => {
+  const tr = e.target.closest('tr[data-id]');
+  if (tr) selectDock(Number(tr.dataset.id), { fly: true });
+});
+$('rows').addEventListener('keydown', (e) => {
+  const tr = e.target.closest('tr[data-id]');
+  if (tr && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); selectDock(Number(tr.dataset.id), { fly: true }); }
+});
+document.querySelectorAll('.nb-table th').forEach((th) => th.addEventListener('click', () => {
+  const key = th.dataset.key;
+  sort = { key, dir: sort.key === key ? -sort.dir : (key === 'name' || key === 'area' || key === 'id' ? 1 : -1) };
+  renderTable();
+}));
+
+window.addEventListener('resize', () => { if (current.length) renderChart(); });
+
+map.on('error', (e) => {
+  if (mapReady) return;
+  const s = $('status');
+  s.className = 'status-note error';
+  s.style.marginTop = '8px';
+  s.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+run(true);
+</script>
+</body>
+</html>

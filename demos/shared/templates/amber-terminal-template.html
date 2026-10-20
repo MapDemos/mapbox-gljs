@@ -1,0 +1,419 @@
+<!--
+  Working EXAMPLE of the Amber Terminal style pack (amber-terminal.css, in
+  this same folder). Open this file directly to see the pattern working
+  with a fictional seismic monitoring console, "RIFT-3 Monitor", showing
+  ~30 illustrative earthquakes on the Reykjanes Peninsula, Iceland, on a
+  dark style recoloured to amber monochrome. Type commands at the prompt
+  (or click the underlined hints): help, list, filter mag>3, goto
+  grindavik, last 6h, clear, bright. Up/down arrows walk the history, and
+  clicking a row in EVENTS selects it and flies there. Copy the markup
+  below into your own demo and link amber-terminal.css from its <head> --
+  see the class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (amber-phosphor CRT terminal, ncurses windows, a
+  command line) at the user's request for something distinct from every
+  other pack in this folder. The peninsula and place names are real, but
+  every event (time, magnitude, depth, position) is generated and purely
+  illustrative, and "RIFT-3 Monitor" and the station id are fictional.
+
+  What's NOT included: a live seismic feed, search/geocoding, routing,
+  popups, or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RIFT-3 Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Anonymous+Pro:wght@400;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="amber-terminal.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="statusbar">
+    <span class="sb-brand">RIFT-3 MONITOR</span>
+    <span class="sb-item" data-opt><span class="sb-label">STN</span><span class="sb-val">RFT3-KEF</span></span>
+    <span class="sb-item"><span class="sb-label">UTC</span><span class="sb-val" id="sb-clock">--:--:--</span></span>
+    <span class="sb-item"><span class="sb-label">UP</span><span class="sb-val" id="sb-up">00:00:00</span></span>
+    <span class="sb-spacer"></span>
+    <span class="sb-item"><span class="sb-label">EVT</span><span class="sb-val" id="sb-evt">--</span></span>
+    <span class="sb-item" data-opt><span class="sb-label">FILTER</span><span class="sb-val" id="sb-filter">--</span></span>
+  </header>
+
+  <main class="main">
+    <section class="win win-events" aria-label="Events">
+      <span class="win-title">EVENTS</span>
+      <div class="win-body">
+        <div class="tbl">
+          <div class="tbl-head"><span>TIME(Z)</span><span class="c-mag">MAG</span><span class="c-dep">KM</span><span>PLACE</span></div>
+          <div class="tbl-body" id="tbl-body"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="win win-map" aria-label="Map">
+      <span class="win-title">MAP</span>
+      <div class="win-body"><div id="map"></div></div>
+    </section>
+
+    <section class="win win-hist" aria-label="Magnitude histogram">
+      <span class="win-title">MAG HISTOGRAM</span>
+      <div class="win-body">
+        <svg id="hist" viewBox="0 0 520 120" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Histogram of event magnitudes"></svg>
+      </div>
+    </section>
+  </main>
+
+  <footer class="cmdline">
+    <div class="log" id="log" role="log" aria-live="polite"></div>
+    <form class="cmdrow" id="cmd-form" autocomplete="off">
+      <label class="prompt" for="cmd-input">rift3&gt;</label>
+      <div class="field">
+        <span class="typed" id="typed"></span><span class="cursor" aria-hidden="true"></span>
+        <input id="cmd-input" type="text" aria-label="Command line" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" enterkeyhint="go" />
+      </div>
+    </form>
+  </footer>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const T0 = Date.now();
+const pad = (n) => String(n).padStart(2, '0');
+const hhmm = (ts) => { const d = new Date(ts); return pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()); };
+const ddhhmm = (ts) => pad(new Date(ts).getUTCDate()) + ' ' + hhmm(ts);
+const norm = (s) => s.toLowerCase().replace(/ð/g, 'd').replace(/þ/g, 'th').normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+// ---- Places (real locations; goto targets and map labels) ----
+const PLACES = [
+  { name: 'Grindavík',      key: 'grindavik',      lng: -22.434, lat: 63.848, zoom: 11.2 },
+  { name: 'Sundhnúkur',     key: 'sundhnukur',     lng: -22.430, lat: 63.880, zoom: 11.2 },
+  { name: 'Fagradalsfjall', key: 'fagradalsfjall', lng: -22.270, lat: 63.903, zoom: 11.0 },
+  { name: 'Krýsuvík',       key: 'krysuvik',       lng: -22.070, lat: 63.890, zoom: 11.0 },
+  { name: 'Keilir',         key: 'keilir',         lng: -22.170, lat: 63.955, zoom: 11.0 },
+  { name: 'Heiðmörk',       key: 'heidmork',       lng: -21.780, lat: 64.050, zoom: 11.0 },
+  { name: 'Reykjavík',      key: 'reykjavik',      lng: -21.940, lat: 64.135, zoom: 10.5 }
+];
+
+// ---- Illustrative events: [place, count, lat spread, recency skew] ----
+function rng(a) {
+  return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+const rand = rng(20261021);
+const CLUSTERS = [
+  ['Sundhnúkur', 9, 0.014, 1.8], ['Grindavík', 6, 0.007, 1.2], ['Fagradalsfjall', 5, 0.012, 1],
+  ['Krýsuvík', 4, 0.012, 1], ['Keilir', 3, 0.01, 1], ['Heiðmörk', 2, 0.012, 1], ['Reykjavík', 1, 0.004, 1]
+];
+const EVENTS = [];
+CLUSTERS.forEach(([name, n, sp, skew]) => {
+  const p = PLACES.find((q) => q.name === name);
+  for (let i = 0; i < n; i++) {
+    const dy = (rand() - 0.5) * 2 * sp, dx = (rand() - 0.5) * 2 * sp * 2.2;
+    const dir = (dy > 0.005 ? 'N' : dy < -0.005 ? 'S' : '') + (dx > 0.01 ? 'E' : dx < -0.01 ? 'W' : '');
+    EVENTS.push({
+      place: name + (dir ? ' ' + dir : ''),
+      lng: +(p.lng + dx).toFixed(4), lat: +(p.lat + dy).toFixed(4),
+      ts: T0 - Math.pow(rand(), skew) * 48 * 36e5 - 4 * 6e4,
+      mag: +(0.8 + 2.6 * Math.pow(rand(), 2.2)).toFixed(1),
+      depth: +(1 + rand() * 9).toFixed(1)
+    });
+  }
+});
+EVENTS.sort((a, b) => b.ts - a.ts);
+EVENTS.forEach((e, i) => { e.id = i + 1; });
+// a few larger events, none of them the newest three
+[[4, 4.6], [9, 3.9], [13, 3.4], [19, 3.7], [6, 3.1], [24, 2.8]].forEach(([i, m]) => { EVENTS[i].mag = m; });
+EVENTS.forEach((e) => { if (e.id <= 3) e.mag = Math.min(e.mag, 2.4); });
+
+const state = { minMag: 0, hours: 48, selected: null };
+const visible = () => {
+  const cut = Date.now() - state.hours * 36e5;
+  return EVENTS.filter((e) => e.mag >= state.minMag && e.ts >= cut);
+};
+
+// ---- Map ----
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/dark-v11',
+  bounds: [[-22.62, 63.80], [-21.70, 64.17]],
+  fitBoundsOptions: { padding: { top: 30, bottom: 70, left: 30, right: 30 } },
+  attributionControl: true
+});
+
+// Recolour the dark basemap to amber monochrome. Every call is guarded.
+function recolour() {
+  const setP = (id, prop, val) => { try { if (map.getLayer(id)) map.setPaintProperty(id, prop, val); } catch (e) {} };
+  map.getStyle().layers.forEach((l) => {
+    const id = l.id;
+    if (l.type === 'background') setP(id, 'background-color', '#0B0700');
+    else if (l.type === 'fill') {
+      setP(id, 'fill-color', /water/.test(id) ? '#140C00' : /building/.test(id) ? '#1A1000' : '#0B0700');
+      setP(id, 'fill-outline-color', 'rgba(138,90,0,0.25)');
+    } else if (l.type === 'line') {
+      const admin = /admin|boundary/.test(id);
+      setP(id, 'line-color', admin ? '#8A5A00' : /water/.test(id) ? '#2A1A00' : '#6B4600');
+      setP(id, 'line-opacity', admin ? 0.8 : 0.7);
+    } else if (l.type === 'symbol') {
+      setP(id, 'text-color', '#FFB000');
+      setP(id, 'text-halo-color', '#0B0700');
+      setP(id, 'text-opacity', 0.62);
+      setP(id, 'icon-opacity', 0.35);
+    } else if (l.type === 'hillshade') setP(id, 'hillshade-shadow-color', '#000000');
+    else if (l.type === 'fill-extrusion') setP(id, 'fill-extrusion-color', '#1A1000');
+  });
+}
+
+const quakeFC = () => ({
+  type: 'FeatureCollection',
+  features: EVENTS.map((e) => ({
+    type: 'Feature', geometry: { type: 'Point', coordinates: [e.lng, e.lat] },
+    properties: { id: e.id, mag: e.mag, depth: e.depth, place: e.place, ts: e.ts }
+  }))
+});
+const MAG_R = ['interpolate', ['linear'], ['get', 'mag'], 0.8, 7, 4.6, 18];
+
+map.on('style.load', () => {
+  try { recolour(); } catch (e) { console.warn('recolour skipped', e); }
+
+  map.addSource('quakes', { type: 'geojson', data: quakeFC() });
+  map.addSource('places', { type: 'geojson', data: { type: 'FeatureCollection', features: PLACES.map((p) => ({
+    type: 'Feature', geometry: { type: 'Point', coordinates: [p.lng, p.lat] }, properties: { name: p.name } })) } });
+
+  map.addLayer({ id: 'quake-pulse', type: 'circle', source: 'quakes', filter: ['==', ['get', 'id'], -1], slot: 'top', paint: {
+    'circle-radius': ['+', MAG_R, 6], 'circle-color': 'rgba(0,0,0,0)',
+    'circle-stroke-color': '#FFD27A', 'circle-stroke-width': 2, 'circle-stroke-opacity': 0.8 } });
+  map.addLayer({ id: 'quakes', type: 'circle', source: 'quakes', slot: 'top', paint: {
+    'circle-radius': MAG_R,
+    'circle-color': ['interpolate', ['linear'], ['get', 'mag'], 0.8, '#FFB000', 3, '#FFD27A'],
+    'circle-opacity': ['interpolate', ['linear'], ['get', 'mag'], 0.8, 0.35, 4.6, 0.75],
+    'circle-stroke-color': '#FFB000', 'circle-stroke-width': 1.5, 'circle-stroke-opacity': 1 } });
+  map.addLayer({ id: 'place-labels', type: 'symbol', source: 'places', slot: 'top',
+    layout: { 'text-field': ['get', 'name'], 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'], 'text-size': 13,
+      'text-variable-anchor': ['top', 'bottom', 'left', 'right'], 'text-radial-offset': 1.5, 'text-letter-spacing': 0.06 },
+    paint: { 'text-color': '#FFD27A', 'text-halo-color': '#0B0700', 'text-halo-width': 1.6 } });
+
+  map.on('click', 'quakes', (e) => { if (e.features[0]) select(e.features[0].properties.id, false); });
+  map.on('mouseenter', 'quakes', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'quakes', () => { map.getCanvas().style.cursor = ''; });
+  refresh();
+  if (!reduce) pulseLoop();
+});
+
+// Newest events get an expanding ring.
+function pulseLoop() {
+  let last = 0;
+  const tick = (now) => {
+    if (now - last > 40 && map.getLayer('quake-pulse')) {
+      last = now;
+      const t = (now % 1800) / 1800;
+      map.setPaintProperty('quake-pulse', 'circle-radius', ['+', MAG_R, 2 + t * 16]);
+      map.setPaintProperty('quake-pulse', 'circle-stroke-opacity', 0.9 * (1 - t));
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+const PAD = { top: 40, bottom: 70, left: 40, right: 40 };
+function fly(opts) {
+  if (reduce) map.jumpTo({ center: opts.center, zoom: opts.zoom });
+  else map.flyTo({ ...opts, padding: PAD, duration: 1600, essential: false });
+}
+
+// ---- Selection (boxed marker + highlighted row) ----
+let selMarker = null;
+function select(id, doFly = true) {
+  const e = EVENTS.find((x) => x.id === +id);
+  if (!e) return;
+  state.selected = e.id;
+  if (!selMarker) {
+    const root = document.createElement('div');
+    const box = document.createElement('div');
+    box.className = 'sel-box';
+    root.appendChild(box);
+    selMarker = new mapboxgl.Marker({ element: root });
+  }
+  selMarker.setLngLat([e.lng, e.lat]).addTo(map);
+  renderTable();
+  const row = document.querySelector('.row.sel');
+  if (row) row.scrollIntoView({ block: 'nearest' });
+  if (doFly) fly({ center: [e.lng, e.lat], zoom: Math.max(map.getZoom(), 11) });
+  out(`EVT-${pad(e.id)}  M${e.mag.toFixed(1)}  ${e.depth.toFixed(1)}km  ${e.place}  ${ddhhmm(e.ts)}Z`, { dim: false });
+}
+
+// ---- Rendering: table, histogram, status, map filters ----
+function renderTable() {
+  const body = $('#tbl-body');
+  const list = visible();
+  if (!list.length) { body.innerHTML = '<div class="tbl-empty">-- no events match --</div>'; return; }
+  body.innerHTML = '';
+  list.forEach((e, i) => {
+    const r = document.createElement('div');
+    r.className = 'row' + (e.id === state.selected ? ' sel' : '') + (e.id <= 3 ? ' new' : '');
+    r.setAttribute('role', 'button'); r.tabIndex = 0;
+    r.innerHTML = `<span class="c-time">${ddhhmm(e.ts)}</span><span class="c-mag">${e.mag.toFixed(1)}</span><span class="c-dep">${e.depth.toFixed(1)}</span><span class="c-place">${e.place}</span>`;
+    r.addEventListener('click', () => select(e.id));
+    r.addEventListener('keydown', (k) => { if (k.key === 'Enter' || k.key === ' ') { k.preventDefault(); select(e.id); } });
+    body.appendChild(r);
+  });
+}
+
+function renderHist() {
+  const svg = $('#hist'), list = visible();
+  const bins = Array.from({ length: 9 }, () => 0);
+  list.forEach((e) => { bins[Math.min(8, Math.max(0, Math.floor((e.mag - 0.5) / 0.5)))]++; });
+  const max = Math.max(4, ...bins), BH = Math.min(10, 74 / max), W = 520, base = 96, bw = 36, gap = 20, x0 = 22;
+  let s = `<line class="hl" x1="8" y1="${base + 2}" x2="${W - 8}" y2="${base + 2}"/>`;
+  bins.forEach((c, i) => {
+    const x = x0 + i * (bw + gap);
+    for (let k = 0; k < c; k++) s += `<rect class="hb${i < 4 ? ' hb-dim' : ''}" x="${x}" y="${base - (k + 1) * BH}" width="${bw}" height="${BH - 2}"/>`;
+    if (c) s += `<text class="hn" x="${x + bw / 2}" y="${base - c * BH - 4}" text-anchor="middle">${c}</text>`;
+    s += `<text class="ha" x="${x + bw / 2}" y="${base + 17}" text-anchor="middle">${(0.5 + i * 0.5).toFixed(1)}</text>`;
+  });
+  svg.innerHTML = s;
+}
+
+function refresh() {
+  const list = visible();
+  renderTable(); renderHist();
+  $('#sb-evt').textContent = `${list.length}/${EVENTS.length}`;
+  $('#sb-filter').textContent = `M>=${state.minMag} ${state.hours}H`;
+  if (!map.getLayer('quakes')) return;
+  const cut = Date.now() - state.hours * 36e5;
+  map.setFilter('quakes', ['all', ['>=', ['get', 'mag'], state.minMag], ['>=', ['get', 'ts'], cut]]);
+  map.setFilter('quake-pulse', ['in', ['get', 'id'], ['literal', list.slice(0, 3).map((e) => e.id)]]);
+}
+
+// ---- Console output: queued, typewriter (instant under reduced motion) ----
+const log = $('#log'), queue = [];
+let busy = false;
+function out(text, o = {}) { queue.push({ text, ...o }); if (!busy) pump(); }
+function pump() {
+  const it = queue.shift();
+  if (!it) { busy = false; return; }
+  busy = true;
+  const el = document.createElement(it.cmd ? 'button' : 'div');
+  el.className = 'ln' + (it.cls ? ' ' + it.cls : '');
+  if (it.cmd) { el.type = 'button'; el.addEventListener('click', () => run(it.cmd)); }
+  log.appendChild(el);
+  while (log.children.length > 200) log.removeChild(log.firstChild);
+  if (reduce || it.text.length < 4) { el.textContent = it.text; log.scrollTop = log.scrollHeight; return pump(); }
+  let i = 0;
+  const step = () => {
+    i += 2; el.textContent = it.text.slice(0, i); log.scrollTop = log.scrollHeight;
+    if (i < it.text.length) setTimeout(step, 10); else pump();
+  };
+  step();
+}
+const err = (t) => out(t, { cls: 'err' });
+
+// ---- Commands ----
+const history = []; let hpos = 0;
+const COMMANDS = {
+  help() {
+    out('COMMANDS (click one to run it):', { cls: 'dim' });
+    [['help', 'help', 'this list'], ['list', 'list', 'show the 8 newest matching events'],
+     ['filter mag>3', 'filter mag>3', 'only events above a magnitude'], ['goto grindavik', 'goto grindavik', 'fly to a place'],
+     ['last 6h', 'last 6h', 'only the last N hours (max 48)'], ['bright', 'bright', 'extra-bright phosphor on/off'],
+     ['reset', 'reset', 'clear filters'], ['clear', 'clear', 'wipe the scrollback']]
+      .forEach(([label, cmd, d]) => out(`  ${label.padEnd(16)}${d}`, { cmd }));
+  },
+  list() {
+    const l = visible().slice(0, 8);
+    if (!l.length) return err('?no events match the current filter');
+    out(`${visible().length} events, newest first:`, { cls: 'dim' });
+    l.forEach((e) => out(`  EVT-${pad(e.id)}  ${ddhhmm(e.ts)}Z  M${e.mag.toFixed(1)}  ${e.depth.toFixed(1)}km  ${e.place}`, { cmd: 'sel ' + e.id }));
+  },
+  sel(a) {
+    if (!EVENTS.some((e) => e.id === +a[0])) return err('?no such event');
+    select(a[0]);
+  },
+  filter(a) {
+    const m = /^mag\s*>=?\s*(\d+(?:\.\d+)?)$/.exec(a.join(''));
+    if (!m) return err('?syntax error: filter mag>3');
+    state.minMag = +m[1]; refresh();
+    out(`filter: magnitude >= ${state.minMag}  (${visible().length} events)`);
+  },
+  last(a) {
+    const m = /^(\d+(?:\.\d+)?)h$/.exec(a.join(''));
+    if (!m || +m[1] <= 0) return err('?syntax error: last 6h');
+    state.hours = Math.min(48, +m[1]); refresh();
+    out(`window: last ${state.hours}h  (${visible().length} events)`);
+  },
+  goto(a) {
+    const k = norm(a.join(''));
+    const p = k && PLACES.find((q) => q.key === k || q.key.startsWith(k));
+    if (!p) {
+      err(k ? `?unknown place '${a.join(' ')}' -- try:` : '?syntax error: goto <place>');
+      return PLACES.forEach((q) => out('  goto ' + q.key, { cmd: 'goto ' + q.key }));
+    }
+    fly({ center: [p.lng, p.lat], zoom: p.zoom });
+    out(`slew to ${p.name.toUpperCase()}  ${p.lat.toFixed(3)}N ${Math.abs(p.lng).toFixed(3)}W`);
+  },
+  clear() { queue.length = 0; log.innerHTML = ''; },
+  reset() { state.minMag = 0; state.hours = 48; refresh(); out('filters cleared  (' + visible().length + ' events)'); },
+  bright() {
+    const on = document.body.classList.toggle('bright');
+    out(on ? 'phosphor: EXTRA BRIGHT' : 'phosphor: normal');
+  }
+};
+
+function run(line) {
+  line = line.trim();
+  if (!line) return;
+  history.push(line); hpos = history.length;
+  out('rift3> ' + line, { cls: 'echo' });
+  const [c, ...args] = line.toLowerCase().split(/\s+/);
+  const fn = Object.prototype.hasOwnProperty.call(COMMANDS, c) ? COMMANDS[c] : null;
+  if (fn) fn(args); else err('?syntax error');
+}
+
+// ---- Command line input (visible text mirrors the invisible real input) ----
+const input = $('#cmd-input'), typed = $('#typed');
+input.addEventListener('input', () => { typed.textContent = input.value; });
+$('#cmd-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const v = input.value; input.value = ''; typed.textContent = '';
+  run(v);
+});
+input.addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+  e.preventDefault();
+  hpos = Math.max(0, Math.min(history.length, hpos + (e.key === 'ArrowUp' ? -1 : 1)));
+  input.value = history[hpos] || ''; typed.textContent = input.value;
+});
+$('.cmdrow').addEventListener('click', () => input.focus());
+
+// ---- Status bar clocks ----
+function tickClock() {
+  const n = new Date(), u = Math.floor((n - T0) / 1000);
+  $('#sb-clock').textContent = `${pad(n.getUTCHours())}:${pad(n.getUTCMinutes())}:${pad(n.getUTCSeconds())}`;
+  $('#sb-up').textContent = `${pad(Math.floor(u / 3600))}:${pad(Math.floor(u / 60) % 60)}:${pad(u % 60)}`;
+}
+tickClock(); setInterval(tickClock, 1000);
+
+// ---- Boot ----
+refresh();
+out('RIFT-3 MONITOR v2.4  --  Reykjanes seismic net  (illustrative data)', { cls: 'dim' });
+out('type help, or try:');
+out('  list', { cmd: 'list' });
+out('  filter mag>3', { cmd: 'filter mag>3' });
+out('  goto grindavik', { cmd: 'goto grindavik' });
+if (matchMedia('(hover: hover)').matches) input.focus();
+</script>
+</body>
+</html>

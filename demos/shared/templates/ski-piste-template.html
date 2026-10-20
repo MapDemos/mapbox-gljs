@@ -1,0 +1,394 @@
+<!--
+  Working EXAMPLE of the Ski Piste style pack (ski-piste.css, in this same
+  folder). Open this file directly to see the pattern working with a
+  fictional resort, "Raven Ridge", laid out on the real slopes of the
+  Whistler / Blackcomb area, BC: six lifts, twelve runs, a live lift and
+  run status board, and a 3D piste map on Mapbox Standard with terrain.
+  Click a lift or run in the list or on the map to dim the rest, fly to it
+  (camera looks up the slope) and open a popup; filter by difficulty;
+  switch on "Night grooming" to see groomed runs glow. Status pills change
+  every ~8 seconds. Copy the markup and script into your own demo and link
+  ski-piste.css from its <head> -- see the class/id contract documented at
+  the top of that CSS file.
+
+  A brand-new style built from a design brief. The mountain is real but the
+  run and lift lines are hand-approximated; "Raven Ridge", every lift and
+  run name, the conditions and the statuses are fictional placeholders.
+
+  What's NOT included: real lift or snow feeds, trail-map data, a backend
+  or a hard-coded access token (demo-kit.js sets that). The status ticker
+  is simulated and keeps running under prefers-reduced-motion (only the
+  row-flash animation and camera flights are switched off).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Raven Ridge &mdash; Piste Status</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="ski-piste.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stage">
+    <div id="map"></div>
+    <div class="stage-chip" aria-live="polite">
+      <svg class="chip-icon" id="icon-day" viewBox="0 0 28 28" fill="none" stroke="#F4A60D" stroke-width="2.2" stroke-linecap="round"><circle cx="14" cy="14" r="5.5" fill="#F4C20D"/><path d="M14 2v3M14 23v3M2 14h3M23 14h3M5.5 5.5l2 2M20.5 20.5l2 2M5.5 22.5l2-2M20.5 7.5l2-2"/></svg>
+      <svg class="chip-icon hidden" id="icon-night" viewBox="0 0 28 28"><path d="M21 17.5A9 9 0 0 1 10.5 7 9 9 0 1 0 21 17.5Z" fill="#1B3A5E"/><circle cx="21" cy="6" r="1.4" fill="#F4C20D"/><circle cx="25" cy="11" r="1" fill="#F4C20D"/></svg>
+      <div><span class="chip-main" id="chip-main">Clear &middot; 12 km vis</span><span class="chip-sub" id="chip-sub">Freezing level 1,350 m</span></div>
+    </div>
+  </div>
+
+  <aside class="status-panel" aria-label="Lift and run status">
+    <header class="panel-head">
+      <div class="brand"><svg viewBox="0 0 20 14" aria-hidden="true"><path d="M0 14 7 2l4 6 3-4 6 10Z" fill="#0F2742"/><path d="M7 2 5 5.5l2-.5 1.5 1.2Z" fill="#fff"/></svg>Live piste board</div>
+      <h1 class="panel-title">Raven Ridge</h1>
+      <p class="panel-sub" id="updated">Updated &mdash;</p>
+    </header>
+
+    <div class="conditions">
+      <div><span class="cond-label">Snow depth</span><span class="cond-value">182<small>cm</small></span></div>
+      <div><span class="cond-label">New snow 24 h</span><span class="cond-value">14<small>cm</small></span></div>
+      <div><span class="cond-label">Temp base / peak</span><span class="cond-value">+1<span class="sep">/</span>&minus;6<small>&deg;C</small></span></div>
+      <div><span class="cond-label">Wind NW</span><span class="cond-value">18<small>km/h</small></span></div>
+    </div>
+
+    <div class="controls">
+      <div class="diff-toggles" id="filters"></div>
+      <button class="night-toggle" id="night" role="switch" aria-checked="false"><span>Night grooming</span><i class="switch"></i></button>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-tab="lifts">Lifts <span class="tab-count" id="cnt-lifts"></span></button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="runs">Runs <span class="tab-count" id="cnt-runs"></span></button>
+    </div>
+    <ul class="list" id="list"></ul>
+    <p class="status-note error hidden" id="err"></p>
+  </aside>
+</div>
+
+<script>
+// Run lines [lng, lat] top to bottom, hand-traced down the real fall lines;
+// st = status, g = grooming time (null = ungroomed), d = difficulty 0..4.
+const RUNS = [
+  { name: 'Corvid Couloir', st: 'closed', g: null, d: 4, top: 2351, bot: 1479, c: [[-122.8720,50.0800],[-122.8751,50.0779],[-122.8786,50.0762],[-122.8827,50.0751],[-122.8871,50.0757],[-122.8912,50.0768],[-122.8957,50.0768],[-122.9001,50.0762]] },
+  { name: 'Songbird Way', st: 'open', g: '05:30', d: 0, top: 2354, bot: 1500, c: [[-122.8685,50.0825],[-122.8684,50.0852],[-122.8700,50.0879],[-122.8702,50.0908],[-122.8702,50.0937],[-122.8698,50.0965],[-122.8714,50.0992],[-122.8725,50.1020],[-122.8752,50.1043],[-122.8767,50.1070],[-122.8776,50.1097],[-122.8810,50.1115],[-122.8843,50.1134],[-122.8865,50.1145]] },
+  { name: 'Silver Feather', st: 'open', g: '05:15', d: 0, top: 1885, bot: 1500, c: [[-122.9000,50.0950],[-122.9033,50.0969],[-122.9073,50.0983],[-122.9113,50.0996],[-122.9152,50.1010],[-122.9156,50.1012]] },
+  { name: 'Alder Glide', st: 'open', g: '05:30', d: 1, top: 2313, bot: 1496, c: [[-122.8790,50.0900],[-122.8793,50.0928],[-122.8827,50.0947],[-122.8846,50.0972],[-122.8874,50.0994],[-122.8913,50.1008],[-122.8943,50.1029],[-122.8973,50.1049],[-122.9012,50.1062],[-122.9037,50.1086]] },
+  { name: 'Glacier Mile', st: 'open', g: '05:45', d: 1, top: 2227, bot: 1542, c: [[-122.8860,50.0925],[-122.8899,50.0939],[-122.8943,50.0942],[-122.8972,50.0961],[-122.8993,50.0986],[-122.9023,50.1007],[-122.9032,50.1035],[-122.9029,50.1064],[-122.9029,50.1071]] },
+  { name: 'Sparrow Run', st: 'open', g: '06:00', d: 2, top: 1981, bot: 1486, c: [[-122.8960,50.0920],[-122.8998,50.0935],[-122.9041,50.0942],[-122.9086,50.0939],[-122.9130,50.0932],[-122.9161,50.0925]] },
+  { name: 'Black Talon', st: 'hold', g: null, d: 3, top: 2225, bot: 1481, c: [[-122.8825,50.0900],[-122.8861,50.0883],[-122.8895,50.0864],[-122.8925,50.0843],[-122.8961,50.0825],[-122.8998,50.0810],[-122.9036,50.0794]] },
+  { name: 'Hollow Tooth', st: 'open', g: null, d: 3, top: 2081, bot: 1486, c: [[-122.8895,50.0900],[-122.8930,50.0882],[-122.8963,50.0862],[-122.8996,50.0843],[-122.9032,50.0826],[-122.9056,50.0817]] },
+  { name: 'Wingbeat', st: 'open', g: '04:50', d: 3, top: 2209, bot: 1482, c: [[-122.8685,50.0750],[-122.8683,50.0721],[-122.8690,50.0693],[-122.8718,50.0671],[-122.8751,50.0652],[-122.8779,50.0629],[-122.8789,50.0620]] },
+  { name: 'Rookery', st: 'open', g: '05:10', d: 2, top: 2251, bot: 1723, c: [[-122.8790,50.0875],[-122.8823,50.0856],[-122.8846,50.0831],[-122.8861,50.0804],[-122.8889,50.0782],[-122.8906,50.0772]] },
+  { name: 'Pinion', st: 'open', g: '05:40', d: 2, top: 2148, bot: 1659, c: [[-122.8825,50.0875],[-122.8852,50.0852],[-122.8877,50.0828],[-122.8903,50.0805],[-122.8929,50.0782],[-122.8941,50.0774]] },
+  { name: 'Cawcaw Cut', st: 'open', g: null, d: 2, top: 2144, bot: 1498, c: [[-122.8860,50.0900],[-122.8892,50.0880],[-122.8924,50.0859],[-122.8956,50.0840],[-122.8994,50.0824],[-122.9031,50.0808],[-122.9040,50.0804]] },
+];
+// Lifts: b = bottom station, t = top station, be/te = elevations (m).
+const LIFTS = [
+  { name: 'Raven Gondola', type: 'Gondola', cap: 2400, st: 'open', wait: 6, be: 1493, te: 1978, b: [-122.9040, 50.1088], t: [-122.8960, 50.0922] },
+  { name: 'Glacier Express', type: 'Express quad', cap: 2200, st: 'open', wait: 4, be: 1480, te: 2072, b: [-122.9000, 50.0762], t: [-122.8770, 50.0840] },
+  { name: 'Summit Six', type: 'Six-pack', cap: 3000, st: 'hold', wait: 0, be: 2044, te: 2387, b: [-122.8850, 50.0860], t: [-122.8715, 50.0825] },
+  { name: 'Saddle Quad', type: 'Quad chair', cap: 1800, st: 'open', wait: 2, be: 1620, te: 2070, b: [-122.9010, 50.0820], t: [-122.8902, 50.0903] },
+  { name: 'Alder Chair', type: 'Triple chair', cap: 1500, st: 'open', wait: 1, be: 1767, te: 2185, b: [-122.8890, 50.0740], t: [-122.8744, 50.0794] },
+  { name: 'North Bowl Express', type: 'Express quad', cap: 2200, st: 'closed', wait: 0, be: 1702, te: 2158, b: [-122.9050, 50.0900], t: [-122.8884, 50.0919] },
+];
+
+const COL = ['#2E9E4F', '#1F6FD1', '#D8352A', '#111111', '#111111'];
+const DIFF = ['Green', 'Blue', 'Red', 'Black', 'Double black'];
+const PILL = { open: 'Open', hold: 'On hold', closed: 'Closed' };
+const NAVY = '#0F2742', YELLOW = '#F4C20D';
+const LIFT_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 19 21 6"/><circle cx="4" cy="18" r="2.6" fill="#F4C20D"/><circle cx="20" cy="7" r="2.6" fill="#F4C20D"/></svg>';
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = () => window.matchMedia('(max-width: 760px)').matches;
+const $ = (id) => document.getElementById(id);
+const state = { tab: 'lifts', night: false, filters: new Set([0, 1, 2, 3, 4]), sel: null };
+
+/* ---- Geometry helpers ---- */
+const rad = Math.PI / 180;
+function hav(a, b) {
+  const dLat = (b[1] - a[1]) * rad, dLng = (b[0] - a[0]) * rad;
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * rad) * Math.cos(b[1] * rad) * Math.sin(dLng / 2) ** 2;
+  return 12742000 * Math.asin(Math.sqrt(s));
+}
+function bearing(a, b) {
+  const y = Math.sin((b[0] - a[0]) * rad) * Math.cos(b[1] * rad);
+  const x = Math.cos(a[1] * rad) * Math.sin(b[1] * rad) - Math.sin(a[1] * rad) * Math.cos(b[1] * rad) * Math.cos((b[0] - a[0]) * rad);
+  return (Math.atan2(y, x) / rad + 360) % 360;
+}
+RUNS.forEach((r) => { r.kind = 'run'; r.len = r.c.reduce((s, p, i) => (i ? s + hav(r.c[i - 1], p) : 0), 0); });
+LIFTS.forEach((l) => { l.kind = 'lift'; l.c = [l.b, l.t]; l.len = hav(l.b, l.t); });
+const items = (kind) => (kind === 'run' ? RUNS : LIFTS);
+
+/* ---- Map ---- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [-122.885, 50.093], zoom: 12.3, pitch: 62, bearing: 105,
+  config: { basemap: {
+    lightPreset: 'day', showPointOfInterestLabels: false, showPlaceLabels: false,
+    showRoadLabels: false, showTransitLabels: false, showPedestrianRoads: false,
+  } },
+});
+map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
+const popup = new mapboxgl.Popup({ className: 'piste-popup', offset: 14, maxWidth: '260px', focusAfterOpen: false });
+
+const pad = () => (phone() ? { top: 64, bottom: 72, left: 24, right: 24 } : { top: 64, bottom: 72, left: 392, right: 24 });
+const boundsOf = (pts) => pts.reduce((b, p) => b.extend(p), new mapboxgl.LngLatBounds(pts[0], pts[0]));
+const allPts = RUNS.flatMap((r) => r.c).concat(LIFTS.flatMap((l) => l.c));
+
+function setFog() {
+  try {
+    map.setFog(state.night
+      ? { color: '#14294A', 'high-color': '#0A1730', 'horizon-blend': 0.1, 'space-color': '#050B18', 'star-intensity': 0.6 }
+      : { color: '#EAF3FA', 'high-color': '#8EC1EC', 'horizon-blend': 0.07, 'space-color': '#1B3A5E', 'star-intensity': 0 });
+  } catch (e) { /* style without fog support: keep the preset's own */ }
+}
+
+function setLook() {
+  const set = (id, key, v) => { if (map.getLayer(id)) { try { map.setPaintProperty(id, key, v); } catch (e) { /* skip */ } } };
+  const em = state.night ? ['case', ['==', ['get', 'g'], 1], 1, 0.3] : 0.75;
+  set('runs-line', 'line-emissive-strength', em);
+  set('runs-casing', 'line-emissive-strength', em);
+  if (map.getLayer('runs-glow')) map.setLayoutProperty('runs-glow', 'visibility', state.night ? 'visible' : 'none');
+  setFog();
+}
+
+function addPisteLayers() {
+  const fc = (a, f) => ({ type: 'FeatureCollection', features: a.map(f) });
+  const feat = (i, props, geometry) => ({ type: 'Feature', id: i, properties: props, geometry });
+  map.addSource('runs', { type: 'geojson', data: fc(RUNS, (r, i) => feat(i + 1, { name: r.name, d: r.d, g: r.g ? 1 : 0 }, { type: 'LineString', coordinates: r.c })) });
+  map.addSource('lifts', { type: 'geojson', data: fc(LIFTS, (l, i) => feat(i + 1, { name: l.name }, { type: 'LineString', coordinates: l.c })) });
+  const st = [];
+  LIFTS.forEach((l, i) => { st.push(feat(2 * i + 1, { name: l.name, top: 0 }, { type: 'Point', coordinates: l.b })); st.push(feat(2 * i + 2, { name: l.name, top: 1 }, { type: 'Point', coordinates: l.t })); });
+  map.addSource('stations', { type: 'geojson', data: { type: 'FeatureCollection', features: st } });
+
+  const dim = ['boolean', ['feature-state', 'dim'], false], shut = ['boolean', ['feature-state', 'shut'], false];
+  const colour = ['match', ['get', 'd'], 0, COL[0], 1, COL[1], 2, COL[2], COL[3]];
+  const z = (a, b, c, d) => ['interpolate', ['linear'], ['zoom'], 10, a, 12, b, 14, c, 16, d];
+  const join = { 'line-join': 'round', 'line-cap': 'round' };
+  const op = ['case', dim, 0.18, shut, 0.45, 1];
+  const line = (id, source, layout, paint, filter) => map.addLayer({ id, type: 'line', source, slot: 'middle', layout, paint, ...(filter ? { filter } : {}) });
+
+  line('runs-glow', 'runs', { ...join, visibility: 'none' }, { 'line-color': colour, 'line-width': z(10, 16, 26, 40), 'line-blur': 10, 'line-opacity': ['case', dim, 0, ['==', ['get', 'g'], 1], 0.75, 0], 'line-emissive-strength': 1 });
+  line('runs-casing', 'runs', join, { 'line-color': '#FFFFFF', 'line-width': z(5, 8.5, 13.5, 20), 'line-opacity': op });
+  line('runs-line', 'runs', join, { 'line-color': colour, 'line-width': z(2.5, 5, 9, 14), 'line-opacity': op });
+  line('runs-dd', 'runs', {}, { 'line-color': '#FFFFFF', 'line-width': z(1, 1.5, 2.5, 3.5), 'line-dasharray': [2, 2], 'line-opacity': op, 'line-emissive-strength': 1 }, ['==', ['get', 'd'], 4]);
+  line('lifts-casing', 'lifts', { 'line-cap': 'butt' }, { 'line-color': NAVY, 'line-width': z(4, 6.5, 9, 13), 'line-opacity': op, 'line-emissive-strength': 1 });
+  line('lifts-line', 'lifts', { 'line-cap': 'butt' }, { 'line-color': YELLOW, 'line-width': z(2, 3.5, 5, 8), 'line-opacity': op, 'line-emissive-strength': 1 });
+  line('runs-hit', 'runs', join, { 'line-color': '#000000', 'line-width': 22, 'line-opacity': 0 });
+  line('lifts-hit', 'lifts', join, { 'line-color': '#000000', 'line-width': 22, 'line-opacity': 0 });
+  map.addLayer({
+    id: 'stations', type: 'circle', source: 'stations', slot: 'middle',
+    paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 6.5, 12, 8, 14, 10], 'circle-color': YELLOW, 'circle-stroke-color': NAVY, 'circle-stroke-width': 3, 'circle-opacity': ['case', dim, 0.3, 1], 'circle-stroke-opacity': ['case', dim, 0.3, 1], 'circle-emissive-strength': 1 },
+  });
+  const font = ['DIN Pro Bold', 'Arial Unicode MS Bold'];
+  map.addLayer({
+    id: 'runs-label', type: 'symbol', source: 'runs', slot: 'top',
+    layout: { 'symbol-placement': 'line', 'text-field': ['get', 'name'], 'text-font': font, 'text-size': ['interpolate', ['linear'], ['zoom'], 11, phone() ? 8 : 10, 15, phone() ? 11 : 13], 'text-transform': 'uppercase', 'text-letter-spacing': 0.06, 'text-max-angle': 35, 'symbol-spacing': 320 },
+    paint: { 'text-color': '#FFFFFF', 'text-halo-color': colour, 'text-halo-width': 2.4, 'text-opacity': ['case', dim, 0.25, 1], 'text-halo-blur': 0.3, 'text-emissive-strength': 1 },
+  });
+  map.addLayer({
+    id: 'stations-label', type: 'symbol', source: 'stations', slot: 'top', filter: ['==', ['get', 'top'], 1],
+    layout: { 'text-field': ['get', 'name'], 'text-font': font, 'text-size': phone() ? 11 : 12.5, 'text-optional': true, 'text-padding': 4, 'text-variable-anchor': ['top', 'bottom', 'left', 'right'], 'text-radial-offset': 1.1, 'text-max-width': 8 },
+    paint: { 'text-color': NAVY, 'text-halo-color': '#FFFFFF', 'text-halo-width': 2, 'text-opacity': ['case', dim, 0.3, 1], 'text-emissive-strength': 1 },
+  });
+}
+
+/* ---- Selection, dimming, camera, popup ---- */
+const same = (it, s) => s && s.kind === it.kind && items(s.kind)[s.i] === it;
+
+function applyState() {
+  const s = state.sel;
+  const fs = (source, id, o) => map.setFeatureState({ source, id }, o);
+  RUNS.forEach((r, i) => fs('runs', i + 1, { dim: !!s && !same(r, s), shut: r.st === 'closed' }));
+  LIFTS.forEach((l, i) => {
+    fs('lifts', i + 1, { dim: !!s && !same(l, s), shut: l.st === 'closed' });
+    [2 * i + 1, 2 * i + 2].forEach((id) => fs('stations', id, { dim: !!s && !same(l, s) }));
+  });
+}
+
+function popupHtml(it) {
+  const run = it.kind === 'run';
+  const head = run ? `<i class="dsym dsym-${it.d}"></i>` : `<span class="row-icon">${LIFT_SVG}</span>`;
+  const foot = run
+    ? (it.g ? `Groomed ${it.g}` : 'Not groomed &middot; moguls')
+    : (it.st === 'open' ? `Wait about ${it.wait} min` : it.st === 'hold' ? 'Paused &middot; restart expected shortly' : 'Not running today');
+  return `<div class="pp-head">${head}<h3 class="pp-name">${it.name}</h3></div>` +
+    `<span class="pill pill-${it.st}">${PILL[it.st]}</span>` +
+    `<div class="pp-stats"><div><b>${(it.len / 1000).toFixed(1)} km</b><span>Length</span></div>` +
+    `<div><b>${run ? it.top - it.bot : it.te - it.be} m</b><span>Vertical drop</span></div>` +
+    `<div><b>${run ? DIFF[it.d] : it.type}</b><span>${run ? 'Difficulty' : 'Type'}</span></div>` +
+    `<div><b>${run ? it.top + ' m' : it.cap + '/h'}</b><span>${run ? 'Start' : 'Capacity'}</span></div></div>` +
+    `<p class="pp-foot">${foot}</p>`;
+}
+
+function select(kind, i) {
+  popup.remove(); // its close handler clears the old selection
+  const it = items(kind)[i];
+  state.sel = { kind, i };
+  applyState();
+  renderList();
+  const top = kind === 'lift' ? it.t : it.c[0], bot = kind === 'lift' ? it.b : it.c[it.c.length - 1];
+  const open = () => {
+    if (!same(it, state.sel)) return;
+    popup.setLngLat(it.c[Math.floor((it.c.length - 1) / 2)]).setHTML(popupHtml(it)).addTo(map);
+  };
+  // Camera stands below the slope and looks up it, so the run faces the viewer.
+  map.fitBounds(boundsOf(it.c), { padding: pad(), bearing: bearing(bot, top), pitch: 60, maxZoom: 14.6, duration: reduce ? 0 : 1700 });
+  if (reduce) open(); else map.once('moveend', open);
+}
+
+function deselect() {
+  if (!state.sel) return;
+  state.sel = null;
+  popup.remove();
+  applyState();
+  renderList();
+}
+popup.on('close', () => { if (state.sel) deselect(); });
+
+/* ---- Board ---- */
+function renderList() {
+  const active = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.k;
+  const ai = active ? document.activeElement.dataset.i : null;
+  const kind = state.tab === 'lifts' ? 'lift' : 'run';
+  const rows = items(kind).map((it, i) => ({ it, i })).filter(({ it }) => kind === 'lift' || state.filters.has(it.d));
+  $('list').innerHTML = rows.map(({ it, i }) => {
+    const run = kind === 'run';
+    const meta = run ? `${(it.len / 1000).toFixed(1)} km &middot; ${it.top - it.bot} m drop` : `${it.type} &middot; ${it.te - it.be} m`;
+    const side = run ? (it.g ? `Groomed ${it.g}` : 'Moguls') : (it.st === 'open' ? `${it.wait} min wait` : '&mdash;');
+    return `<li><button class="row${same(it, state.sel) ? ' is-selected' : ''}${it.flash ? ' flash' : ''}" data-k="${kind}" data-i="${i}">` +
+      `<span class="row-icon">${run ? `<i class="dsym dsym-${it.d}"></i>` : LIFT_SVG}</span>` +
+      `<span class="row-main"><span class="row-name">${it.name}</span><span class="row-meta">${meta}</span></span>` +
+      `<span class="row-side"><span class="pill pill-${it.st}">${PILL[it.st]}</span><span class="wait">${side}</span></span></button></li>`;
+  }).join('') || '<li class="status-note">No runs match the difficulty filter.</li>';
+  items(kind).forEach((it) => { it.flash = false; });
+  const open = (a) => a.filter((x) => x.st === 'open').length;
+  $('cnt-lifts').textContent = `${open(LIFTS)}/${LIFTS.length}`;
+  $('cnt-runs').textContent = `${open(RUNS)}/${RUNS.length}`;
+  if (active) { const b = $('list').querySelector(`[data-k="${active}"][data-i="${ai}"]`); if (b) b.focus({ preventScroll: true }); }
+}
+
+$('list').addEventListener('click', (e) => {
+  const b = e.target.closest('.row');
+  if (!b) return;
+  const i = +b.dataset.i;
+  if (state.sel && state.sel.kind === b.dataset.k && state.sel.i === i) deselect(); else select(b.dataset.k, i);
+});
+
+document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
+  state.tab = t.dataset.tab;
+  document.querySelectorAll('.tab').forEach((o) => o.setAttribute('aria-selected', String(o === t)));
+  renderList();
+}));
+
+[0, 1, 2, 3, 4].forEach((d) => {
+  const b = document.createElement('button');
+  b.className = 'diff-toggle';
+  b.setAttribute('aria-pressed', 'true');
+  b.setAttribute('aria-label', `${DIFF[d]} runs`);
+  b.title = DIFF[d];
+  b.innerHTML = `<i class="dsym dsym-${d}"></i>`;
+  b.addEventListener('click', () => {
+    if (state.filters.has(d)) state.filters.delete(d); else state.filters.add(d);
+    b.setAttribute('aria-pressed', String(state.filters.has(d)));
+    const f = ['in', ['get', 'd'], ['literal', [...state.filters]]];
+    ['runs-glow', 'runs-casing', 'runs-line', 'runs-hit', 'runs-label'].forEach((id) => map.getLayer(id) && map.setFilter(id, f));
+    if (map.getLayer('runs-dd')) map.setFilter('runs-dd', ['all', ['==', ['get', 'd'], 4], f]);
+    if (state.sel && state.sel.kind === 'run' && !state.filters.has(RUNS[state.sel.i].d)) deselect(); else renderList();
+  });
+  $('filters').appendChild(b);
+});
+
+$('night').addEventListener('click', () => {
+  state.night = !state.night;
+  $('night').setAttribute('aria-checked', String(state.night));
+  map.setConfigProperty('basemap', 'lightPreset', state.night ? 'night' : 'day');
+  setLook();
+  $('icon-day').classList.toggle('hidden', state.night);
+  $('icon-night').classList.toggle('hidden', !state.night);
+  $('chip-main').innerHTML = state.night ? 'Night shift &middot; 9 km vis' : 'Clear &middot; 12 km vis';
+  $('chip-sub').textContent = state.night ? 'Groomers out until 05:00' : 'Freezing level 1,350 m';
+});
+
+/* ---- Simulated live status, every ~8 s ---- */
+const rnd = (n) => Math.floor(Math.random() * n);
+function tick() {
+  const flip = (it) => {
+    it.st = it.st === 'open' ? 'hold' : it.st === 'hold' ? 'open' : (Math.random() < 0.25 ? 'open' : 'closed');
+    it.flash = true;
+  };
+  flip(LIFTS[rnd(LIFTS.length)]);
+  if (Math.random() < 0.6) { const r = RUNS[rnd(RUNS.length)]; if (r.st !== 'closed') flip(r); }
+  LIFTS.forEach((l) => { l.wait = l.st === 'open' ? Math.min(14, Math.max(1, l.wait + rnd(3) - 1)) : 0; });
+  $('updated').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (map.isStyleLoaded()) applyState();
+  renderList();
+  if (state.sel && popup.isOpen()) popup.setHTML(popupHtml(items(state.sel.kind)[state.sel.i]));
+}
+
+/* ---- Wire up ---- */
+map.on('style.load', () => {
+  if (!map.getSource('piste-dem')) map.addSource('piste-dem', { type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14 });
+  map.setTerrain({ source: 'piste-dem', exaggeration: 1.3 });
+  if (map.getSource('runs')) return; // style reloaded: layers survive
+  addPisteLayers();
+  setLook();
+  applyState();
+  // Whole resort in view; camera looks up-mountain so the slopes face it.
+  // fitBounds on a rotated, pitched camera leaves lots of slack, so zoom in
+  // step by step while every lift/run point still projects inside the padding.
+  const overview = () => {
+    map.fitBounds(boundsOf(allPts), { padding: pad(), bearing: 105, pitch: 55, duration: 0 });
+    const p = pad(), c = map.getCanvas(), w = c.clientWidth, h = c.clientHeight;
+    const fits = () => allPts.every((ll) => {
+      const q = map.project(ll);
+      return q.x >= p.left && q.x <= w - p.right && q.y >= p.top && q.y <= h - p.bottom;
+    });
+    for (let i = 0; i < 20; i++) {
+      const z = map.getZoom();
+      map.jumpTo({ zoom: z + 0.1 });
+      if (!fits()) { map.jumpTo({ zoom: z }); break; }
+    }
+  };
+  overview();
+  map.once('idle', () => { if (!state.sel) overview(); }); // refit once terrain has loaded
+
+  let picked = false;
+  const pick = (kind) => (e) => { picked = true; select(kind, e.features[0].id - 1); };
+  map.on('click', 'runs-hit', pick('run'));
+  map.on('click', 'lifts-hit', pick('lift'));
+  map.on('click', 'stations', (e) => { picked = true; select('lift', ((e.features[0].id - 1) >> 1)); });
+  map.on('click', () => { if (!picked) deselect(); picked = false; });
+  ['runs-hit', 'lifts-hit', 'stations'].forEach((id) => {
+    map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', id, () => { map.getCanvas().style.cursor = ''; });
+  });
+});
+
+map.on('error', (e) => {
+  if (map.getSource('runs')) return;
+  $('err').textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+  $('err').classList.remove('hidden');
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') deselect(); });
+
+$('updated').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+renderList();
+setInterval(tick, 8000);
+</script>
+</body>
+</html>

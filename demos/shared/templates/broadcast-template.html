@@ -1,0 +1,354 @@
+<!--
+  Working EXAMPLE of the Broadcast style pack (broadcast.css, in this same
+  folder). Open this file directly to see the pattern working as a live TV
+  graphics package over a fictional "Harbour City 10K" road race in Sydney:
+  scorebug, news ticker, re-sorting leaderboard, featured-runner lower third,
+  chase cam and a final-results plate. Copy the markup and script into your
+  own demo and link broadcast.css from its <head> -- see the class/id
+  contract documented at the top of that CSS file for what to build.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (sports-TV graphics: navy, signal red, slanted plates,
+  wipes). The race, runners, channel bug ("RC SPORT") and ticker copy are
+  fictional placeholders -- swap in your own.
+
+  What's NOT included: real timing data, a certified 10 km course (the line
+  is a walking-route polyline from Circular Quay, scaled so its length equals
+  10,000 race metres), a live feed or a build step.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Harbour City 10K - Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Rubik:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="broadcast.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map { position: fixed; inset: 0; z-index: 0; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="ticker">
+  <div class="ticker-tag">RC Sport</div>
+  <div class="ticker-view"><div class="ticker-track" id="ticker-track"></div></div>
+</div>
+
+<div class="hud-left">
+  <div class="scorebug wipe">
+    <div class="plate plate-red sb-live"><span class="plate-in"><i class="dot"></i>LIVE</span></div>
+    <div class="plate plate-navy sb-km"><span class="plate-in"><span class="k">KM</span><span id="sb-km">0.0</span></span></div>
+    <div class="plate sb-clock"><span class="plate-in" id="sb-clock">00:00:00</span></div>
+  </div>
+
+  <div class="leaderboard" id="leaderboard">
+    <div class="plate plate-yellow lb-head"><span class="plate-in">Harbour City 10K <span class="meta">STANDINGS</span></span></div>
+    <div class="lb-rows" id="lb-rows"></div>
+    <button class="btn lb-toggle" id="lb-toggle" aria-expanded="false"><span class="plate-in"><span>Full standings</span></span></button>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="btn" id="chase" aria-pressed="false"><span class="plate-in"><span><span class="hide-sm">Chase cam</span><span class="show-sm">Cam</span></span></span></button>
+  <button class="btn" id="speed"><span class="plate-in"><span><span class="hide-sm">Speed </span><b id="speed-val">1x</b></span></span></button>
+</div>
+
+<div class="lower-third wipe" id="l3">
+  <div class="l3-top">
+    <div class="plate plate-red l3-bib"><span class="plate-in" id="l3-bib">07</span></div>
+    <div class="plate plate-white l3-name"><span class="plate-in"><span id="l3-name">Runner</span><i class="nat" id="l3-nat">AUS</i></span></div>
+  </div>
+  <div class="plate plate-navy l3-stats"><span class="plate-in">
+    <span class="l3-stat"><span class="k">Position</span><span class="v" id="l3-pos">1</span></span>
+    <span class="l3-stat"><span class="k">Pace /km</span><span class="v" id="l3-pace">0:00</span></span>
+    <span class="l3-stat optional"><span class="k" id="l3-split-k">Last split</span><span class="v" id="l3-split">--</span></span>
+  </span></div>
+</div>
+
+<div class="results hidden" id="results">
+  <div class="plate plate-red results-title"><span class="plate-in">Final results</span></div>
+  <div id="res-rows"></div>
+  <div class="results-actions"><button class="btn" id="replay"><span class="plate-in"><span>Replay race</span></span></button></div>
+</div>
+
+<div class="status-note loading" id="status-note">Loading map</div>
+
+<script>
+// Walking-route polyline: Circular Quay, Opera House, Farm Cove, Mrs Macquaries Point, the CBD and back.
+const COURSE = [[151.2105,-33.86152],[151.21204,-33.86158],[151.21212,-33.86195],[151.21292,-33.86204],[151.21304,-33.86116],[151.21326,-33.86119],[151.21348,-33.85963],[151.2137,-33.85894],[151.21353,-33.85877],[151.21396,-33.85844],[151.21419,-33.8579],[151.21486,-33.85803],[151.21541,-33.85814],[151.21659,-33.85917],[151.21715,-33.85997],[151.2172,-33.86053],[151.21692,-33.8617],[151.21691,-33.86214],[151.21715,-33.86269],[151.21762,-33.8631],[151.21823,-33.86332],[151.21895,-33.86333],[151.21946,-33.86316],[151.21986,-33.86288],[151.22031,-33.86238],[151.22062,-33.86184],[151.22101,-33.86098],[151.22141,-33.85977],[151.2217,-33.85932],[151.22184,-33.85925],[151.22219,-33.85934],[151.22266,-33.85964],[151.22295,-33.86215],[151.2229,-33.86238],[151.22275,-33.8626],[151.22238,-33.86285],[151.22184,-33.86306],[151.22164,-33.86325],[151.22124,-33.86383],[151.22098,-33.86454],[151.22059,-33.86497],[151.22008,-33.86513],[151.21946,-33.86622],[151.21847,-33.86695],[151.21791,-33.86719],[151.21778,-33.86712],[151.21707,-33.86797],[151.21604,-33.86791],[151.21475,-33.86924],[151.21439,-33.86974],[151.21376,-33.87022],[151.21344,-33.87035],[151.21298,-33.87029],[151.21221,-33.87073],[151.21196,-33.87057],[151.21162,-33.87057],[151.21139,-33.87072],[151.21129,-33.87091],[151.21009,-33.87084],[151.21006,-33.87074],[151.20957,-33.87074],[151.20945,-33.87027],[151.20958,-33.86913],[151.2103,-33.86909],[151.21047,-33.86766],[151.20979,-33.8676],[151.20996,-33.86613],[151.20891,-33.86567],[151.20877,-33.86568],[151.20888,-33.86472],[151.20869,-33.86469],[151.20878,-33.86422],[151.20873,-33.86368],[151.20884,-33.86368],[151.20914,-33.8616],[151.20954,-33.86163],[151.20956,-33.86144],[151.2105,-33.86152]];
+const RACE_M = 10000, RACE_RATE = 30; // race metres; race-seconds per real second at 1x
+const RUNNERS = [
+  { bib: 7,  name: 'D. Marlowe',  nat: 'AUS', base: 5.98 }, { bib: 12, name: 'S. Tesfaye',  nat: 'ETH', base: 5.93 },
+  { bib: 21, name: 'J. Okafor',   nat: 'NGA', base: 5.88 }, { bib: 3,  name: 'R. Halvorsen', nat: 'NOR', base: 6.02 },
+  { bib: 18, name: 'K. Aoyama',   nat: 'JPN', base: 5.80 }, { bib: 9,  name: 'L. Moreau',   nat: 'FRA', base: 5.85 },
+  { bib: 30, name: 'P. Duarte',   nat: 'POR', base: 5.76 }, { bib: 44, name: 'C. Whitfield', nat: 'NZL', base: 5.70 },
+].map((r, i) => ({ ...r, w: 0.018 + i * 0.0045, ph: i * 1.7, d: 0, v: r.base, fin: null, kmDone: 0, kmT: 0, split: null, splitKm: 0 }));
+const TICKER = ['RC Sport live from Circular Quay: the Harbour City 10K', 'Clear skies, 19 C, light southerly on the Farm Cove stretch',
+  'Lead pack of eight through the Botanic Garden together', 'Road closures lift on Macquarie St at 11:00', 'Pace car holding 2:50 per km on the CBD loop'];
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const phone = () => window.matchMedia('(max-width: 640px)').matches;
+const $ = (id) => document.getElementById(id);
+const byBib = Object.fromEntries(RUNNERS.map((r) => [r.bib, r]));
+
+// ---- Course geometry: interpolate by fraction of total length ----
+const KX = Math.cos(33.86 * Math.PI / 180);
+const cum = [0];
+for (let i = 1; i < COURSE.length; i++) {
+  cum.push(cum[i - 1] + Math.hypot((COURSE[i][0] - COURSE[i - 1][0]) * KX, COURSE[i][1] - COURSE[i - 1][1]));
+}
+function pointAt(frac) {
+  const t = Math.min(Math.max(frac, 0), 1) * cum[cum.length - 1];
+  let i = 1;
+  while (i < cum.length - 1 && cum[i] < t) i++;
+  const u = (t - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1), a = COURSE[i - 1], b = COURSE[i];
+  return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+}
+// Point offset sideways from the course by lane (0-7), so bunched runners sit side by side.
+function lanePoint(frac, lane) {
+  const p = pointAt(frac), m = (lane - 3.5) * 6, th = (bearingAt(frac) + 90) * Math.PI / 180;
+  return [p[0] + Math.sin(th) * m / (111320 * Math.cos(33.86 * Math.PI / 180)), p[1] + Math.cos(th) * m / 111320];
+}
+function bearingAt(frac) {
+  const f0 = Math.min(frac, 0.988), a = pointAt(f0), b = pointAt(f0 + 0.012);
+  return (Math.atan2((b[0] - a[0]) * KX, b[1] - a[1]) * 180 / Math.PI + 360) % 360;
+}
+
+// ---- Formatting ----
+const pad = (n) => String(Math.floor(n)).padStart(2, '0');
+const clock = (s) => pad(s / 3600) + ':' + pad(s / 60 % 60) + ':' + pad(s % 60);
+const mmss = (s) => Math.floor(s / 60) + ':' + pad(s % 60);
+
+// ---- Map ----
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [151.2155, -33.864], zoom: 14, pitch: 0,
+  config: { basemap: { lightPreset: 'day', show3dObjects: true, showPointOfInterestLabels: false } },
+});
+
+function overview(duration) {
+  const b = COURSE.reduce((bb, c) => bb.extend(c), new mapboxgl.LngLatBounds(COURSE[0], COURSE[0]));
+  map.fitBounds(b, { padding: { top: phone() ? 290 : 60, bottom: phone() ? 170 : 130, left: phone() ? 24 : 330, right: 40 }, pitch: 0, bearing: 0,
+    duration: reduceMotion.matches ? 0 : duration });
+}
+
+map.on('style.load', () => {
+  map.addSource('course', { type: 'geojson', lineMetrics: true,
+    data: { type: 'Feature', geometry: { type: 'LineString', coordinates: COURSE } } });
+  map.addSource('runners', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  const round = { 'line-cap': 'round', 'line-join': 'round' };
+  map.addLayer({ id: 'course-casing', type: 'line', source: 'course', slot: 'top', layout: round,
+    paint: { 'line-color': '#FFFFFF', 'line-width': 11, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'course-base', type: 'line', source: 'course', slot: 'top', layout: round,
+    paint: { 'line-color': '#E10600', 'line-width': 7, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'course-done', type: 'line', source: 'course', slot: 'top', layout: round,
+    paint: { 'line-gradient': 'rgba(255,255,255,0)', 'line-width': 3.5, 'line-emissive-strength': 1 } });
+  const R = ['interpolate', ['linear'], ['zoom'], 13, 9, 16, 11];
+  const RING = ['interpolate', ['linear'], ['zoom'], 13, 14, 16, 16.5];
+  map.addLayer({ id: 'runner-dots', type: 'circle', source: 'runners', slot: 'top',
+    layout: { 'circle-sort-key': ['case', ['==', ['get', 'f'], 1], 2, 0] },
+    paint: { 'circle-radius': R, 'circle-color': ['case', ['==', ['get', 'f'], 1], '#E10600', '#0A1A3F'],
+      'circle-stroke-color': '#FFFFFF', 'circle-stroke-width': 2, 'circle-emissive-strength': 1 } });
+  // Yellow ring: featured runner (3px) and current leader (2px); fill is transparent so the disc shows through.
+  map.addLayer({ id: 'runner-ring', type: 'circle', source: 'runners', slot: 'top',
+    filter: ['any', ['==', ['get', 'f'], 1], ['==', ['get', 'l'], 1]],
+    paint: { 'circle-radius': RING, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#FFD60A',
+      'circle-stroke-width': ['case', ['==', ['get', 'f'], 1], 3, 2], 'circle-emissive-strength': 1 } });
+  map.addLayer({ id: 'runner-labels', type: 'symbol', source: 'runners', slot: 'top',
+    layout: { 'text-field': ['to-string', ['get', 'bib']], 'text-size': 11, 'text-allow-overlap': true,
+      'text-ignore-placement': true, 'symbol-sort-key': ['case', ['==', ['get', 'f'], 1], 2, 0],
+      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'] },
+    paint: { 'text-color': '#FFFFFF', 'text-emissive-strength': 1 } });
+
+  map.on('click', 'runner-dots', (e) => setFeatured(Number(e.features[0].properties.bib)));
+  map.on('mouseenter', 'runner-dots', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'runner-dots', () => { map.getCanvas().style.cursor = ''; });
+});
+
+// Km plates and start/finish: Marker roots are positioned by Mapbox, so only the inner child is styled.
+for (let k = 0; k <= 9; k++) {
+  const el = document.createElement('div');
+  el.style.pointerEvents = 'none';
+  el.innerHTML = '<div class="km-plate"><span>' + (k ? k + ' KM' : 'START / FINISH') + '</span></div>';
+  new mapboxgl.Marker({ element: el, anchor: 'bottom', offset: [0, -4] }).setLngLat(pointAt(k / 10)).addTo(map);
+}
+
+map.on('load', () => {
+  overview(0);
+  $('status-note').classList.add('hidden');
+  last = performance.now();
+  running = true;
+});
+map.on('error', (e) => {
+  const n = $('status-note');
+  n.className = 'status-note error';
+  n.textContent = 'Map error: ' + (e.error && e.error.message || 'unknown');
+});
+
+// ---- Ticker (two identical runs for a seamless loop) ----
+const run = TICKER.join('<i class="sep"></i>') + '<i class="sep"></i>';
+$('ticker-track').innerHTML = '<span class="ticker-run">' + run + '</span><span class="ticker-run" aria-hidden="true">' + run + '</span>';
+
+// ---- Leaderboard ----
+const rowsEl = $('lb-rows'), rowEls = {};
+RUNNERS.forEach((r) => {
+  const b = document.createElement('button');
+  b.className = 'lb-row';
+  b.innerHTML = '<span class="lb-plate"><span class="plate-in"><span class="lb-pos"></span><span class="lb-bib">' + r.bib +
+    '</span><span class="lb-name">' + r.name + '</span><span class="lb-gap"></span></span></span>';
+  b.addEventListener('click', () => setFeatured(r.bib));
+  rowsEl.appendChild(b);
+  rowEls[r.bib] = b;
+});
+$('lb-toggle').addEventListener('click', () => {
+  const open = $('leaderboard').classList.toggle('expanded');
+  $('lb-toggle').setAttribute('aria-expanded', open);
+  $('lb-toggle').querySelector('span span').textContent = open ? 'Top 3' : 'Full standings';
+});
+
+const order = () => [...RUNNERS].sort((a, b) =>
+  a.fin !== null && b.fin !== null ? a.fin - b.fin : a.fin !== null ? -1 : b.fin !== null ? 1 : b.d - a.d);
+
+// FLIP: record old positions, reorder the DOM, invert with a transform, then release it to animate.
+function reorder(ord) {
+  const rows = ord.map((r) => rowEls[r.bib]);
+  if (rows.every((el, i) => rowsEl.children[i] === el)) return;
+  const first = new Map(rows.map((el) => [el, el.getBoundingClientRect().top]));
+  rows.forEach((el) => rowsEl.appendChild(el));
+  rows.forEach((el) => {
+    const dy = first.get(el) - el.getBoundingClientRect().top;
+    if (dy) { el.classList.add('no-anim'); el.style.transform = 'translateY(' + dy + 'px)'; }
+  });
+  void rowsEl.offsetWidth;
+  rows.forEach((el) => { el.classList.remove('no-anim'); el.style.transform = ''; });
+}
+
+// ---- Featured runner and lower third ----
+let featured = RUNNERS[0].bib;
+function rewipe(el) { el.classList.remove('wipe'); void el.offsetWidth; el.classList.add('wipe'); }
+
+function setFeatured(bib) {
+  const changed = bib !== featured;
+  featured = bib;
+  const r = byBib[bib];
+  $('l3-bib').textContent = String(bib).padStart(2, '0');
+  $('l3-name').textContent = r.name;
+  $('l3-nat').textContent = r.nat;
+  if (changed) rewipe($('l3'));
+  updateHud(true);
+  if (chase && changed) { lastCam = 0; camSwitch = true; }
+}
+
+function updateHud() {
+  const ord = order(), lead = ord[0];
+  reorder(ord);
+  ord.forEach((r, i) => {
+    const el = rowEls[r.bib];
+    el.classList.toggle('is-featured', r.bib === featured);
+    el.querySelector('.lb-pos').textContent = i + 1;
+    const gap = i === 0 ? '' : r.fin !== null && lead.fin !== null ? r.fin - lead.fin : (lead.d - r.d) / r.v;
+    el.querySelector('.lb-gap').textContent = i === 0 ? (lead.fin !== null ? 'WIN' : 'LEAD') : '+' + mmss(gap);
+  });
+  const f = byBib[featured];
+  $('l3-pos').textContent = ord.indexOf(f) + 1;
+  $('l3-pace').textContent = f.fin !== null ? 'FIN' : mmss(1000 / f.v);
+  $('l3-split-k').textContent = f.splitKm ? 'KM ' + f.splitKm + ' split' : 'Last split';
+  $('l3-split').textContent = f.split ? mmss(f.split) : '--';
+}
+
+// ---- Camera ----
+let chase = false, lastCam = 0, camBearing = 0, camSwitch = false;
+function setChase(on, keepView) {
+  chase = on;
+  $('chase').classList.toggle('is-on', on);
+  $('chase').setAttribute('aria-pressed', on);
+  if (on) { camBearing = map.getBearing(); lastCam = 0; camSwitch = true; } else if (!keepView) overview(1200);
+}
+$('chase').addEventListener('click', () => setChase(!chase));
+['dragstart', 'rotatestart'].forEach((ev) => map.on(ev, (e) => { if (e.originalEvent && chase) setChase(false, true); }));
+
+function followCamera(now) {
+  if (!chase || now - lastCam < 160) return;
+  lastCam = now;
+  const f = byBib[featured];
+  const frac = Math.min((f.d + (f.fin === null ? f.v * RACE_RATE * speed * 0.25 : 0)) / RACE_M, 1); // lead for glide latency
+  camBearing += (((bearingAt(frac) - camBearing + 540) % 360) - 180) * 0.3;
+  const cam = { center: pointAt(frac), bearing: camBearing, pitch: 55, zoom: 16.2,
+    padding: { top: 0, bottom: phone() ? 120 : 140, left: 0, right: 0 } };
+  if (reduceMotion.matches) map.jumpTo(cam);
+  else map.easeTo({ ...cam, duration: camSwitch ? 700 : 220, easing: camSwitch ? (t) => t * (2 - t) : (t) => t, essential: true });
+  camSwitch = false;
+}
+
+// ---- Race simulation ----
+let running = false, last = 0, T = 0, speed = 1, over = false, lastHud = 0, lastLine = 0;
+
+function step(dt) {
+  RUNNERS.forEach((r) => {
+    if (r.fin !== null) return;
+    r.v = r.base * (1 + 0.06 * Math.sin(T * r.w + r.ph));
+    const nd = r.d + r.v * dt, km = Math.floor(nd / 1000);
+    if (km > r.kmDone) {
+      const tc = T + (km * 1000 - r.d) / r.v;
+      r.split = tc - r.kmT; r.kmT = tc; r.kmDone = r.splitKm = km;
+    }
+    if (nd >= RACE_M) { r.fin = T + (RACE_M - r.d) / r.v; r.d = RACE_M; } else r.d = nd;
+  });
+  T += dt;
+}
+
+function showResults() {
+  $('res-rows').innerHTML = order().map((r, i) => '<div class="res-row' + (i ? '' : ' win') + '"><span class="pos">' + (i + 1) +
+    '</span><span class="nm">' + r.name + ' ' + r.nat + '</span><span class="tm">' + (i ? '+' + mmss(r.fin - order()[0].fin) : clock(r.fin).slice(3)) + '</span></div>').join('');
+  $('results').classList.remove('hidden');
+  rewipe($('results'));
+}
+
+$('replay').addEventListener('click', () => {
+  RUNNERS.forEach((r) => Object.assign(r, { d: 0, fin: null, kmDone: 0, kmT: 0, split: null, splitKm: 0 }));
+  T = 0; over = false;
+  $('results').classList.add('hidden');
+  updateHud();
+});
+$('speed').addEventListener('click', () => {
+  speed = speed === 1 ? 4 : 1;
+  $('speed-val').textContent = speed + 'x';
+  $('speed').classList.toggle('is-on', speed === 4);
+});
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (!running) return;
+  const dt = Math.min((now - last) / 1000, 0.1);
+  last = now;
+  if (!over) step(dt * RACE_RATE * speed);
+  const ord = order(), leadFrac = ord[0].d / RACE_M;
+  $('sb-clock').textContent = clock(over ? ord[0].fin : T);
+  $('sb-km').textContent = (ord[0].d / 1000).toFixed(1);
+  if (map.getSource('runners')) {
+    map.getSource('runners').setData({ type: 'FeatureCollection', features: RUNNERS.map((r, i) => ({
+      type: 'Feature', properties: { bib: r.bib, f: r.bib === featured ? 1 : 0, l: r === ord[0] ? 1 : 0 },
+      geometry: { type: 'Point', coordinates: lanePoint(r.d / RACE_M, RUNNERS.indexOf(r)) } })) });
+  }
+  if (now - lastHud > 250) { lastHud = now; updateHud(); }
+  if (now - lastLine > 250 && map.getLayer('course-done')) {
+    lastLine = now;
+    map.setPaintProperty('course-done', 'line-gradient', leadFrac <= 0 ? 'rgba(255,255,255,0)' : leadFrac >= 1 ? '#FFFFFF'
+      : ['step', ['line-progress'], '#FFFFFF', Math.max(leadFrac, 0.0001), 'rgba(255,255,255,0)']);
+  }
+  followCamera(now);
+  if (!over && RUNNERS.every((r) => r.fin !== null)) { over = true; setTimeout(showResults, 700); }
+}
+setFeatured(featured);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

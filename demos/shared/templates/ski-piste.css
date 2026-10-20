@@ -1,0 +1,812 @@
+/*
+  Ski Piste -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a ski resort's live lift and run status
+  board beside a 3D piste map -- snow white and glacier blue chrome, deep
+  night-navy numerals, difficulty-coloured run symbols, lift-line yellow,
+  condensed sporty display type), deliberately distinct from every other
+  style pack in this folder: Arena is a Linear-dark compare layout,
+  Editorial Paper is warm paper + serif, Highway Sign is MUTCD cream/green,
+  Slate Console is a dark cinematic globe, Storefront is a sidebar of
+  filters, Tarmac Glass is dark glass + amber, Vintage Chart is
+  navy/parchment/brass, Weather Console is a layer-explorer dock, Riso Zine
+  is two-ink print, Swiss Grid is a 12-column split screen, Neon HUD is
+  glowing cyber-HUD, Pastel Bento is a rounded tile grid, Blueprint is
+  white-on-blue drafting lines, Story Scroll is cinematic scrollytelling,
+  Retro OS is a desktop-window nostalgia skin, Aurora Command is a glowing
+  aurora control room, Deco Voyage is gilded Art Deco travel posters, Washi
+  Seasons is Japanese paper and seasonal colour, Raw Web is unstyled
+  browser-default HTML, Case Board is a corkboard of pinned evidence, Line
+  Diagram is a transit-map schematic, Aero Gadgets is glossy 2000s desktop
+  widgets, Chat Concierge is a messenger-style assistant, Chronicle is a
+  newsroom timeline, Broadcast is a TV news lower-third, Bottom Sheet is a
+  mobile maps sheet, Trailhead is olive/orange outdoor-gear tags over
+  contour lines, and Field Journal is a naturalist's notebook.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/ski-piste.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Big Shoulders Display for headings and
+  big numerals, Hanken Grotesk for UI text and lists):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  Signature touch: DIFFICULTY SYMBOLS. Every run is tagged with the piste
+  convention drawn in pure CSS (.dsym): green circle, blue square, red
+  triangle, black diamond and a double-black pair of diamonds -- the same
+  colours as the run lines on the map -- and the big numerals of the
+  conditions block (snow depth, new snow, temperatures, wind) sit in a deep
+  night-navy band under a pale sky-gradient header. Frosted white panels
+  (translucent white + backdrop blur) float over the map.
+
+  Layout: .app holds .stage (the map) and .status-panel. On desktop the map
+  is full-bleed and the panel floats on the left (360px), ending 64px above
+  the bottom so the Mapbox logo and attribution stay clear. On phones .app
+  is a grid: the map takes 55dvh, the panel scrolls below it and its tabs
+  stay pinned. A raster-dem (terrain) source makes GL JS hide the Mapbox
+  logo; the rule near the bottom of this file forces it back.
+
+  Class/id contract (see ski-piste-template.html in this same folder for a
+  full working example):
+
+  - .app                      page shell, 100dvh, never scrolls itself
+  - .stage                    positioned map area; holds #map and the chip
+  - #map                      map container (every demo defines its own,
+                               per convention -- position: absolute;
+                               inset: 0 inside .stage)
+  - .stage-chip               frosted pill top-right of the map (weather /
+                               visibility) --
+    .chip-icon                  inline SVG icon (toggle with .hidden)
+    .chip-main, .chip-sub       two text lines
+  - .status-panel             the left board (frosted white) --
+    .panel-head                 sky-gradient header --
+    .brand                        tiny uppercase line with an inline SVG
+                                   mountain mark
+    .panel-title                  h1, big condensed resort name
+    .panel-sub                    "Updated 08:42" style line
+  - .conditions > .cond       navy numerals band, 2 x 2 --
+    .cond-label                 tiny uppercase caption
+    .cond-value                 big condensed numeral; <small> = unit
+  - .controls                 filter block --
+    .diff-toggles > .diff-toggle   one button per difficulty,
+                                 aria-pressed="true|false"; holds a .dsym
+    .night-toggle               role="switch" aria-checked; holds <i
+                                 class="switch">
+  - .dsym .dsym-0 ... .dsym-4 difficulty symbol (0 green circle, 1 blue
+                               square, 2 red triangle, 3 black diamond,
+                               4 double black)
+  - .tabs > .tab              role="tab" aria-selected; .tab-count = "5/6"
+  - .list                     <ul> of rows; the only scroller on desktop
+    .row                        one lift or run (a <button>);
+                                 .is-selected, .flash
+    .row-icon, .row-main        icon / symbol, then text column
+    .row-name, .row-meta        name and length / vertical line
+    .row-side                   right column: .pill + .wait
+    .pill .pill-open | .pill-hold | .pill-closed    status pill
+  - .piste-popup              class to pass to mapboxgl.Popup (frosted card)
+    .pp-head, .pp-name          symbol + condensed name
+    .pp-stats > div             <b> value / <span> label cells
+    .pp-foot                    grooming / wait line
+  - .status-note (+.error)    inline panel message (e.g. map error)
+  - .hidden                   utility: display: none !important
+
+  Colours reused by the map layers (keep in sync with the demo script):
+  green #2E9E4F, blue #1F6FD1, red #D8352A, black #111111 (white casing),
+  lift line #F4C20D with a navy casing.
+*/
+
+:root {
+  --snow: #F7FAFC;
+  --glacier: #DCEBF5;
+  --sky: #B9DCF3;
+  --night: #0F2742;
+  --night-2: #1B3A5E;
+  --ink: #0F2742;
+  --ink-muted: #56708B;
+  --rule: rgba(15, 39, 66, 0.12);
+  --frost: rgba(247, 250, 252, 0.86);
+  --d-green: #2E9E4F;
+  --d-blue: #1F6FD1;
+  --d-red: #D8352A;
+  --d-black: #111111;
+  --lift: #F4C20D;
+  --open: #17A05D;
+  --hold: #E8A317;
+  --closed: #8693A1;
+  --shadow: 0 12px 40px rgba(15, 39, 66, 0.28);
+
+  --font-display: 'Big Shoulders Display', 'Arial Narrow', Impact, sans-serif;
+  --font-ui: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--snow);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--d-blue);
+  outline-offset: 2px;
+}
+
+/* ---- Shell ---- */
+.app {
+  position: relative;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+}
+
+/* Lift GL JS's own top-right controls below the weather chip */
+.mapboxgl-ctrl-top-right {
+  margin-top: 62px;
+}
+
+.stage-chip {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px 7px 10px;
+  border-radius: 999px;
+  background: var(--frost);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 6px 22px rgba(15, 39, 66, 0.22);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+.chip-icon {
+  flex: none;
+  width: 28px;
+  height: 28px;
+}
+
+.chip-main {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.chip-sub {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-muted);
+  line-height: 1.2;
+}
+
+/* ---- Status panel ---- */
+.status-panel {
+  position: absolute;
+  z-index: 3;
+  top: 16px;
+  left: 16px;
+  bottom: 64px;
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--frost);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+}
+
+.panel-head {
+  flex: none;
+  padding: 14px 16px 12px;
+  background: linear-gradient(180deg, var(--sky) 0%, var(--glacier) 100%);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--night-2);
+}
+
+.brand svg {
+  width: 20px;
+  height: 14px;
+}
+
+.panel-title {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 38px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--night);
+}
+
+.panel-sub {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--night-2);
+}
+
+/* ---- Conditions: big numerals on navy ---- */
+.conditions {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  padding: 12px 16px 14px;
+  background: var(--night);
+  color: var(--snow);
+}
+
+.cond-label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9DB9D3;
+}
+
+.cond-value {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 38px;
+  line-height: 1.02;
+  white-space: nowrap;
+}
+
+.cond-value small {
+  margin-left: 3px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #9DB9D3;
+}
+
+.cond-value .sep {
+  margin: 0 5px;
+  font-weight: 400;
+  color: #5E7C9A;
+}
+
+/* ---- Filters ---- */
+.controls {
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.diff-toggles {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.diff-toggles::before {
+  content: 'Show';
+  margin-right: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.diff-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1.5px solid var(--rule);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.diff-toggle[aria-pressed="true"] {
+  border-color: var(--night);
+}
+
+.diff-toggle[aria-pressed="false"] {
+  opacity: 0.4;
+}
+
+.night-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.night-toggle .switch {
+  position: relative;
+  flex: none;
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  background: #B7C6D4;
+  transition: background 0.2s ease;
+}
+
+.night-toggle .switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 39, 66, 0.35);
+  transition: transform 0.2s ease;
+}
+
+.night-toggle[aria-checked="true"] .switch {
+  background: var(--night-2);
+}
+
+.night-toggle[aria-checked="true"] .switch::after {
+  transform: translateX(18px);
+  background: var(--lift);
+}
+
+/* ---- Difficulty symbols (pure CSS) ---- */
+.dsym {
+  position: relative;
+  flex: none;
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+}
+
+.dsym-0 {
+  border-radius: 50%;
+  background: var(--d-green);
+}
+
+.dsym-1 {
+  border-radius: 3px;
+  background: var(--d-blue);
+}
+
+.dsym-2 {
+  background: var(--d-red);
+  clip-path: polygon(50% 3%, 98% 94%, 2% 94%);
+}
+
+.dsym-3 {
+  background: var(--d-black);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+.dsym-4 {
+  width: 28px;
+}
+
+.dsym-4::before,
+.dsym-4::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 16px;
+  height: 18px;
+  background: var(--d-black);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+.dsym-4::before {
+  left: 0;
+}
+
+.dsym-4::after {
+  right: 0;
+}
+
+/* ---- Tabs ---- */
+.tabs {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  padding: 0 16px;
+  background: rgba(247, 250, 252, 0.96);
+  border-bottom: 1px solid var(--rule);
+}
+
+.tab {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 0 7px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.tab[aria-selected="true"] {
+  color: var(--night);
+  border-bottom-color: var(--lift);
+}
+
+.tab-count {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--ink-muted);
+}
+
+/* ---- List ---- */
+.list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 6px 8px 12px;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 8px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.row:hover {
+  background: rgba(31, 111, 209, 0.08);
+}
+
+.row.is-selected {
+  background: #fff;
+  box-shadow: inset 4px 0 0 var(--lift), 0 2px 10px rgba(15, 39, 66, 0.12);
+}
+
+.row-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.row-icon svg {
+  width: 26px;
+  height: 26px;
+  color: var(--night);
+}
+
+.row-main {
+  min-width: 0;
+}
+
+.row-name {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+}
+
+.row-meta {
+  display: block;
+  margin-top: 1px;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+
+.row-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  text-align: right;
+}
+
+.wait {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pill::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.pill-open {
+  color: #0C7A43;
+  background: rgba(23, 160, 93, 0.15);
+}
+
+.pill-hold {
+  color: #8A5A00;
+  background: rgba(232, 163, 23, 0.24);
+}
+
+.pill-closed {
+  color: #5B6877;
+  background: rgba(134, 147, 161, 0.22);
+}
+
+.row.flash {
+  animation: piste-flash 1.4s ease-out 1;
+}
+
+@keyframes piste-flash {
+  from { background: rgba(244, 194, 13, 0.55); }
+  to { background: transparent; }
+}
+
+/* ---- Map popup ---- */
+.piste-popup {
+  font-family: var(--font-ui);
+}
+
+.piste-popup .mapboxgl-popup-content {
+  min-width: 220px;
+  padding: 12px 14px 12px;
+  border-radius: 14px;
+  background: rgba(247, 250, 252, 0.92);
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  color: var(--ink);
+}
+
+.piste-popup .mapboxgl-popup-close-button {
+  padding: 4px 8px;
+  font-size: 20px;
+  color: var(--ink-muted);
+}
+
+.piste-popup.mapboxgl-popup-anchor-top .mapboxgl-popup-tip,
+.piste-popup.mapboxgl-popup-anchor-top-left .mapboxgl-popup-tip,
+.piste-popup.mapboxgl-popup-anchor-top-right .mapboxgl-popup-tip {
+  border-bottom-color: rgba(247, 250, 252, 0.92);
+}
+
+.piste-popup.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip,
+.piste-popup.mapboxgl-popup-anchor-bottom-left .mapboxgl-popup-tip,
+.piste-popup.mapboxgl-popup-anchor-bottom-right .mapboxgl-popup-tip {
+  border-top-color: rgba(247, 250, 252, 0.92);
+}
+
+.piste-popup.mapboxgl-popup-anchor-left .mapboxgl-popup-tip {
+  border-right-color: rgba(247, 250, 252, 0.92);
+}
+
+.piste-popup.mapboxgl-popup-anchor-right .mapboxgl-popup-tip {
+  border-left-color: rgba(247, 250, 252, 0.92);
+}
+
+.pp-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 18px;
+}
+
+.pp-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 24px;
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.piste-popup .pill {
+  margin-top: 8px;
+}
+
+.pp-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  margin-top: 10px;
+}
+
+.pp-stats b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.pp-stats span {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.pp-foot {
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.status-note {
+  margin: 8px 16px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.status-note.error {
+  color: var(--d-red);
+}
+
+/* The terrain-dem TileJSON sets mapbox_logo:false, which makes GL JS hide
+   the logo; Mapbox maps must still show it, so force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---- Phones / narrow: map on top (55dvh), board scrolls below ---- */
+@media (max-width: 760px) {
+  .app {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 55dvh minmax(0, 1fr);
+  }
+
+  .stage {
+    position: relative;
+    inset: auto;
+    min-height: 0;
+  }
+
+  .mapboxgl-ctrl-top-right {
+    margin-top: 54px;
+  }
+
+  .stage-chip {
+    top: 10px;
+    right: 10px;
+    padding: 5px 12px 5px 8px;
+  }
+
+  .chip-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .chip-sub {
+    display: none;
+  }
+
+  .status-panel {
+    position: static;
+    width: auto;
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+    overflow-y: auto;
+    background: var(--snow);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .tabs {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  .list {
+    flex: none;
+    overflow: visible;
+    padding-bottom: 24px;
+  }
+
+  .panel-head,
+  .conditions,
+  .controls {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .panel-title {
+    font-size: 34px;
+  }
+
+  .cond-value {
+    font-size: 34px;
+  }
+
+  .diff-toggle {
+    min-width: 0;
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row.flash {
+    animation: none;
+  }
+
+  .night-toggle .switch,
+  .night-toggle .switch::after,
+  .diff-toggle,
+  .row {
+    transition: none;
+  }
+}

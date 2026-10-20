@@ -1,0 +1,452 @@
+<!--
+  Working EXAMPLE of the Estate Luxe style pack (estate-luxe.css, in this
+  same folder). Open this file directly to see the pattern working: a
+  listings split view for twelve illustrative Cape Town residences on the
+  Mapbox Standard style (dawn light, faded theme, 3D buildings). The left
+  column is a scrolling grid of cards with CSS-only "photo" placeholders;
+  the right is the map with price-pill markers. Hover a card and its pill
+  lights up (and vice versa); click either to fly in at 50 degrees and open
+  a popup with an "Arrange a viewing" form. Price, Beds and Sea view filter
+  the list and the pills together, "Draw area" filters by a rectangle you
+  drag on the map, and the select re-sorts. Copy the markup below into
+  your own demo and link estate-luxe.css from its <head> -- see the
+  class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (quiet-luxury listings: bone, warm black, taupe,
+  champagne hairlines, Bodoni Moda + Jost) at the user's request for
+  something distinct from every other pack in this folder. The suburbs are
+  real; "Halden & Vos", every property name, price and spec are fictional
+  placeholders, and the coordinates are hand-placed approximations -- swap
+  in your own.
+
+  What's NOT included: real photography, a listings API, a working
+  enquiry backend (the form only shows a toast), geocoding, or a
+  hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Halden &amp; Vos &mdash; Estate Luxe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;1,6..96,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="estate-luxe.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map (inside .map-pane). */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <h1 class="wordmark"><span class="wm-name">Halden<span class="wm-amp">&amp;</span>Vos</span><span class="wm-sub">Residences &middot; Cape Town</span></h1>
+    <div class="filters">
+      <button class="chip" id="chip-price" aria-expanded="false">Price</button>
+      <button class="chip" id="chip-beds" aria-expanded="false">Beds</button>
+      <button class="chip" id="chip-sea" aria-pressed="false">Sea view</button>
+      <button class="btn btn-ghost" id="draw-btn" aria-pressed="false">Draw area</button>
+    </div>
+  </header>
+
+  <div class="split">
+    <main class="list-pane">
+      <div class="list-head">
+        <div class="list-head-row">
+          <p class="count" id="count" aria-live="polite"></p>
+          <label class="sort">Sort
+            <select id="sort">
+              <option value="new">Newest</option>
+              <option value="asc">Price &uarr;</option>
+              <option value="desc">Price &darr;</option>
+            </select>
+          </label>
+        </div>
+        <div class="filter-panel hidden" id="filter-panel">
+          <div class="fp-row" id="fp-price">
+            <div class="field"><label for="p-min">From</label>
+              <select id="p-min"><option value="0">Any</option><option value="5000000">R 5M</option><option value="10000000">R 10M</option><option value="20000000">R 20M</option><option value="30000000">R 30M</option></select></div>
+            <div class="field"><label for="p-max">To</label>
+              <select id="p-max"><option value="0">Any</option><option value="10000000">R 10M</option><option value="20000000">R 20M</option><option value="30000000">R 30M</option><option value="50000000">R 50M</option></select></div>
+          </div>
+          <div class="field" id="fp-beds">
+            <span class="fp-label">Bedrooms</span>
+            <div class="seg" id="beds-seg">
+              <button data-beds="0" aria-pressed="true">Any</button><button data-beds="2" aria-pressed="false">2+</button><button data-beds="3" aria-pressed="false">3+</button><button data-beds="4" aria-pressed="false">4+</button><button data-beds="5" aria-pressed="false">5+</button>
+            </div>
+          </div>
+          <button class="btn btn-ghost" id="fp-clear">Clear</button>
+        </div>
+      </div>
+      <div class="grid" id="grid"></div>
+    </main>
+
+    <section class="map-pane" aria-label="Map of residences">
+      <div id="map"></div>
+      <div class="map-chip"><span id="map-count"></span><button id="reset-view">Show all</button></div>
+      <div class="draw-rect hidden" id="draw-rect"></div>
+      <div class="status-note loading" id="status-note">Loading map&hellip;</div>
+    </section>
+  </div>
+</div>
+
+<aside class="drawer" id="drawer" aria-label="Arrange a viewing" aria-hidden="true">
+  <div class="drawer-head">
+    <div><h2>Arrange a viewing</h2><p id="drawer-sub"></p></div>
+    <button class="drawer-close" id="drawer-close" aria-label="Close">&times;</button>
+  </div>
+  <form class="drawer-form" id="viewing-form">
+    <div class="field"><label for="v-name">Name</label><input id="v-name" required autocomplete="name" /></div>
+    <div class="field"><label for="v-mail">Email</label><input id="v-mail" type="email" required autocomplete="email" /></div>
+    <div class="field"><label for="v-when">Preferred time</label>
+      <select id="v-when"><option>Next available</option><option>Weekday morning</option><option>Weekday afternoon</option><option>Saturday</option></select></div>
+    <div class="field"><label for="v-note">A few words (optional)</label><textarea id="v-note" rows="3"></textarea></div>
+    <button class="btn btn-primary" type="submit">Request viewing</button>
+  </form>
+</aside>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+// [lng, lat] hand-placed on land; ph = house position in the CSS photo.
+const L = [
+  { id: 'casa-meridiana', name: 'Casa Meridiana', sub: 'Clifton', price: 62500000, bd: 5, ba: 5, m2: 640, sea: 1, days: 2, c: [18.3790, -33.9405] },
+  { id: 'salt-house', name: 'The Salt House', sub: 'Clifton', price: 38900000, bd: 4, ba: 4, m2: 410, sea: 1, days: 9, c: [18.3800, -33.9330] },
+  { id: 'villa-aurelia', name: 'Villa Aurelia', sub: 'Camps Bay', price: 29750000, bd: 4, ba: 3, m2: 380, sea: 1, days: 5, c: [18.3830, -33.9500] },
+  { id: 'tidewater', name: 'Tidewater Residence', sub: 'Camps Bay', price: 18400000, bd: 3, ba: 3, m2: 260, sea: 1, days: 21, c: [18.3810, -33.9590] },
+  { id: 'atrium-bantry', name: 'Atrium on Bantry', sub: 'Bantry Bay', price: 24000000, bd: 3, ba: 3, m2: 285, sea: 1, days: 40, sold: 1, c: [18.3820, -33.9255] },
+  { id: 'fresnaye-terrace', name: 'Fresnaye Terrace', sub: 'Sea Point', price: 12950000, bd: 3, ba: 2, m2: 210, sea: 1, days: 12, c: [18.3870, -33.9165] },
+  { id: 'lantern-court', name: 'Lantern Court Penthouse', sub: 'Sea Point', price: 16800000, bd: 2, ba: 2, m2: 190, sea: 1, days: 3, c: [18.3945, -33.9085] },
+  { id: 'dorp-lane', name: 'No. 9 Dorp Lane', sub: 'De Waterkant', price: 9650000, bd: 2, ba: 2, m2: 140, sea: 0, days: 16, c: [18.4155, -33.9165] },
+  { id: 'oakhaven', name: 'Oakhaven Estate', sub: 'Constantia', price: 34500000, bd: 6, ba: 5, m2: 820, sea: 0, days: 7, c: [18.4190, -34.0200] },
+  { id: 'vineyard-lodge', name: 'Vineyard Lodge', sub: 'Constantia', price: 21900000, bd: 5, ba: 4, m2: 540, sea: 0, days: 30, c: [18.4120, -34.0310] },
+  { id: 'silver-pine', name: 'The Silver Pine House', sub: 'Bishopscourt', price: 27800000, bd: 5, ba: 5, m2: 610, sea: 0, days: 14, c: [18.4565, -34.0095] },
+  { id: 'harbour-ridge', name: 'Harbour Ridge', sub: 'Hout Bay', price: 15200000, bd: 4, ba: 3, m2: 350, sea: 1, days: 25, c: [18.3640, -34.0440] },
+];
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phoneMQ = matchMedia('(max-width: 859px)');
+const $ = (id) => document.getElementById(id);
+const gridEl = $('grid'), mapEl = $('map'), drawerEl = $('drawer');
+const money = (n) => 'R ' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const short = (n) => 'R ' + (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+const specs = (l) => `${l.bd} beds &middot; ${l.ba} baths &middot; ${l.m2} m&sup2;`;
+const HEART = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5 4.2 12.8a4.6 4.6 0 0 1 6.5-6.5l1.3 1.3 1.3-1.3a4.6 4.6 0 0 1 6.5 6.5z"/></svg>';
+
+const f = { min: 0, max: 0, beds: 0, sea: false, area: null, sort: 'new' };
+const saved = new Set();
+let selectedId = null, popup = null, drawing = false;
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [18.39, -33.96],
+  zoom: 11,
+  config: { basemap: { lightPreset: 'dawn', theme: 'faded', show3dObjects: true, showPointOfInterestLabels: false, showTransitLabels: false } },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+/* ---- Filtering and sorting ---- */
+function visible() {
+  const r = L.filter((l) => l.price >= f.min && (!f.max || l.price <= f.max) && l.bd >= f.beds &&
+    (!f.sea || l.sea) && (!f.area || f.area.contains(l.c)));
+  const by = { new: (a, b) => a.days - b.days, asc: (a, b) => a.price - b.price, desc: (a, b) => b.price - a.price };
+  return r.sort(by[f.sort]);
+}
+
+// Four CSS scenes so the grid reads as distinct properties.
+const SCENE = { 'casa-meridiana': 'sea', 'salt-house': 'sea', 'villa-aurelia': 'mountain', 'tidewater': 'sea', 'atrium-bantry': 'city',
+  'fresnaye-terrace': 'city', 'lantern-court': 'city', 'dorp-lane': 'city', 'oakhaven': 'garden', 'vineyard-lodge': 'garden',
+  'silver-pine': 'garden', 'harbour-ridge': 'mountain' };
+const PAL = { // [sky top, sky horizon, ground top, ground bottom]
+  sea: [['#E8CDBA', '#F7E6CE', '#93A5A6', '#6E8587'], ['#D9D2D0', '#F1E4D2', '#A0B0AE', '#7A8F90']],
+  mountain: [['#CFD6D8', '#EFE6D6', '#9C9A86', '#767564'], ['#E3CDBE', '#F4E5D0', '#A7A08A', '#807A66']],
+  garden: [['#EBD6BE', '#F8EBD3', '#8E9A74', '#66714F'], ['#D8DDD2', '#F0EADA', '#97A47C', '#6E7A55']],
+  city: [['#D5D6DA', '#EEE6D9', '#8F9BA3', '#68757E'], ['#E5CFC4', '#F5E6D4', '#A4A29B', '#7C7B76']],
+};
+const HOUSE = { sea: [[14, 44, 36], [30, 36, 46], [8, 52, 30]], mountain: [[40, 34, 34], [10, 42, 28], [24, 40, 40]],
+  garden: [[16, 58, 28], [30, 50, 32], [8, 56, 26]], city: [[34, 24, 62], [40, 22, 56], [26, 30, 50]] };
+function photoStyle(l, i) {
+  const sc = SCENE[l.id], k = i % 3, p = PAL[sc][i % 2], [bl, bw, bh] = HOUSE[sc][k];
+  return `--sa:${p[0]};--sb:${p[1]};--ga:${p[2]};--gb:${p[3]};--bl:${bl}%;--bw:${bw}%;--bh:${bh}%`;
+}
+
+function cardHTML(l) {
+  const tag = l.sold ? '<span class="tag tag-sold">Sold</span>' : l.days <= 7 ? '<span class="tag">New</span>' : '';
+  return `<article class="card" data-id="${l.id}">
+    <div class="photo" data-scene="${SCENE[l.id]}" style="${photoStyle(l, L.indexOf(l))}"><i class="ph-r"></i><i class="ph-b"></i><i class="ph-w"></i>${tag}
+      <button class="heart" aria-label="Save ${l.name}" aria-pressed="${saved.has(l.id)}">${HEART}</button></div>
+    <div class="card-body"><p class="c-suburb">${l.sub}${l.sea ? ' &middot; Sea view' : ''}</p>
+      <h3 class="c-name"><button>${l.name}</button></h3>
+      <p class="c-price">${money(l.price)}</p><p class="c-specs">${specs(l)}</p></div></article>`;
+}
+
+function refresh(fit) {
+  const list = visible();
+  gridEl.innerHTML = list.length ? list.map(cardHTML).join('') : '<p class="empty">No residences match. Adjust the filters.</p>';
+  const n = `${list.length} ${list.length === 1 ? 'residence' : 'residences'}`;
+  $('count').textContent = n;
+  $('map-count').textContent = n;
+  const ids = new Set(list.map((l) => l.id));
+  pins.forEach((p, id) => {
+    const on = ids.has(id);
+    if (on && !p.shown) p.marker.addTo(map);
+    if (!on && p.shown) p.marker.remove();
+    p.shown = on;
+  });
+  if (selectedId && !ids.has(selectedId)) closePopup();
+  paint();
+  if (fit && list.length) fitTo(list);
+}
+
+/* ---- Pins (the pill is an inner child; the marker root is untouched) ---- */
+const pins = new Map();
+L.forEach((l) => {
+  const root = document.createElement('div');
+  const el = document.createElement('button');
+  el.className = 'price-pin' + (l.sold ? ' is-sold' : '');
+  el.textContent = short(l.price);
+  el.setAttribute('aria-label', `${l.name}, ${money(l.price)}`);
+  root.appendChild(el);
+  el.addEventListener('mouseenter', () => { hot(l.id, true); cardOf(l.id)?.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' }); });
+  el.addEventListener('mouseleave', () => hot(l.id, false));
+  el.addEventListener('click', () => select(l.id));
+  pins.set(l.id, { el, root, shown: false, marker: new mapboxgl.Marker({ element: root }).setLngLat(l.c) });
+});
+
+const cardOf = (id) => gridEl.querySelector(`.card[data-id="${id}"]`);
+let hotId = null;
+function hot(id, on) { hotId = on ? id : null; paint(); }
+
+function paint() {
+  pins.forEach((p, id) => {
+    const isHot = id === hotId, isSel = id === selectedId;
+    p.el.classList.toggle('is-hot', isHot);
+    p.el.classList.toggle('is-active', isSel);
+    p.el.classList.toggle('is-saved', saved.has(id));
+    p.root.style.zIndex = isSel ? 3 : isHot ? 2 : 1;
+  });
+  gridEl.querySelectorAll('.card').forEach((c) => {
+    c.classList.toggle('is-hot', c.dataset.id === hotId);
+    c.classList.toggle('is-active', c.dataset.id === selectedId);
+  });
+}
+
+/* ---- Camera ---- */
+// Top padding clears the floating map chip; bottom keeps pins off the logo/attribution.
+const pad = () => {
+  const chip = document.querySelector('.map-chip'), top = chip.offsetTop + chip.offsetHeight + 28;
+  return phoneMQ.matches ? { top, bottom: 64, left: 32, right: 32 } : { top, bottom: 72, left: 60, right: 60 };
+};
+function fitTo(list, instant) {
+  const b = new mapboxgl.LngLatBounds();
+  list.forEach((l) => b.extend(l.c));
+  const o = { padding: pad(), maxZoom: 14, pitch: 0, bearing: 0, duration: reduce || instant ? 0 : 800 };
+  map.fitBounds(b, o);
+}
+
+function select(id) {
+  const l = L.find((x) => x.id === id);
+  selectedId = id;
+  const h = mapEl.clientHeight;
+  const opts = { center: l.c, zoom: 15.2, pitch: 50, bearing: -15,
+    padding: { top: Math.min(230, Math.round(h * 0.6)), bottom: 64, left: 30, right: 30 } };
+  if (reduce) map.jumpTo(opts); else map.flyTo({ ...opts, duration: 2200, essential: true });
+  openPopup(l);
+  paint();
+  cardOf(id)?.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+}
+
+function openPopup(l) {
+  closePopup(true);
+  const p = new mapboxgl.Popup({ className: 'estate-popup', offset: 20, maxWidth: '280px', closeOnClick: false, focusAfterOpen: false })
+    .setLngLat(l.c)
+    .setHTML(`<p class="pp-sub">${l.sub}${l.sold ? ' &middot; Sold' : ''}</p><h3 class="pp-name">${l.name}</h3>
+      <p class="pp-price">${money(l.price)}</p><p class="pp-specs">${specs(l)}</p>
+      <button class="btn btn-primary" data-view>Arrange a viewing</button>`)
+    .addTo(map);
+  popup = p;
+  p.getElement().querySelector('[data-view]').addEventListener('click', () => openDrawer(l));
+  p.on('close', () => { if (popup === p) { popup = null; selectedId = null; paint(); } });
+}
+function closePopup(quiet) {
+  const p = popup; popup = null;
+  if (p) p.remove();
+  if (!quiet) { selectedId = null; paint(); }
+}
+
+/* ---- Viewing drawer + toast ---- */
+let toastTimer;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('is-visible');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('is-visible'), 2800);
+}
+function openDrawer(l) {
+  $('drawer-sub').textContent = `${l.name} · ${l.sub}`;
+  // On a phone the drawer sits under the sticky map so the map (and its logo) stay visible.
+  drawerEl.style.top = phoneMQ.matches ? mapEl.parentElement.getBoundingClientRect().bottom + 'px' : '';
+  drawerEl.classList.add('is-open');
+  drawerEl.setAttribute('aria-hidden', 'false');
+}
+function closeDrawer() { drawerEl.classList.remove('is-open'); drawerEl.setAttribute('aria-hidden', 'true'); }
+$('drawer-close').addEventListener('click', closeDrawer);
+$('viewing-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  closeDrawer();
+  e.target.reset();
+  toast('Request sent — Halden & Vos will be in touch');
+});
+
+/* ---- Cards ---- */
+gridEl.addEventListener('click', (e) => {
+  const card = e.target.closest('.card');
+  if (!card) return;
+  const heart = e.target.closest('.heart');
+  if (heart) {
+    const id = card.dataset.id, on = !saved.has(id);
+    on ? saved.add(id) : saved.delete(id);
+    heart.setAttribute('aria-pressed', on);
+    paint();
+    toast(on ? 'Saved to your shortlist' : 'Removed from shortlist');
+    return;
+  }
+  select(card.dataset.id);
+});
+gridEl.addEventListener('mouseover', (e) => { const c = e.target.closest('.card'); if (c && c.dataset.id !== hotId) hot(c.dataset.id, true); });
+gridEl.addEventListener('mouseleave', () => hot(null, false));
+
+/* ---- Filters ---- */
+const panel = $('filter-panel');
+function showPanel(which) {
+  const open = which && !(panel.dataset.open === which && !panel.classList.contains('hidden'));
+  panel.dataset.open = open ? which : '';
+  panel.classList.toggle('hidden', !open);
+  $('fp-price').classList.toggle('hidden', which !== 'price');
+  $('fp-beds').classList.toggle('hidden', which !== 'beds');
+  $('chip-price').setAttribute('aria-expanded', open && which === 'price');
+  $('chip-beds').setAttribute('aria-expanded', open && which === 'beds');
+}
+$('chip-price').addEventListener('click', () => showPanel('price'));
+$('chip-beds').addEventListener('click', () => showPanel('beds'));
+
+function chipLabels() {
+  const price = $('chip-price'), beds = $('chip-beds');
+  price.textContent = f.min || f.max ? `Price · ${f.min ? short(f.min) : 'Any'}–${f.max ? short(f.max) : 'Any'}` : 'Price';
+  price.classList.toggle('is-set', !!(f.min || f.max));
+  beds.textContent = f.beds ? `Beds · ${f.beds}+` : 'Beds';
+  beds.classList.toggle('is-set', !!f.beds);
+}
+function onPrice() {
+  f.min = +$('p-min').value; f.max = +$('p-max').value;
+  if (f.max && f.min > f.max) { f.max = 0; $('p-max').value = '0'; } // keep the range valid
+  chipLabels(); refresh(true);
+}
+$('p-min').addEventListener('change', onPrice);
+$('p-max').addEventListener('change', onPrice);
+$('beds-seg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  f.beds = +b.dataset.beds;
+  $('beds-seg').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b));
+  chipLabels(); refresh(true);
+});
+$('chip-sea').addEventListener('click', (e) => {
+  f.sea = !f.sea;
+  e.currentTarget.setAttribute('aria-pressed', f.sea);
+  refresh(true);
+});
+$('sort').addEventListener('change', (e) => { f.sort = e.target.value; refresh(false); });
+$('fp-clear').addEventListener('click', () => {
+  Object.assign(f, { min: 0, max: 0, beds: 0 });
+  $('p-min').value = '0'; $('p-max').value = '0';
+  $('beds-seg').querySelectorAll('button').forEach((x, i) => x.setAttribute('aria-pressed', i === 0));
+  chipLabels(); refresh(true);
+});
+$('reset-view').addEventListener('click', () => { closePopup(); fitTo(visible()); });
+showPanel(null);
+
+/* ---- Draw area: drag a rectangle on the map to filter by it ---- */
+const rectEl = $('draw-rect'), drawBtn = $('draw-btn');
+let start = null, last = null;
+function setDrawing(on) {
+  drawing = on;
+  drawBtn.setAttribute('aria-pressed', on);
+  mapEl.classList.toggle('is-drawing', on);
+  on ? map.dragPan.disable() : map.dragPan.enable();
+  if (on) toast('Drag on the map to outline an area');
+}
+drawBtn.addEventListener('click', () => {
+  if (f.area) { f.area = null; setAreaLayer(); drawBtn.textContent = 'Draw area'; refresh(true); return; }
+  setDrawing(!drawing);
+});
+function dragMove(e) {
+  if (!start) return;
+  last = e.point;
+  const x = Math.min(start.x, e.point.x), y = Math.min(start.y, e.point.y);
+  Object.assign(rectEl.style, { left: x + 'px', top: y + 'px', width: Math.abs(e.point.x - start.x) + 'px', height: Math.abs(e.point.y - start.y) + 'px' });
+}
+function dragEnd(e) {
+  if (!start) return;
+  const a = map.unproject(start), b = map.unproject(e.point);
+  const moved = Math.abs(e.point.x - start.x) + Math.abs(e.point.y - start.y) > 12;
+  start = null;
+  rectEl.classList.add('hidden');
+  setDrawing(false);
+  if (!moved) return;
+  f.area = new mapboxgl.LngLatBounds(a, a).extend(b);
+  setAreaLayer();
+  drawBtn.textContent = 'Clear area';
+  refresh(false);
+  if (!visible().length) toast('No residences in that area');
+}
+map.on('mousedown', (e) => { if (drawing) { start = last = e.point; rectEl.classList.remove('hidden'); dragMove(e); } });
+map.on('touchstart', (e) => { if (drawing) { start = last = e.point; rectEl.classList.remove('hidden'); dragMove(e); } });
+map.on('mousemove', dragMove);
+map.on('touchmove', dragMove);
+map.on('mouseup', dragEnd);
+map.on('touchend', () => dragEnd({ point: last || start }));
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (drawing) { start = null; rectEl.classList.add('hidden'); setDrawing(false); }
+  else if (drawerEl.classList.contains('is-open')) closeDrawer();
+  else closePopup();
+});
+
+function setAreaLayer() {
+  const src = map.getSource('area');
+  if (!src) return;
+  const b = f.area;
+  src.setData(b ? { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[
+    [b.getWest(), b.getSouth()], [b.getEast(), b.getSouth()], [b.getEast(), b.getNorth()], [b.getWest(), b.getNorth()], [b.getWest(), b.getSouth()]]] } }
+    : { type: 'FeatureCollection', features: [] });
+}
+
+/* ---- Map ---- */
+map.on('style.load', () => {
+  map.addSource('area', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({ id: 'area-fill', type: 'fill', source: 'area', slot: 'top', paint: { 'fill-color': '#CBB891', 'fill-opacity': 0.18 } });
+  map.addLayer({ id: 'area-line', type: 'line', source: 'area', slot: 'top', paint: { 'line-color': '#1B1A17', 'line-width': 1.2, 'line-dasharray': [3, 2] } });
+});
+// Dots instead of pills when zoomed far out (checked on every zoom)
+map.on('move', () => mapEl.classList.toggle('is-far', map.getZoom() < 10.9));
+map.on('load', () => $('status-note').classList.add('hidden'));
+map.on('error', (e) => {
+  const n = $('status-note');
+  n.className = 'status-note error';
+  n.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+phoneMQ.addEventListener('change', () => { closeDrawer(); map.resize(); });
+
+refresh(false);
+fitTo(visible(), true);
+</script>
+</body>
+</html>

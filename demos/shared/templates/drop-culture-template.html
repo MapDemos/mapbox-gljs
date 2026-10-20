@@ -1,0 +1,393 @@
+<!--
+  Working EXAMPLE of the Drop Culture style pack (drop-culture.css, in this
+  same folder). Open this file directly to see the pattern working as a
+  streetwear "drop" microsite: a marquee band, a hero with a live ticking
+  countdown and a drawn sneaker silhouette, and below it a raffle-store list
+  linked to a Mapbox Standard map (monochrome theme, night preset) of eight
+  stores across Paris. Click a store or a pin to fly there, press "Enter
+  raffle" for a slide-up sheet with a fake size/email form, and wait ~45
+  seconds for the countdown to hit zero and flip the hero to LIVE NOW. Copy
+  the markup below into your own demo and link drop-culture.css from its
+  <head> -- see the class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (hyped streetwear drop: black, white, volt, huge
+  condensed type) at the user's request for something distinct from every
+  other pack in this folder. "NORTHSIDE ATELIER", "Runner 01 'Ash'", the
+  drop date, entry counts and every store are fictional placeholders (the
+  streets are real, the shops are not) -- swap in your own.
+
+  What's NOT included: a real raffle backend (the form is visual only, no
+  network request), payments, accounts, a product photo (the sneaker is
+  hand-drawn inline SVG), or a hard-coded access token (demo-kit.js sets
+  that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Drop 07 &mdash; Runner 01 &lsquo;Ash&rsquo;</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="drop-culture.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map (here: fill the frame). */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="marquee" aria-label="Drop 07, Runner 01 Ash, 10.24, 10:00 CET">
+  <div class="marquee-track">
+    <div class="marquee-group" id="mq-a"></div>
+    <div class="marquee-group" id="mq-b" aria-hidden="true"></div>
+  </div>
+</div>
+
+<header class="hero" id="hero">
+  <div class="hero-copy">
+    <p class="eyebrow" id="eyebrow">Northside Atelier &mdash; Drop 07</p>
+    <h1 class="hero-title">Runner 01<br />&lsquo;Ash&rsquo;</h1>
+
+    <div class="countdown" id="count" role="timer" aria-label="Time until the drop">
+      <div class="cd-seg"><span class="cd-num" id="cd-d">00</span><span class="cd-lab">Days</span></div>
+      <span class="cd-sep">:</span>
+      <div class="cd-seg"><span class="cd-num" id="cd-h">00</span><span class="cd-lab">Hrs</span></div>
+      <span class="cd-sep">:</span>
+      <div class="cd-seg"><span class="cd-num" id="cd-m">00</span><span class="cd-lab">Min</span></div>
+      <span class="cd-sep">:</span>
+      <div class="cd-seg"><span class="cd-num" id="cd-s">45</span><span class="cd-lab">Sec</span></div>
+    </div>
+
+    <div class="live-flash hidden" id="live">
+      Live now
+      <small>The draw is open at every store below.</small>
+    </div>
+
+    <div class="hero-cta">
+      <a class="btn btn-volt" href="#stores">Find a store</a>
+      <button class="btn btn-ghost hidden" id="replay" type="button">Replay demo</button>
+    </div>
+  </div>
+
+  <div class="hero-art" aria-hidden="true">
+    <span class="art-num">01</span>
+    <svg viewBox="0 0 600 270" role="img" aria-label="Abstract sneaker silhouette">
+      <!-- upper -->
+      <path d="M40 196 L40 152 C40 136 56 126 78 123 L150 113 C176 109 192 90 206 70 C216 57 236 55 252 66 L304 102 C334 120 384 124 434 137 C504 155 562 163 568 192 L568 204 L40 204 Z" fill="#fff"/>
+      <!-- toe cap and heel counter -->
+      <path d="M440 138 C504 155 562 163 568 192 L568 204 L452 204 C462 178 456 154 440 138 Z" fill="none" stroke="#000" stroke-width="2"/>
+      <path d="M40 152 C40 136 56 126 78 123 L96 121 L96 204 L40 204 Z" fill="#000" opacity=".12"/>
+      <path d="M96 121 L96 204" stroke="#000" stroke-width="2"/>
+      <!-- collar -->
+      <path d="M150 113 C176 109 192 90 206 70" fill="none" stroke="#000" stroke-width="2"/>
+      <!-- lace bars -->
+      <g stroke="#000" stroke-width="5" stroke-linecap="square">
+        <path d="M232 84 L252 98"/><path d="M258 100 L280 114"/><path d="M286 116 L310 128"/><path d="M318 130 L344 138"/>
+      </g>
+      <!-- side stripes -->
+      <path d="M130 170 L400 170" stroke="#000" stroke-width="2"/>
+      <path d="M130 182 L360 182" stroke="#000" stroke-width="2"/>
+      <!-- volt midsole and outsole -->
+      <path d="M28 204 H580 V226 C580 236 570 242 558 242 H54 C38 242 28 236 28 226 Z" fill="#D4FF00"/>
+      <path d="M28 226 H580" stroke="#000" stroke-width="2"/>
+      <path d="M60 234 H540" stroke="#000" stroke-width="2" stroke-dasharray="3 9"/>
+    </svg>
+    <span class="art-cap">Colourway: Ash / Volt</span>
+  </div>
+</header>
+
+<main class="split" id="stores">
+  <section class="raffle" aria-labelledby="raffle-h">
+    <div class="section-head">
+      <h2 id="raffle-h">In-store raffle</h2>
+      <span class="meta">8 stores &middot; Paris</span>
+    </div>
+    <ul class="store-list" id="store-list"></ul>
+  </section>
+
+  <div class="map-frame" id="map-frame">
+    <div id="map"></div>
+    <div class="map-hud"><b>Paris</b> / <span id="hud-count">8</span> stores</div>
+    <button class="map-reset" id="map-reset" type="button">Show all</button>
+  </div>
+</main>
+
+<p class="fine">Demo only. Northside Atelier, Runner 01 &lsquo;Ash&rsquo;, the stores and all entry numbers are fictional. No data is sent or stored.</p>
+
+<div class="sheet-wrap" id="sheet-wrap" inert>
+  <div class="sheet-scrim" id="sheet-scrim"></div>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <button class="sheet-close" id="sheet-close" type="button" aria-label="Close">&times;</button>
+    <h3 id="sheet-title">Enter raffle</h3>
+    <p class="sub" id="sheet-sub"></p>
+
+    <form id="raffle-form" novalidate>
+      <span class="field-label">Size (EU)</span>
+      <div class="size-grid" id="size-grid"></div>
+      <div class="field">
+        <label class="field-label" for="email">Email</label>
+        <input id="email" type="email" inputmode="email" autocomplete="off" placeholder="you@example.com" />
+      </div>
+      <button class="btn btn-volt" id="submit" type="submit" disabled>Enter the draw</button>
+    </form>
+
+    <div id="done" class="hidden">
+      <div class="stamp"><strong>You&rsquo;re in</strong><span>Entry #04821</span></div>
+      <button class="btn" id="done-close" type="button" style="width:100%">Back to the map</button>
+    </div>
+  </section>
+</div>
+
+<script>
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+
+/* ---- Marquee: fill both groups with the same message ---- */
+const MSG = "DROP 07 — RUNNER 01 ‘ASH’ — 10.24 — 10:00 CET — ";
+['mq-a', 'mq-b'].forEach((id) => {
+  for (let i = 0; i < 5; i++) {
+    const s = document.createElement('span');
+    s.textContent = MSG;
+    $(id).appendChild(s);
+  }
+});
+
+/* ---- Fictional stores on real streets, Paris ---- */
+const STORES = [
+  { n: 1, name: 'Marais',         area: 'Rue de Bretagne',      arr: '3e',      c: [2.3616, 48.8631], total: 500, left: 312 },
+  { n: 2, name: 'Saint-Germain',  area: 'Rue de Buci',          arr: '6e',      c: [2.3382, 48.8535], total: 400, left: 188 },
+  { n: 3, name: 'Pigalle',        area: 'Rue des Martyrs',      arr: '9e',      c: [2.3380, 48.8785], total: 500, left: 31 },
+  { n: 4, name: 'Bastille',       area: 'Rue de la Roquette',   arr: '11e',     c: [2.3736, 48.8546], total: 300, left: 0 },
+  { n: 5, name: 'Canal St-Martin',area: 'Quai de Valmy',        arr: '10e',     c: [2.3637, 48.8731], total: 400, left: 254 },
+  { n: 6, name: 'Les Halles',     area: 'Rue Montorgueil',      arr: '1er/2e',  c: [2.3466, 48.8647], total: 600, left: 420 },
+  { n: 7, name: 'Belleville',     area: 'Rue de Belleville',    arr: '20e',     c: [2.3855, 48.8723], total: 300, left: 0 },
+  { n: 8, name: 'Montmartre',     area: 'Rue du Mont-Cenis',    arr: '18e',     c: [2.3400, 48.8870], total: 350, left: 96 },
+];
+
+const statusOf = (s) => (s.left === 0 ? 'sold' : s.left / s.total <= 0.15 ? 'closing' : 'open');
+const STATUS_TEXT = { open: 'Open', closing: 'Closing', sold: 'Sold out' };
+
+/* ---- Map ---- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: { basemap: { theme: 'monochrome', lightPreset: 'night', showPointOfInterestLabels: false, showTransitLabels: false } },
+  center: [2.355, 48.866],
+  zoom: 11.6,
+  attributionControl: true,
+});
+
+const pad = () => ({ top: 64, bottom: 72, left: 56, right: 56 });
+const bounds = STORES.reduce((b, s) => b.extend(s.c), new mapboxgl.LngLatBounds(STORES[0].c, STORES[0].c));
+let selected = null;
+
+function showAll() {
+  const o = { padding: pad(), maxZoom: 14 };
+  if (reduce) map.fitBounds(bounds, { ...o, duration: 0 });
+  else map.fitBounds(bounds, { ...o, duration: 1200 });
+}
+map.fitBounds(bounds, { padding: pad(), maxZoom: 14, duration: 0 });
+
+// Store names as labels: variable anchor (no overlap forcing), above the 3D slot
+map.on('style.load', () => {
+  map.addSource('stores', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: STORES.map((s) => ({
+      type: 'Feature', properties: { label: s.name }, geometry: { type: 'Point', coordinates: s.c } })) },
+  });
+  map.addLayer({
+    id: 'store-labels', type: 'symbol', source: 'stores', slot: 'top',
+    layout: {
+      'text-field': ['get', 'label'],
+      'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+      'text-size': 11,
+      'text-letter-spacing': 0.08,
+      'text-transform': 'uppercase',
+      'text-variable-anchor': ['top', 'bottom', 'left', 'right'],
+      'text-radial-offset': 1.9,
+      'text-optional': true,
+    },
+    paint: { 'text-color': '#ffffff', 'text-halo-color': '#000000', 'text-halo-width': 1.6, 'text-emissive-strength': 1 },
+  });
+});
+
+/* ---- List + pins ---- */
+const listEl = $('store-list');
+STORES.forEach((s) => {
+  const li = document.createElement('li');
+  li.className = 'store';
+  li.innerHTML =
+    `<button class="store-head" type="button">
+       <span class="store-num">${s.n}</span>
+       <span><span class="store-name">${s.name}</span><span class="store-area">${s.area} &middot; ${s.arr}</span></span>
+       <span class="tag"></span>
+     </button>
+     <div class="meter" role="img"><div class="meter-fill"></div></div>
+     <div class="meter-label"><span class="ml-left"></span><span class="ml-pct"></span></div>
+     <button class="btn enter" type="button">Enter raffle</button>`;
+  s.li = li;
+  li.querySelector('.store-head').addEventListener('click', () => select(s, true));
+  li.querySelector('.enter').addEventListener('click', () => { select(s, false); openSheet(s); });
+  listEl.appendChild(li);
+
+  // Marker root stays untouched; all styling is on the inner .pin
+  const root = document.createElement('div');
+  root.className = 'pin-root';
+  root.innerHTML = `<div class="pin"><b>${s.n}</b></div>`;
+  root.addEventListener('click', (e) => { e.stopPropagation(); select(s, true); });
+  s.pin = root.firstChild;
+  s.root = root;
+  new mapboxgl.Marker({ element: root }).setLngLat(s.c).addTo(map);
+});
+
+function paint(s) {
+  const st = statusOf(s);
+  const tag = s.li.querySelector('.tag');
+  tag.className = `tag tag-${st}`;
+  tag.textContent = STATUS_TEXT[st];
+  s.li.classList.toggle('is-sold', st === 'sold');
+  s.pin.classList.toggle('is-sold', st === 'sold');
+  s.li.querySelector('.meter-fill').style.width = `${(s.left / s.total) * 100}%`;
+  s.li.querySelector('.ml-left').textContent = `${s.left} / ${s.total} entries left`;
+  s.li.querySelector('.ml-pct').textContent = `${Math.round((s.left / s.total) * 100)}%`;
+  const btn = s.li.querySelector('.enter');
+  btn.disabled = st === 'sold';
+  btn.textContent = s.entered ? 'Entered' : st === 'sold' ? 'Sold out' : 'Enter raffle';
+}
+STORES.forEach(paint);
+
+const desktop = window.matchMedia('(min-width: 901px)');
+
+function select(s, fly) {
+  selected = s;
+  STORES.forEach((o) => {
+    o.li.classList.toggle('is-active', o === s);
+    o.pin.classList.toggle('is-active', o === s);
+    o.root.style.zIndex = o === s ? 2 : '';
+  });
+  if (!fly) return;
+  const o = { center: s.c, zoom: 14.6, padding: pad() };
+  if (reduce) map.jumpTo(o); else map.flyTo({ ...o, duration: 1400 });
+  if (desktop.matches) s.li.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+  else $('map-frame').scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+}
+
+$('map-reset').addEventListener('click', () => {
+  selected = null;
+  STORES.forEach((o) => { o.li.classList.remove('is-active'); o.pin.classList.remove('is-active'); o.root.style.zIndex = ''; });
+  showAll();
+});
+
+/* ---- Entries tick down ---- */
+setInterval(() => {
+  const live = STORES.filter((s) => s.left > 0);
+  for (let i = 0; i < 2 && live.length; i++) {
+    const s = live[Math.floor(Math.random() * live.length)];
+    s.left = Math.max(0, s.left - 1 - Math.floor(Math.random() * 8));
+    paint(s);
+  }
+}, 2800);
+
+/* ---- Countdown (demo: starts at 45 s, then flips to LIVE NOW) ---- */
+let target = Date.now() + 45000;
+let isLive = false;
+const pad2 = (n) => String(n).padStart(2, '0');
+
+function tick() {
+  const r = Math.max(0, Math.ceil((target - Date.now()) / 1000));
+  $('cd-d').textContent = pad2(Math.floor(r / 86400));
+  $('cd-h').textContent = pad2(Math.floor((r % 86400) / 3600));
+  $('cd-m').textContent = pad2(Math.floor((r % 3600) / 60));
+  $('cd-s').textContent = pad2(r % 60);
+  if (r === 0 && !isLive) setLive(true);
+}
+
+function setLive(on) {
+  isLive = on;
+  $('hero').classList.toggle('live', on);
+  $('count').classList.toggle('hidden', on);
+  $('live').classList.toggle('hidden', !on);
+  $('replay').classList.toggle('hidden', !on);
+  $('eyebrow').textContent = on ? 'Drop 07 is live' : 'Northside Atelier — Drop 07';
+}
+
+$('replay').addEventListener('click', () => { target = Date.now() + 45000; setLive(false); tick(); });
+setInterval(tick, 250);
+tick();
+
+/* ---- Slide-up raffle sheet (visual only, no network) ---- */
+const wrap = $('sheet-wrap');
+const sizeGrid = $('size-grid');
+const email = $('email');
+const submit = $('submit');
+let size = null, current = null, opener = null;
+
+for (let n = 38; n <= 46; n++) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'size';
+  b.textContent = n;
+  b.setAttribute('aria-pressed', 'false');
+  b.addEventListener('click', () => {
+    size = n;
+    sizeGrid.querySelectorAll('.size').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    check();
+  });
+  sizeGrid.appendChild(b);
+}
+
+function check() {
+  submit.disabled = !(size && /^\S+@\S+\.\S+$/.test(email.value.trim()));
+}
+email.addEventListener('input', check);
+
+function openSheet(s) {
+  current = s;
+  opener = document.activeElement;
+  size = null;
+  email.value = '';
+  sizeGrid.querySelectorAll('.size').forEach((x) => x.setAttribute('aria-pressed', 'false'));
+  $('sheet-title').textContent = `Northside Atelier — ${s.name}`;
+  $('sheet-sub').textContent = `${s.area}, Paris ${s.arr}. Pick your size and we’ll draw at 10:00 CET.`;
+  $('raffle-form').classList.remove('hidden');
+  $('done').classList.add('hidden');
+  check();
+  wrap.inert = false;
+  wrap.classList.add('open');
+  $('sheet-close').focus();
+}
+
+function closeSheet() {
+  wrap.classList.remove('open');
+  wrap.inert = true;
+  if (opener && opener.focus) opener.focus();
+}
+
+$('raffle-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (submit.disabled) return;
+  if (current.left > 0) current.left -= 1;
+  current.entered = true;
+  paint(current);
+  $('raffle-form').classList.add('hidden');
+  $('done').classList.remove('hidden');
+});
+
+$('sheet-close').addEventListener('click', closeSheet);
+$('done-close').addEventListener('click', closeSheet);
+$('sheet-scrim').addEventListener('click', closeSheet);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && wrap.classList.contains('open')) closeSheet(); });
+
+map.on('error', (e) => console.warn('Map error:', e.error && e.error.message));
+</script>
+</body>
+</html>
