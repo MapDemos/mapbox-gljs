@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Mapbox Demos</title>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<script src="shared/demo-kit.js"></script>
 <style>
   :root {
     --bg: oklch(0.15 0.008 260);
@@ -20,11 +23,34 @@
   body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
   a { color: var(--brand); text-decoration: none; }
 
-  .page { max-width: 900px; margin: 0 auto; padding: 28px 24px 64px; }
+  .page { max-width: 900px; margin: 0 auto; padding: 8px 24px 64px; }
 
-  .topbar { display: flex; align-items: center; gap: 12px; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
-  .topbar .icon { color: var(--brand); display: flex; }
-  .topbar h1 { font-family: Raleway, sans-serif; font-weight: 700; font-size: 22px; margin: 0; }
+  /* Hero: a slowly spinning night globe behind the title. Purely decorative
+     (non-interactive); if the map can't load, the band is just --bg. */
+  .hero { position: relative; height: 260px; overflow: hidden; background: var(--bg); }
+  .hero #hero-map { position: absolute; inset: 0; }
+  .hero::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 40px; pointer-events: none;
+    background: linear-gradient(to bottom, transparent, var(--bg));
+  }
+  /* Decorative header map: no logo or attribution controls (by request). */
+  .hero .mapboxgl-control-container { display: none; }
+  .hero-inner {
+    position: relative; z-index: 2; height: 100%; max-width: 900px; margin: 0 auto; padding: 0 24px;
+    display: flex; flex-direction: column; justify-content: center; gap: 10px; pointer-events: none;
+  }
+  .hero-title { display: flex; align-items: center; gap: 14px; }
+  .hero-title .icon { color: var(--brand); display: flex; }
+  .hero h1 {
+    font-family: Raleway, sans-serif; font-weight: 700; font-size: 40px; margin: 0; letter-spacing: -0.01em;
+    text-shadow: 0 2px 18px oklch(0 0 0 / 0.6);
+  }
+  .hero .subtitle { margin: 0; font-size: 15px; color: var(--muted); text-shadow: 0 1px 10px oklch(0 0 0 / 0.7); }
+  @media (max-width: 640px) {
+    .hero { height: 200px; }
+    .hero h1 { font-size: 30px; }
+    .hero .subtitle { font-size: 14px; max-width: 70%; }
+  }
 
   .controls { display: flex; flex-direction: column; gap: 12px; margin-bottom: 6px; }
   .search { position: relative; max-width: 440px; }
@@ -35,7 +61,19 @@
   }
   .search input:focus { border-color: var(--brand); }
 
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  /* Chips are grouped by tags.json `kind`: one labelled row per group. */
+  .chip-groups { display: flex; flex-direction: column; gap: 10px; }
+  .chip-group { display: flex; align-items: flex-start; gap: 12px; }
+  .chip-group-label {
+    flex: 0 0 96px; padding-top: 9px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; min-width: 0; }
+  .chip-more { border-style: dashed; color: var(--muted); }
+  @media (max-width: 640px) {
+    .chip-group { flex-direction: column; gap: 6px; }
+    .chip-group-label { flex: none; padding-top: 0; }
+  }
   .chip {
     display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 13px; border-radius: 999px;
     background: transparent; border: 1px solid var(--border); color: var(--text); font-size: 14px; cursor: pointer;
@@ -45,7 +83,12 @@
   .chip-selected { background: var(--chip-accent); border-color: var(--chip-accent); color: oklch(0.16 0 0); }
   .chip-selected .chip-count { color: oklch(0.16 0 0 / 0.65); }
 
-  .result-count { font-size: 15px; color: var(--muted); margin: 18px 0 10px; }
+  .result-line { display: flex; align-items: baseline; gap: 10px; margin: 18px 0 10px; }
+  .result-count { font-size: 15px; color: var(--muted); margin: 0; }
+  .clear-filters {
+    background: none; border: none; padding: 0; font: inherit; font-size: 14px; color: var(--brand); cursor: pointer;
+  }
+  .clear-filters:hover { text-decoration: underline; }
 
   .list { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
   .row {
@@ -68,6 +111,10 @@
   .row-top .title { flex: 1; font-size: 15px; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row-top .source { font-size: 13px; color: var(--muted); flex-shrink: 0; display: none; }
   .row-top .open { color: var(--muted); display: flex; flex-shrink: 0; }
+  .desc {
+    margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted);
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  }
 
   .tags-full { display: flex; flex-wrap: wrap; gap: 6px; }
   .tag {
@@ -78,38 +125,38 @@
 
   .empty { color: var(--muted); font-size: 15px; padding: 40px 0; text-align: center; }
 
-  .floating-tooltip {
-    position: fixed; z-index: 1000; max-width: 320px; pointer-events: none;
-    background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px;
-    padding: 9px 12px; font-size: 13px; line-height: 1.4; color: var(--text);
-    box-shadow: 0 8px 20px oklch(0 0 0 / 0.4);
-    opacity: 0; transition: opacity 0.1s ease;
-  }
-
   @media (min-width: 820px) {
     .row-top .source { display: block; }
   }
 </style>
 </head>
 <body>
-<div class="page">
-  <header class="topbar">
-    <span class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M15.5 8.5 13 13l-4.5 2.5L11 11l4.5-2.5Z"/></svg></span>
-    <h1>Mapbox Demos</h1>
-  </header>
+<header class="hero">
+  <div id="hero-map"></div>
+  <div class="hero-inner">
+    <div class="hero-title">
+      <span class="icon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M15.5 8.5 13 13l-4.5 2.5L11 11l4.5-2.5Z"/></svg></span>
+      <h1>Mapbox Demos</h1>
+    </div>
+    <p class="subtitle" id="hero-subtitle">Demos built with Mapbox GL JS and Mapbox APIs</p>
+  </div>
+</header>
 
+<div class="page">
   <div class="controls">
     <div class="search">
       <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M16.5 16.5 13 13"/></svg>
       <input type="text" id="search-input" placeholder="Search demos" autocomplete="off" />
     </div>
-    <div class="chips" id="chips"></div>
+    <div class="chip-groups" id="chips"></div>
   </div>
 
-  <p class="result-count" id="result-count"></p>
+  <div class="result-line">
+    <p class="result-count" id="result-count"></p>
+    <button class="clear-filters" id="clear-filters" type="button" hidden>Clear filters</button>
+  </div>
   <div id="list-container"></div>
 </div>
-<div class="floating-tooltip" id="tooltip"></div>
 
 <script>
 // The tag list lives in tags.json ({name, kind, hue, description}, in chip
@@ -121,6 +168,16 @@
 const TAG_HUES = {};
 const TAG_ORDER = [];
 const TAG_DESCRIPTIONS = {};
+const TAG_KINDS = {};
+// One chip row per tags.json `kind`, in this order; unknown kinds join Products.
+const CHIP_GROUPS = [
+  { kind: 'product', label: 'Products' },
+  { kind: 'feature', label: 'Features' },
+  { kind: 'industry', label: 'Industries' },
+];
+// Products is long: show this many (plus any selected) until "+N more" is clicked.
+const PRODUCTS_COLLAPSED = 6;
+let productsExpanded = false;
 const BRAND_ACCENT = 'oklch(0.66 0.19 264)';
 const BRAND_TINT = 'oklch(0.66 0.19 264 / 0.16)';
 const accentFor = (tag) => TAG_HUES[tag] === undefined ? BRAND_ACCENT : `oklch(0.74 0.15 ${TAG_HUES[tag]})`;
@@ -156,25 +213,35 @@ function render() {
   const bySearch = DATA.filter(matchesQuery);
   const filtered = bySearch.filter(matchesTags);
 
-  // Chips: "All" plus every tag in tags.json, in its order. Multi-select is AND: selecting more tags narrows
+  // Chips: every tag in tags.json, grouped by kind, in its order. Multi-select is AND: selecting more tags narrows
   // results to demos that have every selected tag. A chip's count answers
   // "how many demos would match if this tag were added to the current
   // selection" (given the search text) -- for an already-selected chip
   // that's just the current result count, since it's already included.
-  const chipsHtml = [{ key: null, label: 'All' }, ...TAG_ORDER.map((t) => ({ key: t, label: t }))]
-    .map(({ key, label }) => {
-      const count = key === null
-        ? bySearch.length
-        : bySearch.filter((d) => [...selectedTags, key].every((t) => d.tags.includes(t))).length;
-      const selected = key === null ? selectedTags.size === 0 : selectedTags.has(key);
-      const accent = key === null ? BRAND_ACCENT : accentFor(key);
-      const title = key !== null && TAG_DESCRIPTIONS[key] ? ` title="${escapeHtml(TAG_DESCRIPTIONS[key])}"` : '';
-      return `<button class="chip${selected ? ' chip-selected' : ''}" style="--chip-accent:${accent}" data-tag="${key === null ? '' : escapeHtml(key)}"${title}>${escapeHtml(label)}<span class="chip-count">${count}</span></button>`;
-    })
-    .join('');
-  document.getElementById('chips').innerHTML = chipsHtml;
+  const chipHtml = (key) => {
+    const count = bySearch.filter((d) => [...selectedTags, key].every((t) => d.tags.includes(t))).length;
+    const title = TAG_DESCRIPTIONS[key] ? ` title="${escapeHtml(TAG_DESCRIPTIONS[key])}"` : '';
+    return `<button class="chip${selectedTags.has(key) ? ' chip-selected' : ''}" style="--chip-accent:${accentFor(key)}" data-tag="${escapeHtml(key)}"${title}>${escapeHtml(key)}<span class="chip-count">${count}</span></button>`;
+  };
+  const known = new Set(CHIP_GROUPS.map((g) => g.kind));
+  const groupsHtml = CHIP_GROUPS.map(({ kind, label }) => {
+    const tags = TAG_ORDER.filter((t) => (known.has(TAG_KINDS[t]) ? TAG_KINDS[t] : 'product') === kind);
+    if (tags.length === 0) return '';
+    let shown = tags;
+    let toggle = '';
+    if (kind === 'product' && tags.length > PRODUCTS_COLLAPSED) {
+      if (!productsExpanded) shown = tags.filter((t, i) => i < PRODUCTS_COLLAPSED || selectedTags.has(t));
+      const hidden = tags.length - shown.length;
+      toggle = productsExpanded
+        ? '<button class="chip chip-more" data-toggle="products">Show less</button>'
+        : `<button class="chip chip-more" data-toggle="products">+${hidden} more</button>`;
+    }
+    return `<div class="chip-group"><span class="chip-group-label">${label}</span><div class="chips">${shown.map(chipHtml).join('')}${toggle}</div></div>`;
+  }).join('');
+  document.getElementById('chips').innerHTML = groupsHtml;
 
   document.getElementById('result-count').textContent = `${filtered.length} of ${DATA.length} demos`;
+  document.getElementById('clear-filters').hidden = selectedTags.size === 0;
 
   const listContainer = document.getElementById('list-container');
   if (filtered.length === 0) {
@@ -189,13 +256,14 @@ function render() {
       : item.tags.map((t) => `<span class="tag" style="--tag-accent:${accentFor(t)};--tag-tint:${tintFor(t)}">${escapeHtml(t)}</span>`).join('');
     const thumb = THUMBS.has(item.slug) ? `thumbs/${encodeURIComponent(item.slug)}.jpg` : null;
     return `
-      <a class="row${thumb ? ' has-thumb' : ''}" href="${escapeHtml(item.url)}" target="_blank" rel="noopener" data-tooltip="${escapeHtml(item.description)}">
+      <a class="row${thumb ? ' has-thumb' : ''}" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">
         ${thumb ? `<span class="thumb"><img src="${thumb}" alt="" loading="lazy"></span><div class="row-body">` : ''}
         <div class="row-top">
           <span class="title">${escapeHtml(item.title)}</span>
           ${domain ? `<span class="source">${escapeHtml(domain)}</span>` : ''}
           <span class="open"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h6v6M12 4 4 12"/></svg></span>
         </div>
+        ${item.description ? `<p class="desc">${escapeHtml(item.description)}</p>` : ''}
         <div class="tags-full">${tagsHtml}</div>
         ${thumb ? '</div>' : ''}
       </a>`;
@@ -211,49 +279,50 @@ document.getElementById('search-input').addEventListener('input', (e) => {
 document.getElementById('chips').addEventListener('click', (e) => {
   const btn = e.target.closest('.chip');
   if (!btn) return;
-  const tag = btn.dataset.tag;
-  if (tag === '') {
-    selectedTags.clear();
-  } else if (selectedTags.has(tag)) {
-    selectedTags.delete(tag);
+  if (btn.dataset.toggle === 'products') {
+    productsExpanded = !productsExpanded;
+  } else if (selectedTags.has(btn.dataset.tag)) {
+    selectedTags.delete(btn.dataset.tag);
   } else {
-    selectedTags.add(tag);
+    selectedTags.add(btn.dataset.tag);
   }
   render();
 });
 
-const tooltip = document.getElementById('tooltip');
-let tooltipRow = null;
+document.getElementById('clear-filters').addEventListener('click', () => {
+  selectedTags.clear();
+  render();
+});
 
-function positionTooltip(x, y) {
-  const pad = 12;
-  const rect = tooltip.getBoundingClientRect();
-  let left = x + 16;
-  let top = y + 20;
-  if (left + rect.width + pad > window.innerWidth) left = x - rect.width - 16;
-  if (top + rect.height + pad > window.innerHeight) top = y - rect.height - 20;
-  tooltip.style.left = `${Math.max(pad, left)}px`;
-  tooltip.style.top = `${Math.max(pad, top)}px`;
-}
-
-document.getElementById('list-container').addEventListener('mousemove', (e) => {
-  const row = e.target.closest('.row');
-  if (row !== tooltipRow) {
-    tooltipRow = row;
-    if (row) {
-      tooltip.textContent = row.dataset.tooltip;
-      tooltip.style.opacity = '1';
-    } else {
-      tooltip.style.opacity = '0';
-    }
+// Hero globe: slow eastward spin, decorative only. Skipped (static globe)
+// under prefers-reduced-motion; any map failure leaves the plain band.
+try {
+  const heroMap = new mapboxgl.Map({
+    container: 'hero-map',
+    style: 'mapbox://styles/mapbox/standard',
+    config: { basemap: { lightPreset: 'night', showPointOfInterestLabels: false, showTransitLabels: false } },
+    projection: 'globe',
+    center: [135, 20],
+    zoom: 0.6,
+    interactive: false,
+    attributionControl: false,
+  });
+  const wide = () => window.innerWidth > 640;
+  // Push the globe right on wide screens so the title on the left stays clear.
+  const heroPadding = () => (wide() ? { left: Math.min(window.innerWidth * 0.45, 640) } : { left: 0 });
+  heroMap.on('load', () => heroMap.setPadding(heroPadding()));
+  window.addEventListener('resize', () => heroMap.setPadding(heroPadding()));
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const spin = () => {
+      const c = heroMap.getCenter();
+      heroMap.easeTo({ center: [c.lng + 20, c.lat], duration: 10000, easing: (t) => t });
+    };
+    heroMap.on('moveend', spin);
+    heroMap.on('load', spin);
   }
-  if (row) positionTooltip(e.clientX, e.clientY);
-});
-
-document.getElementById('list-container').addEventListener('mouseleave', () => {
-  tooltipRow = null;
-  tooltip.style.opacity = '0';
-});
+} catch (err) {
+  console.error('Hero map failed to load', err);
+}
 
 // Without tags.json the list still works, just with no chips.
 const tagsLoaded = fetch('./tags.json')
@@ -263,6 +332,7 @@ const tagsLoaded = fetch('./tags.json')
       TAG_ORDER.push(tag.name);
       if (Number.isFinite(tag.hue)) TAG_HUES[tag.name] = tag.hue;
       if (tag.description) TAG_DESCRIPTIONS[tag.name] = tag.description;
+      if (tag.kind) TAG_KINDS[tag.name] = tag.kind;
     }
   })
   .catch((err) => console.error('Could not load tags.json', err));
@@ -279,6 +349,7 @@ fetch('./demos.json')
   .then(async (data) => {
     await Promise.all([tagsLoaded, thumbsLoaded]);
     DATA = data;
+    document.getElementById('hero-subtitle').textContent = `${data.length} demos built with Mapbox GL JS and Mapbox APIs`;
     render();
   })
   .catch((err) => {

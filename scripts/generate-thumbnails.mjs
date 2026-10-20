@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Screenshots every demo in demos/demos.json that has no thumbnail yet and
-// saves it as demos/thumbs/<slug>.jpg (480px wide), then rewrites
+// saves it as demos/thumbs/<slug>.jpg (256px wide), then rewrites
 // demos/thumbs/index.json -- the list of slugs index.html shows a thumbnail
 // for. Existing thumbnails are never regenerated: commit your own image to
 // replace a bad one, or delete the file to have it re-shot.
@@ -20,7 +20,8 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DEMOS_DIR = join(ROOT, 'demos');
 const THUMBS_DIR = join(DEMOS_DIR, 'thumbs');
 const VIEWPORT = { width: 1280, height: 800 };
-const THUMB_WIDTH = 480;
+// index.html shows thumbnails 128px wide; 256px covers 2x (retina) screens.
+const THUMB_WIDTH = 256;
 const PAGE_TIMEOUT_MS = 30000;
 const CANVAS_TIMEOUT_MS = 15000;
 const SETTLE_MS = 4000;
@@ -98,7 +99,7 @@ async function shoot(browser, item, url) {
     await page.waitForTimeout(SETTLE_MS);
     const png = await page.screenshot({ type: 'png' });
     if (await isBlank(png)) throw new Error('blank screenshot');
-    await sharp(png).resize({ width: THUMB_WIDTH }).jpeg({ quality: 75, mozjpeg: true })
+    await sharp(png).resize({ width: THUMB_WIDTH }).jpeg({ quality: 72, mozjpeg: true })
       .toFile(join(THUMBS_DIR, `${item.slug}.jpg`));
   } finally {
     await page.close();
