@@ -1,0 +1,121 @@
+[
+  {
+    "name": "tarmac-glass",
+    "description": {
+      "en": "Dark frosted glass, amber accent, Bebas Neue — playful airport wayfinding",
+      "ja": "ダークなすりガラス、アンバーのアクセント、Bebas Neue — 遊び心のある空港案内"
+    }
+  },
+  {
+    "name": "highway-sign",
+    "description": {
+      "en": "Cream & teal MUTCD highway-sign palette — civic navigation HUD",
+      "ja": "クリームとティールの MUTCD 道路標識風パレット — 公共ナビゲーション HUD"
+    }
+  },
+  {
+    "name": "slate-console",
+    "description": {
+      "en": "Dark blue-slate with a cyan accent stripe — technical readout panel",
+      "ja": "ダークなブルースレートにシアンのアクセント — 技術系の計器パネル"
+    }
+  },
+  {
+    "name": "arena",
+    "description": {
+      "en": "Near-black precision UI (Linear-inspired) — split-pane comparison shell",
+      "ja": "ほぼ黒の精密な UI（Linear 風） — 2 画面比較レイアウト"
+    }
+  },
+  {
+    "name": "vintage-chart",
+    "description": {
+      "en": "Navy/parchment/brass, serif display — dark cinematic dashboard",
+      "ja": "ネイビー・羊皮紙・真鍮、セリフ体の見出し — 映画のようなダークダッシュボード"
+    }
+  },
+  {
+    "name": "editorial-paper",
+    "description": {
+      "en": "Warm paper, oversized serif headlines — magazine/newspaper look",
+      "ja": "温かみのある紙、大きなセリフ体の見出し — 雑誌・新聞風"
+    }
+  },
+  {
+    "name": "storefront",
+    "description": {
+      "en": "Warm blush-white, coral-red accent — retail wayfinding sidebar",
+      "ja": "やわらかなオフホワイトにコーラルレッド — 店舗案内のサイドバー"
+    }
+  },
+  {
+    "name": "riso-zine",
+    "description": {
+      "en": "Risograph zine print — snap-scrolling card filmstrip along the bottom",
+      "ja": "リソグラフ印刷のジン風 — 下部にスナップスクロールするカードの帯"
+    }
+  },
+  {
+    "name": "swiss-grid",
+    "description": {
+      "en": "Swiss typographic grid — split-screen index linked to the map",
+      "ja": "スイス風タイポグラフィのグリッド — 地図と連動する 2 画面の索引"
+    }
+  },
+  {
+    "name": "neon-hud",
+    "description": {
+      "en": "Synthwave neon full-frame HUD — route playback and gauges",
+      "ja": "シンセウェーブのネオン全画面 HUD — ルート再生とゲージ"
+    }
+  },
+  {
+    "name": "pastel-bento",
+    "description": {
+      "en": "Soft clay bento grid — category filter tiles",
+      "ja": "やわらかなクレイ風の弁当箱グリッド — カテゴリ絞り込みタイル"
+    }
+  },
+  {
+    "name": "blueprint",
+    "description": {
+      "en": "Engineering drawing sheet — title block and a measure tool",
+      "ja": "設計図の図面シート風 — 表題欄と計測ツール"
+    }
+  },
+  {
+    "name": "story-scroll",
+    "description": {
+      "en": "Scrollytelling chapters — scrolling drives the camera over 3D terrain",
+      "ja": "スクロールで語るストーリー — スクロールに合わせて 3D 地形の上をカメラが移動"
+    }
+  },
+  {
+    "name": "retro-os",
+    "description": {
+      "en": "90s desktop — draggable map window and a taskbar",
+      "ja": "90 年代のデスクトップ風 — ドラッグできる地図ウィンドウとタスクバー"
+    }
+  },
+  {
+    "name": "aurora-command",
+    "description": {
+      "en": "Aurora-framed dark map — command palette search",
+      "ja": "オーロラに縁取られたダークな地図 — コマンドパレットで検索"
+    }
+  },
+  {
+    "name": "deco-voyage",
+    "description": {
+      "en": "Art Deco travel poster — arch-masked globe and ticket-style route arcs",
+      "ja": "アール・デコの旅行ポスター風 — アーチ型の地球儀とチケット風のルート弧"
+    }
+  },
+  {
+    "name": "washi-seasons",
+    "description": {
+      "en": "Japanese minimal washi layout — season switcher",
+      "ja": "和紙を思わせる和のミニマルなレイアウト — 季節の切り替え"
+    }
+  }
+]
