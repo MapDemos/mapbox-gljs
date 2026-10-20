@@ -22,10 +22,10 @@ mkdir -p _build
 # Flatten every demo page to the root of _build/
 find demos -maxdepth 1 -type f -exec cp {} _build/ \;
 
-# Companion subfolders inside demos/ (data/, assets/, shared/ — all
+# Companion subfolders inside demos/ (data/, assets/, shared/, thumbs/ — all
 # referenced by relative path from the demo pages) also need to land at
 # the flattened root, alongside the pages themselves.
-find demos -maxdepth 1 -type d \( -name data -o -name assets -o -name shared \) -exec cp -R {} _build/ \;
+find demos -maxdepth 1 -type d \( -name data -o -name assets -o -name shared -o -name thumbs \) -exec cp -R {} _build/ \;
 
 echo "Built _build/ — $(find _build -maxdepth 1 -name '*.html' | wc -l | tr -d ' ') demo pages flattened to root."
 echo "Test with: cd _build && python3 -m http.server 8000"

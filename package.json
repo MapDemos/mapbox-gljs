@@ -7,7 +7,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "thumbs": "node scripts/generate-thumbnails.mjs"
   },
   "repository": {
     "type": "git",
@@ -22,7 +23,9 @@
   "homepage": "https://github.com/MapDemos/mapbox-gljs#readme",
   "devDependencies": {
     "chrome-devtools-mcp": "^0.10.2",
-    "eslint": "^9.39.1"
+    "eslint": "^9.39.1",
+    "playwright": "^1.64.1",
+    "sharp": "^0.35.5"
   },
   "packageManager": "npm@11.6.3+sha512.4085a763162e0e3acd19a4e9d23ad3aa0978e501ccf947dd7233c12a689ae0bb0190763c4ef12366990056b34eec438903ffed38fde4fbd722a17c2a7407ee92"
 }

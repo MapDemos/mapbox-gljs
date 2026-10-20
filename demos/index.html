@@ -53,6 +53,16 @@
     border-bottom: 1px solid var(--border); background: var(--card);
   }
   .row:last-child { border-bottom: none; }
+  /* Rows with a thumbnail put it on the left; the text column is unchanged. */
+  .row.has-thumb { flex-direction: row; align-items: center; gap: 16px; }
+  .row-body { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; }
+  .thumb {
+    width: 128px; aspect-ratio: 16 / 10; flex-shrink: 0; border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--border); background: var(--bg-elevated);
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.2s ease; }
+  .row:hover .thumb img { transform: scale(1.06); }
+  @media (max-width: 480px) { .thumb { width: 96px; } }
   .row:hover { background: var(--bg-elevated); }
   .row-top { display: flex; align-items: center; gap: 10px; }
   .row-top .title { flex: 1; font-size: 15px; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -125,6 +135,8 @@ function sourceDomain(item) {
   try { return new URL(item.url).hostname; } catch { return null; }
 }
 
+const THUMBS = new Set();
+
 let DATA = [];
 let searchQuery = '';
 const selectedTags = new Set();
@@ -175,14 +187,17 @@ function render() {
     const tagsHtml = item.tags.length === 0
       ? '<span class="tag-none">&mdash;</span>'
       : item.tags.map((t) => `<span class="tag" style="--tag-accent:${accentFor(t)};--tag-tint:${tintFor(t)}">${escapeHtml(t)}</span>`).join('');
+    const thumb = THUMBS.has(item.slug) ? `thumbs/${encodeURIComponent(item.slug)}.jpg` : null;
     return `
-      <a class="row" href="${escapeHtml(item.url)}" target="_blank" rel="noopener" data-tooltip="${escapeHtml(item.description)}">
+      <a class="row${thumb ? ' has-thumb' : ''}" href="${escapeHtml(item.url)}" target="_blank" rel="noopener" data-tooltip="${escapeHtml(item.description)}">
+        ${thumb ? `<span class="thumb"><img src="${thumb}" alt="" loading="lazy"></span><div class="row-body">` : ''}
         <div class="row-top">
           <span class="title">${escapeHtml(item.title)}</span>
           ${domain ? `<span class="source">${escapeHtml(domain)}</span>` : ''}
           <span class="open"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h6v6M12 4 4 12"/></svg></span>
         </div>
         <div class="tags-full">${tagsHtml}</div>
+        ${thumb ? '</div>' : ''}
       </a>`;
   }).join('');
   listContainer.innerHTML = `<div class="list">${rowsHtml}</div>`;
@@ -252,10 +267,17 @@ const tagsLoaded = fetch('./tags.json')
   })
   .catch((err) => console.error('Could not load tags.json', err));
 
+// thumbs/index.json lists the slugs that have a thumbs/<slug>.jpg; CI
+// (scripts/generate-thumbnails.mjs) keeps it current. Without it, no thumbnails.
+const thumbsLoaded = fetch('./thumbs/index.json')
+  .then((r) => r.json())
+  .then((slugs) => slugs.forEach((s) => THUMBS.add(s)))
+  .catch((err) => console.error('Could not load thumbs/index.json', err));
+
 fetch('./demos.json')
   .then((r) => r.json())
   .then(async (data) => {
-    await tagsLoaded;
+    await Promise.all([tagsLoaded, thumbsLoaded]);
     DATA = data;
     render();
   })

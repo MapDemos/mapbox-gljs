@@ -6,7 +6,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  # write: the build job commits thumbnails for newly added demos.
+  contents: write
   pages: write
   id-token: write
 
@@ -22,6 +23,42 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Thumbnails run here, not in a separate workflow: a commit pushed with
+      # GITHUB_TOKEN never triggers another workflow run, so a separate job's
+      # images would not be deployed until some later push. Generating them
+      # before Flatten ships them in this same deploy (and can't loop).
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Generate thumbnails for demos that have none
+        run: npm run thumbs
+
+      - name: Commit new thumbnails
+        run: |
+          git add demos/thumbs
+          if git diff --cached --quiet; then
+            echo "No new thumbnails."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Add demo thumbnails [skip ci]"
+          # The demo generator also pushes to main, so rebase and retry.
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep $((attempt * 5))
+          done
+          echo "::warning::Could not push thumbnail commit; they are still deployed in this run."
 
       - name: Flatten demos/ to the published root
         run: ./scripts/flatten-demos.sh
