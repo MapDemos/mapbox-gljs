@@ -810,5 +810,19 @@
     ],
     "tagsVerified": false,
     "description": "Demonstrates excluding road types/areas from Directions API routes."
+  },
+  {
+    "slug": "japan-city-jump-map",
+    "title": "Japan City Jump Map",
+    "type": "local",
+    "url": "japan-city-jump-map.html",
+    "tags": [
+      "Geocoding API",
+      "Animation",
+      "Travel"
+    ],
+    "description": "Pick a Japanese city from a scrapbook-style strip of cards to geocode it live and fly the map in, dropping a numbered marker with a popup, with a button to reset back to the full Japan view.",
+    "tagsVerified": false,
+    "source": "demo-generator"
   }
 ]
