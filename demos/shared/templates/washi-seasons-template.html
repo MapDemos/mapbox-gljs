@@ -1,0 +1,251 @@
+<!--
+  Working EXAMPLE of the Washi Seasons style pack (washi-seasons.css, in
+  this same folder). Open this file directly to see the pattern working
+  with sixteen Kyoto places across four seasons: a vertical-writing title
+  and red hanko seal on the right, an off-centre framed Mapbox Standard map
+  on the left, and a narrow rail between them with a season switcher and a
+  place list. Switching season flips data-season on <html> (accent + seal
+  colour), changes Standard's lightPreset/theme, swaps the markers and
+  refits the map. Copy the markup below into your own demo and link
+  washi-seasons.css from its <head> -- see the class/id contract documented
+  at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (washi, sumi ink, vermilion hanko, "ma") at the
+  user's request for something distinct from every other pack in this
+  folder. The places are real public landmarks, but the haiku-like lines
+  and English notes are illustrative placeholders. The Japanese copy
+  should be reviewed by a native speaker before any real use.
+
+  What's NOT included: any real dataset, search/geocoding, routing,
+  popups, or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="ja" data-season="spring">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>京都 四季めぐり</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="washi-seasons.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="ma">
+  <header class="title-col">
+    <h1 class="tate">京都 四季めぐり</h1>
+    <p class="tate-sub">古都の季節を歩く</p>
+    <div class="hanko" aria-hidden="true">四季</div>
+  </header>
+
+  <div class="stage">
+    <div class="frame"><div id="map"></div></div>
+  </div>
+
+  <aside class="rail">
+    <p class="rail-label">季節 / Season</p>
+    <div class="season-switch" id="season-switch"></div>
+
+    <h2 class="season-title" id="season-title"></h2>
+    <ul class="place-list" id="place-list"></ul>
+
+    <div class="note" id="note" aria-live="polite">
+      <p class="note-empty" id="note-empty">場所を選んでください。</p>
+      <div class="hidden" id="note-body">
+        <h3 class="note-name" id="note-name"></h3>
+        <p class="note-ja" id="note-ja"></p>
+        <p class="note-en" id="note-en"></p>
+      </div>
+    </div>
+
+    <p class="status-note" id="status-note">地図を読み込み中</p>
+  </aside>
+</div>
+
+<script>
+// Illustrative copy. lightPreset/theme follow the brief: only keys from
+// Standard's documented config schema.
+const SEASONS = {
+  spring: { ja: '春', en: 'Spring', title: '桜の便り', lightPreset: 'dawn', theme: 'faded', places: [
+    { name: '哲学の道', ja: '疏水に散る花びら ひとひらずつの朝', en: 'Petals drift down the canal, one by one.', coord: [135.7952, 35.0273] },
+    { name: '円山公園', ja: 'しだれ桜 夜明けの空を撫でている', en: 'A weeping cherry strokes the dawn sky.', coord: [135.7807, 35.0036] },
+    { name: '仁和寺', ja: '遅咲きの御室桜 低く香る', en: 'Late Omuro cherries, low and fragrant.', coord: [135.7140, 35.0310] },
+    { name: '醍醐寺', ja: '太閤の春 いまも枝先に', en: "Hideyoshi's spring lingers on the branches.", coord: [135.8217, 34.9511] },
+  ] },
+  summer: { ja: '夏', en: 'Summer', title: '川風の頃', lightPreset: 'day', theme: 'faded', places: [
+    { name: '鴨川の川床', ja: '川風に 灯りがゆれる 夕涼み', en: 'Lanterns sway in the river breeze at dusk.', coord: [135.7706, 35.0053] },
+    { name: '下鴨神社', ja: '糺の森 蝉しぐれ降る 木漏れ日', en: 'Cicadas rain through the Tadasu forest.', coord: [135.7726, 35.0390] },
+    { name: '八坂神社', ja: '祇園囃子 遠く近くに 夏がくる', en: 'Gion festival music, near then far: summer arrives.', coord: [135.7785, 35.0037] },
+    { name: '渡月橋', ja: '鵜飼の火 水面に揺れて 夜は深く', en: 'Cormorant-fishing fires tremble on the water.', coord: [135.6777, 35.0094] },
+  ] },
+  autumn: { ja: '秋', en: 'Autumn', title: '紅葉の寺', lightPreset: 'dusk', theme: 'faded', places: [
+    { name: '東福寺', ja: '通天橋 紅の海を わたりゆく', en: 'Crossing a sea of red on the Tsuten bridge.', coord: [135.7739, 34.9763] },
+    { name: '永観堂', ja: '夕映えの 池に重なる 紅葉かな', en: 'Maples layer upon the pond in evening light.', coord: [135.7940, 35.0143] },
+    { name: '清水寺', ja: '舞台より 燃ゆる山々 見下ろして', en: 'From the great stage, the hills look aflame.', coord: [135.7850, 34.9949] },
+    { name: '神護寺', ja: '高雄路 かわらけ投げて 秋の空', en: 'Tossing clay discs into the autumn sky at Takao.', coord: [135.6700, 35.0630] },
+  ] },
+  winter: { ja: '冬', en: 'Winter', title: '雪と灯り', lightPreset: 'day', theme: 'monochrome', places: [
+    { name: '金閣寺', ja: '雪の金閣 白に光を 置いている', en: 'Snow settles; gold lays light on white.', coord: [135.7292, 35.0394] },
+    { name: '銀閣寺', ja: '銀沙灘 雪の白さに 溶けてゆく', en: 'The silver sand garden melts into snow.', coord: [135.7982, 35.0270] },
+    { name: '伏見稲荷', ja: '朱の鳥居 雪を頂き 山へ伸び', en: 'Vermilion gates, snow-capped, climb the mountain.', coord: [135.7727, 34.9671] },
+    { name: '京都駅', ja: '駅前の 冬の灯りに 息白し', en: "Breath turns white under the station's winter lights.", coord: [135.7588, 34.9858] },
+  ] },
+};
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+let season = 'spring';
+let selected = null;
+let ready = false;
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [135.768, 35.01],
+  zoom: 12,
+  maxZoom: 14.5,
+  // Only keys confirmed in Standard's config schema.
+  config: {
+    basemap: {
+      theme: SEASONS.spring.theme,
+      lightPreset: SEASONS.spring.lightPreset,
+      show3dObjects: false,
+      showPointOfInterestLabels: false,
+      showTransitLabels: false,
+    },
+  },
+});
+
+const $ = (id) => document.getElementById(id);
+const statusEl = $('status-note');
+
+/* ---- Switcher ---- */
+Object.entries(SEASONS).forEach(([key, s]) => {
+  const btn = document.createElement('button');
+  btn.className = 'season-btn';
+  btn.dataset.season = key;
+  btn.setAttribute('aria-label', s.en);
+  btn.innerHTML = `<span class="season-kanji">${s.ja}</span><span class="season-en">${s.en}</span>`;
+  btn.addEventListener('click', () => setSeason(key));
+  $('season-switch').appendChild(btn);
+});
+
+/* ---- Places ---- */
+function toGeoJSON(places) {
+  return {
+    type: 'FeatureCollection',
+    features: places.map((p, i) => ({
+      type: 'Feature',
+      id: i + 1,
+      properties: { name: p.name },
+      geometry: { type: 'Point', coordinates: p.coord },
+    })),
+  };
+}
+
+function renderList() {
+  const list = $('place-list');
+  list.innerHTML = '';
+  SEASONS[season].places.forEach((p, i) => {
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.className = 'place-item';
+    btn.innerHTML = `<span class="place-no">${String(i + 1).padStart(2, '0')}</span><span></span>`;
+    btn.lastChild.textContent = p.name;
+    btn.addEventListener('click', () => select(i));
+    li.appendChild(btn);
+    list.appendChild(li);
+  });
+}
+
+function select(i) {
+  selected = i;
+  const p = SEASONS[season].places[i];
+  document.querySelectorAll('.place-item').forEach((el, n) => el.classList.toggle('is-active', n === i));
+  $('note-empty').classList.add('hidden');
+  $('note-body').classList.remove('hidden');
+  $('note-name').textContent = p.name;
+  $('note-ja').textContent = p.ja;
+  $('note-en').textContent = p.en;
+  if (map.getSource('places')) {
+    map.removeFeatureState({ source: 'places' });
+    map.setFeatureState({ source: 'places', id: i + 1 }, { selected: true });
+  }
+  map.flyTo({ center: p.coord, zoom: 13.3, duration: reduceMotion.matches ? 0 : 1400 });
+}
+
+function clearNote() {
+  selected = null;
+  $('note-empty').classList.remove('hidden');
+  $('note-body').classList.add('hidden');
+}
+
+/* ---- Season ---- */
+function setSeason(key, initial) {
+  season = key;
+  const s = SEASONS[key];
+  document.documentElement.dataset.season = key;
+  document.querySelectorAll('.season-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.season === key)));
+  $('season-title').textContent = `${s.ja} — ${s.title}`;
+  clearNote();
+  renderList();
+  if (!ready) return;
+
+  if (!initial) {
+    map.setConfigProperty('basemap', 'lightPreset', s.lightPreset);
+    map.setConfigProperty('basemap', 'theme', s.theme);
+  }
+  // The accent token is the single source of truth for marker colour.
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--season').trim();
+  map.removeFeatureState({ source: 'places' });
+  map.getSource('places').setData(toGeoJSON(s.places));
+  map.setPaintProperty('places-dot', 'circle-color', accent);
+
+  const bounds = new mapboxgl.LngLatBounds();
+  s.places.forEach((p) => bounds.extend(p.coord));
+  map.fitBounds(bounds, { padding: 40, maxZoom: 13.5, duration: initial || reduceMotion.matches ? 0 : 1600 });
+}
+
+map.on('style.load', () => {
+  map.addSource('places', { type: 'geojson', data: toGeoJSON([]) });
+  map.addLayer({
+    id: 'places-dot',
+    type: 'circle',
+    source: 'places',
+    slot: 'top',
+    paint: {
+      'circle-radius': ['case', ['boolean', ['feature-state', 'selected'], false], 13, 9],
+      'circle-color': '#E8A0B4',
+      'circle-stroke-color': '#1C1C1C',
+      'circle-stroke-width': 1,
+      'circle-emissive-strength': 1,
+    },
+  });
+  map.on('mouseenter', 'places-dot', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'places-dot', () => { map.getCanvas().style.cursor = ''; });
+  map.on('click', 'places-dot', (e) => select(e.features[0].id - 1));
+
+  ready = true;
+  setSeason(season, true);
+  statusEl.className = 'status-note success';
+  statusEl.textContent = '十六の場所';
+});
+
+map.on('error', (e) => {
+  statusEl.className = 'status-note error';
+  statusEl.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+setSeason(season, true);
+</script>
+</body>
+</html>

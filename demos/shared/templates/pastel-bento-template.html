@@ -1,0 +1,244 @@
+<!--
+  Working EXAMPLE of the Pastel Bento style pack (pastel-bento.css, in this
+  same folder). Open this file directly to see the pattern working with 25
+  illustrative neighbourhood places across five categories, then copy the
+  markup below into your own demo and link pastel-bento.css from its
+  <head> -- see the class/id contract documented at the top of that CSS
+  file for what to build.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (soft claymorphism, bento grid, rounded display type)
+  at the user's request for something distinct from every other pack in
+  this folder. The place names, coordinates and weekly numbers are
+  illustrative placeholders, not real content -- swap in your own.
+
+  What's NOT included: real data, search, routing, or any API call beyond
+  the basemap -- the demo-kit.js script supplies the access token, and the
+  GeoJSON below is inline.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pastel Bento -- Neighbourhood Picks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="pastel-bento.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: the map fills its grid tile (which has an explicit height). */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+
+  /* Desktop bento placement (phones use the CSS pack's single flow). */
+  @media (min-width: 721px) {
+    .tile-title  { grid-column: 3 / 5; grid-row: 1; }
+    .tile-map    { grid-column: 1 / 3; grid-row: 1 / 4; }
+    .tile-detail { grid-column: 1 / 3; grid-row: 4; }
+    #cat-cafe    { grid-column: 3; grid-row: 2; }
+    #cat-park    { grid-column: 4; grid-row: 2; }
+    #cat-bakery  { grid-column: 3; grid-row: 3; }
+    #cat-books   { grid-column: 4; grid-row: 3; }
+    #cat-play    { grid-column: 3; grid-row: 4; }
+    .tile-stat   { grid-column: 4; grid-row: 4; }
+  }
+</style>
+</head>
+<body>
+<main class="bento">
+  <section class="tile tile-title">
+    <h1>Good morning! &#9728;&#65039;</h1>
+    <p class="tile-sub">Tap a tile to switch a kind of place on or off.</p>
+  </section>
+
+  <section class="tile tile-map"><div id="map"></div></section>
+
+  <button class="tile tile-cat tone-peach" id="cat-cafe" data-cat="cafe" aria-pressed="true">
+    <span class="tile-icon">&#9749;</span>
+    <span><span class="tile-label">Caf&eacute;s</span><span class="big-number">5</span></span>
+    <span class="tile-state">on</span>
+  </button>
+  <button class="tile tile-cat tone-mint" id="cat-park" data-cat="park" aria-pressed="true">
+    <span class="tile-icon">&#127795;</span>
+    <span><span class="tile-label">Parks</span><span class="big-number">5</span></span>
+    <span class="tile-state">on</span>
+  </button>
+  <button class="tile tile-cat tone-butter" id="cat-bakery" data-cat="bakery" aria-pressed="true">
+    <span class="tile-icon">&#129360;</span>
+    <span><span class="tile-label">Bakeries</span><span class="big-number">5</span></span>
+    <span class="tile-state">on</span>
+  </button>
+  <button class="tile tile-cat tone-lavender" id="cat-books" data-cat="books" aria-pressed="true">
+    <span class="tile-icon">&#128214;</span>
+    <span><span class="tile-label">Bookshops</span><span class="big-number">5</span></span>
+    <span class="tile-state">on</span>
+  </button>
+  <button class="tile tile-cat tone-sky" id="cat-play" data-cat="play" aria-pressed="true">
+    <span class="tile-icon">&#128733;</span>
+    <span><span class="tile-label">Playgrounds</span><span class="big-number">5</span></span>
+    <span class="tile-state">on</span>
+  </button>
+
+  <section class="tile tile-detail" id="detail">
+    <span class="tile-label">Selected place</span>
+    <h2 class="detail-name" id="detail-name">Pick a dot on the map</h2>
+    <p class="detail-meta" id="detail-meta">Its details will pop up here.</p>
+    <span class="detail-chip hidden" id="detail-chip"></span>
+  </section>
+
+  <section class="tile tile-stat">
+    <span class="tile-label">Showing</span>
+    <div class="stat-row">
+      <span class="big-number" id="stat-n">25</span>
+      <span class="stat-of">of <span id="stat-m">25</span></span>
+    </div>
+    <svg class="sparkline" id="sparkline" viewBox="0 0 120 44" preserveAspectRatio="none" aria-label="Weekly visits"></svg>
+  </section>
+</main>
+
+<script>
+const CATS = {
+  cafe:   { label: 'Café',       color: '#FF9F6B', weekly: [3, 4, 4, 5, 6, 9, 8] },
+  park:   { label: 'Park',       color: '#5CCB9B', weekly: [2, 2, 3, 3, 4, 8, 9] },
+  bakery: { label: 'Bakery',     color: '#F2C94C', weekly: [5, 5, 4, 6, 6, 7, 6] },
+  books:  { label: 'Bookshop',   color: '#A57CF0', weekly: [1, 2, 2, 3, 3, 5, 4] },
+  play:   { label: 'Playground', color: '#6FB7F5', weekly: [1, 1, 2, 2, 3, 7, 8] },
+};
+
+// Illustrative places, clustered around one imaginary old-town neighbourhood.
+const PLACES = [
+  ['cafe', 'Sunny Cup', -9.1420, 38.7160], ['cafe', 'Biscuit & Bean', -9.1385, 38.7142],
+  ['cafe', 'The Cozy Pot', -9.1352, 38.7121], ['cafe', 'Oat Moon', -9.1441, 38.7118],
+  ['cafe', 'Tiny Teacup', -9.1398, 38.7099],
+  ['park', 'Pebble Garden', -9.1465, 38.7138], ['park', 'Fountain Green', -9.1370, 38.7170],
+  ['park', 'Lantern Square', -9.1333, 38.7098], ['park', 'Hilltop Meadow', -9.1428, 38.7185],
+  ['park', 'Duck Pond Park', -9.1405, 38.7075],
+  ['bakery', 'Flour Power', -9.1411, 38.7131], ['bakery', 'Warm Crumb', -9.1360, 38.7150],
+  ['bakery', 'Sugar Spoon', -9.1450, 38.7102], ['bakery', 'Rolling Pin', -9.1318, 38.7128],
+  ['bakery', 'Bun Voyage', -9.1380, 38.7108],
+  ['books', 'Page & Paw', -9.1435, 38.7148], ['books', 'Story Nook', -9.1347, 38.7140],
+  ['books', 'Paper Moon Books', -9.1392, 38.7165], ['books', 'The Last Chapter', -9.1425, 38.7085],
+  ['books', 'Bookworm Alley', -9.1322, 38.7108],
+  ['play', 'Rainbow Yard', -9.1455, 38.7170], ['play', 'Swing Set Corner', -9.1375, 38.7185],
+  ['play', 'Sandbox Square', -9.1340, 38.7160], ['play', 'Treehouse Court', -9.1412, 38.7062],
+  ['play', 'Slide Hill', -9.1308, 38.7138],
+];
+
+const DETAILS = {
+  cafe: 'Fresh brews and cozy corners.',
+  park: 'Green space for a slow stroll.',
+  bakery: 'Warm pastries, baked this morning.',
+  books: 'Shelves to get happily lost in.',
+  play: 'Swings, slides and giggles.',
+};
+
+const geojson = {
+  type: 'FeatureCollection',
+  features: PLACES.map(([cat, name, lng, lat], i) => ({
+    type: 'Feature',
+    id: i,
+    properties: { id: i, cat, name, visits: 40 + ((i * 37) % 90) },
+    geometry: { type: 'Point', coordinates: [lng, lat] },
+  })),
+};
+
+const active = new Set(Object.keys(CATS));
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [-9.1385, 38.7128],
+  zoom: 14.6,
+  pitch: 30,
+  // Standard config keys (theme, lightPreset, showPointOfInterestLabels)
+  // are all listed in the Standard style API reference.
+  config: { basemap: { theme: 'faded', lightPreset: 'dawn', showPointOfInterestLabels: false } },
+});
+
+// The map lives in a grid cell: keep its canvas matched to the tile size.
+new ResizeObserver(() => map.resize()).observe(document.querySelector('.tile-map'));
+
+const colorExpr = ['match', ['get', 'cat'],
+  ...Object.entries(CATS).flatMap(([k, c]) => [k, c.color]), '#CDB4FF'];
+
+map.on('load', () => {
+  map.addSource('places', { type: 'geojson', data: geojson });
+  map.addLayer({
+    id: 'places', type: 'circle', source: 'places',
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 7, 16, 14],
+      'circle-color': colorExpr,
+      'circle-stroke-color': '#FFFFFF',
+      'circle-stroke-width': 4,
+      'circle-emissive-strength': 1,
+    },
+  });
+  map.addLayer({
+    id: 'places-selected', type: 'circle', source: 'places',
+    filter: ['==', ['get', 'id'], -1],
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 11, 16, 19],
+      'circle-color': colorExpr,
+      'circle-stroke-color': '#2E1A47',
+      'circle-stroke-width': 4,
+      'circle-emissive-strength': 1,
+    },
+  });
+
+  map.on('click', 'places', (e) => selectPlace(e.features[0]));
+  map.on('mouseenter', 'places', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'places', () => { map.getCanvas().style.cursor = ''; });
+  applyFilter();
+});
+
+function selectPlace(feature) {
+  const { id, cat, name, visits } = feature.properties;
+  document.getElementById('detail-name').textContent = name;
+  document.getElementById('detail-meta').textContent = `${DETAILS[cat]} About ${visits} visits this week.`;
+  const chip = document.getElementById('detail-chip');
+  chip.textContent = CATS[cat].label;
+  chip.style.background = CATS[cat].color;
+  chip.classList.remove('hidden');
+  map.setFilter('places-selected', ['==', ['get', 'id'], id]);
+  map.flyTo({ center: feature.geometry.coordinates, zoom: Math.max(map.getZoom(), 15.5), duration: 1200 });
+}
+
+function drawSparkline() {
+  // Sum the weekly series of the active categories into one smooth line.
+  const totals = [0, 1, 2, 3, 4, 5, 6].map((d) =>
+    [...active].reduce((s, k) => s + CATS[k].weekly[d], 0));
+  const max = Math.max(...totals, 1);
+  const pts = totals.map((v, i) => [4 + i * (112 / 6), 40 - (v / max) * 34]);
+  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+  document.getElementById('sparkline').innerHTML =
+    `<path class="spark-area" d="${line} L116 44 L4 44 Z"/><path d="${line}"/>`;
+}
+
+function applyFilter() {
+  map.setFilter('places', ['in', ['get', 'cat'], ['literal', [...active]]]);
+  const shown = PLACES.filter((p) => active.has(p[0])).length;
+  document.getElementById('stat-n').textContent = shown;
+  document.getElementById('stat-m').textContent = PLACES.length;
+  drawSparkline();
+}
+
+document.querySelectorAll('.tile-cat').forEach((tile) => {
+  tile.addEventListener('click', () => {
+    const cat = tile.dataset.cat;
+    const on = !active.has(cat);
+    if (on) active.add(cat); else active.delete(cat);
+    tile.setAttribute('aria-pressed', on);
+    tile.querySelector('.tile-state').textContent = on ? 'on' : 'off';
+    if (map.getLayer('places')) applyFilter();
+  });
+});
+
+drawSparkline();
+</script>
+</body>
+</html>

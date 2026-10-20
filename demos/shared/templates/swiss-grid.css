@@ -1,0 +1,427 @@
+/*
+  Swiss Grid -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: International Typographic Style --
+  white, black and one signal red, flush-left ragged-right type, huge
+  numerals, a visible 12-column grid, a true split screen -- deliberately
+  distinct from every other style pack in this folder: Arena is a
+  Linear-dark compare layout, Editorial Paper is warm paper + serif,
+  Highway Sign is MUTCD cream/green, Slate Console is a dark cinematic
+  globe, Storefront is a sidebar of filters, Tarmac Glass is dark glass +
+  amber, Vintage Chart is navy/parchment/brass, Weather Console is a
+  layer-explorer dock).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/swiss-grid.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Archivo, with its width axis, for body
+  and labels; Archivo Black for display numerals and titles):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Archivo+Black&display=swap" rel="stylesheet" />
+
+  Signature touch: a visible 12-column grid (.grid-overlay) of 1px
+  hairlines laid over the whole viewport, toggled with the G key or the
+  small .grid-toggle button. The 5/12 index column and the 7/12 map cell
+  snap to those lines. No rounded corners, no shadows, no gradients --
+  structure comes from rules and type size alone.
+
+  Class/id contract (see swiss-grid-template.html in this same folder for
+  a full working example):
+
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here). Put it
+                               inside .frame and make it fill it.
+  - .split                    root layout: 5/12 index | 7/12 map, exactly
+                               100vh. At <= 760px it stacks: .frame on top
+                               (45vh), .index below, scrolling
+  - .index                    left column, scrolls on its own --
+    .kicker                     small wide uppercase label (red rule above)
+    .display                    the big Archivo Black title (an <h1>)
+    .intro                      short flush-left intro paragraph
+    .toolbar                    row of plain text buttons (+ a .toolbar-label)
+      .txt-btn                    plain underlined-on-active text button;
+                                   aria-pressed="true" marks the active one
+  - .rank-list                the ranked <ol> (list-style none) --
+    .rank-row                   one <button> per row inside an <li>:
+      .rank-num                   oversized Archivo Black numeral
+      .rank-name                  bold name
+      .rank-sub                   small grey meta line under the name
+      .rank-value                 right-aligned figure (+ .rank-unit)
+      .is-hot                   modifier: hovered/focused, row turns red
+      .is-active                modifier: clicked row, black bar on its left
+  - .frame                    right cell: black rule border, holds #map --
+    .corner-tag                 small red tag, top-left corner of the frame
+    .caption                    tiny uppercase caption, top-right of frame
+                                 (keeps the Mapbox logo, bottom-left, clear)
+  - .grid-overlay             fixed 12-column hairline overlay (12 empty
+                               <i> children), pointer-events: none
+  - .grid-toggle              small fixed text button (bottom-right) that
+                               toggles the overlay; shows the "G" shortcut
+  - .status-note (+.loading/  a one-line plain status, flush-left, red for
+    .success/.error)           errors -- no boxes
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --white: #FFFFFF;
+  --black: #000000;
+  --red: #E30613;
+  --red-ink: #FFFFFF;
+  --hairline: #D4D4D4;
+  --grey: #6E6E6E;
+  --grey-light: #EDEDED;
+  --success: #000000;
+  --error: #E30613;
+
+  --font-body: 'Archivo', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-display: 'Archivo Black', 'Archivo', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-label: 'Archivo', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+
+  --gutter: 24px;
+}
+
+* {
+  box-sizing: border-box;
+  border-radius: 0;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--white);
+  color: var(--black);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--red);
+  outline-offset: -3px;
+}
+
+/* ---- Split screen: 5/12 index | 7/12 map ---- */
+.split {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  height: 100vh;
+  height: 100dvh;
+}
+
+.index {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 var(--gutter) 48px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--black) var(--white);
+}
+
+.kicker {
+  margin: 0;
+  padding: 20px 0 0;
+  border-top: 8px solid var(--red);
+  font-family: var(--font-label);
+  font-stretch: 125%;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.display {
+  margin: 28px 0 24px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(44px, 6.4vw, 104px);
+  line-height: 0.92;
+  letter-spacing: -0.035em;
+  text-transform: none;
+  text-align: left;
+  hyphens: none;
+}
+
+.intro {
+  max-width: 34ch;
+  margin: 0 0 32px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: left;
+}
+
+/* ---- Plain text buttons ---- */
+.toolbar {
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+  padding: 10px 0;
+  border-top: 2px solid var(--black);
+  border-bottom: 1px solid var(--black);
+  font-family: var(--font-label);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.toolbar-label {
+  margin-right: auto;
+  color: var(--grey);
+}
+
+.txt-btn {
+  padding: 4px 0;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  font-size: inherit;
+  font-weight: 700;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.txt-btn:hover {
+  color: var(--red);
+}
+
+.txt-btn[aria-pressed="true"] {
+  border-bottom-color: var(--red);
+}
+
+/* ---- Ranked list: oversized numerals ---- */
+.rank-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rank-list li {
+  border-bottom: 1px solid var(--black);
+}
+
+.rank-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(72px, 0.34fr) 1fr auto;
+  align-items: end;
+  column-gap: 16px;
+  width: 100%;
+  padding: 14px 0 12px;
+  border: 0;
+  background: var(--white);
+  text-align: left;
+  cursor: pointer;
+}
+
+.rank-num {
+  font-family: var(--font-display);
+  font-size: clamp(56px, 6vw, 96px);
+  line-height: 0.82;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+}
+
+.rank-name {
+  display: block;
+  font-weight: 800;
+  font-size: 18px;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.rank-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--grey);
+}
+
+.rank-value {
+  text-align: right;
+  font-weight: 800;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rank-unit {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+.rank-row.is-hot {
+  background: var(--red);
+  color: var(--red-ink);
+}
+
+.rank-row.is-hot .rank-sub,
+.rank-row.is-hot .rank-unit {
+  color: var(--red-ink);
+}
+
+/* Clicked row: a thick black bar to its left, kept inside the gutter */
+.rank-row.is-active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--gutter) * -1);
+  width: 8px;
+  background: var(--black);
+}
+
+/* ---- Map cell ---- */
+.frame {
+  position: relative;
+  margin: var(--gutter) var(--gutter) var(--gutter) 0;
+  border: 2px solid var(--black);
+  background: var(--grey-light);
+}
+
+.corner-tag {
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  z-index: 3;
+  padding: 6px 10px 5px;
+  background: var(--red);
+  color: var(--red-ink);
+  font-family: var(--font-label);
+  font-stretch: 125%;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.caption {
+  position: absolute;
+  right: -2px;
+  top: -2px;
+  z-index: 3;
+  padding: 6px 10px;
+  background: var(--white);
+  border-bottom: 2px solid var(--black);
+  border-left: 2px solid var(--black);
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+/* ---- 12-column grid overlay ---- */
+.grid-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+.grid-overlay i {
+  border-left: 1px solid var(--hairline);
+}
+
+.grid-overlay i:last-child {
+  border-right: 1px solid var(--hairline);
+}
+
+.grid-toggle {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  z-index: 11;
+  padding: 8px 12px;
+  border: 0;
+  border-top: 2px solid var(--black);
+  border-left: 2px solid var(--black);
+  background: var(--white);
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.grid-toggle:hover,
+.grid-toggle[aria-pressed="true"] {
+  background: var(--black);
+  color: var(--white);
+}
+
+/* ---- Status line ---- */
+.status-note {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  margin: 16px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.status-note.loading { color: var(--grey); }
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); }
+
+.hidden {
+  display: none !important;
+}
+
+/* ---- Phone: map on top, index scrolls below ---- */
+@media (max-width: 760px) {
+  :root {
+    --gutter: 16px;
+  }
+
+  .split {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .frame {
+    order: -1;
+    flex: none;
+    height: 45vh;
+    margin: var(--gutter);
+  }
+
+  .index {
+    flex: 1;
+    min-height: 0;
+    padding-bottom: 64px;
+  }
+
+  .display {
+    font-size: clamp(44px, 15vw, 72px);
+  }
+
+  .rank-num {
+    font-size: 56px;
+  }
+
+  .rank-row {
+    grid-template-columns: 76px 1fr auto;
+  }
+
+  .rank-row.is-active::before {
+    left: calc(var(--gutter) * -1);
+  }
+}

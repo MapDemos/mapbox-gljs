@@ -1,0 +1,241 @@
+<!--
+  Working EXAMPLE of the Neon HUD style pack (neon-hud.css, in this same
+  folder). Open this file directly to see the pattern working -- a drone
+  looping over an illustrative route while a full-frame HUD (corner
+  brackets, speed + heading gauges, telemetry ticker) updates live -- then
+  copy the markup below into your own demo and link neon-hud.css from its
+  <head>. See the class/id contract documented at the top of that CSS file
+  for what to build.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (synthwave HUD, magenta/cyan glow on violet-black).
+  The mission copy, route and telemetry numbers are illustrative
+  placeholders, not real data -- swap in your own.
+
+  What's NOT included: real vehicle/GPS data (speed and heading are
+  simulated from the hand-written route), any backend, and the demo-owned
+  #map positioning beyond the minimal rule below.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="neon-hud.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="hud-frame">
+  <span class="hud-corner tl"></span><span class="hud-corner tr"></span>
+  <span class="hud-corner bl"></span><span class="hud-corner br"></span>
+</div>
+
+<div class="callsign">
+  <span class="tag">MISSION // 07</span>
+  <h1>Night Runner</h1>
+  <div class="sub">Kestrel-9 &middot; Sector Midtown-C</div>
+  <div class="link"><span class="dot"></span><span id="link-text">LINK ESTABLISHED</span></div>
+</div>
+
+<div class="gauges">
+  <div class="gauge" id="gauge-speed">
+    <svg viewBox="0 0 100 100" aria-hidden="true">
+      <circle class="gauge-track" cx="50" cy="50" r="42" pathLength="100" />
+      <circle class="gauge-fill" cx="50" cy="50" r="42" pathLength="100" />
+    </svg>
+    <div class="gauge-readout"><span class="gauge-value" id="speed-value">000</span><span class="gauge-unit">KM/H</span></div>
+    <div class="gauge-label">SPEED</div>
+  </div>
+  <div class="gauge" id="gauge-heading">
+    <svg viewBox="0 0 100 100" aria-hidden="true">
+      <circle class="gauge-track" cx="50" cy="50" r="42" pathLength="100" />
+      <text class="gauge-north" x="50" y="-2">N</text>
+      <g class="gauge-needle"><polygon points="50,2 56,16 50,12 44,16" /></g>
+    </svg>
+    <div class="gauge-readout"><span class="gauge-value" id="heading-value">000</span><span class="gauge-unit" id="heading-card">N</span></div>
+    <div class="gauge-label">HEADING</div>
+  </div>
+</div>
+
+<div class="reticle"></div>
+
+<div class="hud-bottom">
+  <div class="readouts">
+    <div class="readout"><span class="k">DIST</span><span class="v" id="dist-value">0.0 KM</span></div>
+    <div class="readout"><span class="k">ETA</span><span class="v magenta" id="eta-value">00:00</span></div>
+    <div class="readout"><span class="k">LAP</span><span class="v" id="lap-value">01</span></div>
+  </div>
+  <div class="controls">
+    <button class="hud-btn active" id="btn-play" type="button">Pause</button>
+    <button class="hud-btn active" data-speed="1" type="button">1x</button>
+    <button class="hud-btn" data-speed="2" type="button">2x</button>
+    <button class="hud-btn" data-speed="4" type="button">4x</button>
+  </div>
+</div>
+
+<div class="ticker"><div class="ticker-track" id="ticker-track">
+  <span class="ticker-item">Uplink stable</span>
+  <span class="ticker-item">Waypoint 6th Ave armed</span>
+  <span class="ticker-item warn">Crosswind advisory gusting 18 kt</span>
+  <span class="ticker-item">Battery 87%</span>
+  <span class="ticker-item">Altitude hold 120 m</span>
+  <span class="ticker-item warn">Tower canyon ahead - holding altitude</span>
+  <span class="ticker-item">Crosstown grid lock acquired</span>
+  <span class="ticker-item">Telemetry packet 4F2A acknowledged</span>
+</div></div>
+
+<div class="hud-scanlines"></div>
+
+<script>
+// Illustrative drone route (lng, lat) -- a closed loop; the first point repeats at the end.
+const ROUTE = [
+  [-73.9903, 40.7569], [-73.9895, 40.7583], [-73.9888, 40.7597], [-73.9880, 40.7610],
+  [-73.9872, 40.7624], [-73.9845, 40.7613], [-73.9818, 40.7601], [-73.9791, 40.7590],
+  [-73.9764, 40.7578], [-73.9737, 40.7567], [-73.9747, 40.7553], [-73.9757, 40.7540],
+  [-73.9767, 40.7526], [-73.9777, 40.7512], [-73.9802, 40.7523], [-73.9827, 40.7535],
+  [-73.9853, 40.7546], [-73.9878, 40.7558], [-73.9903, 40.7569],
+];
+const BASE_MPS = 111;   // ~400 km/h simulated cruise
+const CAM_ZOOM = 15.2, CAM_PITCH = 52;
+
+// Haversine distance and initial bearing between two [lng, lat] points.
+const rad = (d) => (d * Math.PI) / 180;
+function dist(a, b) {
+  const h = Math.sin(rad(b[1] - a[1]) / 2) ** 2 +
+    Math.cos(rad(a[1])) * Math.cos(rad(b[1])) * Math.sin(rad(b[0] - a[0]) / 2) ** 2;
+  return 12742000 * Math.asin(Math.sqrt(h));
+}
+function bearing(a, b) {
+  const y = Math.sin(rad(b[0] - a[0])) * Math.cos(rad(b[1]));
+  const x = Math.cos(rad(a[1])) * Math.sin(rad(b[1])) - Math.sin(rad(a[1])) * Math.cos(rad(b[1])) * Math.cos(rad(b[0] - a[0]));
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+const cum = [0];
+for (let i = 1; i < ROUTE.length; i++) cum.push(cum[i - 1] + dist(ROUTE[i - 1], ROUTE[i]));
+const TOTAL = cum[cum.length - 1];
+
+// Position + segment index at distance s along the route.
+function at(s) {
+  let i = 1;
+  while (i < cum.length - 1 && cum[i] < s) i++;
+  const t = (s - cum[i - 1]) / (cum[i] - cum[i - 1]);
+  const a = ROUTE[i - 1], b = ROUTE[i];
+  return { pos: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], seg: i - 1 };
+}
+
+// Standard config keys below all exist in Standard's schema (docs.mapbox.com/map-styles/standard/api/).
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: ROUTE[0],
+  zoom: CAM_ZOOM,
+  pitch: CAM_PITCH,
+  config: {
+    basemap: {
+      lightPreset: 'night',
+      showPointOfInterestLabels: false,
+      showTransitLabels: false,
+      colorLand: '#0F0430',
+      colorWater: '#1B0A66',
+      colorGreenspace: '#16074A',
+      colorBuildings: '#2E1170',
+      colorMotorways: '#FF2BD6',
+      colorTrunks: '#B026FF',
+      colorRoads: '#00C8E0',
+      colorPlaceLabels: '#00F0FF',
+      colorRoadLabels: '#FF9BF0',
+      colorAdminBoundaries: '#FF2BD6',
+    },
+  },
+});
+
+const progress = { type: 'Feature', geometry: { type: 'LineString', coordinates: [ROUTE[0], ROUTE[1]] } };
+map.on('style.load', () => {
+  map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE } } });
+  map.addSource('progress', { type: 'geojson', data: progress });
+  const line = (id, source, color, width, blur, opacity) => map.addLayer({
+    id, source, type: 'line', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': color, 'line-width': width, 'line-blur': blur, 'line-opacity': opacity, 'line-emissive-strength': 1 },
+  });
+  line('route-glow', 'route', '#FF2BD6', 26, 12, 0.9);
+  line('route-core', 'route', '#FF8BEA', 4, 0, 1);
+  line('progress-glow', 'progress', '#00F0FF', 26, 12, 1);
+  line('progress-core', 'progress', '#E0FFFF', 5, 0, 1);
+});
+
+const marker = new mapboxgl.Marker({ element: Object.assign(document.createElement('div'), { className: 'vehicle-marker' }), pitchAlignment: 'viewport' })
+  .setLngLat(ROUTE[0]).addTo(map);
+
+// HUD elements
+const $ = (id) => document.getElementById(id);
+const speedGauge = $('gauge-speed'), headingGauge = $('gauge-heading');
+const CARDS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const pad = (n, w = 2) => String(n).padStart(w, '0');
+
+// Duplicate ticker items once so the -50% marquee loops seamlessly.
+const track = $('ticker-track');
+track.innerHTML += track.innerHTML;
+
+let playing = true, mult = 1, s = 0, lap = 1, camBearing = bearing(ROUTE[0], ROUTE[1]), last = null;
+
+$('btn-play').addEventListener('click', (e) => {
+  playing = !playing;
+  e.target.textContent = playing ? 'Pause' : 'Play';
+  e.target.classList.toggle('active', playing);
+  $('link-text').textContent = playing ? 'LINK ESTABLISHED' : 'LINK HOLD';
+});
+document.querySelectorAll('[data-speed]').forEach((btn) => btn.addEventListener('click', () => {
+  mult = Number(btn.dataset.speed);
+  document.querySelectorAll('[data-speed]').forEach((b) => b.classList.toggle('active', b === btn));
+}));
+
+function frame(now) {
+  const dt = last == null ? 0 : Math.min((now - last) / 1000, 0.1);
+  last = now;
+  if (playing) {
+    const kmh = 400 + 45 * Math.sin(s / 700);                     // simulated speed varies along the route
+    s += (BASE_MPS * (kmh / 400)) * dt * mult;
+    if (s >= TOTAL) { s -= TOTAL; lap++; }
+    const { pos, seg } = at(s);
+    const target = bearing(ROUTE[seg], ROUTE[seg + 1]);
+    camBearing = (camBearing + ((((target - camBearing) % 360) + 540) % 360 - 180) * Math.min(1, dt * 2.5) + 360) % 360;
+
+    marker.setLngLat(pos);
+    map.jumpTo({ center: pos, bearing: camBearing, pitch: CAM_PITCH, zoom: CAM_ZOOM });
+    if (map.getSource('progress')) {
+      progress.geometry.coordinates = ROUTE.slice(0, seg + 1).concat([pos]);
+      map.getSource('progress').setData(progress);
+    }
+
+    speedGauge.style.setProperty('--v', ((kmh / 500) * 75).toFixed(1));
+    $('speed-value').textContent = pad(Math.round(kmh), 3);
+    headingGauge.style.setProperty('--deg', `${camBearing.toFixed(1)}deg`);
+    $('heading-value').textContent = pad(Math.round(camBearing) % 360, 3);
+    $('heading-card').textContent = CARDS[Math.round(camBearing / 45) % 8];
+    $('dist-value').textContent = `${(s / 1000).toFixed(1)} KM`;
+    const eta = Math.max(0, (TOTAL - s) / (BASE_MPS * mult));
+    $('eta-value').textContent = `${pad(Math.floor(eta / 60))}:${pad(Math.floor(eta % 60))}`;
+    $('lap-value').textContent = pad(lap);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

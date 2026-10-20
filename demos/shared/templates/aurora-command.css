@@ -1,0 +1,580 @@
+/*
+  Aurora Command -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: an animated aurora gradient mesh, frosted
+  white glass, and a keyboard-first command palette -- deliberately distinct
+  from every other style pack in this folder: Arena, Editorial Paper,
+  Highway Sign, Slate Console, Storefront, Tarmac Glass, Vintage Chart and
+  Weather Console are all single-palette sidebars/panels, Riso Zine is
+  two-ink print, Swiss Grid is black/white/red typography, Neon HUD is dark
+  neon, Pastel Bento is soft tiled cards, and Blueprint is drafting-paper
+  lines. This one is bright, inset-map, and driven by a search palette).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/aurora-command.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Sora for display/headings/result titles,
+  Manrope for body and hints):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  Signature touch: the aurora gradient mesh (violet, pink, orange, cyan
+  radial layers) slowly drifts on the page BEHIND an inset, rounded map, so
+  the colour lives in the frame and glow -- never over the basemap. Motion
+  stops under prefers-reduced-motion.
+
+  Class/id contract (see aurora-command-template.html in this same folder
+  for a full working example):
+
+  - .topbar                   slim bar in the aurora frame above the map:
+    .brand                      wordmark (with .brand-dot gradient dot) on
+    .topbar-hint                the left, a keycap hint on the right (hidden
+                                 on phones)
+  - .stage                    the inset, rounded frame that holds the map
+                               and every overlay (fixed; 32px margin and a
+                               56px top bar on desktop, 8px on phones). Put
+                               #map inside it.
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .palette                  command palette wrapper, centered near the top
+                               of .stage. Add .is-open to expand it; when
+                               closed only .palette-pill shows.
+    .palette-pill               the closed state: a small "Search or type >
+                                 for commands" pill (button)
+    .palette-panel              the open state: frosted glass sheet
+    .palette-input-row          row holding the search icon, the input and
+                                 a hint keycap
+    .palette-icon               leading magnifier glyph
+    #palette-input              the text input (role=combobox)
+    .keycap                     a keyboard-key chip (<kbd>); use anywhere
+    .palette-results            scrolling list (role=listbox, max ~50vh)
+    .result-group               group label ("Places", "Commands")
+    .result-row                 one option; add .is-selected for the active
+                                 one. Children:
+      .result-icon                gradient-tinted square with a glyph/initial
+      .result-text                wraps .result-title + .result-sub
+      .result-title               Sora title; <mark> wraps matched chars
+      .result-sub                 Manrope subtitle
+      .result-hint                right-aligned .keycap hint
+    .palette-empty              "no matches" message inside the results
+    .palette-footer             footer row of keycap legends
+  - .toast                    tiny top-right feedback toast; add .show
+  - .aurora-marker            gradient-ringed map marker element (use with
+                               mapboxgl.Marker({ element }))
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --violet: #7C3AED;
+  --pink: #F472B6;
+  --orange: #FB923C;
+  --cyan: #22D3EE;
+  --ink: #0F0A1E;
+  --ink-muted: #4B4563;
+  --ink-faint: #7A7494;
+  --glass: rgba(255, 255, 255, 0.7);
+  --glass-strong: rgba(255, 255, 255, 0.88);
+  --glass-edge: rgba(255, 255, 255, 0.9);
+  --hairline: rgba(15, 10, 30, 0.1);
+  --accent-grad: linear-gradient(135deg, var(--violet), var(--pink) 55%, var(--orange));
+  --accent-soft: linear-gradient(90deg, rgba(124, 58, 237, 0.13), rgba(244, 114, 182, 0.13));
+  --success: #0E9F6E;
+  --error: #DC2626;
+
+  --font-display: 'Sora', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Manrope', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #EEE9FF;
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Aurora mesh: layered radial gradients drifting slowly behind the stage */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 15% 20%, var(--violet) 0, transparent 42%),
+    radial-gradient(circle at 85% 15%, var(--pink) 0, transparent 40%),
+    radial-gradient(circle at 80% 90%, var(--orange) 0, transparent 42%),
+    radial-gradient(circle at 15% 85%, var(--cyan) 0, transparent 44%),
+    #C4B5FD;
+  background-size: 230% 230%;
+  animation: aurora-drift 16s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-drift {
+  0% { background-position: 0% 0%; }
+  50% { background-position: 100% 25%; }
+  100% { background-position: 20% 100%; }
+}
+
+button, input {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
+}
+
+/* Inset, rounded map frame -- the aurora glows around it */
+.stage {
+  position: fixed;
+  inset: 56px 32px 32px;
+  border-radius: 24px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px var(--glass-edge),
+    0 0 0 6px rgba(255, 255, 255, 0.3),
+    0 0 50px rgba(34, 211, 238, 0.45),
+    0 0 110px rgba(244, 114, 182, 0.45),
+    0 28px 80px rgba(124, 58, 237, 0.45);
+}
+
+/* Slim bar in the frame, outside the map */
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 32px;
+  right: 32px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #fff;
+  text-shadow: 0 1px 10px rgba(15, 10, 30, 0.35);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.brand-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: conic-gradient(var(--violet), var(--pink), var(--orange), var(--cyan), var(--violet));
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.85);
+}
+
+.topbar-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Keep the Mapbox logo and attribution clear of the rounded corners */
+.stage .mapboxgl-ctrl-bottom-left,
+.stage .mapboxgl-ctrl-bottom-right {
+  margin: 0 12px 8px;
+}
+
+/* Command palette */
+.palette {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  z-index: 5;
+  width: min(620px, calc(100% - 32px));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.palette > * {
+  pointer-events: auto;
+}
+
+.palette-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  padding: 8px 8px 8px 14px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  backdrop-filter: blur(18px) saturate(1.6);
+  box-shadow: 0 8px 28px rgba(15, 10, 30, 0.16);
+  color: var(--ink-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.palette-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 32px rgba(124, 58, 237, 0.28);
+}
+
+.pill-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.palette-panel {
+  position: relative;
+  display: none;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--glass-edge);
+  border-radius: 20px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(24px) saturate(1.7);
+  backdrop-filter: blur(24px) saturate(1.7);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+    0 24px 60px rgba(15, 10, 30, 0.28);
+  overflow: hidden;
+}
+
+/* 1px aurora-gradient border, drawn with a masked pseudo-element */
+.palette-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1.5px;
+  border-radius: inherit;
+  background: conic-gradient(from 200deg, var(--violet), var(--pink), var(--orange), var(--cyan), var(--violet));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+
+.palette.is-open .palette-panel {
+  display: block;
+  animation: palette-in 0.16s ease-out;
+}
+
+.palette.is-open .palette-pill {
+  display: none;
+}
+
+@keyframes palette-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+.palette-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.palette-icon,
+.pill-icon {
+  flex: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--violet);
+}
+
+#palette-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+#palette-input::placeholder {
+  color: var(--ink-faint);
+  font-weight: 400;
+}
+
+.keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  box-sizing: border-box;
+  border: 1px solid var(--hairline);
+  border-bottom-width: 2px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink-muted);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.palette-results {
+  max-height: min(50vh, 380px);
+  overflow-y: auto;
+  padding: 6px 8px 8px;
+  overscroll-behavior: contain;
+}
+
+.result-group {
+  padding: 10px 10px 6px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.result-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.result-row.is-selected {
+  background: var(--accent-soft);
+}
+
+.result-row.is-selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--accent-grad);
+}
+
+.result-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  color: var(--violet);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.result-row.is-command .result-icon,
+.result-row.is-selected .result-icon {
+  background: var(--accent-grad);
+  box-shadow: none;
+  color: #fff;
+}
+
+.result-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.result-title,
+.result-sub {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.result-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.result-title mark {
+  background: none;
+  color: var(--violet);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--pink);
+}
+
+.result-sub {
+  margin-top: 1px;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.result-hint {
+  flex: none;
+  opacity: 0.5;
+}
+
+.result-row.is-selected .result-hint {
+  opacity: 1;
+}
+
+.palette-empty {
+  padding: 22px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.palette-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--hairline);
+  background: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.palette-footer span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Toast */
+.toast {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 6;
+  max-width: 260px;
+  padding: 9px 14px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 12px;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 24px rgba(15, 10, 30, 0.18);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: none;
+}
+
+.toast.error {
+  color: var(--error);
+}
+
+/* Gradient-ringed marker */
+.aurora-marker {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: conic-gradient(var(--violet), var(--pink), var(--orange), var(--cyan), var(--violet));
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.5);
+}
+
+.aurora-marker::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.aurora-marker::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--pink);
+  animation: marker-pulse 2s ease-out infinite;
+}
+
+@keyframes marker-pulse {
+  from { transform: scale(1); opacity: 0.8; }
+  to { transform: scale(2.4); opacity: 0; }
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (max-width: 640px) {
+  .stage {
+    inset: 8px;
+    border-radius: 18px;
+  }
+
+  .topbar {
+    display: none;
+  }
+
+  .stage .mapboxgl-ctrl-bottom-left,
+  .stage .mapboxgl-ctrl-bottom-right {
+    margin: 0 6px 6px;
+  }
+
+  /* 8px stage margin + 8px offset = 16px gutters from the viewport edge */
+  .palette {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    transform: none;
+  }
+
+  .toast {
+    top: 64px;
+    right: 8px;
+  }
+
+  .palette-footer {
+    font-size: 11px;
+    gap: 4px 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  .aurora-marker::before,
+  .palette.is-open .palette-panel {
+    animation: none;
+  }
+
+  .palette-pill,
+  .toast {
+    transition: none;
+  }
+}

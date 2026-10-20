@@ -1,0 +1,260 @@
+<!--
+  Working EXAMPLE of the Story Scroll style pack (story-scroll.css, in this
+  same folder). Open this file directly to see the pattern working with a
+  five-chapter coastal journey down the Portuguese Atlantic coast, then copy
+  the markup and script into your own demo and link story-scroll.css from
+  its <head> -- see the class/id contract documented at the top of that CSS
+  file for what to build.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (cinematic scrollytelling: forest, bone, antique
+  gold, a fixed map under scrolling chapter cards). The journey, copy and
+  coordinates are illustrative placeholders, not real content -- swap in
+  your own chapters.
+
+  Gotcha: adding a raster-dem terrain source (mapbox-terrain-dem-v1) makes
+  GL JS hide the Mapbox logo (its TileJSON has mapbox_logo:false); the pack
+  CSS forces the logo back, so keep that rule when you add a DEM.
+
+  What's NOT included: a real road route (the gold line just joins the
+  chapter points), geocoding, data layers, or a build step. Chapter cards
+  are plain markup generated from the CHAPTERS array below.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Where Europe Ends</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="story-scroll.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: the map is fixed behind the scrolling story. */
+  #map {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="status-note loading" id="status-note">Loading map</div>
+
+<nav class="rail" id="rail" aria-label="Chapters"></nav>
+
+<main class="story">
+  <section class="cover" id="cover">
+    <div class="cover-inner">
+      <div class="eyebrow">A journey in five chapters</div>
+      <h1 class="cover-title">Where <em>Europe</em> Ends</h1>
+      <p class="cover-sub">Down the Atlantic coast of Portugal, from the last headland of the mainland to the far south-west corner of the continent.</p>
+    </div>
+    <div class="scroll-cue">Scroll</div>
+  </section>
+
+  <div id="chapters"></div>
+
+  <section class="chapter end" id="end">
+    <div class="chapter-card end-card">
+      <div class="chapter-kicker">Fim</div>
+      <h2 class="chapter-title">The road runs out at the sea.</h2>
+      <p class="chapter-body">Five stops, one coastline. Scroll back up to retrace it, or jump to any chapter.</p>
+      <div class="chapter-actions">
+        <button class="btn btn-primary" id="replay">Back to start</button>
+        <button class="btn btn-secondary" id="last">Final chapter</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const CHAPTERS = [
+  { kicker: 'Headland', title: 'Cabo da Roca',
+    body: 'A wind-scoured cliff where the mainland stops. The road climbs through scrub and ends at a lighthouse above the open Atlantic.',
+    center: [-9.4989, 38.7804], zoom: 13.6, pitch: 62, bearing: 15 },
+  { kicker: 'Hills', title: 'Sintra, in the mist',
+    body: 'Forested ridges rise out of the coastal fog, crowned with towers and palaces in colours that should not work, and do.',
+    center: [-9.3906, 38.7876], zoom: 14.4, pitch: 66, bearing: 40 },
+  { kicker: 'Range', title: 'The Arrabida wall',
+    body: 'A limestone ridge drops straight into a turquoise bay. Take the cliff road at dusk and the whole range turns the colour of honey.',
+    via: [[-9.1420, 38.7223], [-9.1773, 38.6916], [-9.0600, 38.6000], [-8.8900, 38.5250]],
+    center: [-8.9755, 38.4800], zoom: 13.2, pitch: 64, bearing: 10 },
+  { kicker: 'Wild coast', title: 'Costa Vicentina',
+    body: 'Hundreds of kilometres without a single high-rise: dunes, schist cliffs and long empty beaches facing straight west.',
+    via: [[-8.5100, 38.3700], [-8.6900, 38.0200], [-8.7800, 37.7200], [-8.8000, 37.3100]],
+    center: [-8.9100, 37.1650], zoom: 12.6, pitch: 60, bearing: 170 },
+  { kicker: 'Land’s end', title: 'Cabo de Sao Vicente',
+    body: 'For centuries this was the end of the known world. A lone lighthouse, a last sunset, and nothing west of here but water.',
+    via: [[-8.9100, 37.0800]],
+    center: [-8.9965, 37.0236], zoom: 13.8, pitch: 68, bearing: 95 },
+];
+
+const COVER_VIEW = { center: [-8.9, 38.0], zoom: 5.9, pitch: 0, bearing: 0 };
+const END_VIEW = { center: [-8.95, 37.6], zoom: 7.4, pitch: 45, bearing: -15 };
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  ...COVER_VIEW,
+  interactive: false,
+  config: { basemap: { lightPreset: 'dusk', show3dObjects: true, showPointOfInterestLabels: false } },
+});
+
+// Cumulative share of the route length at each chapter vertex, for the reveal gradient.
+// Each chapter may list `via` land waypoints so the line follows the coast, not open water.
+const coords = [];
+const vertexOf = []; // index into coords for each chapter
+CHAPTERS.forEach((c) => {
+  (c.via || []).forEach((w) => coords.push(w));
+  coords.push(c.center);
+  vertexOf.push(coords.length - 1);
+});
+const dist = [0];
+for (let i = 1; i < coords.length; i++) {
+  dist.push(dist[i - 1] + Math.hypot(coords[i][0] - coords[i - 1][0], coords[i][1] - coords[i - 1][1]));
+}
+const share = vertexOf.map((v) => dist[v] / dist[dist.length - 1]);
+
+const GOLD = '#C9A227';
+const CLEAR = 'rgba(201, 162, 39, 0)';
+
+function revealGradient(index) {
+  if (index < 0) return CLEAR;
+  const p = Math.max(share[index], 0.0001);
+  return index >= CHAPTERS.length - 1
+    ? GOLD
+    : ['step', ['line-progress'], GOLD, p, CLEAR];
+}
+
+map.on('style.load', () => {
+  map.addSource('terrain-dem', {
+    type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14,
+  });
+  map.setTerrain({ source: 'terrain-dem', exaggeration: 1.4 });
+  map.addSource('route', {
+    type: 'geojson', lineMetrics: true,
+    data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } },
+  });
+  map.addSource('stops', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: CHAPTERS.map((c, i) => ({
+      type: 'Feature', properties: { i }, geometry: { type: 'Point', coordinates: c.center } })) },
+  });
+  map.addLayer({
+    id: 'route-line', type: 'line', source: 'route', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-width': 3, 'line-gradient': CLEAR, 'line-emissive-strength': 1 },
+  });
+  map.addLayer({
+    id: 'stop-dots', type: 'circle', source: 'stops', slot: 'top',
+    paint: {
+      'circle-radius': 5, 'circle-color': GOLD, 'circle-emissive-strength': 1,
+      'circle-stroke-width': 2, 'circle-stroke-color': '#0F1F1A',
+      'circle-opacity': ['case', ['<=', ['get', 'i'], activeIndex], 1, 0],
+      'circle-stroke-opacity': ['case', ['<=', ['get', 'i'], activeIndex], 1, 0],
+    },
+  });
+  document.getElementById('status-note').classList.add('hidden');
+  applyReveal(); // the user may have scrolled before the style finished loading
+});
+
+map.on('error', (e) => {
+  const note = document.getElementById('status-note');
+  note.className = 'status-note error';
+  note.textContent = 'Map error: ' + (e.error && e.error.message || 'unknown');
+});
+
+// Build chapter cards and rail dots from the data.
+const chaptersEl = document.getElementById('chapters');
+const railEl = document.getElementById('rail');
+const numerals = ['I', 'II', 'III', 'IV', 'V'];
+const sections = [document.getElementById('cover')];
+
+CHAPTERS.forEach((c, i) => {
+  const sec = document.createElement('section');
+  sec.className = 'chapter';
+  sec.dataset.index = i;
+  sec.innerHTML =
+    '<div class="chapter-card">' +
+      '<div class="chapter-head"><span class="chapter-num">' + numerals[i] + '</span>' +
+      '<span class="chapter-kicker">' + c.kicker + '</span></div>' +
+      '<h2 class="chapter-title">' + c.title + '</h2>' +
+      '<p class="chapter-body">' + c.body + '</p>' +
+      '<p class="chapter-meta">' + Math.abs(c.center[1]).toFixed(2) + '° N · ' +
+      Math.abs(c.center[0]).toFixed(2) + '° W</p>' +
+    '</div>';
+  chaptersEl.appendChild(sec);
+  sections.push(sec);
+
+  const dot = document.createElement('button');
+  dot.className = 'rail-dot';
+  dot.setAttribute('aria-label', 'Chapter ' + (i + 1) + ': ' + c.title);
+  dot.addEventListener('click', () => scrollToSection(sec));
+  railEl.appendChild(dot);
+});
+sections.push(document.getElementById('end'));
+
+function scrollToSection(el) {
+  el.scrollIntoView({ behavior: reduceMotion.matches ? 'auto' : 'smooth', block: 'center' });
+}
+
+let activeIndex = -1; // -1 = cover, CHAPTERS.length = end card
+
+function activate(index) {
+  if (index === activeIndex) return;
+  activeIndex = index;
+  document.querySelectorAll('.chapter').forEach((el) => {
+    el.classList.toggle('is-active', Number(el.dataset.index) === index || (el.id === 'end' && index === CHAPTERS.length));
+  });
+  railEl.querySelectorAll('.rail-dot').forEach((d, i) => {
+    d.setAttribute('aria-current', i === index ? 'true' : 'false');
+  });
+
+  const view = index < 0 ? COVER_VIEW : index >= CHAPTERS.length ? END_VIEW : CHAPTERS[index];
+  const camera = { center: view.center, zoom: view.zoom, pitch: view.pitch, bearing: view.bearing,
+    padding: cameraPadding(index) };
+  if (reduceMotion.matches) map.jumpTo(camera);
+  else map.flyTo({ ...camera, duration: 2500, essential: true });
+
+  applyReveal();
+}
+
+// Keep the focus point clear of the card: card column on the left (desktop),
+// card pinned to the bottom (phone). Measured at fly time.
+function cameraPadding(index) {
+  const none = { top: 0, right: 0, bottom: 0, left: 0 };
+  if (index < 0) return none;
+  const phone = window.matchMedia('(max-width: 640px)').matches;
+  if (!phone) return { ...none, left: 480 };
+  const card = sections[index + 1].querySelector('.chapter-card');
+  return { ...none, bottom: (card ? card.offsetHeight : 240) + 80 };
+}
+
+function applyReveal() {
+  if (!map.getLayer('route-line')) return;
+  const shown = Math.min(activeIndex, CHAPTERS.length - 1);
+  map.setPaintProperty('route-line', 'line-gradient', revealGradient(shown));
+  ['circle-opacity', 'circle-stroke-opacity'].forEach((prop) =>
+    map.setPaintProperty('stop-dots', prop, ['case', ['<=', ['get', 'i'], shown], 1, 0]));
+}
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => {
+    if (!entry.isIntersecting) return;
+    const i = sections.indexOf(entry.target) - 1;
+    activate(i);
+  });
+}, { threshold: 0.5 });
+sections.forEach((s) => observer.observe(s));
+
+document.getElementById('replay').addEventListener('click', () => scrollToSection(sections[0]));
+document.getElementById('last').addEventListener('click', () => scrollToSection(sections[CHAPTERS.length]));
+</script>
+</body>
+</html>

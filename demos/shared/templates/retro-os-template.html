@@ -1,0 +1,344 @@
+<!--
+  Working EXAMPLE of the Retro OS style pack (retro-os.css, in this same
+  folder). Open this file directly to see a fictional late-90s desktop
+  ("MapOS 97"): the map lives in a draggable, resizable, maximisable
+  window; a Layers dialog swaps the basemap and toggles overlays; a
+  Places listbox flies to eight public parks and landmarks in Chicago (double-click, or a single
+  tap on touch); the Start menu and desktop icons open windows; minimised
+  windows live on the taskbar next to a ticking clock. Copy the markup and
+  script below into your own demo and link retro-os.css from its <head> --
+  see the class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief at the user's request for something distinct from
+  every other pack in this folder. The places are real; the OS name, the
+  icons and the copy are illustrative placeholders, not any real product.
+
+  What's NOT included: real data, search/geocoding, routing, popups, a
+  hard-coded access token (demo-kit.js sets that), or any window-manager
+  code in the CSS pack (the small manager below is demo-owned).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MapOS 97</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="retro-os.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: #map fills its .window-body.is-map. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<div class="desktop" id="desktop">
+  <div class="desktop-icons">
+    <button class="desktop-icon" data-open="map"><span class="icon-glyph g-map"></span><span class="icon-label">Map.exe</span></button>
+    <button class="desktop-icon" data-open="layers"><span class="icon-glyph g-layers"></span><span class="icon-label">Layers</span></button>
+    <button class="desktop-icon" data-open="places"><span class="icon-glyph g-doc"></span><span class="icon-label">Places.txt</span></button>
+    <button class="desktop-icon" data-open="about"><span class="icon-glyph g-about"></span><span class="icon-label">About</span></button>
+  </div>
+
+  <section class="window" data-win="map">
+    <div class="title-bar"><span class="title-text">Map.exe - Chicago</span>
+      <span class="title-btns"><button class="tb-btn tb-min" data-act="min" aria-label="Minimize"></button><button class="tb-btn tb-max" data-act="max" aria-label="Maximize"></button><button class="tb-btn tb-close" data-act="close" aria-label="Close"></button></span></div>
+    <div class="window-body is-map"><div id="map"></div></div>
+    <div class="status-bar"><span class="status-cell" id="st-main">Loading map...</span><span class="status-cell" id="st-pos">--, --</span><span class="resize-grip" id="grip" title="Resize"></span></div>
+  </section>
+
+  <section class="window" data-win="layers">
+    <div class="title-bar"><span class="title-text">Layers</span>
+      <span class="title-btns"><button class="tb-btn tb-min" data-act="min" aria-label="Minimize"></button><button class="tb-btn tb-close" data-act="close" aria-label="Close"></button></span></div>
+    <div class="window-body">
+      <fieldset class="group-box"><legend>Basemap</legend>
+        <label class="opt-row"><input class="opt" type="radio" name="base" value="streets" checked> Streets</label>
+        <label class="opt-row"><input class="opt" type="radio" name="base" value="sat"> Satellite</label>
+      </fieldset>
+      <fieldset class="group-box"><legend>Overlays</legend>
+        <label class="opt-row"><input class="opt" id="chk-pins" type="checkbox" checked> Places (pixel pins)</label>
+        <label class="opt-row"><input class="opt" id="chk-labels" type="checkbox" checked> Place names</label>
+      </fieldset>
+      <div class="btn-row"><button class="btn" id="btn-reset">Reset view</button></div>
+    </div>
+  </section>
+
+  <section class="window" data-win="places">
+    <div class="title-bar"><span class="title-text">Places.txt</span>
+      <span class="title-btns"><button class="tb-btn tb-min" data-act="min" aria-label="Minimize"></button><button class="tb-btn tb-close" data-act="close" aria-label="Close"></button></span></div>
+    <div class="window-body is-list">
+      <ul class="listbox" id="listbox" role="listbox" tabindex="0" aria-label="Places"></ul>
+      <p class="hint" id="list-hint">Double-click a place to fly there.</p>
+    </div>
+  </section>
+
+  <section class="window hidden" data-win="about">
+    <div class="title-bar"><span class="title-text">About MapOS 97</span>
+      <span class="title-btns"><button class="tb-btn tb-close" data-act="close" aria-label="Close"></button></span></div>
+    <div class="window-body">
+      <div class="dialog-row"><span class="icon-glyph g-about"></span>
+        <div><p><b>MapOS 97</b><br>Version 4.00.950</p><p class="hint">A fictional operating system with a very real map. Any resemblance to software you once owned is a happy accident.</p></div></div>
+      <div class="btn-row"><button class="btn is-default" data-act="close">OK</button></div>
+    </div>
+  </section>
+</div>
+
+<div class="start-menu hidden" id="start-menu">
+  <div class="start-side">MapOS 97</div>
+  <div class="menu-list">
+    <button class="menu-item" data-open="map">Map.exe</button>
+    <button class="menu-item" data-open="layers">Layers...</button>
+    <button class="menu-item" data-open="places">Places.txt</button>
+    <button class="menu-item" data-open="about">About...</button>
+    <div class="menu-sep"></div>
+    <button class="menu-item" id="mi-reset">Reset view</button>
+    <button class="menu-item" id="mi-off">Shut Down...</button>
+  </div>
+</div>
+
+<div class="taskbar">
+  <button class="start-btn" id="start-btn" aria-haspopup="true"><span class="start-logo"></span>Start</button>
+  <div class="tasks" id="tasks"></div>
+  <div class="tray"><span class="clock" id="clock">00:00:00</span></div>
+</div>
+
+<script>
+const PLACES = [
+  ['Millennium Park', -87.6224, 41.8826], ['Grant Park', -87.6189, 41.8758],
+  ['Navy Pier', -87.6054, 41.8917], ['Chicago Riverwalk', -87.6290, 41.8878],
+  ['North Avenue Beach', -87.6262, 41.9170], ['Humboldt Park', -87.7022, 41.9028],
+  ['Garfield Park Conservatory', -87.7173, 41.8860], ['Promontory Point', -87.5806, 41.7945],
+];
+const HOME = { center: [-87.65, 41.87], zoom: 11.5 };
+const STYLES = { streets: 'mapbox://styles/mapbox/streets-v12', sat: 'mapbox://styles/mapbox/satellite-streets-v12' };
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const clamp = (v, a, b) => Math.min(Math.max(v, a), Math.max(a, b));
+const isPhone = () => matchMedia('(max-width:640px)').matches;
+const touchy = () => isPhone() || matchMedia('(pointer:coarse)').matches;
+
+/* ---------- Map ---------- */
+const map = new mapboxgl.Map({ container: 'map', style: STYLES.streets, ...HOME });
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+const say = (t) => { $('#st-main').textContent = t; };
+let sel = -1;
+
+// Pixel-art square marker; ImageData so no network or SVG is needed.
+function pin(fill) {
+  const c = document.createElement('canvas'); c.width = c.height = 20;
+  const g = c.getContext('2d');
+  g.fillStyle = '#000'; g.fillRect(0, 0, 20, 20);
+  g.fillStyle = fill; g.fillRect(2, 2, 16, 16);
+  g.fillStyle = '#fff'; g.fillRect(2, 2, 16, 2); g.fillRect(2, 2, 2, 16); g.fillRect(8, 8, 4, 4);
+  return g.getImageData(0, 0, 20, 20);
+}
+
+const GEOJSON = { type: 'FeatureCollection', features: PLACES.map(([name, x, y], id) => (
+  { type: 'Feature', properties: { id, name }, geometry: { type: 'Point', coordinates: [x, y] } })) };
+
+// setStyle() wipes sources, layers and images, so everything is re-added on style.load.
+function addOverlay() {
+  if (!map.hasImage('pin')) map.addImage('pin', pin('#D00000'));
+  if (!map.hasImage('pin-sel')) map.addImage('pin-sel', pin('#000080'));
+  if (!map.getSource('places')) map.addSource('places', { type: 'geojson', data: GEOJSON });
+  const icon = { 'icon-allow-overlap': true, 'icon-ignore-placement': true };
+  map.addLayer({ id: 'places-pins', type: 'symbol', source: 'places', layout: { ...icon, 'icon-image': 'pin' } });
+  map.addLayer({ id: 'places-sel', type: 'symbol', source: 'places', filter: ['==', ['get', 'id'], sel],
+    layout: { ...icon, 'icon-image': 'pin-sel', 'icon-size': 1.3 } });
+  map.addLayer({ id: 'places-labels', type: 'symbol', source: 'places',
+    layout: { 'text-field': ['get', 'name'], 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+      'text-size': 12, 'text-anchor': 'top', 'text-offset': [0, 1.1], 'text-optional': true },
+    paint: { 'text-color': '#000', 'text-halo-color': '#C0C0C0', 'text-halo-width': 2 } });
+  applyVisibility();
+}
+
+function applyVisibility() {
+  const set = (ids, on) => ids.forEach((id) => {
+    if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+  });
+  set(['places-pins', 'places-sel'], $('#chk-pins').checked);
+  set(['places-labels'], $('#chk-labels').checked);
+}
+
+map.on('style.load', () => { addOverlay(); say('Ready'); });
+map.on('moveend', () => say('Ready'));
+map.on('error', (e) => say('Error: ' + ((e.error && e.error.message) || 'unknown')));
+map.on('mousemove', (e) => { $('#st-pos').textContent = `${e.lngLat.lat.toFixed(4)}, ${e.lngLat.lng.toFixed(4)}`; });
+map.on('click', 'places-pins', (e) => pick(e.features[0].properties.id, { scroll: true }));
+map.on('mouseenter', 'places-pins', () => { map.getCanvas().style.cursor = 'pointer'; });
+map.on('mouseleave', 'places-pins', () => { map.getCanvas().style.cursor = ''; });
+new ResizeObserver(() => { if ($('#map').offsetWidth) map.resize(); }).observe($('#map'));
+
+$$('input[name=base]').forEach((r) => r.addEventListener('change', () => {
+  say('Loading style...'); map.setStyle(STYLES[r.value]);
+}));
+$('#chk-pins').addEventListener('change', applyVisibility);
+$('#chk-labels').addEventListener('change', applyVisibility);
+const resetView = () => { menu(false); map.flyTo({ ...HOME, duration: 1500 }); };
+$('#btn-reset').addEventListener('click', resetView);
+$('#mi-reset').addEventListener('click', resetView);
+$('#mi-off').addEventListener('click', () => { menu(false); say('It is now safe to turn off your map.'); });
+
+/* ---------- Places listbox ---------- */
+const listEl = $('#listbox');
+if (touchy()) $('#list-hint').textContent = 'Tap a place to fly there.';
+PLACES.forEach(([name], i) => {
+  const li = document.createElement('li');
+  li.className = 'list-item'; li.setAttribute('role', 'option'); li.textContent = name;
+  li.addEventListener('click', () => pick(i, { fly: touchy() }));
+  li.addEventListener('dblclick', () => pick(i, { fly: true }));
+  listEl.appendChild(li);
+});
+listEl.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault(); pick(clamp(sel + (e.key === 'ArrowDown' ? 1 : -1), 0, PLACES.length - 1), { scroll: true });
+  } else if (e.key === 'Enter' && sel >= 0) pick(sel, { fly: true });
+});
+
+function pick(i, { fly, scroll } = {}) {
+  sel = i;
+  $$('.list-item', listEl).forEach((li, k) => {
+    li.classList.toggle('is-selected', k === i); li.setAttribute('aria-selected', k === i);
+  });
+  if (scroll) listEl.children[i].scrollIntoView({ block: 'nearest' });
+  if (map.getLayer('places-sel')) map.setFilter('places-sel', ['==', ['get', 'id'], i]);
+  if (!fly) return;
+  const w = W.map;
+  if (w.classList.contains('hidden') || w.classList.contains('is-minimized')) openWin('map');
+  if (isPhone()) w.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  say('Flying to ' + PLACES[i][0] + '...');
+  map.flyTo({ center: [PLACES[i][1], PLACES[i][2]], zoom: 15, duration: 1800 });
+}
+
+/* ---------- Tiny window manager ---------- */
+const desk = $('#desktop');
+const W = {}, tasks = {};
+let z = 10, active = null;
+$$('.window').forEach((el) => {
+  const id = el.dataset.win; W[id] = el;
+  const b = document.createElement('button');
+  b.className = 'task-btn'; b.textContent = $('.title-text', el).textContent;
+  b.addEventListener('click', () => {
+    if (el.classList.contains('is-minimized')) openWin(id);
+    else if (active === id) dropWin(id, 'is-minimized');
+    else focusWin(id);
+  });
+  $('#tasks').appendChild(b); tasks[id] = b;
+  el.addEventListener('pointerdown', () => focusWin(id), true);
+});
+
+function sync() {
+  for (const id in W) {
+    const on = id === active;
+    W[id].classList.toggle('is-active', on);
+    tasks[id].classList.toggle('is-active', on);
+    tasks[id].classList.toggle('hidden', W[id].classList.contains('hidden'));
+  }
+}
+function focusWin(id) { W[id].style.zIndex = ++z; active = id; sync(); }
+function openWin(id) {
+  W[id].classList.remove('hidden', 'is-minimized'); menu(false); focusWin(id);
+  if (isPhone()) W[id].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+function dropWin(id, cls) {
+  W[id].classList.add(cls);
+  if (active === id) {
+    active = Object.keys(W).filter((k) => !/hidden|is-minimized/.test(W[k].className))
+      .sort((a, b) => (W[b].style.zIndex || 0) - (W[a].style.zIndex || 0))[0] || null;
+  }
+  sync();
+}
+
+desk.addEventListener('click', (e) => {
+  const b = e.target.closest('.tb-btn, .btn[data-act]');
+  if (!b) return;
+  const id = b.closest('.window').dataset.win;
+  if (b.dataset.act === 'min') dropWin(id, 'is-minimized');
+  else if (b.dataset.act === 'close') dropWin(id, 'hidden');
+  else W[id].classList.toggle('is-max');
+});
+$$('.title-bar').forEach((bar) => bar.addEventListener('dblclick', (e) => {
+  if (!isPhone() && !e.target.closest('.tb-btn') && $('.tb-max', bar)) bar.closest('.window').classList.toggle('is-max');
+}));
+
+// Drag by title bar, kept fully inside the desktop.
+$$('.title-bar').forEach((bar) => bar.addEventListener('pointerdown', (e) => {
+  const el = bar.closest('.window');
+  if (e.target.closest('.tb-btn') || isPhone() || el.classList.contains('is-max')) return;
+  const dx = e.clientX - el.offsetLeft, dy = e.clientY - el.offsetTop;
+  bar.setPointerCapture(e.pointerId);
+  const move = (ev) => {
+    el.style.left = clamp(ev.clientX - dx, 0, desk.clientWidth - el.offsetWidth) + 'px';
+    el.style.top = clamp(ev.clientY - dy, 0, desk.clientHeight - el.offsetHeight) + 'px';
+  };
+  const up = () => ['pointermove', 'pointerup', 'pointercancel'].forEach((t) => bar.removeEventListener(t, t === 'pointermove' ? move : up));
+  bar.addEventListener('pointermove', move); bar.addEventListener('pointerup', up); bar.addEventListener('pointercancel', up);
+}));
+
+// Resize the map window from the status-bar grip (#map follows via ResizeObserver).
+$('#grip').addEventListener('pointerdown', (e) => {
+  const el = W.map, g = e.currentTarget, x0 = e.clientX, y0 = e.clientY, w0 = el.offsetWidth, h0 = el.offsetHeight;
+  g.setPointerCapture(e.pointerId);
+  const move = (ev) => {
+    el.style.width = clamp(w0 + ev.clientX - x0, 320, desk.clientWidth - el.offsetLeft) + 'px';
+    el.style.height = clamp(h0 + ev.clientY - y0, 240, desk.clientHeight - el.offsetTop) + 'px';
+  };
+  const up = () => { g.removeEventListener('pointermove', move); g.removeEventListener('pointerup', up); };
+  g.addEventListener('pointermove', move); g.addEventListener('pointerup', up);
+});
+
+function layout() {
+  if (isPhone()) return;
+  const dw = desk.clientWidth, dh = desk.clientHeight;
+  const put = (id, l, t, w, h) => {
+    const s = W[id].style; s.left = l + 'px'; s.top = t + 'px';
+    if (w) s.width = w + 'px'; if (h) s.height = h + 'px';
+  };
+  const side = Math.max(110, dw - 276);
+  // Map takes ~62% of the width and nearly the full height; side windows stack
+  // on the right, Places placed below Layers' measured height so both titles show.
+  put('map', 110, 12, clamp(dw * 0.62, 420, 1100), dh - 24);
+  put('layers', side, 16, 260);
+  const top = 16 + W.layers.offsetHeight + 14;
+  put('places', side, top, 260, clamp(dh - top - 16, 150, 300));
+  put('about', Math.max(0, (dw - 330) / 2), Math.max(0, dh / 2 - 110), 330);
+}
+addEventListener('resize', () => {
+  if (isPhone()) return;
+  $$('.window').forEach((el) => {
+    el.style.left = clamp(el.offsetLeft, 0, desk.clientWidth - el.offsetWidth) + 'px';
+    el.style.top = clamp(el.offsetTop, 0, desk.clientHeight - el.offsetHeight) + 'px';
+  });
+});
+
+/* ---------- Icons, Start menu, clock ---------- */
+$$('.desktop-icon').forEach((b) => {
+  b.addEventListener('click', (e) => {
+    $$('.desktop-icon').forEach((o) => o.classList.toggle('is-selected', o === b));
+    if (touchy() || e.detail === 0) openWin(b.dataset.open);
+  });
+  b.addEventListener('dblclick', () => openWin(b.dataset.open));
+});
+desk.addEventListener('pointerdown', (e) => {
+  if (!e.target.closest('.desktop-icon')) $$('.desktop-icon').forEach((o) => o.classList.remove('is-selected'));
+});
+
+const menuEl = $('#start-menu'), startBtn = $('#start-btn');
+function menu(open) { menuEl.classList.toggle('hidden', !open); startBtn.classList.toggle('is-open', open); }
+startBtn.addEventListener('click', () => menu(menuEl.classList.contains('hidden')));
+$$('.menu-item[data-open]').forEach((b) => b.addEventListener('click', () => openWin(b.dataset.open)));
+document.addEventListener('pointerdown', (e) => { if (!e.target.closest('#start-menu, #start-btn')) menu(false); });
+addEventListener('keydown', (e) => { if (e.key === 'Escape') menu(false); });
+
+const tick = () => { $('#clock').textContent = new Date().toTimeString().slice(0, 8); };
+tick(); setInterval(tick, 1000);
+
+layout();
+['places', 'layers', 'map'].forEach(focusWin);
+</script>
+</body>
+</html>

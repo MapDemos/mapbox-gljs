@@ -1,0 +1,427 @@
+/*
+  Pastel Bento -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: soft claymorphism, a bento grid of
+  chunky pastel tiles, rounded display type, deep-plum ink -- a friendly
+  consumer-app home screen, deliberately distinct from every other style
+  pack in this folder: Arena is a Linear-dark compare view, Editorial Paper
+  is warm paper + serif, Highway Sign is MUTCD cream/green, Slate Console
+  is a dark cinematic globe, Storefront is a sidebar of filters, Tarmac
+  Glass is dark glass + amber, Vintage Chart is navy/parchment/brass, and
+  Weather Console is a layer-explorer dock).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/pastel-bento.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Fredoka for display, Nunito for
+  body):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet" />
+
+  Signature touch: "clay" depth -- every tile has a soft outer drop shadow
+  plus an inner top highlight and inner bottom shade, and squishes
+  (transform: scale) when pressed. The map is NOT full-bleed: it is one big
+  rounded tile among the others.
+
+  Class/id contract (see pastel-bento-template.html in this same folder
+  for a full working example):
+
+  - .bento                    page-filling CSS grid (4 cols; page padding,
+                               14px gap). Phones: 2 cols, page scrolls.
+  - .tile                     base clay tile (radius, clay shadow, padding)
+    .tile-title                 greeting tile: h1 + .tile-sub line
+    .tile-map                   the map tile (overflow hidden, same radius);
+                                 put your own #map inside it (every demo
+                                 defines its own #map -- not included here).
+                                 On phones it is ~50vh tall.
+    .tile-cat                   a toggle tile (use a <button>): .tile-icon,
+                                 .tile-label, .big-number, .tile-state.
+                                 Colour via .tone-lavender / .tone-peach /
+                                 .tone-mint / .tone-butter / .tone-sky.
+                                 aria-pressed="false" renders the "off" look.
+    .tile-detail                selected-place tile: .tile-label,
+                                 .detail-name, .detail-meta, .detail-chip
+    .tile-stat                  "showing N of M" tile: .big-number,
+                                 .tile-label and an inline-SVG .sparkline
+  - .tile-label               small rounded uppercase-ish caption
+  - .big-number               oversized Fredoka numeral
+  - .btn, .btn-primary,       pill buttons with clay depth and squish
+    .btn-secondary
+  - .status-note (+.loading/  small rounded pill status line
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --bg: #F6F2FF;
+  --ink: #2E1A47;
+  --ink-muted: #6B5A82;
+  --ink-faint: #9A8CB0;
+  --white: #FFFFFF;
+  --tile: #FFFFFF;
+
+  --lavender: #CDB4FF;
+  --peach: #FFC9A8;
+  --mint: #B8F0D8;
+  --butter: #FFF1A8;
+  --sky: #BDE0FE;
+
+  --success: #2F8F66;
+  --error: #C2415D;
+
+  --radius: 28px;
+  --gap: 14px;
+  --pad: 16px;
+  --clay-shadow:
+    0 12px 22px rgba(46, 26, 71, 0.14),
+    inset 0 5px 8px rgba(255, 255, 255, 0.75),
+    inset 0 -6px 10px rgba(46, 26, 71, 0.10);
+  --clay-shadow-pressed:
+    0 4px 8px rgba(46, 26, 71, 0.12),
+    inset 0 3px 6px rgba(255, 255, 255, 0.6),
+    inset 0 -3px 6px rgba(46, 26, 71, 0.12);
+
+  --font-display: 'Fredoka', 'Nunito', ui-rounded, system-ui, sans-serif;
+  --font-body: 'Nunito', ui-rounded, system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 700;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/* Bento grid -- fills the viewport on desktop */
+.bento {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: 0.8fr 1fr 1fr 1fr;
+  gap: var(--gap);
+  height: 100vh;
+  height: 100dvh;
+  padding: var(--pad);
+}
+
+.tile {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  padding: 18px 20px;
+  border-radius: var(--radius);
+  background: var(--tile);
+  box-shadow: var(--clay-shadow);
+  overflow: hidden;
+}
+
+.tile-label {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+}
+
+.big-number {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(36px, 5vw, 64px);
+  line-height: 1;
+  color: var(--ink);
+}
+
+/* Greeting tile */
+.tile-title {
+  background: var(--lavender);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.tile-title h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(24px, 2.6vw, 38px);
+  line-height: 1.1;
+}
+
+.tile-sub {
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+/* Map tile -- the map is one big rounded tile, not full-bleed */
+.tile-map {
+  padding: 0;
+  background: var(--sky);
+}
+
+.tile-map .mapboxgl-canvas {
+  border-radius: var(--radius);
+}
+
+/* Category toggle tiles */
+.tile-cat {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  text-align: left;
+  border: 0;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease, opacity 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tile-cat:hover {
+  transform: translateY(-2px);
+}
+
+.tile-cat:active {
+  transform: scale(0.95);
+  box-shadow: var(--clay-shadow-pressed);
+}
+
+.tile-icon {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.tile-state {
+  align-self: flex-end;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: inset 0 2px 4px rgba(46, 26, 71, 0.12);
+}
+
+.tone-lavender { background: var(--lavender); }
+.tone-peach { background: var(--peach); }
+.tone-mint { background: var(--mint); }
+.tone-butter { background: var(--butter); }
+.tone-sky { background: var(--sky); }
+
+.tile-cat[aria-pressed="false"] {
+  background: #EDE8F6;
+  box-shadow: var(--clay-shadow-pressed);
+}
+
+.tile-cat[aria-pressed="false"] .tile-icon,
+.tile-cat[aria-pressed="false"] .big-number,
+.tile-cat[aria-pressed="false"] .tile-label {
+  opacity: 0.4;
+}
+
+.tile-cat[aria-pressed="false"] .tile-state {
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink-faint);
+}
+
+/* Selected-place detail tile */
+.tile-detail {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.detail-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(20px, 2vw, 28px);
+  line-height: 1.15;
+}
+
+.detail-meta {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+.detail-chip {
+  align-self: flex-start;
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--butter);
+  box-shadow: inset 0 2px 4px rgba(46, 26, 71, 0.12);
+}
+
+/* "Showing N of M" + sparkline tile */
+.tile-stat {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--white);
+}
+
+.tile-stat .stat-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.tile-stat .stat-of {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.sparkline {
+  display: block;
+  width: 100%;
+  height: 44px;
+  overflow: visible;
+}
+
+.sparkline path {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sparkline .spark-area {
+  fill: var(--lavender);
+  stroke: none;
+  opacity: 0.55;
+}
+
+/* Buttons -- chunky pills with clay depth */
+.btn {
+  display: inline-block;
+  padding: 10px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--clay-shadow);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+}
+
+.btn:active {
+  transform: scale(0.95);
+  box-shadow: var(--clay-shadow-pressed);
+}
+
+.btn-primary {
+  background: var(--lavender);
+}
+
+.btn-secondary {
+  background: var(--butter);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Status note -- small rounded pill */
+.status-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  color: var(--ink-muted);
+  box-shadow: inset 0 2px 4px rgba(46, 26, 71, 0.10);
+}
+
+.status-note.loading .status-icon {
+  display: inline-block;
+  animation: bento-spin 0.9s linear infinite;
+}
+
+@keyframes bento-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); }
+
+.hidden {
+  display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile-cat, .btn { transition: none; }
+}
+
+/* Phones: two columns, page scrolls, map tile ~50vh near the top */
+@media (max-width: 720px) {
+  .bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+    grid-auto-rows: auto;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .bento > .tile-title,
+  .bento > .tile-map,
+  .bento > .tile-detail,
+  .bento > .tile-stat {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+
+  .bento > .tile-map {
+    height: 50vh;
+    height: 50svh;
+    min-height: 280px;
+  }
+
+  .tile-cat {
+    min-height: 130px;
+  }
+
+  .big-number {
+    font-size: 44px;
+  }
+}

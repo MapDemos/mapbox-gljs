@@ -1,0 +1,460 @@
+/*
+  Blueprint -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a cyanotype engineering drawing sheet --
+  white line work on blueprint blue, a double-rule drawing border with ruler
+  ticks and zone labels, a ruled title block, handwritten pencil notes --
+  deliberately distinct from every other style pack in this folder: Arena is
+  a Linear-style dark compare layout, Editorial Paper is warm paper + serif,
+  Highway Sign is MUTCD cream/green, Slate Console is a dark cinematic
+  globe, Storefront is a sidebar-filters locator, Tarmac Glass is dark glass
+  + amber, Vintage Chart is navy/parchment/brass, Weather Console is a
+  layer-explorer dock).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/blueprint.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Red Hat Mono for labels and the
+  title block, Caveat for handwritten annotations):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Mono:wght@400;500;600&family=Caveat:wght@500;700&display=swap" rel="stylesheet" />
+
+  Signature touch: a fine drafting-paper grid (minor lines every 12px, major
+  every 60px, drawn with repeating-linear-gradients) on <body>, so the whole
+  page reads as a printed sheet and the map as a window cut into it. The one
+  warm colour (--pencil) is reserved for the active measurement, like a
+  correction pencil on a print.
+
+  Class/id contract (see blueprint-template.html in this same folder for a
+  full working example):
+
+  - .sheet                    full-page drawing sheet (wrapper for everything)
+  - .drawing                  the inset frame: double white rule, holds the
+                               map and the ruler strips. 44px sheet margin on
+                               desktop, 16px gutters on phones
+    #map                       map container, placed INSIDE .drawing (every
+                               demo defines its own absolute fill -- not
+                               included here)
+    .zones                     a ruler strip along one border edge; combine
+                               with .zones-top / .zones-bottom (numbers 1-8)
+                               or .zones-left / .zones-right (letters A-F).
+                               Fill each with <span class="zone"> cells (JS in
+                               the template does this). Hidden on phones
+  - .north-arrow              small SVG north arrow, top-right inside .drawing
+  - .toolbar                  tool strip, top-left inside .drawing
+    .btn, .btn-primary,        drafting buttons: sharp corners, 1px white
+    .btn-secondary              rule, uppercase mono; primary uses the pencil
+                                accent
+  - .titleblock-wrap          sibling of .drawing, inside .sheet: bottom-right
+                               stack overlapping the map corner (below the
+                               map on phones): note + revisions + title block
+    .note                      Caveat handwritten annotation (use sparingly)
+    .revisions                 <table> REV / DESCRIPTION / DIST log
+    .title-block               <table> ruled engineering title block;
+      .tb-label                  tiny uppercase caption inside a cell
+      .tb-value                  the cell's value (.tb-value.live = pencil)
+  - .status-note (+.loading/  one-line mono status under the toolbar
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --sheet: #1E4E8C;
+  --sheet-deep: #163A6B;
+  --line: #FFFFFF;
+  --line-soft: rgba(255, 255, 255, 0.55);
+  --line-faint: rgba(255, 255, 255, 0.18);
+  --line-pale: #9EC5F0;
+  --pencil: #FF6B4A;
+  --pencil-ink: #163A6B;
+  --success: #9EE6B8;
+  --error: #FF6B4A;
+
+  --margin: 44px;
+  --frame: 5px;
+  --zone: 30px;
+
+  --font-label: 'Red Hat Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-hand: 'Caveat', 'Bradley Hand', cursive;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--sheet);
+  color: var(--line);
+  font-family: var(--font-label);
+  font-size: 12px;
+  /* Drafting-paper grid: minor lines every 12px, major every 60px */
+  background-image:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.14) 0 1px, transparent 1px 60px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.14) 0 1px, transparent 1px 60px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 12px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 12px);
+  overflow: hidden;
+}
+
+button, input, select {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--pencil);
+  outline-offset: 2px;
+}
+
+.sheet {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+}
+
+/* The inset drawing frame: a double white rule, like a plotted border */
+.drawing {
+  position: absolute;
+  inset: var(--margin);
+  border: var(--frame) double var(--line);
+  background: var(--sheet);
+}
+
+/* Ruler strips live in the sheet margin, outside the frame. Absolute
+   offsets are measured from the frame's padding box, so subtract the border. */
+.zones {
+  position: absolute;
+  display: flex;
+  color: var(--line-pale);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  user-select: none;
+}
+
+.zones .zone {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-style: solid;
+  border-color: var(--line-soft);
+  border-width: 0;
+}
+
+.zones-top, .zones-bottom {
+  left: 0;
+  right: 0;
+  height: var(--zone);
+}
+
+.zones-top {
+  top: calc(-1 * (var(--zone) + var(--frame)));
+  background: repeating-linear-gradient(90deg, var(--line-soft) 0 1px, transparent 1px 12px) left bottom / 100% 6px no-repeat;
+}
+
+.zones-bottom {
+  bottom: calc(-1 * (var(--zone) + var(--frame)));
+  background: repeating-linear-gradient(90deg, var(--line-soft) 0 1px, transparent 1px 12px) left top / 100% 6px no-repeat;
+}
+
+.zones-top .zone, .zones-bottom .zone {
+  border-left-width: 1px;
+}
+
+.zones-top .zone:last-child, .zones-bottom .zone:last-child {
+  border-right-width: 1px;
+}
+
+.zones-left, .zones-right {
+  top: 0;
+  bottom: 0;
+  width: var(--zone);
+  flex-direction: column;
+}
+
+.zones-left {
+  left: calc(-1 * (var(--zone) + var(--frame)));
+  background: repeating-linear-gradient(180deg, var(--line-soft) 0 1px, transparent 1px 12px) right top / 6px 100% no-repeat;
+}
+
+.zones-right {
+  right: calc(-1 * (var(--zone) + var(--frame)));
+  background: repeating-linear-gradient(180deg, var(--line-soft) 0 1px, transparent 1px 12px) left top / 6px 100% no-repeat;
+}
+
+.zones-left .zone, .zones-right .zone {
+  border-top-width: 1px;
+}
+
+.zones-left .zone:last-child, .zones-right .zone:last-child {
+  border-bottom-width: 1px;
+}
+
+/* North arrow, drawn as inline SVG in the template */
+.north-arrow {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+  width: 44px;
+  height: 64px;
+  padding: 4px;
+  background: rgba(22, 58, 107, 0.85);
+  border: 1px solid var(--line-soft);
+  pointer-events: none;
+}
+
+.north-arrow svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Tool strip, top-left */
+.toolbar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 80px);
+}
+
+.toolbar .status-note {
+  flex-basis: 100%;
+}
+
+/* Buttons -- drafting: sharp corners, 1px rule, uppercase mono */
+.btn {
+  display: inline-block;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  background: var(--sheet-deep);
+  color: var(--line);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.btn:hover {
+  background: var(--line);
+  color: var(--sheet-deep);
+}
+
+.btn-primary {
+  border-color: var(--pencil);
+  color: var(--pencil);
+}
+
+.btn-primary:hover {
+  background: var(--pencil);
+  color: var(--pencil-ink);
+}
+
+.btn-secondary {
+  border-color: var(--line-soft);
+  color: var(--line-pale);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Status line -- mono, plotted onto the sheet with a blue backing */
+.status-note {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 8px;
+  background: rgba(22, 58, 107, 0.85);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--line-pale);
+}
+
+.status-note .status-icon {
+  flex: none;
+}
+
+.status-note.loading .status-icon {
+  display: inline-block;
+  animation: blueprint-spin 0.9s linear infinite;
+}
+
+@keyframes blueprint-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.status-note.success {
+  color: var(--success);
+}
+
+.status-note.error {
+  color: var(--error);
+}
+
+/* Bottom-right stack: handwritten note, revisions, title block */
+.titleblock-wrap {
+  position: absolute;
+  right: calc(var(--margin) + var(--frame));
+  bottom: calc(var(--margin) + var(--frame));
+  z-index: 3;
+  width: 320px;
+  max-width: 100%;
+}
+
+.note {
+  margin: 0 0 4px;
+  padding-right: 8px;
+  text-align: right;
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--pencil);
+  text-shadow: 0 0 4px var(--sheet-deep), 0 0 8px var(--sheet-deep);
+  transform: rotate(-2deg);
+  transform-origin: right bottom;
+}
+
+.revisions, .title-block {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(22, 58, 107, 0.94);
+  border: 2px solid var(--line);
+}
+
+.revisions {
+  border-bottom-width: 1px;
+  font-size: 10px;
+}
+
+.revisions th, .revisions td {
+  padding: 3px 8px;
+  border: 1px solid var(--line-soft);
+  text-align: left;
+  font-weight: 400;
+}
+
+.revisions th {
+  color: var(--line-pale);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.revisions th:first-child, .revisions td:first-child {
+  width: 44px;
+  text-align: center;
+}
+
+.revisions td:last-child {
+  text-align: right;
+  color: var(--pencil);
+}
+
+.revisions .empty td {
+  color: var(--line-pale);
+  text-align: center;
+}
+
+.title-block td {
+  padding: 5px 8px 6px;
+  border: 1px solid var(--line-soft);
+  vertical-align: top;
+}
+
+.title-block .tb-label {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--line-pale);
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.title-block .tb-value {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.title-block .tb-value.live {
+  color: var(--pencil);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Attribution sits bottom-left with the logo; keep it legible on the sheet */
+.drawing .mapboxgl-ctrl-bottom-left .mapboxgl-ctrl-attrib {
+  background: rgba(22, 58, 107, 0.85);
+  color: var(--line-pale);
+}
+
+.drawing .mapboxgl-ctrl-attrib a {
+  color: var(--line);
+}
+
+/* Phones: slim 16px gutters, no ruler strips, and the title block drops
+   below the map as a compact full-width strip instead of covering it. */
+@media (max-width: 640px) {
+  body {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .sheet {
+    height: auto;
+    padding: 16px;
+  }
+
+  .drawing {
+    position: relative;
+    inset: auto;
+    height: 62vh;
+    min-height: 320px;
+  }
+
+  .zones {
+    display: none;
+  }
+
+  .titleblock-wrap {
+    position: static;
+    width: auto;
+    margin-top: 12px;
+  }
+
+  .note {
+    text-align: left;
+    padding: 0 0 0 4px;
+    transform-origin: left bottom;
+  }
+
+  .toolbar {
+    max-width: calc(100% - 72px);
+  }
+
+  .north-arrow {
+    width: 36px;
+    height: 52px;
+  }
+}

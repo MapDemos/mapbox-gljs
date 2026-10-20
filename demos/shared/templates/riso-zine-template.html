@@ -1,0 +1,203 @@
+<!--
+  Working EXAMPLE of the Riso Zine style pack (riso-zine.css, in this same
+  folder). Open this file directly to see the pattern working with six
+  illustrative walking-tour stops, then copy the markup and the
+  recolourBasemap() helper below into your own demo and link riso-zine.css
+  from its <head> -- see the class/id contract documented at the top of
+  that CSS file for what to build.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (risograph zine: newsprint paper, pink/blue/yellow
+  spot inks, bottom scroll-snap filmstrip) at the user's request for
+  something distinct from every other pack in this folder. The tour,
+  stops, and copy here are illustrative placeholders, not real content --
+  swap in your own.
+
+  What's NOT included: real tour data, a routing/Directions call (the
+  dotted line just joins the stops in order), search, or any backend.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="riso-zine.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="zine-title">
+  <h1>Slow Walk<br />Zine</h1>
+  <div class="issue">Issue 01 &middot; 6 stops &middot; 3.2 km</div>
+</div>
+
+<div class="filmstrip" id="filmstrip"></div>
+
+<script>
+const INK = '#1B1A24';
+const PAPER = '#F2EFE6';
+const PINK = '#FF48B0';
+const BLUE = '#0078BF';
+const YELLOW = '#FFE800';
+
+const STOPS = [
+  { title: 'Riverside Pier', meta: 'Start / 0.0 km', tag: 'Sunrise', halftone: 'halftone',
+    body: 'Coffee from the kiosk, then watch the ferries stack up along the quay.',
+    center: [-9.1445, 38.7066] },
+  { title: 'Grand Waterfront Square', meta: '0.9 km / 12 min', tag: 'Arches', halftone: '',
+    body: 'A huge yellow arcade facing the water. Stand dead centre and clap.',
+    center: [-9.1366, 38.7075] },
+  { title: 'Old Cathedral', meta: '0.6 km / 8 min', tag: 'Stone', halftone: 'halftone-blue',
+    body: 'Fortress-thick walls, a rose window, and a tram that squeals past the door.',
+    center: [-9.1333, 38.7099] },
+  { title: 'Hilltop Castle', meta: '0.5 km / 9 min', tag: 'Climb', halftone: 'halftone',
+    body: 'Steep lanes up, peacocks on the lawn, and the best view of the red roofs.',
+    center: [-9.1334, 38.7139] },
+  { title: 'Rossio Plaza', meta: '0.7 km / 10 min', tag: 'Waves', halftone: '',
+    body: 'Wavy black-and-white paving underfoot. Zine swap on the north steps.',
+    center: [-9.1393, 38.7138] },
+  { title: 'Garden Lookout', meta: '0.5 km / 7 min', tag: 'Golden hour', halftone: 'halftone-blue',
+    body: 'Finish on the terrace with a cold drink and the whole city lit up pink.',
+    center: [-9.1444, 38.7152] },
+];
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  center: STOPS[0].center,
+  zoom: 14.6,
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+const strip = document.getElementById('filmstrip');
+let activeIndex = -1;
+const markers = [];
+const cards = [];
+
+// Recolour light-v11 into a 3-ink riso look: blue water, yellow parks,
+// pink roads, ink labels, newsprint land. Every call is guarded so a
+// layer that is missing or has a different paint schema never throws.
+function recolourBasemap() {
+  const set = (id, prop, value) => {
+    try { map.setPaintProperty(id, prop, value); } catch (e) { /* layer lacks this prop */ }
+  };
+  map.getStyle().layers.forEach(({ id, type }) => {
+    if (type === 'background') {
+      set(id, 'background-color', PAPER);
+    } else if (type === 'fill') {
+      if (/water/.test(id)) set(id, 'fill-color', BLUE);
+      else if (/park|green|wood|grass|pitch|golf|landuse|national/.test(id)) {
+        set(id, 'fill-color', YELLOW);
+        set(id, 'fill-opacity', 0.35);
+      } else if (/building/.test(id)) {
+        set(id, 'fill-color', '#E6E1D2');
+      } else set(id, 'fill-color', PAPER);
+    } else if (type === 'line') {
+      if (/waterway/.test(id)) set(id, 'line-color', BLUE);
+      else if (/admin/.test(id)) set(id, 'line-color', INK);
+      else if (/road|bridge|tunnel|street|motorway|trunk|path|ferry/.test(id)) set(id, 'line-color', PINK);
+    } else if (type === 'symbol') {
+      set(id, 'text-color', INK);
+      set(id, 'text-halo-color', PAPER);
+      set(id, 'text-halo-width', 1.4);
+      set(id, 'icon-opacity', 0);
+    } else if (type === 'fill-extrusion') {
+      set(id, 'fill-extrusion-color', '#E6E1D2');
+    }
+  });
+}
+
+// Fly to a stop, flag its marker + card. fromScroll = true when the
+// filmstrip is already where it should be.
+function setActive(index, fromScroll) {
+  if (index === activeIndex) return;
+  activeIndex = index;
+  cards.forEach((c, i) => c.classList.toggle('is-active', i === index));
+  markers.forEach((m, i) => m.getElement().classList.toggle('is-active', i === index));
+  map.flyTo({ center: STOPS[index].center, zoom: 15.6, duration: 1400, essential: true });
+  if (!fromScroll) scrollToCard(index);
+}
+
+function scrollToCard(index) {
+  cards[index].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+}
+
+// Keep the map's visual centre above the filmstrip, and tell the CSS how tall it is
+function syncStripHeight() {
+  const h = strip.offsetHeight;
+  document.documentElement.style.setProperty('--strip-h', h + 'px');
+  map.setPadding({ top: 0, left: 0, right: 0, bottom: h });
+}
+
+// Build cards + markers
+STOPS.forEach((stop, i) => {
+  const card = document.createElement('article');
+  card.className = `zine-card ${stop.halftone}`.trim();
+  card.dataset.index = i;
+  card.innerHTML = `
+    <span class="card-num">${String(i + 1).padStart(2, '0')}</span>
+    <h2 class="card-title">${stop.title}</h2>
+    <div class="card-meta">${stop.meta}</div>
+    <p class="card-body">${stop.body}</p>
+    <span class="card-tag">${stop.tag}</span>`;
+  card.addEventListener('click', () => scrollToCard(i));
+  strip.appendChild(card);
+  cards.push(card);
+
+  const el = document.createElement('div');
+  el.className = 'zine-marker';
+  el.innerHTML = `<div class="pin">${i + 1}</div>`;
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    scrollToCard(i); // the observer below does the flyTo + highlight
+  });
+  markers.push(new mapboxgl.Marker({ element: el }).setLngLat(stop.center).addTo(map));
+});
+
+// The card nearest the strip's centre (>= 60% visible) becomes the active stop
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => {
+    if (entry.isIntersecting) setActive(Number(entry.target.dataset.index), true);
+  });
+}, { root: strip, threshold: 0.6 });
+cards.forEach((c) => observer.observe(c));
+
+map.on('style.load', () => {
+  recolourBasemap();
+
+  // Dotted pink line joining the stops in order
+  map.addSource('tour', {
+    type: 'geojson',
+    data: { type: 'Feature', geometry: { type: 'LineString', coordinates: STOPS.map((s) => s.center) } },
+  });
+  map.addLayer({
+    id: 'tour-line',
+    type: 'line',
+    source: 'tour',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': INK, 'line-width': 3, 'line-dasharray': [0.1, 2.2] },
+  });
+});
+
+map.on('load', () => {
+  syncStripHeight();
+  setActive(0, true);
+});
+window.addEventListener('resize', syncStripHeight);
+</script>
+</body>
+</html>

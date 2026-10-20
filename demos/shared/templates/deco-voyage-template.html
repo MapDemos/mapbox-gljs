@@ -1,0 +1,266 @@
+<!--
+  Working EXAMPLE of the Deco Voyage style pack (deco-voyage.css, in this
+  same folder). Open this file directly to see the pattern working with
+  six illustrative departures from one fictional home port: a 1930s travel
+  poster with a headline band, a Mapbox globe in a tall arch window, and a
+  row of perforated tickets. Click a ticket and it is punched, a
+  great-circle arc is drawn from the home port to that destination, and
+  the map frames it. Copy the markup below into your own demo and link
+  deco-voyage.css from its <head> -- see the class/id contract documented
+  at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (Art Deco travel poster) at the user's request for
+  something distinct from every other pack in this folder. The "Meridian
+  Line", the fares, classes and dates are fictional illustrative
+  placeholders, not real content -- swap in your own.
+
+  What's NOT included: any real timetable or fare data, search/geocoding,
+  routing, popups, or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Deco Voyage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Limelight&family=Josefin+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="deco-voyage.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<main class="poster">
+  <header class="poster-head">
+    <p class="kicker">Est. 1931</p>
+    <h1 class="marquee">The Meridian Line</h1>
+    <p class="tagline">Six ports &middot; One steady course</p>
+  </header>
+  <div class="chevrons"></div>
+
+  <section class="arch-stage">
+    <div class="deco-side left" aria-hidden="true"></div>
+    <div class="arch-frame">
+      <div class="arch-window"><div id="map"></div></div>
+    </div>
+    <div class="deco-side right" aria-hidden="true"></div>
+    <div class="arch-caption">Home port &mdash; Lisbon &middot; 38&deg;43&prime;N 9&deg;08&prime;W</div>
+  </section>
+
+  <section class="ticket-section">
+    <h2 class="section-title">Departures</h2>
+    <div class="ticket-row" id="ticket-row"></div>
+    <div class="status-note loading" id="status-note" role="status" aria-live="polite">Loading the chart</div>
+  </section>
+
+  <div class="chevrons"></div>
+  <footer class="poster-foot">Fares and dates are illustrative &middot; The Meridian Line is fictional</footer>
+</main>
+
+<script>
+// Illustrative values only.
+const HOME = { name: 'Lisbon', coord: [-9.1393, 38.7223] };
+const DESTS = [
+  { city: 'New York',     coord: [-74.006, 40.7128],  fare: '$ 420', cls: '1st', date: '14 May' },
+  { city: 'Rio',          coord: [-43.1729, -22.9068], fare: '$ 515', cls: '1st', date: '02 Jun' },
+  { city: 'Cape Town',    coord: [18.4241, -33.9249], fare: '$ 480', cls: '2nd', date: '19 Jun' },
+  { city: 'Cairo',        coord: [31.2357, 30.0444],  fare: '$ 260', cls: '2nd', date: '07 Jul' },
+  { city: 'Reykjavik',    coord: [-21.9426, 64.1466], fare: '$ 210', cls: '3rd', date: '22 Jul' },
+  { city: 'Mumbai',       coord: [72.8777, 19.076],   fare: '$ 590', cls: '1st', date: '11 Aug' },
+];
+
+const C = { cream: '#F3E9D2', creamDeep: '#E6D6AC', teal: '#0F4C5C', deep: '#08303B', orange: '#E36414', gold: '#D4A017', black: '#111111', ochre: '#C9B27A' };
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  projection: 'globe',
+  center: [-20, 30],
+  zoom: 1.3,
+});
+
+const rowEl = document.getElementById('ticket-row');
+const statusEl = document.getElementById('status-note');
+let homeMarker = null;
+let destMarker = null;
+let animToken = 0;
+let activeBtn = null;
+
+function setStatus(kind, text) {
+  statusEl.className = 'status-note ' + kind;
+  statusEl.textContent = text;
+}
+
+/* ---- Great circle: slerp between two lon/lat points, no Turf ---- */
+function greatCircle(a, b, n) {
+  const rad = Math.PI / 180;
+  const vec = ([lon, lat]) => [Math.cos(lat * rad) * Math.cos(lon * rad), Math.cos(lat * rad) * Math.sin(lon * rad), Math.sin(lat * rad)];
+  const p = vec(a), q = vec(b);
+  const dot = Math.min(1, Math.max(-1, p[0] * q[0] + p[1] * q[1] + p[2] * q[2]));
+  const w = Math.acos(dot);
+  if (w < 1e-6) return [a, b];
+  const pts = [];
+  let prevLon = a[0];
+  for (let i = 0; i <= n; i++) {
+    const f = i / n;
+    const s1 = Math.sin((1 - f) * w) / Math.sin(w), s2 = Math.sin(f * w) / Math.sin(w);
+    const x = s1 * p[0] + s2 * q[0], y = s1 * p[1] + s2 * q[1], z = s1 * p[2] + s2 * q[2];
+    let lon = Math.atan2(y, x) / rad;
+    while (lon - prevLon > 180) lon -= 360;   // keep the line continuous across the antimeridian
+    while (lon - prevLon < -180) lon += 360;
+    prevLon = lon;
+    pts.push([lon, Math.atan2(z, Math.hypot(x, y)) / rad]);
+  }
+  return { pts, km: w * 6371 };
+}
+
+/* ---- Markers ---- */
+function makeMarker(kind, label, coord) {
+  const el = document.createElement('div');
+  el.className = 'deco-marker ' + kind;
+  el.innerHTML = '<span class="deco-marker-gem"></span><span class="deco-marker-tag"></span>';
+  el.querySelector('.deco-marker-tag').textContent = label;
+  return new mapboxgl.Marker({ element: el, anchor: 'center' }).setLngLat(coord).addTo(map);
+}
+
+/* ---- Tickets ---- */
+DESTS.forEach((d, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'ticket';
+  btn.type = 'button';
+  btn.setAttribute('aria-pressed', 'false');
+  btn.innerHTML =
+    `<span class="ticket-main"><span class="ticket-no">No. ${String(i + 1).padStart(2, '0')}</span>` +
+    `<span class="ticket-to">To</span><span class="ticket-city"></span></span>` +
+    `<span class="ticket-stub"><span class="ticket-fare"></span><span class="ticket-meta"></span></span>` +
+    `<span class="punch"></span><span class="stamp">Punched</span>`;
+  btn.querySelector('.ticket-city').textContent = d.city;
+  btn.querySelector('.ticket-fare').textContent = d.fare;
+  btn.querySelector('.ticket-meta').textContent = `${d.cls} class · ${d.date}`;
+  btn.addEventListener('click', () => select(d, btn));
+  rowEl.appendChild(btn);
+});
+
+function select(d, btn) {
+  if (btn === activeBtn) return;
+  if (activeBtn) {
+    activeBtn.classList.remove('is-punched');
+    activeBtn.setAttribute('aria-pressed', 'false');
+  }
+  activeBtn = btn;
+  btn.setAttribute('aria-pressed', 'true');
+  btn.classList.add('is-punched');   // CSS plays the punch + stamp (<= 300ms)
+  drawVoyage(d);
+}
+
+/* ---- Arc reveal ---- */
+function setArc(coords) {
+  const src = map.getSource('voyage');
+  if (src) src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} });
+}
+
+function drawVoyage(d) {
+  const token = ++animToken;
+  if (destMarker) { destMarker.remove(); destMarker = null; }
+  setArc([HOME.coord, HOME.coord]);
+
+  const { pts, km } = greatCircle(HOME.coord, d.coord, 120);
+  setStatus('success', `${HOME.name} → ${d.city} · ${Math.round(km).toLocaleString()} km`);
+
+  const bounds = pts.reduce((b, p) => b.extend(p), new mapboxgl.LngLatBounds(pts[0], pts[0]));
+  const el = map.getContainer();
+  const pad = Math.round(Math.min(el.clientWidth, el.clientHeight) * 0.18);
+  map.fitBounds(bounds, { padding: { top: pad + 24, bottom: pad, left: pad, right: pad }, maxZoom: 4.5, duration: REDUCED ? 0 : 1300 });
+
+  const dur = REDUCED ? 1 : 1700;
+  const t0 = performance.now();
+  (function frame(now) {
+    if (token !== animToken) return;   // a newer ticket took over
+    const t = Math.min(1, (now - t0) / dur);
+    const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    setArc(pts.slice(0, Math.max(2, Math.ceil(e * pts.length))));
+    if (t < 1) requestAnimationFrame(frame);
+    else destMarker = makeMarker('dest', d.city, d.coord);
+  })(t0);
+}
+
+/* ---- Poster-tone recolour of light-v11, guarded per layer ---- */
+function paint(id, prop, value) {
+  try { map.setPaintProperty(id, prop, value); } catch (e) { /* layer/property absent: skip */ }
+}
+
+function recolour() {
+  const layers = (map.getStyle() || {}).layers || [];
+  layers.forEach((l) => {
+    const id = l.id;
+    try {
+      if (l.type === 'background') {
+        paint(id, 'background-color', C.cream);
+      } else if (l.type === 'fill') {
+        if (/water/.test(id)) paint(id, 'fill-color', C.teal);
+        else if (/park|wood|grass|green|nature|landcover/.test(id)) paint(id, 'fill-color', '#CBD6B8');
+        else if (/building/.test(id)) paint(id, 'fill-color', C.creamDeep);
+        else if (/landuse|land-use|aeroway|pitch/.test(id)) paint(id, 'fill-color', C.ochre);
+        else if (/^land$|land-structure/.test(id)) paint(id, 'fill-color', C.cream);
+      } else if (l.type === 'line') {
+        if (/water/.test(id)) paint(id, 'line-color', C.teal);
+        else if (/admin/.test(id)) paint(id, 'line-color', C.orange);
+        else if (/road|bridge|tunnel|street|motorway|trunk|path|ferry/.test(id)) paint(id, 'line-color', '#BFAE86');
+      } else if (l.type === 'symbol') {
+        if (/poi|transit|airport|rail|ferry/.test(id)) {
+          map.setLayoutProperty(id, 'visibility', 'none');
+        } else {
+          const onWater = /water|ocean|sea|natural/.test(id);
+          paint(id, 'text-color', onWater ? C.gold : C.black);
+          paint(id, 'text-halo-color', onWater ? C.deep : C.cream);
+        }
+      }
+    } catch (e) { /* skip this layer */ }
+  });
+  map.setFog({
+    color: C.cream,
+    'high-color': C.gold,
+    'horizon-blend': 0.05,
+    'space-color': C.deep,
+    'star-intensity': 0,
+  });
+}
+
+map.on('style.load', () => {
+  recolour();
+
+  map.addSource('voyage', {
+    type: 'geojson',
+    data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [HOME.coord, HOME.coord] }, properties: {} },
+  });
+  map.addLayer({
+    id: 'voyage-casing', type: 'line', source: 'voyage',
+    layout: { 'line-cap': 'butt', 'line-join': 'round' },
+    paint: { 'line-color': C.black, 'line-width': 7 },
+  });
+  map.addLayer({
+    id: 'voyage-line', type: 'line', source: 'voyage',
+    layout: { 'line-cap': 'butt', 'line-join': 'round' },
+    paint: { 'line-color': C.orange, 'line-width': 3.5, 'line-dasharray': [3, 1.2] },
+  });
+
+  if (!homeMarker) homeMarker = makeMarker('home', HOME.name, HOME.coord);
+  setStatus('', 'Choose a ticket to punch');
+});
+
+map.on('error', (e) => {
+  setStatus('error', 'Map error: ' + ((e.error && e.error.message) || 'unknown'));
+});
+</script>
+</body>
+</html>

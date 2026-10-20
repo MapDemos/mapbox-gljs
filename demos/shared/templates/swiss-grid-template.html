@@ -1,0 +1,259 @@
+<!--
+  Working EXAMPLE of the Swiss Grid style pack (swiss-grid.css, in this
+  same folder). Open this file directly to see the pattern working with
+  eight illustrative "busiest squares" in one city on a split screen: a
+  ranked typographic index on the left, a framed Mapbox Standard
+  (monochrome) map on the right. Hover or focus a row and its dot turns
+  red; hover a dot and its row lights up and scrolls into view; click
+  either to fly there. Press G to toggle the 12-column grid. Copy the
+  markup below into your own demo and link swiss-grid.css from its <head>
+  -- see the class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (International Typographic Style: white, black, one
+  signal red) at the user's request for something distinct from every
+  other pack in this folder. The places are real, but the footfall
+  figures and the "busiest squares" framing are illustrative
+  placeholders, not real data -- swap in your own.
+
+  What's NOT included: any real dataset, search/geocoding, routing,
+  popups, or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Swiss Grid</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Archivo+Black&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="swiss-grid.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="split">
+  <section class="index" id="index">
+    <p class="kicker">Index 01 / Public squares</p>
+    <h1 class="display">Busiest<br>squares</h1>
+    <p class="intro">Eight squares ranked by illustrative daily footfall. Point at a row or a dot; click to fly there.</p>
+
+    <div class="toolbar">
+      <span class="toolbar-label">Sort</span>
+      <button class="txt-btn" data-sort="rank" aria-pressed="true">Rank</button>
+      <button class="txt-btn" data-sort="name" aria-pressed="false">Name</button>
+    </div>
+    <ol class="rank-list" id="rank-list"></ol>
+
+    <div class="status-note loading" id="status-note">Loading map</div>
+  </section>
+
+  <div class="frame">
+    <div id="map"></div>
+    <div class="corner-tag">Fig. 1</div>
+    <div class="caption">Zürich &mdash; illustrative data</div>
+  </div>
+</div>
+
+<div class="grid-overlay" id="grid-overlay" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+<button class="grid-toggle" id="grid-toggle" aria-pressed="true" title="Toggle grid (G)">Grid [G]</button>
+
+<script>
+// Illustrative values only. id doubles as rank, so feature-state keys on it.
+const SQUARES = [
+  { id: 1, name: 'Bahnhofplatz',      sub: 'Main station forecourt', value: 412, coord: [8.5402, 47.3784] },
+  { id: 2, name: 'Paradeplatz',       sub: 'Financial district',     value: 358, coord: [8.5388, 47.3698] },
+  { id: 3, name: 'Bellevueplatz',     sub: 'Lakefront junction',     value: 321, coord: [8.5450, 47.3668] },
+  { id: 4, name: 'Central',           sub: 'Riverside tram hub',     value: 287, coord: [8.5434, 47.3786] },
+  { id: 5, name: 'Stauffacher',       sub: 'Old-town crossing',      value: 244, coord: [8.5283, 47.3729] },
+  { id: 6, name: 'Limmatplatz',       sub: 'Industrial quarter',     value: 203, coord: [8.5307, 47.3868] },
+  { id: 7, name: 'Escher-Wyss-Platz', sub: 'West river bend',        value: 166, coord: [8.5215, 47.3911] },
+  { id: 8, name: 'Albisriederplatz',  sub: 'Residential district',   value: 121, coord: [8.5126, 47.3767] },
+];
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [8.535, 47.375],
+  zoom: 12.2,
+  // Only keys confirmed in Standard's config schema.
+  config: {
+    basemap: {
+      theme: 'monochrome',
+      lightPreset: 'day',
+      show3dObjects: false,
+      showPointOfInterestLabels: false,
+      showTransitLabels: false,
+    },
+  },
+});
+
+const listEl = document.getElementById('rank-list');
+const statusEl = document.getElementById('status-note');
+const byId = new Map(SQUARES.map((s) => [s.id, s]));
+let hoverId = null;
+let selectedId = null;
+let sortMode = 'rank';
+
+/* ---- List ---- */
+function renderList() {
+  const rows = [...SQUARES];
+  if (sortMode === 'name') rows.sort((a, b) => a.name.localeCompare(b.name));
+  listEl.innerHTML = '';
+  rows.forEach((s) => {
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.className = 'rank-row';
+    btn.dataset.id = s.id;
+    btn.innerHTML =
+      `<span class="rank-num">${String(s.id).padStart(2, '0')}</span>` +
+      `<span><span class="rank-name">${s.name}</span><span class="rank-sub">${s.sub}</span></span>` +
+      `<span class="rank-value">${s.value}k<span class="rank-unit">per day</span></span>`;
+    btn.addEventListener('mouseenter', () => setHover(s.id));
+    btn.addEventListener('mouseleave', () => setHover(null));
+    btn.addEventListener('focus', () => setHover(s.id));
+    btn.addEventListener('blur', () => setHover(null));
+    btn.addEventListener('click', () => select(s.id));
+    li.appendChild(btn);
+    listEl.appendChild(li);
+  });
+  syncHighlight();
+}
+
+/* ---- Highlight: one source of truth, pushed to rows and map ---- */
+function syncHighlight() {
+  const hot = hoverId ?? selectedId;
+  listEl.querySelectorAll('.rank-row').forEach((el) => {
+    const id = Number(el.dataset.id);
+    el.classList.toggle('is-hot', id === hot);
+    el.classList.toggle('is-active', id === selectedId);
+  });
+  if (!map.getSource('squares')) return;
+  SQUARES.forEach((s) => {
+    map.setFeatureState({ source: 'squares', id: s.id }, { hot: s.id === hot, active: s.id === selectedId });
+  });
+}
+
+function setHover(id, scroll) {
+  hoverId = id;
+  syncHighlight();
+  if (id != null && scroll) {
+    const el = listEl.querySelector(`.rank-row[data-id="${id}"]`);
+    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+}
+
+function select(id) {
+  selectedId = id;
+  syncHighlight();
+  map.flyTo({ center: byId.get(id).coord, zoom: 14.5, duration: 1400 });
+}
+
+document.querySelectorAll('.txt-btn').forEach((b) => {
+  b.addEventListener('click', () => {
+    sortMode = b.dataset.sort;
+    document.querySelectorAll('.txt-btn').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+    renderList();
+  });
+});
+
+/* ---- Grid toggle (G key or button) ---- */
+function toggleGrid() {
+  const hidden = document.getElementById('grid-overlay').classList.toggle('hidden');
+  document.getElementById('grid-toggle').setAttribute('aria-pressed', String(!hidden));
+}
+document.getElementById('grid-toggle').addEventListener('click', toggleGrid);
+// Grid is on by default on desktop, off on phones (still toggleable).
+if (window.matchMedia('(max-width: 760px)').matches) toggleGrid();
+window.addEventListener('keydown', (e) => {
+  if ((e.key === 'g' || e.key === 'G') && !e.metaKey && !e.ctrlKey && !e.altKey) toggleGrid();
+});
+
+/* ---- Map layers ---- */
+map.on('style.load', () => {
+  map.addSource('squares', {
+    type: 'geojson',
+    data: {
+      type: 'FeatureCollection',
+      features: SQUARES.map((s) => ({
+        type: 'Feature',
+        id: s.id,
+        properties: { id: s.id, name: s.name },
+        geometry: { type: 'Point', coordinates: s.coord },
+      })),
+    },
+  });
+
+  // slot 'top' keeps the dots above Standard's own labels.
+  map.addLayer({
+    id: 'squares-dot',
+    type: 'circle',
+    source: 'squares',
+    slot: 'top',
+    paint: {
+      'circle-radius': ['case', ['boolean', ['feature-state', 'hot'], false], 13, 7],
+      'circle-color': ['case', ['boolean', ['feature-state', 'hot'], false], '#E30613', '#000000'],
+      'circle-stroke-color': '#FFFFFF',
+      'circle-stroke-width': 2,
+      'circle-emissive-strength': 1,
+    },
+  });
+
+  map.addLayer({
+    id: 'squares-rank',
+    type: 'symbol',
+    source: 'squares',
+    slot: 'top',
+    layout: {
+      'text-field': ['to-string', ['get', 'id']],
+      'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+      'text-size': 18,
+      'text-anchor': 'bottom-left',
+      'text-offset': [0.6, -0.4],
+      'text-allow-overlap': true,
+    },
+    paint: {
+      'text-color': ['case', ['boolean', ['feature-state', 'hot'], false], '#E30613', '#000000'],
+      'text-halo-color': '#FFFFFF',
+      'text-halo-width': 2,
+      'text-emissive-strength': 1,
+    },
+  });
+
+  map.on('mousemove', 'squares-dot', (e) => {
+    map.getCanvas().style.cursor = 'pointer';
+    const id = e.features[0].id;
+    if (id !== hoverId) setHover(id, true);
+  });
+  map.on('mouseleave', 'squares-dot', () => {
+    map.getCanvas().style.cursor = '';
+    setHover(null);
+  });
+  map.on('click', 'squares-dot', (e) => {
+    const id = e.features[0].id;
+    select(id);
+    setHover(id, true);
+  });
+
+  syncHighlight();
+  statusEl.className = 'status-note success';
+  statusEl.textContent = 'Map ready — 8 squares';
+});
+
+map.on('error', (e) => {
+  statusEl.className = 'status-note error';
+  statusEl.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+renderList();
+</script>
+</body>
+</html>

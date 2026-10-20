@@ -1,0 +1,708 @@
+/*
+  Retro OS -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a late-90s desktop operating system --
+  teal desktop, silver window chrome with 2px bevels, navy title bars, a
+  taskbar with a Start button and a ticking clock -- deliberately distinct
+  from every other style pack in this folder: Arena, Editorial Paper,
+  Highway Sign, Slate Console, Storefront, Tarmac Glass, Vintage Chart,
+  Weather Console, Riso Zine, Swiss Grid, Neon HUD, Pastel Bento and
+  Blueprint). Brand-neutral on purpose: the OS is fictional ("MapOS 97")
+  and every icon and the Start logo are drawn in plain CSS.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/retro-os.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Pixelify Sans for UI text,
+  Silkscreen for title bars and the taskbar clock):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet" />
+
+  Signature touch: every raised surface is built from four stacked inset
+  box-shadows (white / light grey / dark grey / black) -- the classic 2px
+  bevel -- and the pressed state simply swaps them, so buttons really do
+  look pushed in. The active taskbar button also gets a 2px checker
+  "dither" fill.
+
+  Class/id contract (see retro-os-template.html in this same folder for a
+  full working example; the window manager JS lives in that template, this
+  file is styling only):
+
+  - .desktop                  fixed teal work area above the taskbar. On
+                               desktop widths its children (.window) are
+                               absolutely positioned by the demo; on phones
+                               (<=640px) it becomes a vertically scrolling
+                               column and the windows stack full width
+    .desktop-icons              top-left icon column (a row on phones)
+    .desktop-icon               <button> -- .icon-glyph + .icon-label;
+                                 .is-selected = navy label highlight
+      .icon-glyph .g-map|.g-layers|.g-about|.g-doc
+                                CSS-drawn 32px icons
+  - .window                   draggable window. Modifiers: .is-active
+                               (navy title bar), .is-max (fills .desktop),
+                               .is-minimized (display:none, taskbar keeps
+                               its button). Set left/top/width/height inline
+    .title-bar                  gradient bar (drag handle)
+      .title-text                 ellipsized title
+      .title-btns > .tb-btn .tb-min | .tb-max | .tb-close
+    .window-body                content area (padding 8px, scrolls).
+                                 .is-map = sunken, no padding, position:
+                                 relative -- put #map inside (demo sizes it)
+                                 .is-list = flex column, for a .listbox
+    .status-bar                 optional footer of .status-cell s
+                                 (first one flexes); .resize-grip at the
+                                 right end = bottom-right resize handle
+    .dialog-row                 icon + text row for dialogs (About)
+    .btn-row                    right-aligned row of .btn
+  - .btn  (.is-default)       classic push button
+  - .group-box                <fieldset> with a <legend>, etched border
+  - .opt-row                  <label> wrapping an input.opt + text;
+    input.opt                   type=checkbox or radio, custom drawn
+  - .listbox > .list-item     classic listbox; .is-selected = navy + white
+  - .hint                     small dim helper text
+  - .taskbar                  fixed bottom bar (--taskbar-h tall)
+    .start-btn                  Start button; .is-open = pressed
+      .start-logo                 fictional logo drawn in CSS (map pin)
+    .tasks > .task-btn          open-window buttons; .is-active = pressed
+                                 and dithered. Hide with .hidden
+    .tray > .clock              sunken system tray with the clock
+  - .start-menu               classic menu above the Start button
+    .start-side                 vertical navy product-name strip
+    .menu-item, .menu-sep       menu rows and divider
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --desktop: #008080;
+  --silver: #C0C0C0;
+  --silver-light: #DFDFDF;
+  --white: #FFFFFF;
+  --shadow: #808080;
+  --black: #000000;
+  --navy: #000080;
+  --title-end: #1084D0;
+  --inactive-a: #808080;
+  --inactive-b: #B5B5B5;
+  --select-bg: #000080;
+  --select-fg: #FFFFFF;
+  --text: #000000;
+  --text-dim: #404040;
+
+  --font-ui: 'Pixelify Sans', 'Courier New', monospace;
+  --font-title: 'Silkscreen', 'Pixelify Sans', 'Courier New', monospace;
+
+  --taskbar-h: 36px;
+
+  /* Raised button / title-bar button */
+  --bevel-out: inset -1px -1px #000, inset 1px 1px #fff, inset -2px -2px #808080, inset 2px 2px #DFDFDF;
+  /* Pushed-in button */
+  --bevel-pressed: inset -1px -1px #fff, inset 1px 1px #000, inset -2px -2px #DFDFDF, inset 2px 2px #808080;
+  /* Window frame */
+  --bevel-window: inset -1px -1px #000, inset 1px 1px #DFDFDF, inset -2px -2px #808080, inset 2px 2px #fff;
+  /* Sunken field (listbox, checkbox) */
+  --bevel-field: inset -1px -1px #fff, inset 1px 1px #808080, inset -2px -2px #DFDFDF, inset 2px 2px #000;
+  /* Thin sunken cell (status bar, tray) */
+  --bevel-cell: inset 1px 1px #808080, inset -1px -1px #fff;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--desktop);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+button, input {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* ---------- Desktop ---------- */
+.desktop {
+  position: fixed;
+  inset: 0 0 var(--taskbar-h) 0;
+  overflow: hidden;
+  background: var(--desktop);
+}
+
+.desktop-icons {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.desktop-icon {
+  width: 84px;
+  padding: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 0;
+  color: #fff;
+  font-size: 14px;
+  text-align: center;
+  cursor: default;
+}
+
+.desktop-icon:focus { outline: none; }
+
+.icon-label {
+  padding: 1px 3px;
+  line-height: 1.1;
+  word-break: break-all;
+}
+
+.desktop-icon.is-selected .icon-label,
+.desktop-icon:focus-visible .icon-label {
+  background: var(--select-bg);
+  color: var(--select-fg);
+  outline: 1px dotted #fff;
+}
+
+.icon-glyph {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  flex: none;
+}
+
+/* Map.exe: a tiny landscape with a red pin */
+.g-map {
+  box-sizing: border-box;
+  border: 2px solid #000;
+  background: linear-gradient(135deg, #4BA84B 0 40%, #3B7BD8 40% 70%, #E8D68A 70%);
+}
+.g-map::after {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #D00000;
+  box-shadow: 0 0 0 1px #fff;
+}
+
+/* Layers: two overlapping sheets */
+.g-layers::before,
+.g-layers::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 2px solid #000;
+}
+.g-layers::before { left: 0; top: 4px; background: #fff; }
+.g-layers::after { left: 10px; top: 14px; background: #FFFF55; }
+
+/* About: a blue "i" disc */
+.g-about {
+  border-radius: 50%;
+  background: #0000A8;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px #000;
+  color: #fff;
+  font: 700 20px/32px var(--font-title);
+  text-align: center;
+}
+.g-about::before { content: 'i'; }
+
+/* Places.txt: a ruled sheet of paper */
+.g-doc {
+  width: 24px;
+  margin: 0 4px;
+  box-sizing: border-box;
+  border: 2px solid #000;
+  background: repeating-linear-gradient(#fff 0 4px, #808080 4px 5px);
+}
+
+/* ---------- Window ---------- */
+.window {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-width: 240px;
+  min-height: 120px;
+  max-width: 100%;
+  max-height: 100%;
+  padding: 3px;
+  background: var(--silver);
+  box-shadow: var(--bevel-window);
+  color: var(--text);
+}
+
+.window.is-max {
+  inset: 0 !important;
+  width: auto !important;
+  height: auto !important;
+}
+
+.window.is-minimized { display: none; }
+
+.title-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 22px;
+  padding: 2px 2px 2px 4px;
+  box-sizing: border-box;
+  background: linear-gradient(90deg, var(--inactive-a), var(--inactive-b));
+  color: var(--silver);
+  font-family: var(--font-title);
+  font-size: 12px;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.window.is-active .title-bar {
+  background: linear-gradient(90deg, var(--navy), var(--title-end));
+  color: #fff;
+}
+
+.title-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  letter-spacing: 0.04em;
+}
+
+.title-btns {
+  flex: none;
+  display: flex;
+  gap: 2px;
+}
+
+.tb-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  background: var(--silver);
+  box-shadow: var(--bevel-out);
+  color: #000;
+  cursor: default;
+}
+.tb-btn:active { box-shadow: var(--bevel-pressed); }
+.tb-btn + .tb-btn.tb-close { margin-left: 2px; }
+
+.tb-min::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  bottom: 3px;
+  width: 6px;
+  height: 2px;
+  background: #000;
+}
+.tb-max::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 3px;
+  width: 9px;
+  height: 8px;
+  box-sizing: border-box;
+  border: 1px solid #000;
+  border-top-width: 2px;
+}
+.tb-close::before {
+  content: '\00d7';
+  font: 700 16px/1 var(--font-ui);
+}
+
+.window-body {
+  flex: 1;
+  min-height: 0;
+  padding: 8px;
+  overflow: auto;
+}
+
+.window-body.is-map {
+  position: relative;
+  margin-top: 3px;
+  padding: 0;
+  overflow: hidden;
+  background: #fff;
+  border: 2px solid;
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+}
+
+.window-body.is-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.status-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding-top: 3px;
+  font-size: 13px;
+}
+
+.status-cell {
+  min-width: 0;
+  padding: 1px 6px;
+  box-shadow: var(--bevel-cell);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.status-cell:first-child { flex: 1; }
+
+.resize-grip {
+  flex: none;
+  align-self: flex-end;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(135deg,
+    transparent 0 50%, #808080 50% 58%, transparent 58% 66%,
+    #808080 66% 74%, transparent 74% 82%, #808080 82% 90%, transparent 90%);
+}
+
+.dialog-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.dialog-row p { margin: 0 0 6px; }
+
+.btn-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* ---------- Controls ---------- */
+.btn {
+  min-width: 75px;
+  padding: 4px 12px;
+  border: 0;
+  background: var(--silver);
+  box-shadow: var(--bevel-out);
+  color: var(--text);
+  cursor: default;
+}
+.btn:active { box-shadow: var(--bevel-pressed); padding: 5px 11px 3px 13px; }
+.btn.is-default { box-shadow: 0 0 0 1px #000, var(--bevel-out); }
+.btn.is-default:active { box-shadow: 0 0 0 1px #000, var(--bevel-pressed); }
+.btn:focus-visible,
+.task-btn:focus-visible,
+.start-btn:focus-visible {
+  outline: 1px dotted #000;
+  outline-offset: -5px;
+}
+
+.group-box {
+  margin: 0 0 10px;
+  padding: 6px 10px 8px;
+  border: 1px solid var(--shadow);
+  box-shadow: 1px 1px 0 #fff, inset 1px 1px 0 #fff;
+}
+.group-box legend { padding: 0 4px; }
+
+.opt-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+
+input.opt {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  background: #fff;
+  box-shadow: var(--bevel-field);
+}
+input.opt[type=checkbox]:checked {
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14'%3E%3Cpath d='M3 7l3 3 5-6' stroke='%23000' stroke-width='2' fill='none' shape-rendering='crispEdges'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+}
+input.opt[type=radio] { border-radius: 50%; }
+input.opt[type=radio]:checked {
+  background: radial-gradient(circle, #000 0 2.5px, #fff 3px);
+}
+input.opt:focus-visible { outline: 1px dotted #000; outline-offset: 3px; }
+
+.listbox {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+  overflow: auto;
+  background: #fff;
+  box-shadow: var(--bevel-field);
+}
+.listbox:focus-visible { outline: 1px dotted #000; outline-offset: -4px; }
+.list-item {
+  padding: 2px 6px;
+  white-space: nowrap;
+  cursor: default;
+}
+.list-item.is-selected {
+  background: var(--select-bg);
+  color: var(--select-fg);
+  outline: 1px dotted #fff;
+  outline-offset: -1px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+/* Mapbox's own controls, dressed to match the chrome */
+.window .mapboxgl-ctrl-group {
+  border-radius: 0;
+  background: var(--silver);
+  box-shadow: var(--bevel-out);
+}
+.window .mapboxgl-ctrl-group button { border-radius: 0 !important; }
+
+/* ---------- Taskbar ---------- */
+.taskbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--taskbar-h);
+  padding: 2px;
+  box-sizing: border-box;
+  background: var(--silver);
+  box-shadow: inset 0 1px 0 #DFDFDF, inset 0 2px 0 #fff;
+}
+
+.start-btn,
+.task-btn {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  border: 0;
+  background: var(--silver);
+  box-shadow: var(--bevel-out);
+  color: var(--text);
+  cursor: default;
+}
+
+.start-btn {
+  flex: none;
+  gap: 6px;
+  font-weight: 700;
+}
+.start-btn.is-open { box-shadow: var(--bevel-pressed); }
+
+/* Fictional logo: a red map pin on a little green hill */
+.start-logo {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+.start-logo::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 1px solid #000;
+  border-radius: 50% 50% 50% 0;
+  background: radial-gradient(circle at 50% 50%, #fff 0 2px, #D00000 2.5px);
+  transform: rotate(-45deg);
+}
+.start-logo::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  bottom: 0;
+  width: 14px;
+  height: 4px;
+  border: 1px solid #000;
+  border-radius: 50%;
+  box-sizing: border-box;
+  background: #2E8B2E;
+}
+
+.tasks {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 4px;
+}
+
+.task-btn {
+  flex: 0 1 150px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: left;
+  display: block;
+  line-height: 28px;
+}
+.task-btn.is-active {
+  box-shadow: var(--bevel-pressed);
+  font-weight: 700;
+  background: repeating-conic-gradient(#fff 0 25%, var(--silver) 0 50%) 0 0 / 2px 2px;
+}
+
+.tray {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  box-shadow: var(--bevel-cell);
+}
+.clock {
+  font-family: var(--font-title);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+
+/* ---------- Start menu ---------- */
+.start-menu {
+  position: fixed;
+  left: 2px;
+  bottom: var(--taskbar-h);
+  z-index: 1000;
+  display: flex;
+  width: 210px;
+  max-width: calc(100vw - 4px);
+  padding: 3px;
+  box-sizing: border-box;
+  background: var(--silver);
+  box-shadow: var(--bevel-out);
+}
+
+.start-side {
+  flex: none;
+  width: 28px;
+  padding: 8px 0;
+  box-sizing: border-box;
+  background: linear-gradient(0deg, var(--navy), var(--title-end));
+  color: #fff;
+  font: 700 16px/28px var(--font-title);
+  letter-spacing: 0.08em;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.menu-list {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-item {
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: default;
+}
+.menu-item:hover,
+.menu-item:focus-visible {
+  background: var(--select-bg);
+  color: var(--select-fg);
+  outline: none;
+}
+
+.menu-sep {
+  height: 2px;
+  margin: 3px 2px;
+  box-shadow: inset 0 1px #808080, inset 0 -1px #fff;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---------- Phone: windows stack full width, no dragging ---------- */
+@media (max-width: 640px) {
+  .desktop {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 16px;
+    box-sizing: border-box;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .desktop-icons {
+    position: static;
+    flex: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .desktop-icon { width: 72px; }
+
+  .window {
+    position: relative;
+    flex: none;
+    z-index: auto;
+    min-width: 0;
+    left: auto !important;
+    top: auto !important;
+    width: auto !important;
+    height: auto !important;
+  }
+  .window.is-max { inset: auto !important; }
+
+  .window-body.is-map {
+    flex: none;
+    height: 55vh;
+    height: 55dvh;
+  }
+  .listbox { max-height: 220px; }
+
+  .tb-max,
+  .resize-grip { display: none; }
+
+  .start-btn { padding: 0 6px; }
+  .tray { padding: 0 6px; }
+  .task-btn { flex: 1 1 0; padding: 0 5px; font-size: 13px; }
+}

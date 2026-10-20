@@ -1,0 +1,499 @@
+/*
+  Riso Zine -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a risograph-printed gig-poster / zine
+  look -- newsprint paper, fluoro pink + riso blue + yellow spot inks,
+  chunky grotesque headlines, misregistered offset shadows, halftone dots --
+  deliberately distinct from every other style pack in this folder: Arena is
+  Linear-style dark compare, Editorial Paper is warm paper serif, Highway
+  Sign is MUTCD cream/green, Slate Console is a dark cinematic globe,
+  Storefront is a sidebar of filters, Tarmac Glass is dark glass + amber,
+  Vintage Chart is navy/parchment/brass, Weather Console is a layer-explorer
+  dock).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/riso-zine.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Bricolage Grotesque for chunky
+  display type, Space Mono for labels/meta):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+
+  Signature touch: misregistration. Every card and sticker carries two
+  hard-edged offset shadows, one pink and one blue, as if the two ink
+  drums were printed slightly out of line; big numerals repeat the trick
+  with a text-shadow. The active card is "stamped" (lifted, straightened,
+  with a rotated pink stamp mark).
+
+  The layout is a full-bleed map, a sticker title top-left, and a bottom
+  horizontal scroll-snap filmstrip of cards. Pair it with a style recolour
+  (see riso-zine-template.html) so the basemap reads as 2-3 spot inks.
+
+  Class/id contract (see riso-zine-template.html in this same folder for a
+  full working example):
+
+  - #map                      full-bleed map container (every demo defines
+                               its own, per convention -- not included here)
+  - .zine-title               sticker-like title block, floating top-left
+                               (yellow, tilted, offset shadows) --
+    .zine-title h1              chunky display headline, tight tracking
+    .zine-title .issue          Space Mono meta line (issue/edition/count)
+  - .filmstrip                bottom horizontal strip, scroll-snap-type x
+                               mandatory; one .zine-card per item. JS sets
+                               --strip-h on :root (its pixel height) so map
+                               attribution can clear it
+  - .zine-card                one filmstrip card; scroll-snap-align center.
+                               Add data-index="N" for the JS to read
+    .zine-card.is-active        the snapped/selected card: "stamped"
+    .zine-card.halftone         optional: pink dot-screen fill on the
+                                 lower half; .halftone-blue for blue dots
+    .card-num                   big numeral, misregistered pink/blue
+    .card-title                 heavy display title
+    .card-meta                  Space Mono meta line (distance, time...)
+    .card-body                  short paragraph of body copy
+    .card-tag                   small ink-outlined sticker label
+  - .zine-marker              custom HTML marker root (Mapbox positions
+                               it with transform -- never style transform
+                               on it) --
+    .zine-marker .pin           the numbered badge; .is-active on the root
+                                 turns it pink and enlarges it
+  - .btn, .btn-primary        chunky offset-shadow buttons; press = the
+                               shadow collapses
+  - .status-note (+.loading/  a small Space Mono tape-label status line
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --paper: #F2EFE6;
+  --paper-deep: #E6E1D2;
+  --pink: #FF48B0;
+  --blue: #0078BF;
+  --yellow: #FFE800;
+  --ink: #1B1A24;
+  --ink-muted: #4B4959;
+  --success: #0078BF;
+  --error: #D6249F;
+
+  --font-display: 'Bricolage Grotesque', 'Arial Black', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'Space Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --gutter: 16px;
+  --card-w: 340px;
+  --strip-h: 250px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/* Keep Mapbox's logo/attribution above the filmstrip */
+.mapboxgl-ctrl-bottom-left,
+.mapboxgl-ctrl-bottom-right {
+  bottom: var(--strip-h);
+  z-index: 1;
+}
+
+/* Sticker title block -- yellow, tilted, two misregistered shadows */
+.zine-title {
+  position: absolute;
+  top: 18px;
+  left: var(--gutter);
+  z-index: 4;
+  max-width: 300px;
+  padding: 12px 16px 12px;
+  background: var(--yellow);
+  border: 2.5px solid var(--ink);
+  transform: rotate(-2.5deg);
+  box-shadow: 5px 5px 0 var(--pink), -4px -3px 0 var(--blue);
+}
+
+/* Halftone corner on the sticker */
+.zine-title::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 56px;
+  height: 40px;
+  background-image: radial-gradient(var(--pink) 1.6px, transparent 2px);
+  background-size: 7px 7px;
+  pointer-events: none;
+}
+
+.zine-title h1 {
+  position: relative;
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 34px;
+  line-height: 0.92;
+  letter-spacing: -0.045em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.zine-title .issue {
+  position: relative;
+  margin-top: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  z-index: 1;
+}
+
+/* Bottom filmstrip */
+.filmstrip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  gap: 22px;
+  padding: 22px max(var(--gutter), calc(50% - var(--card-w) / 2)) 24px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  /* no backdrop: the map stays fully visible behind the cards, which carry
+     their own solid paper fills. The empty strip ignores the pointer so the
+     map remains draggable; only cards take events (dragging a card still
+     scrolls the strip). */
+  pointer-events: none;
+}
+
+.filmstrip > * {
+  pointer-events: auto;
+}
+
+.filmstrip::-webkit-scrollbar {
+  display: none;
+}
+
+.zine-card {
+  position: relative;
+  flex: 0 0 var(--card-w);
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  min-height: 190px;
+  padding: 14px 16px 16px;
+  background-color: var(--paper);
+  border: 2.5px solid var(--ink);
+  box-shadow: 6px 6px 0 var(--pink), -4px -4px 0 var(--blue);
+  opacity: 0.88;
+  transform: rotate(-0.8deg) scale(0.96);
+  transform-origin: 50% 100%;
+  transition: transform 0.28s cubic-bezier(.3, 1.6, .5, 1), box-shadow 0.28s ease, opacity 0.2s ease;
+  overflow: hidden;
+}
+
+/* Slightly different tilt + shadow throw per card so no two sit alike */
+.zine-card:nth-child(3n + 2) {
+  transform: rotate(0.7deg) scale(0.96);
+  box-shadow: -6px 5px 0 var(--pink), 4px -4px 0 var(--blue);
+}
+
+.zine-card:nth-child(3n) {
+  transform: rotate(-0.3deg) scale(0.96);
+  box-shadow: 5px -5px 0 var(--blue), -5px 5px 0 var(--pink);
+}
+
+/* Halftone dot screens -- add to any card */
+.zine-card.halftone::before,
+.zine-card.halftone-blue::before {
+  content: '';
+  position: absolute;
+  inset: 45% 0 0 0;
+  background-image: radial-gradient(var(--pink) 1.5px, transparent 2px);
+  background-size: 8px 8px;
+  -webkit-mask-image: linear-gradient(to top, #000, transparent);
+  mask-image: linear-gradient(to top, #000, transparent);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.zine-card.halftone-blue::before {
+  background-image: radial-gradient(var(--blue) 1.5px, transparent 2px);
+  background-position: 4px 4px;
+}
+
+.zine-card > * {
+  position: relative;
+}
+
+/* Active card: stamped -- straight, lifted, shadows pushed apart, with a
+   rotated ink stamp mark in the corner */
+.zine-card.is-active {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+  box-shadow: 9px 9px 0 var(--pink), -6px -6px 0 var(--blue);
+  background-color: #FFFEF8;
+  z-index: 1;
+}
+
+.zine-card.is-active::after {
+  content: 'You are here';
+  position: absolute;
+  top: 14px;
+  right: 10px;
+  padding: 3px 7px;
+  border: 2px solid var(--pink);
+  color: var(--pink);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transform: rotate(8deg);
+  mix-blend-mode: multiply;
+  animation: zine-stamp 0.32s cubic-bezier(.2, 1.8, .4, 1) both;
+}
+
+@keyframes zine-stamp {
+  from { transform: rotate(8deg) scale(2.2); opacity: 0; }
+  to { transform: rotate(8deg) scale(1); opacity: 1; }
+}
+
+/* Big numeral, printed twice out of register */
+.card-num {
+  display: block;
+  margin: 0 0 2px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 64px;
+  line-height: 0.85;
+  letter-spacing: -0.06em;
+  color: var(--blue);
+  text-shadow: 3px 3px 0 var(--pink);
+  mix-blend-mode: multiply;
+}
+
+.card-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: -0.035em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.card-meta {
+  margin: 6px 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+
+.card-body {
+  margin: 0;
+  max-width: 94%;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.card-tag {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 2px 8px;
+  background: var(--yellow);
+  border: 1.5px solid var(--ink);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transform: rotate(-2deg);
+}
+
+/* Custom HTML marker -- numbered riso dot. Never put transform on the
+   root: Mapbox positions it with one. */
+.zine-marker {
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+}
+
+.zine-marker .pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: var(--yellow);
+  border: 2.5px solid var(--ink);
+  border-radius: 50%;
+  box-shadow: 3px 3px 0 var(--pink), -2px -2px 0 var(--blue);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+  transition: transform 0.25s cubic-bezier(.3, 1.6, .5, 1), background 0.2s ease, color 0.2s ease;
+}
+
+.zine-marker:hover .pin {
+  transform: rotate(-8deg) scale(1.1);
+}
+
+.zine-marker.is-active .pin {
+  background: var(--pink);
+  color: #fff;
+  transform: scale(1.4) rotate(-6deg);
+  box-shadow: 4px 4px 0 var(--blue), -2px -2px 0 var(--yellow);
+}
+
+.zine-marker.is-active {
+  z-index: 2;
+}
+
+/* Buttons -- chunky, press collapses the offset shadow */
+.btn {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 7px 12px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--blue);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.btn:hover {
+  background: var(--yellow);
+}
+
+.btn:active {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 var(--blue);
+}
+
+.btn-primary {
+  background: var(--pink);
+  color: #fff;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.btn-primary:hover {
+  background: var(--pink);
+  filter: brightness(1.08);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Status -- a strip of label tape */
+.status-note {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 8px;
+  background: var(--yellow);
+  border: 1.5px solid var(--ink);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transform: rotate(-1deg);
+}
+
+.status-note .status-icon {
+  flex: none;
+}
+
+.status-note.loading .status-icon {
+  display: inline-block;
+  animation: zine-spin 0.9s linear infinite;
+}
+
+@keyframes zine-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.status-note.success {
+  background: var(--blue);
+  color: #fff;
+}
+
+.status-note.error {
+  background: var(--error);
+  color: #fff;
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --card-w: calc(100vw - 56px);
+    --strip-h: 236px;
+  }
+
+  .zine-title {
+    top: 14px;
+    max-width: calc(100vw - 96px);
+    padding: 9px 12px;
+  }
+
+  .zine-title h1 {
+    font-size: 26px;
+  }
+
+  .filmstrip {
+    gap: 18px;
+    padding-top: 18px;
+    padding-bottom: 20px;
+  }
+
+  .card-num {
+    font-size: 54px;
+  }
+
+  .card-title {
+    font-size: 19px;
+  }
+
+  .mapboxgl-ctrl-top-right {
+    top: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zine-card, .zine-marker .pin, .zine-card.is-active::after {
+    transition: none;
+    animation: none;
+  }
+}

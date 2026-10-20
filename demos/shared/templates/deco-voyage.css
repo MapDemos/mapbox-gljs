@@ -1,0 +1,701 @@
+/*
+  Deco Voyage -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a 1930s Art Deco travel poster -- cream,
+  deep teal, burnt orange and gold, stepped geometric borders, chevrons,
+  sunburst rays, a headline band and perforated tickets -- deliberately
+  distinct from every other style pack in this folder: Arena is a
+  Linear-dark compare layout, Editorial Paper is warm paper + serif,
+  Highway Sign is MUTCD cream/green, Slate Console is a dark cinematic
+  globe, Storefront is a sidebar of filters, Tarmac Glass is dark glass +
+  amber, Vintage Chart is navy/parchment/brass, Weather Console is a
+  layer-explorer dock, Riso Zine is two-ink print, Swiss Grid is a
+  12-column typographic split screen, Neon HUD is a glowing dark
+  instrument overlay, Pastel Bento is soft rounded tiles, Blueprint is
+  white-on-blue drafting lines).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/deco-voyage.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Limelight for display, Josefin Sans
+  for body and labels):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Limelight&family=Josefin+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  Signature touch: the map is not a rectangle. It sits in a tall ARCH
+  WINDOW (round top, square bottom) framed by stepped black/gold rings,
+  with sunburst rays (a repeating-conic-gradient) fanning out behind it.
+  Below, a row of perforated TICKET STUBS: dashed tear line, notched
+  edges, and a "punch" hole + PUNCHED stamp when one is selected. Flat
+  colour only -- no blur, no soft shadows; depth comes from hard offsets.
+  The arch's bottom edge is kept square on purpose so the Mapbox logo
+  and attribution (bottom corners) are never clipped. Put nothing on top
+  of the map.
+
+  Class/id contract (see deco-voyage-template.html in this same folder
+  for a full working example):
+
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here). Put it
+                               inside .arch-window and make it fill it.
+  - .poster                   the centered poster sheet (max 1200px; full
+                               width on phones), cream with a gold inset
+                               hairline frame
+  - .poster-head              teal headline band, stepped gold hairlines --
+    .kicker                     small wide-tracked label above the title
+                                 (flanked by gold rules)
+    .marquee                    the big Limelight title (an <h1>)
+    .tagline                    tiny uppercase tracked line under the title
+  - .chevrons                 a thin gold zigzag strip (decorative; use it
+                               under the head band and above the footer)
+  - .arch-stage               sunburst stage; 3 columns on desktop
+                               (ornament | arch | ornament), arch only on
+                               phones --
+    .deco-side                  fluted-column ornament; add .left/.right.
+                                 Hidden below 900px
+    .arch-frame                 stepped black/gold rings around the window
+      .arch-window              round-top, square-bottom mask; holds #map
+    .arch-caption               black plaque with gold text under the arch
+  - .ticket-section           wrapper for the stubs --
+    .section-title              Limelight heading between gold hairlines
+    .ticket-row                 6-up grid on desktop, a horizontally
+                                 scrolling snap row on phones (the page
+                                 itself never scrolls sideways)
+    .ticket                     one <button> stub; aria-pressed="true" and
+                                 .is-punched mark the active one. Children:
+      .ticket-main                upper half (flex column)
+      .ticket-no                  small "No. 01" label
+      .ticket-to                  small "To" label
+      .ticket-city                destination, Limelight
+      .ticket-stub                lower half, behind a dashed tear line
+      .ticket-fare                fare, Limelight
+      .ticket-meta                class / date line, tracked uppercase
+      .punch                      the hole (shown when punched)
+      .stamp                      "PUNCHED" stamp (shown when punched)
+  - .deco-marker              Mapbox marker root (do NOT transform it --
+                               Mapbox positions it). Children:
+      .deco-marker-gem            the diamond; .home or .dest on the ROOT
+                                   picks colours
+      .deco-marker-tag            small black label above the gem
+  - .status-note (+.loading/  a one-line tracked status under the tickets
+    .success/.error)
+  - .poster-foot              small footer line (fine print)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --cream: #F3E9D2;
+  --cream-deep: #E6D6AC;
+  --paper: #FBF4E2;
+  --teal: #0F4C5C;
+  --teal-deep: #08303B;
+  --orange: #E36414;
+  --gold: #D4A017;
+  --gold-soft: #EBD08A;
+  --black: #111111;
+  --muted: #5B6B6E;
+  --success: #0F4C5C;
+  --error: #B3330B;
+
+  --font-display: 'Limelight', 'Poiret One', 'Didot', 'Bodoni 72', Georgia, serif;
+  --font-body: 'Josefin Sans', 'Gill Sans', 'Futura', 'Century Gothic', sans-serif;
+  --font-label: 'Josefin Sans', 'Gill Sans', 'Futura', 'Century Gothic', sans-serif;
+
+  --gutter: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--teal-deep);
+  color: var(--black);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.4;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--orange);
+  outline-offset: 3px;
+}
+
+/* ---- The poster sheet ---- */
+.poster {
+  position: relative;
+  max-width: 1200px;
+  margin: 0 auto;
+  background: var(--cream);
+  overflow: hidden;
+}
+
+/* Gold + black inset hairline frame; sits in the outer 12px margin only,
+   so it can never touch the map. */
+.poster::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border: 2px solid var(--gold);
+  outline: 1px solid var(--black);
+  outline-offset: 2px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* ---- Headline band ---- */
+.poster-head {
+  position: relative;
+  padding: 44px var(--gutter) 30px;
+  background: var(--teal);
+  color: var(--cream);
+  text-align: center;
+  /* stepped hairlines, hard-edged inset rings */
+  box-shadow:
+    inset 0 -6px 0 var(--teal),
+    inset 0 -8px 0 var(--gold),
+    inset 0 -12px 0 var(--teal),
+    inset 0 -13px 0 var(--gold);
+}
+
+.kicker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 0 auto 10px;
+  max-width: 560px;
+  font-family: var(--font-label);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.kicker::before,
+.kicker::after {
+  content: '';
+  flex: 1;
+  height: 5px;
+  border-top: 1px solid var(--gold);
+  border-bottom: 1px solid var(--gold);
+}
+
+.marquee {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(34px, 8.4vw, 92px);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  color: var(--cream);
+  /* hard, flat offset -- a printed misregistration, not a soft shadow */
+  text-shadow: 3px 3px 0 var(--orange);
+}
+
+.tagline {
+  margin: 14px 0 0;
+  font-family: var(--font-label);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--gold-soft);
+}
+
+/* ---- Chevron strip ---- */
+.chevrons {
+  height: 14px;
+  background-color: var(--teal);
+  background-image:
+    linear-gradient(135deg, var(--gold) 25%, transparent 25%),
+    linear-gradient(225deg, var(--gold) 25%, transparent 25%);
+  background-size: 14px 14px;
+  background-position: -7px 0, -7px 0;
+}
+
+/* ---- Arch stage: sunburst + window ---- */
+.arch-stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 580px) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 24px;
+  padding: 56px 36px 36px;
+  background:
+    repeating-conic-gradient(from -90deg at 50% 52%, var(--gold-soft) 0 5deg, var(--cream) 5deg 10deg);
+}
+
+.arch-frame {
+  grid-column: 2;
+  align-self: start;
+  min-width: 0;
+  background: var(--cream);
+  /* stepped rings: black / cream / gold / black; hard edges only.
+     They follow the arch's round top. */
+  border-radius: 999px 999px 0 0;
+  box-shadow:
+    0 0 0 4px var(--black),
+    0 0 0 8px var(--cream),
+    0 0 0 13px var(--gold),
+    0 0 0 15px var(--black);
+}
+
+.arch-window {
+  position: relative;
+  height: clamp(420px, 68vh, 640px);
+  /* round at the TOP only; the square bottom keeps the Mapbox logo and
+     attribution fully visible */
+  border-radius: 999px 999px 0 0;
+  overflow: hidden;
+  background: var(--teal-deep);
+}
+
+.arch-caption {
+  grid-column: 2;
+  min-width: 0;
+  margin: 12px 15px 0;
+  padding: 9px 14px;
+  background: var(--black);
+  color: var(--gold);
+  text-align: center;
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+/* Side ornaments: fluted columns capped with a gold stepped crown */
+.deco-side {
+  grid-row: 1 / span 2;
+  min-width: 0;
+  align-self: stretch;
+  max-width: 120px;
+  border-top: 12px solid var(--orange);
+  box-shadow: inset 0 6px 0 var(--black), inset 0 10px 0 var(--gold);
+  background:
+    repeating-linear-gradient(90deg, var(--teal) 0 10px, var(--gold) 10px 12px, var(--teal) 12px 22px, var(--black) 22px 24px);
+}
+
+.deco-side.left { grid-column: 1; justify-self: end; width: 100%; }
+.deco-side.right { grid-column: 3; justify-self: start; width: 100%; }
+
+/* ---- Tickets ---- */
+.ticket-section {
+  position: relative;
+  padding: 34px 36px 26px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 22px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(18px, 3vw, 26px);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--teal);
+}
+
+.section-title::before,
+.section-title::after {
+  content: '';
+  flex: 1;
+  height: 6px;
+  border-top: 1px solid var(--gold);
+  border-bottom: 1px solid var(--gold);
+}
+
+.ticket-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px;
+  padding: 6px 6px 10px;
+}
+
+.ticket {
+  --stub-h: 62px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 196px;
+  padding: 0;
+  border: 2px solid var(--black);
+  background: var(--paper);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.ticket:hover {
+  transform: translateY(-3px);
+  box-shadow: 4px 4px 0 var(--gold);
+}
+
+.ticket-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 10px 12px 0;
+  /* a teal top cap with a gold hairline under it */
+  border-top: 8px solid var(--teal);
+  box-shadow: inset 0 3px 0 var(--gold);
+  padding-top: 14px;
+}
+
+.ticket-no,
+.ticket-to {
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.ticket-no {
+  color: var(--orange);
+}
+
+.ticket-city {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 21px;
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  color: var(--teal);
+}
+
+.ticket-stub {
+  position: relative;
+  flex: none;
+  height: var(--stub-h);
+  padding: 9px 12px 0;
+  /* the dashed tear line */
+  border-top: 2px dashed var(--black);
+}
+
+.ticket-fare {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1;
+  color: var(--orange);
+}
+
+.ticket-meta {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Perforation notches: half-circles biting into each edge at the tear
+   line, filled with the poster colour. */
+.ticket::before,
+.ticket::after {
+  content: '';
+  position: absolute;
+  bottom: calc(var(--stub-h) - 10px);
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--black);
+  border-radius: 50%;
+  background: var(--cream);
+  pointer-events: none;
+}
+
+.ticket::before {
+  left: -11px;
+  clip-path: inset(0 0 0 50%);
+}
+
+.ticket::after {
+  right: -11px;
+  clip-path: inset(0 50% 0 0);
+}
+
+/* Punch hole + stamp (hidden until punched) */
+.punch {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--black);
+  border-radius: 50%;
+  background: var(--cream);
+  transform: scale(0);
+  pointer-events: none;
+}
+
+.stamp {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  padding: 3px 8px 2px;
+  border: 2px solid var(--orange);
+  color: var(--orange);
+  font-family: var(--font-label);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, -50%) rotate(-12deg);
+  pointer-events: none;
+}
+
+.ticket.is-punched,
+.ticket[aria-pressed="true"] {
+  border-color: var(--orange);
+  transform: translateY(-3px);
+  box-shadow: 4px 4px 0 var(--orange);
+}
+
+.ticket.is-punched::before,
+.ticket.is-punched::after {
+  border-color: var(--orange);
+}
+
+.ticket.is-punched .punch {
+  transform: scale(1);
+  animation: deco-punch 0.18s ease-out;
+}
+
+.ticket.is-punched .stamp {
+  opacity: 0.92;
+  animation: deco-stamp 0.26s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+@keyframes deco-punch {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+
+@keyframes deco-stamp {
+  from { opacity: 0; transform: translate(-50%, -50%) rotate(-12deg) scale(2.4); }
+  to { opacity: 0.92; transform: translate(-50%, -50%) rotate(-12deg) scale(1); }
+}
+
+/* ---- Map markers (the root is positioned by Mapbox: never transform it) ---- */
+.deco-marker {
+  /* no position here: mapboxgl-marker already makes it absolute, which also
+     anchors the tag; overriding it pulls the marker into normal flow */
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+}
+
+.deco-marker-gem {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 3px solid var(--black);
+  background: var(--orange);
+  outline: 2px solid var(--gold);
+  transform: rotate(45deg);
+}
+
+.deco-marker.home .deco-marker-gem {
+  background: var(--gold);
+  outline-color: var(--black);
+}
+
+.deco-marker.dest .deco-marker-gem {
+  animation: deco-drop 0.4s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+.deco-marker-tag {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  margin-bottom: 8px;
+  padding: 3px 7px 2px;
+  background: var(--black);
+  color: var(--gold);
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+@keyframes deco-drop {
+  from { transform: translateY(-26px) rotate(45deg); opacity: 0; }
+  to { transform: translateY(0) rotate(45deg); opacity: 1; }
+}
+
+/* ---- Status + footer ---- */
+.status-note {
+  display: block;
+  margin: 8px 6px 0;
+  min-height: 1.4em;
+  font-family: var(--font-label);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--muted);
+}
+
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); }
+
+.status-note.loading::after {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 10px;
+  background: var(--orange);
+  transform: rotate(45deg);
+  animation: deco-pulse 0.9s steps(2, jump-none) infinite;
+}
+
+@keyframes deco-pulse {
+  from { opacity: 1; }
+  to { opacity: 0.2; }
+}
+
+.poster-foot {
+  padding: 14px var(--gutter) 24px;
+  background: var(--teal);
+  color: var(--gold-soft);
+  text-align: center;
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticket,
+  .ticket.is-punched .punch,
+  .ticket.is-punched .stamp,
+  .deco-marker.dest .deco-marker-gem {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ---- Desktop-only outer rings (they would overflow a phone) ---- */
+@media (min-width: 761px) {
+  body {
+    padding: 28px 24px;
+  }
+
+  .poster {
+    overflow: visible;
+    box-shadow:
+      0 0 0 4px var(--black),
+      0 0 0 8px var(--gold),
+      0 0 0 12px var(--black);
+  }
+}
+
+/* ---- Narrower desktop / tablet: ornaments go, tickets scroll ---- */
+@media (max-width: 960px) {
+  .ticket-row {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
+    padding: 10px 8px 14px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--teal) var(--cream);
+  }
+
+  .ticket {
+    flex: 0 0 160px;
+    scroll-snap-align: start;
+  }
+}
+
+@media (max-width: 900px) {
+  .deco-side {
+    display: none;
+  }
+
+  .arch-stage {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 44px 32px 30px;
+  }
+
+  .arch-frame,
+  .arch-caption {
+    grid-column: 1;
+  }
+}
+
+/* ---- Phone ---- */
+@media (max-width: 760px) {
+  .poster-head {
+    padding: 36px var(--gutter) 28px;
+  }
+
+  .kicker {
+    font-size: 10px;
+    letter-spacing: 0.3em;
+  }
+
+  .tagline {
+    font-size: 10px;
+    letter-spacing: 0.22em;
+  }
+
+  .arch-stage {
+    padding: 36px 32px 26px;
+  }
+
+  .arch-window {
+    height: clamp(360px, 62vh, 520px);
+  }
+
+  .arch-caption {
+    margin-left: 15px;
+    margin-right: 15px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+  }
+
+  .ticket-section {
+    padding: 26px var(--gutter) 20px;
+  }
+}

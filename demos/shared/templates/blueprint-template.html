@@ -1,0 +1,363 @@
+<!--
+  Working EXAMPLE of the Blueprint style pack (blueprint.css, in this same
+  folder). Open this file directly to see the pattern working: a cyanotype
+  engineering drawing sheet with the map inset in a double-rule border, ruler
+  zones, a live-scale title block, and a click-two-points dimension tool that
+  logs each measurement as a revision. Copy the markup below into your own
+  demo and link blueprint.css from its <head> -- see the class/id contract
+  documented at the top of that CSS file for what to build.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief at the user's request for something distinct from every
+  other pack in this folder. The project name, initials and location here are
+  illustrative placeholders, not real content -- swap in your own.
+
+  What's NOT included: the basemap recolour is a best-effort pass over the
+  light-v11 layers (it guards every call, but custom styles will need their
+  own id patterns), there is no unit toggle or snapping, and the measurement
+  is straight-line haversine only -- no routing, areas or editing.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Mono:wght@400;500;600&family=Caveat:wght@500;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="blueprint.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map (here: fill the frame). */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+  #map canvas { cursor: crosshair; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="drawing">
+    <div id="map"></div>
+    <div class="zones zones-top" data-zones="12345678"></div>
+    <div class="zones zones-bottom" data-zones="12345678"></div>
+    <div class="zones zones-left" data-zones="ABCDEF"></div>
+    <div class="zones zones-right" data-zones="ABCDEF"></div>
+
+    <div class="toolbar">
+      <button class="btn btn-primary" id="btn-clear" type="button">Clear</button>
+      <div class="status-note" id="status-note">
+        <span class="status-icon">&#9998;</span>
+        <span id="status-text">Dimension tool armed</span>
+      </div>
+    </div>
+
+    <div class="north-arrow" aria-label="North arrow">
+      <svg viewBox="0 0 36 52" fill="none" stroke="#fff" stroke-width="1.5">
+        <path d="M18 8 L28 42 L18 35 L8 42 Z" fill="rgba(255,255,255,0.25)" />
+        <path d="M18 8 L18 35" />
+        <text x="18" y="6" text-anchor="middle" fill="#fff" stroke="none" font-size="9" font-family="Red Hat Mono, monospace" font-weight="600">N</text>
+        <circle cx="18" cy="46" r="3" />
+      </svg>
+    </div>
+  </div>
+
+  <div class="titleblock-wrap">
+    <p class="note" id="note">click two points to dimension</p>
+    <table class="revisions">
+      <thead><tr><th>Rev</th><th>Description</th><th>Dist</th></tr></thead>
+      <tbody id="rev-body"></tbody>
+    </table>
+    <table class="title-block">
+      <tr><td colspan="2"><span class="tb-label">Project</span><span class="tb-value">Harbour District Survey</span></td></tr>
+      <tr>
+        <td><span class="tb-label">Drawn by</span><span class="tb-value">K.L.</span></td>
+        <td><span class="tb-label">Date</span><span class="tb-value" id="tb-date"></span></td>
+      </tr>
+      <tr>
+        <td><span class="tb-label">Scale</span><span class="tb-value live" id="tb-scale">1:--</span></td>
+        <td><span class="tb-label">Sheet</span><span class="tb-value">1 / 1</span></td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<script>
+const ACCENT = '#FF6B4A';
+const SHEET = '#1E4E8C';
+const SHEET_DEEP = '#163A6B';
+const MAX_REV_ROWS = 4;
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  center: [4.4777, 51.9244],
+  zoom: 14.5,
+  pitch: 0,
+  projection: 'mercator',
+  attributionControl: false,
+});
+// Attribution lives bottom-left (beside the logo) so the title block never covers it
+map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-left');
+map.dragRotate.disable();
+map.touchZoomRotate.disableRotation();
+
+// ---- Zone labels along the border (1-8 across, A-F down) ----
+document.querySelectorAll('.zones').forEach((strip) => {
+  [...strip.dataset.zones].forEach((ch) => {
+    const cell = document.createElement('span');
+    cell.className = 'zone';
+    cell.textContent = ch;
+    strip.appendChild(cell);
+  });
+});
+
+document.getElementById('tb-date').textContent = new Date().toISOString().slice(0, 10);
+
+// ---- Live scale: metres per CSS pixel at the map centre latitude -> 1:N ----
+// Mapbox GL uses 512px tiles: m/px = 78271.517 * cos(lat) / 2^zoom.
+// A CSS pixel is 0.0002646 m (96 dpi), so 1:N = (m/px) / 0.0002646.
+const scaleEl = document.getElementById('tb-scale');
+function updateScale() {
+  const lat = map.getCenter().lat * Math.PI / 180;
+  const mpp = 78271.517 * Math.cos(lat) / Math.pow(2, map.getZoom());
+  const n = Math.round(mpp / 0.0002646);
+  scaleEl.textContent = '1:' + n.toLocaleString('en-US');
+}
+
+// ---- Blueprint recolour: guarded setPaintProperty over whatever layers exist ----
+function paint(id, prop, value) {
+  try { map.setPaintProperty(id, prop, value); } catch (e) { /* layer lacks this prop */ }
+}
+
+function recolor() {
+  const layers = (map.getStyle().layers || []);
+  layers.forEach((l) => {
+    const id = l.id;
+    switch (l.type) {
+      case 'background':
+        paint(id, 'background-color', SHEET);
+        break;
+      case 'fill':
+        if (/building/.test(id)) {
+          paint(id, 'fill-color', SHEET);
+          paint(id, 'fill-opacity', 0.35);
+          paint(id, 'fill-outline-color', 'rgba(255,255,255,0.85)');
+        } else if (/water/.test(id)) {
+          paint(id, 'fill-color', '#17417A');
+          paint(id, 'fill-opacity', 1);
+          paint(id, 'fill-outline-color', 'rgba(255,255,255,0.9)');
+        } else if (/park|green|wood|grass|pitch|sand|landuse|hospital|school|airport/.test(id)) {
+          paint(id, 'fill-color', '#2A5FA3');
+          paint(id, 'fill-opacity', 0.3);
+          paint(id, 'fill-outline-color', 'rgba(255,255,255,0.08)');
+        } else {
+          paint(id, 'fill-color', SHEET);
+          paint(id, 'fill-opacity', 0.5);
+        }
+        break;
+      case 'fill-extrusion':
+        paint(id, 'fill-extrusion-color', SHEET);
+        paint(id, 'fill-extrusion-opacity', 0.3);
+        break;
+      case 'line':
+        if (/case|casing/.test(id)) {
+          paint(id, 'line-opacity', 0);
+        } else if (/admin|boundary/.test(id)) {
+          paint(id, 'line-color', '#9EC5F0');
+          paint(id, 'line-opacity', 0.6);
+        } else if (/road|bridge|tunnel|street|motorway|trunk|primary|secondary|tertiary|service|path|link|ferry|aeroway/.test(id)) {
+          let op = 0.5;
+          if (/motorway|trunk/.test(id)) op = 0.95;
+          else if (/primary/.test(id)) op = 0.85;
+          else if (/secondary|tertiary/.test(id)) op = 0.7;
+          else if (/service|path|pedestrian|track/.test(id)) op = 0.35;
+          paint(id, 'line-color', '#FFFFFF');
+          paint(id, 'line-opacity', op);
+          // Plotter-pen thin roads regardless of class
+          paint(id, 'line-width', ['interpolate', ['exponential', 1.5], ['zoom'], 10, 0.4, 14, 0.8, 18, 2]);
+        } else {
+          paint(id, 'line-color', '#9EC5F0');
+          paint(id, 'line-opacity', 0.3);
+        }
+        break;
+      case 'symbol':
+        paint(id, 'text-color', '#FFFFFF');
+        paint(id, 'text-halo-color', SHEET);
+        paint(id, 'text-halo-width', 1.2);
+        paint(id, 'icon-opacity', 0);
+        break;
+      default:
+        break;
+    }
+  });
+}
+
+// ---- Measure tool: dimension line with end ticks, label and revision log ----
+const R = 6371008.8;
+function haversine(a, b) {
+  const rad = Math.PI / 180;
+  const dLat = (b[1] - a[1]) * rad;
+  const dLng = (b[0] - a[0]) * rad;
+  const h = Math.sin(dLat / 2) ** 2 +
+    Math.cos(a[1] * rad) * Math.cos(b[1] * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function fmt(m) {
+  return m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(2) + ' km';
+}
+
+let pts = [];
+let revCount = 0;
+const revBody = document.getElementById('rev-body');
+const noteEl = document.getElementById('note');
+const statusText = document.getElementById('status-text');
+
+function setHint(note, status) {
+  noteEl.textContent = note;
+  statusText.textContent = status;
+}
+
+function logRevision(dist) {
+  const empty = revBody.querySelector('.empty');
+  if (empty) empty.remove();
+  const letter = String.fromCharCode(65 + (revCount++ % 26));
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${letter}</td><td>Dimension added</td><td>${fmt(dist)}</td>`;
+  revBody.appendChild(tr);
+  while (revBody.children.length > MAX_REV_ROWS) revBody.removeChild(revBody.firstChild);
+}
+
+function showEmptyRow() {
+  revBody.innerHTML = '<tr class="empty"><td colspan="3">no revisions</td></tr>';
+}
+showEmptyRow();
+
+// Build the GeoJSON for the current (or in-progress) dimension. Ticks and
+// extension lines are laid out in screen space so they stay a fixed pixel
+// size at any zoom, then unprojected back to coordinates.
+function buildDimension(cursor) {
+  const a = pts[0];
+  const b = pts[1] || cursor;
+  const features = [];
+  if (a) features.push({ type: 'Feature', properties: { kind: 'node' }, geometry: { type: 'Point', coordinates: a } });
+  if (pts[1]) features.push({ type: 'Feature', properties: { kind: 'node' }, geometry: { type: 'Point', coordinates: pts[1] } });
+  if (a && b) {
+    const pa = map.project(a);
+    const pb = map.project(b);
+    const dx = pb.x - pa.x;
+    const dy = pb.y - pa.y;
+    const len = Math.hypot(dx, dy);
+    features.push({
+      type: 'Feature',
+      properties: { kind: 'dim', label: fmt(haversine(a, b)) },
+      geometry: { type: 'LineString', coordinates: [a, b] },
+    });
+    if (len > 1) {
+      const px = -dy / len;
+      const py = dx / len;
+      [pa, pb].forEach((p) => {
+        const seg = (r) => [
+          map.unproject([p.x - px * r, p.y - py * r]).toArray(),
+          map.unproject([p.x + px * r, p.y + py * r]).toArray(),
+        ];
+        features.push({ type: 'Feature', properties: { kind: 'tick' }, geometry: { type: 'LineString', coordinates: seg(9) } });
+        features.push({ type: 'Feature', properties: { kind: 'ext' }, geometry: { type: 'LineString', coordinates: seg(26) } });
+      });
+    }
+  }
+  return { type: 'FeatureCollection', features };
+}
+
+function draw(cursor) {
+  const src = map.getSource('dimension');
+  if (src) src.setData(buildDimension(cursor));
+}
+
+function clearCurrent() {
+  pts = [];
+  draw();
+  setHint('click two points to dimension', 'Dimension tool armed');
+}
+
+function clearAll() {
+  clearCurrent();
+  revCount = 0;
+  showEmptyRow();
+}
+
+map.on('style.load', () => {
+  recolor();
+  if (!map.getSource('dimension')) {
+    map.addSource('dimension', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({
+      id: 'dim-ext', type: 'line', source: 'dimension',
+      filter: ['==', ['get', 'kind'], 'ext'],
+      paint: { 'line-color': ACCENT, 'line-width': 1, 'line-dasharray': [2, 2], 'line-opacity': 0.8 },
+    });
+    map.addLayer({
+      id: 'dim-line', type: 'line', source: 'dimension',
+      filter: ['==', ['get', 'kind'], 'dim'],
+      paint: { 'line-color': ACCENT, 'line-width': 2 },
+    });
+    map.addLayer({
+      id: 'dim-tick', type: 'line', source: 'dimension',
+      filter: ['==', ['get', 'kind'], 'tick'],
+      paint: { 'line-color': ACCENT, 'line-width': 2.5 },
+    });
+    map.addLayer({
+      id: 'dim-node', type: 'circle', source: 'dimension',
+      filter: ['==', ['get', 'kind'], 'node'],
+      paint: { 'circle-radius': 3.5, 'circle-color': SHEET_DEEP, 'circle-stroke-color': ACCENT, 'circle-stroke-width': 2 },
+    });
+    map.addLayer({
+      id: 'dim-label', type: 'symbol', source: 'dimension',
+      filter: ['==', ['get', 'kind'], 'dim'],
+      layout: {
+        'symbol-placement': 'line-center',
+        'text-field': ['get', 'label'],
+        'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+        'text-size': 14,
+        'text-offset': [0, -0.9],
+        'text-allow-overlap': true,
+        'text-ignore-placement': true,
+      },
+      paint: { 'text-color': ACCENT, 'text-halo-color': SHEET_DEEP, 'text-halo-width': 2 },
+    });
+  }
+});
+
+map.on('load', updateScale);
+map.on('move', () => {
+  updateScale();
+  if (pts.length) draw();
+});
+
+map.on('click', (e) => {
+  const p = [e.lngLat.lng, e.lngLat.lat];
+  if (pts.length >= 2) pts = []; // third click starts a fresh dimension
+  pts.push(p);
+  if (pts.length === 1) {
+    draw();
+    setHint('now pick the second point', 'First datum set');
+  } else {
+    draw();
+    logRevision(haversine(pts[0], pts[1]));
+    setHint('click again for a new one', 'Dimension ' + fmt(haversine(pts[0], pts[1])));
+  }
+});
+
+// Rubber-band preview while the second point is pending
+map.on('mousemove', (e) => {
+  if (pts.length === 1) draw([e.lngLat.lng, e.lngLat.lat]);
+});
+
+document.getElementById('btn-clear').addEventListener('click', clearAll);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') clearCurrent();
+});
+</script>
+</body>
+</html>
