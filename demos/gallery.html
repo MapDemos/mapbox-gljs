@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Style Template Gallery</title>
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  /* Same tokens as index.html, so the two pages read as one site. */
+  :root {
+    --bg: oklch(0.15 0.008 260);
+    --bg-elevated: oklch(0.195 0.01 260);
+    --card: oklch(0.185 0.01 260);
+    --border: oklch(0.30 0.012 260);
+    --text: oklch(0.96 0.004 260);
+    --muted: oklch(0.66 0.012 260);
+    --brand: oklch(0.66 0.19 264);
+    --brand-tint: oklch(0.66 0.19 264 / 0.16);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif; }
+  a { color: var(--brand); text-decoration: none; }
+  body.modal-open { overflow: hidden; }
+
+  .page { max-width: 1200px; margin: 0 auto; padding: 8px 24px 64px; }
+
+  /* Plain title band (no globe here; index.html keeps its spinning one). */
+  .hero { position: relative; background: var(--bg); }
+  .hero-inner {
+    position: relative; max-width: 1200px; margin: 0 auto; padding: 40px 24px 28px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .hero-title { display: flex; align-items: center; gap: 14px; }
+  .hero-title .icon { color: var(--brand); display: flex; }
+  .hero h1 { font-family: Raleway, sans-serif; font-weight: 700; font-size: 40px; margin: 0; letter-spacing: -0.01em; }
+  .hero .subtitle { margin: 0; font-size: 15px; color: var(--muted); }
+  .hero .back { font-size: 14px; width: fit-content; }
+  .hero .back:hover { text-decoration: underline; }
+  @media (max-width: 640px) {
+    .hero-inner { padding: 28px 16px 20px; }
+    .hero h1 { font-size: 30px; }
+    .hero .subtitle { font-size: 14px; max-width: 80%; }
+  }
+
+  /* EN / JA switch, top-right of the hero. */
+  .lang {
+    position: absolute; top: 16px; right: 16px; z-index: 3; display: flex; padding: 3px; gap: 2px;
+    border-radius: 999px; background: var(--bg-elevated); border: 1px solid var(--border);
+  }
+  .lang button {
+    height: 28px; min-width: 40px; padding: 0 10px; border-radius: 999px; border: none; cursor: pointer;
+    background: transparent; color: var(--muted); font: 600 13px/1 inherit; font-family: inherit;
+  }
+  .lang button[aria-pressed="true"] { background: var(--brand); color: oklch(0.16 0 0); }
+
+  .controls { display: flex; flex-direction: column; gap: 12px; margin-bottom: 6px; }
+  .search { position: relative; max-width: 440px; }
+  .search svg { position: absolute; left: 14px; top: 15px; color: var(--muted); pointer-events: none; }
+  .search input {
+    width: 100%; height: 44px; border-radius: 9px; border: 1px solid var(--border);
+    background: var(--bg-elevated); color: var(--text); font-size: 15px; padding: 0 14px 0 38px; outline: none;
+  }
+  .search input:focus { border-color: var(--brand); }
+
+  .chip-groups { display: flex; flex-direction: column; gap: 10px; }
+  .chip-group { display: flex; align-items: flex-start; gap: 12px; }
+  .chip-group-label {
+    flex: 0 0 96px; padding-top: 9px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; min-width: 0; }
+  @media (max-width: 640px) {
+    .chip-group { flex-direction: column; gap: 6px; }
+    .chip-group-label { flex: none; padding-top: 0; }
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 13px; border-radius: 999px;
+    background: transparent; border: 1px solid var(--border); color: var(--text); font-size: 14px; cursor: pointer;
+    font-family: inherit;
+  }
+  .chip-count { font-size: 12px; color: var(--muted); }
+  .chip[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: oklch(0.16 0 0); }
+  .chip[aria-pressed="true"] .chip-count { color: oklch(0.16 0 0 / 0.65); }
+
+  .result-line { display: flex; align-items: baseline; gap: 10px; margin: 18px 0 14px; }
+  .result-count { font-size: 15px; color: var(--muted); margin: 0; }
+  .clear-filters {
+    background: none; border: none; padding: 0; font: inherit; font-size: 14px; color: var(--brand); cursor: pointer;
+  }
+  .clear-filters:hover { text-decoration: underline; }
+
+  /* Unlike the demo list, the look is the point here, so templates are cards. */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .card {
+    display: flex; flex-direction: column; min-width: 0; text-align: left; padding: 0; cursor: pointer;
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+    color: inherit; font: inherit; transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+  .card:hover, .card:focus-visible { border-color: var(--brand); transform: translateY(-2px); outline: none; }
+  .card-thumb { aspect-ratio: 16 / 10; background: var(--bg-elevated); overflow: hidden; border-bottom: 1px solid var(--border); }
+  .card-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.25s ease; }
+  .card:hover .card-thumb img { transform: scale(1.04); }
+  .card-thumb.none { display: grid; place-items: center; color: var(--muted); font-size: 13px; }
+  .card-body { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 14px; }
+  .card-name { font-size: 15px; font-weight: 600; }
+  .card-desc {
+    margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted);
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  }
+  .card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag {
+    font-size: 12px; padding: 3px 8px; border-radius: 6px; white-space: nowrap;
+    color: var(--muted); border: 1px solid var(--border);
+  }
+  .empty { color: var(--muted); font-size: 15px; padding: 40px 0; text-align: center; }
+  /* Phones: two compact columns so 60+ templates aren't one endless scroll. */
+  @media (max-width: 640px) {
+    .page { padding: 8px 16px 48px; }
+    .hero-title { padding-right: 96px; }
+    .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .card-body { padding: 8px 10px 10px; gap: 4px; }
+    .card-name { font-size: 13px; }
+    .card-desc { font-size: 12px; }
+    .card-tags { display: none; }
+    .card-thumb.none { font-size: 11px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card, .card-thumb img { transition: none; }
+    .card:hover { transform: none; }
+    .card:hover .card-thumb img { transform: none; }
+  }
+
+  /* Preview: one live template at a time, in a full-screen sheet. */
+  .modal {
+    position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
+    background: oklch(0.1 0.006 260 / 0.92); backdrop-filter: blur(4px);
+  }
+  .modal[hidden] { display: none; }
+  .modal-bar {
+    display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--border);
+    background: var(--bg-elevated);
+  }
+  .modal-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .modal-title strong { font-size: 15px; }
+  .modal-title span { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .modal-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .btn {
+    display: inline-flex; align-items: center; height: 34px; padding: 0 12px; border-radius: 8px; font-size: 13px;
+    border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font-family: inherit;
+  }
+  .btn:hover { border-color: var(--brand); }
+  .btn-close { width: 34px; justify-content: center; padding: 0; font-size: 18px; }
+  .modal-frame { flex: 1; min-height: 0; padding: 12px; }
+  .modal-frame iframe { width: 100%; height: 100%; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+  @media (max-width: 640px) {
+    .modal-bar { flex-wrap: wrap; }
+    .modal-title { flex-basis: calc(100% - 46px); }
+    .modal-actions { order: 3; width: 100%; }
+    .modal-actions .btn:not(.btn-close) { flex: 1; justify-content: center; }
+    .modal-frame { padding: 0; }
+    .modal-frame iframe { border: none; border-radius: 0; }
+  }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="lang" role="group" aria-label="Language">
+    <button type="button" data-lang="en" aria-pressed="true">EN</button>
+    <button type="button" data-lang="ja" aria-pressed="false">JA</button>
+  </div>
+  <div class="hero-inner">
+    <div class="hero-title">
+      <span class="icon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg></span>
+      <h1 data-i18n="title">Style Template Gallery</h1>
+    </div>
+    <p class="subtitle" id="hero-subtitle"></p>
+    <a class="back" href="index.html" data-i18n="back">&larr; All demos</a>
+  </div>
+</header>
+
+<div class="page">
+  <div class="controls">
+    <div class="search">
+      <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M16.5 16.5 13 13"/></svg>
+      <input type="text" id="search-input" autocomplete="off" />
+    </div>
+    <div class="chip-groups" id="chips"></div>
+  </div>
+
+  <div class="result-line">
+    <p class="result-count" id="result-count"></p>
+    <button class="clear-filters" id="clear-filters" type="button" hidden></button>
+  </div>
+  <div id="grid-container"></div>
+</div>
+
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modal-name">
+  <div class="modal-bar">
+    <div class="modal-title"><strong id="modal-name"></strong><span id="modal-desc"></span></div>
+    <div class="modal-actions">
+      <a class="btn" id="modal-open" target="_blank" rel="noopener"></a>
+      <a class="btn" id="modal-css" target="_blank" rel="noopener"></a>
+      <button class="btn btn-close" id="modal-close" type="button">&times;</button>
+    </div>
+  </div>
+  <div class="modal-frame"><iframe id="modal-iframe" title=""></iframe></div>
+</div>
+
+<script>
+// The template list is shared/templates/templates.json ({name, description:
+// {en, ja}, tags: {tone, layout}, gallery?}) -- the same file the demo generator's Style
+// picker reads, so a pack added there shows up here too. Thumbnails come from
+// CI (scripts/generate-thumbnails.mjs) as thumbs/templates/<name>.jpg, listed
+// in thumbs/templates/index.json.
+const TEMPLATES_DIR = 'shared/templates';
+
+const STRINGS = {
+  en: {
+    title: 'Style Template Gallery',
+    subtitle: (n) => `${n} style templates for Mapbox GL JS demos`,
+    back: '← All demos',
+    search: 'Search templates',
+    tone: 'Tone', layout: 'Layout',
+    count: (a, b) => `${a} of ${b} templates`,
+    clear: 'Clear filters',
+    empty: 'No templates match your search.',
+    open: 'Open in new tab', css: 'View CSS', close: 'Close preview',
+    noThumb: 'Preview coming soon',
+    loadError: 'Could not load templates.json.',
+  },
+  ja: {
+    title: 'スタイルテンプレート ギャラリー',
+    subtitle: (n) => `Mapbox GL JS デモ用のスタイルテンプレート ${n} 種`,
+    back: '← デモ一覧へ',
+    search: 'テンプレートを検索',
+    tone: 'トーン', layout: 'レイアウト',
+    count: (a, b) => `${b} 件中 ${a} 件`,
+    clear: '絞り込みを解除',
+    empty: '該当するテンプレートはありません。',
+    open: '新しいタブで開く', css: 'CSS を見る', close: 'プレビューを閉じる',
+    noThumb: 'プレビュー準備中',
+    loadError: 'templates.json を読み込めませんでした。',
+  },
+};
+
+// Chip values in display order, with labels per language.
+const FACETS = {
+  tone: [
+    { value: 'light', en: 'Light', ja: 'ライト' },
+    { value: 'dark', en: 'Dark', ja: 'ダーク' },
+  ],
+  layout: [
+    { value: 'overlay', en: 'Floating panels', ja: 'フローティング' },
+    { value: 'sidebar', en: 'Side panel', ja: 'サイドパネル' },
+    { value: 'split', en: 'Split layout', ja: '分割レイアウト' },
+    { value: 'page', en: 'Scrolling page', ja: 'ページ型' },
+    { value: 'device', en: 'Device frame', ja: 'デバイス枠' },
+  ],
+};
+const facetLabel = (facet, value) => (FACETS[facet].find((f) => f.value === value) || { [lang]: value })[lang];
+
+// Names are kebab-case slugs; a few need their capitals back.
+const NAME_OVERRIDES = { 'neon-hud': 'Neon HUD', 'retro-os': 'Retro OS', 'e-ink': 'E-Ink' };
+const displayName = (name) => NAME_OVERRIDES[name]
+  || name.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Language: ?lang= wins, then the saved choice, then the browser language.
+// localStorage can throw (private mode, blocked storage), so every access is guarded.
+function initialLang() {
+  const q = new URLSearchParams(location.search).get('lang');
+  if (q === 'en' || q === 'ja') return q;
+  try {
+    const saved = localStorage.getItem('gallery-lang');
+    if (saved === 'en' || saved === 'ja') return saved;
+  } catch { /* storage unavailable */ }
+  return (navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en';
+}
+let lang = initialLang();
+
+let DATA = [];
+const THUMBS = new Set();
+let searchQuery = '';
+const selected = { tone: new Set(), layout: new Set() };
+
+const t = (key, ...args) => {
+  const v = STRINGS[lang][key];
+  return typeof v === 'function' ? v(...args) : v;
+};
+const descOf = (tpl) => (tpl.description && (tpl.description[lang] || tpl.description.en)) || '';
+
+function matchesQuery(tpl) {
+  if (!searchQuery) return true;
+  const tags = tpl.tags || {};
+  const hay = [
+    tpl.name, displayName(tpl.name), tpl.description?.en, tpl.description?.ja,
+    tags.tone && facetLabel('tone', tags.tone), tags.layout && facetLabel('layout', tags.layout),
+  ].join(' ').toLowerCase();
+  return hay.includes(searchQuery);
+}
+// Within a facet, chips are OR (light or dark); across facets, AND.
+const matchesFacet = (tpl, facet, set = selected[facet]) => set.size === 0 || set.has(tpl.tags?.[facet]);
+
+function applyLang() {
+  document.documentElement.lang = lang;
+  document.title = t('title');
+  document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('.lang button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
+  document.getElementById('search-input').placeholder = t('search');
+  document.getElementById('clear-filters').textContent = t('clear');
+  document.getElementById('modal-open').textContent = t('open');
+  document.getElementById('modal-css').textContent = t('css');
+  document.getElementById('modal-close').setAttribute('aria-label', t('close'));
+  if (DATA.length) document.getElementById('hero-subtitle').textContent = t('subtitle', DATA.length);
+  if (current) fillModalText(current);
+}
+
+function render() {
+  const bySearch = DATA.filter(matchesQuery);
+  const filtered = bySearch.filter((tpl) => matchesFacet(tpl, 'tone') && matchesFacet(tpl, 'layout'));
+
+  // A chip's count: how many templates would show if only that chip were
+  // picked in its own facet (other facet's selection and the search still apply).
+  const chipsHtml = Object.keys(FACETS).map((facet) => {
+    const other = facet === 'tone' ? 'layout' : 'tone';
+    const base = bySearch.filter((tpl) => matchesFacet(tpl, other));
+    const chips = FACETS[facet].map(({ value }) => {
+      const count = base.filter((tpl) => tpl.tags?.[facet] === value).length;
+      const on = selected[facet].has(value);
+      return `<button class="chip" type="button" aria-pressed="${on}" data-facet="${facet}" data-value="${value}">${escapeHtml(facetLabel(facet, value))}<span class="chip-count">${count}</span></button>`;
+    }).join('');
+    return `<div class="chip-group"><span class="chip-group-label">${escapeHtml(t(facet))}</span><div class="chips">${chips}</div></div>`;
+  }).join('');
+  document.getElementById('chips').innerHTML = chipsHtml;
+
+  document.getElementById('result-count').textContent = t('count', filtered.length, DATA.length);
+  document.getElementById('clear-filters').hidden = selected.tone.size + selected.layout.size === 0;
+
+  const container = document.getElementById('grid-container');
+  if (filtered.length === 0) {
+    container.innerHTML = `<p class="empty">${escapeHtml(t('empty'))}</p>`;
+    return;
+  }
+  container.innerHTML = `<div class="grid">${filtered.map((tpl) => {
+    const tags = tpl.tags || {};
+    const thumb = THUMBS.has(tpl.name)
+      ? `<div class="card-thumb"><img src="thumbs/templates/${encodeURIComponent(tpl.name)}.jpg" alt="" loading="lazy"></div>`
+      : `<div class="card-thumb none">${escapeHtml(t('noThumb'))}</div>`;
+    const tagHtml = ['tone', 'layout'].filter((f) => tags[f])
+      .map((f) => `<span class="tag">${escapeHtml(facetLabel(f, tags[f]))}</span>`).join('');
+    return `
+      <button class="card" type="button" data-name="${escapeHtml(tpl.name)}">
+        ${thumb}
+        <div class="card-body">
+          <span class="card-name">${escapeHtml(displayName(tpl.name))}</span>
+          <p class="card-desc">${escapeHtml(descOf(tpl))}</p>
+          <div class="card-tags">${tagHtml}</div>
+        </div>
+      </button>`;
+  }).join('')}</div>`;
+}
+
+/* ---- Preview modal ---- */
+let current = null;
+let lastFocus = null;
+const modal = document.getElementById('modal');
+const iframe = document.getElementById('modal-iframe');
+
+function fillModalText(tpl) {
+  document.getElementById('modal-name').textContent = displayName(tpl.name);
+  document.getElementById('modal-desc').textContent = descOf(tpl);
+  iframe.title = displayName(tpl.name);
+}
+function openPreview(name) {
+  const tpl = DATA.find((d) => d.name === name);
+  if (!tpl) return;
+  current = tpl;
+  lastFocus = document.activeElement;
+  fillModalText(tpl);
+  const page = `${TEMPLATES_DIR}/${encodeURIComponent(tpl.name)}-template.html`;
+  document.getElementById('modal-open').href = page;
+  document.getElementById('modal-css').href = `${TEMPLATES_DIR}/${encodeURIComponent(tpl.name)}.css`;
+  // Show the sheet before loading: a template that loads into a hidden,
+  // zero-size iframe fits its map to the wrong size.
+  modal.hidden = false;
+  document.body.classList.add('modal-open');
+  iframe.src = page;
+  history.replaceState(null, '', `#${tpl.name}`);
+  document.getElementById('modal-close').focus();
+}
+function closePreview() {
+  if (modal.hidden) return;
+  modal.hidden = true;
+  iframe.src = 'about:blank'; // stop the live map
+  current = null;
+  document.body.classList.remove('modal-open');
+  history.replaceState(null, '', location.pathname + location.search);
+  if (lastFocus) lastFocus.focus();
+}
+
+document.getElementById('grid-container').addEventListener('click', (e) => {
+  const card = e.target.closest('.card');
+  if (card) openPreview(card.dataset.name);
+});
+document.getElementById('modal-close').addEventListener('click', closePreview);
+document.addEventListener('keydown', (e) => {
+  if (modal.hidden) return;
+  if (e.key === 'Escape') closePreview();
+  // Keep Tab inside the dialog's bar (the iframe manages its own focus).
+  if (e.key === 'Tab') {
+    const items = [...modal.querySelectorAll('a[href], button, iframe')];
+    const first = items[0], last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+});
+
+/* ---- Controls ---- */
+document.getElementById('search-input').addEventListener('input', (e) => {
+  searchQuery = e.target.value.trim().toLowerCase();
+  render();
+});
+document.getElementById('chips').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  const set = selected[chip.dataset.facet];
+  if (set.has(chip.dataset.value)) set.delete(chip.dataset.value); else set.add(chip.dataset.value);
+  render();
+});
+document.getElementById('clear-filters').addEventListener('click', () => {
+  selected.tone.clear(); selected.layout.clear();
+  render();
+});
+document.querySelector('.lang').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-lang]');
+  if (!b || b.dataset.lang === lang) return;
+  lang = b.dataset.lang;
+  try { localStorage.setItem('gallery-lang', lang); } catch { /* storage unavailable */ }
+  applyLang();
+  render();
+});
+
+applyLang();
+
+// 'no-cache': revalidate with the server each load, so an edited list shows
+// up on refresh (otherwise browsers may reuse a stale copy for minutes).
+const thumbsLoaded = fetch('./thumbs/templates/index.json', { cache: 'no-cache' })
+  .then((r) => r.json())
+  .then((names) => names.forEach((n) => THUMBS.add(n)))
+  .catch((err) => console.error('Could not load thumbs/templates/index.json', err));
+
+fetch(`./${TEMPLATES_DIR}/templates.json`, { cache: 'no-cache' })
+  .then((r) => r.json())
+  .then(async (data) => {
+    await thumbsLoaded;
+    // "gallery": false keeps a pack out of this page while the demo
+    // generator still offers it (it reads only name and description).
+    DATA = data.filter((tpl) => typeof tpl?.name === 'string' && tpl.gallery !== false);
+    applyLang();
+    render();
+    // A #name in the URL opens that template's preview (shareable links).
+    const openFromHash = () => {
+      const hash = decodeURIComponent(location.hash.slice(1));
+      if (!hash) closePreview();
+      else if (hash !== current?.name) openPreview(hash);
+    };
+    window.addEventListener('hashchange', openFromHash);
+    openFromHash();
+  })
+  .catch((err) => {
+    document.getElementById('grid-container').innerHTML = `<p class="empty">${escapeHtml(t('loadError'))}</p>`;
+    console.error(err);
+  });
+</script>
+</body>
+</html>

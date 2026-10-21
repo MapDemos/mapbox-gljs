@@ -46,6 +46,8 @@
     text-shadow: 0 2px 18px oklch(0 0 0 / 0.6);
   }
   .hero .subtitle { margin: 0; font-size: 15px; color: var(--muted); text-shadow: 0 1px 10px oklch(0 0 0 / 0.7); }
+  .hero .hero-link { pointer-events: auto; width: fit-content; font-size: 14px; text-shadow: 0 1px 10px oklch(0 0 0 / 0.7); }
+  .hero .hero-link:hover { text-decoration: underline; }
   @media (max-width: 640px) {
     .hero { height: 200px; }
     .hero h1 { font-size: 30px; }
@@ -139,6 +141,7 @@
       <h1>Mapbox Demos</h1>
     </div>
     <p class="subtitle" id="hero-subtitle">Demos built with Mapbox GL JS and Mapbox APIs</p>
+    <a class="hero-link" href="gallery.html">Browse style templates &rarr;</a>
   </div>
 </header>
 

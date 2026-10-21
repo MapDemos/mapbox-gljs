@@ -4,55 +4,94 @@
     "description": {
       "en": "Dark frosted glass, amber accent, Bebas Neue — playful airport wayfinding",
       "ja": "ダークなすりガラス、アンバーのアクセント、Bebas Neue — 遊び心のある空港案内"
-    }
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "overlay"
+    },
+    "gallery": false
   },
   {
     "name": "highway-sign",
     "description": {
       "en": "Cream & teal MUTCD highway-sign palette — civic navigation HUD",
       "ja": "クリームとティールの MUTCD 道路標識風パレット — 公共ナビゲーション HUD"
-    }
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "overlay"
+    },
+    "gallery": false
   },
   {
     "name": "slate-console",
     "description": {
       "en": "Dark blue-slate with a cyan accent stripe — technical readout panel",
       "ja": "ダークなブルースレートにシアンのアクセント — 技術系の計器パネル"
-    }
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "overlay"
+    },
+    "gallery": false
   },
   {
     "name": "arena",
     "description": {
       "en": "Near-black precision UI (Linear-inspired) — split-pane comparison shell",
       "ja": "ほぼ黒の精密な UI（Linear 風） — 2 画面比較レイアウト"
-    }
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "split"
+    },
+    "gallery": false
   },
   {
     "name": "vintage-chart",
     "description": {
       "en": "Navy/parchment/brass, serif display — dark cinematic dashboard",
       "ja": "ネイビー・羊皮紙・真鍮、セリフ体の見出し — 映画のようなダークダッシュボード"
-    }
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "overlay"
+    },
+    "gallery": false
   },
   {
     "name": "editorial-paper",
     "description": {
       "en": "Warm paper, oversized serif headlines — magazine/newspaper look",
       "ja": "温かみのある紙、大きなセリフ体の見出し — 雑誌・新聞風"
-    }
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
+    },
+    "gallery": false
   },
   {
     "name": "storefront",
     "description": {
       "en": "Warm blush-white, coral-red accent — retail wayfinding sidebar",
       "ja": "やわらかなオフホワイトにコーラルレッド — 店舗案内のサイドバー"
-    }
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "sidebar"
+    },
+    "gallery": false
   },
   {
     "name": "riso-zine",
     "description": {
       "en": "Risograph zine print — snap-scrolling card filmstrip along the bottom",
       "ja": "リソグラフ印刷のジン風 — 下部にスナップスクロールするカードの帯"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "overlay"
     }
   },
   {
@@ -60,6 +99,10 @@
     "description": {
       "en": "Swiss typographic grid — split-screen index linked to the map",
       "ja": "スイス風タイポグラフィのグリッド — 地図と連動する 2 画面の索引"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
     }
   },
   {
@@ -67,6 +110,10 @@
     "description": {
       "en": "Synthwave neon full-frame HUD — route playback and gauges",
       "ja": "シンセウェーブのネオン全画面 HUD — ルート再生とゲージ"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "overlay"
     }
   },
   {
@@ -74,6 +121,10 @@
     "description": {
       "en": "Soft clay bento grid — category filter tiles",
       "ja": "やわらかなクレイ風の弁当箱グリッド — カテゴリ絞り込みタイル"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
     }
   },
   {
@@ -81,6 +132,10 @@
     "description": {
       "en": "Engineering drawing sheet — title block and a measure tool",
       "ja": "設計図の図面シート風 — 表題欄と計測ツール"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "overlay"
     }
   },
   {
@@ -88,6 +143,10 @@
     "description": {
       "en": "Scrollytelling chapters — scrolling drives the camera over 3D terrain",
       "ja": "スクロールで語るストーリー — スクロールに合わせて 3D 地形の上をカメラが移動"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "page"
     }
   },
   {
@@ -95,6 +154,10 @@
     "description": {
       "en": "90s desktop — draggable map window and a taskbar",
       "ja": "90 年代のデスクトップ風 — ドラッグできる地図ウィンドウとタスクバー"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "device"
     }
   },
   {
@@ -102,6 +165,10 @@
     "description": {
       "en": "Aurora-framed dark map — command palette search",
       "ja": "オーロラに縁取られたダークな地図 — コマンドパレットで検索"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "overlay"
     }
   },
   {
@@ -109,6 +176,10 @@
     "description": {
       "en": "Art Deco travel poster — arch-masked globe and ticket-style route arcs",
       "ja": "アール・デコの旅行ポスター風 — アーチ型の地球儀とチケット風のルート弧"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
     }
   },
   {
@@ -116,6 +187,10 @@
     "description": {
       "en": "Japanese minimal washi layout — season switcher",
       "ja": "和紙を思わせる和のミニマルなレイアウト — 季節の切り替え"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
     }
   },
   {
@@ -123,6 +198,10 @@
     "description": {
       "en": "1996 hand-coded homepage — map above a sortable data table",
       "ja": "1996年の手作りホームページ風 — 地図の下に並べ替え可能なデータ表"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
     }
   },
   {
@@ -130,6 +209,10 @@
     "description": {
       "en": "Detective corkboard — clue cards, pushpins and red yarn on a pinned city map",
       "ja": "探偵のコルクボード風 — 手がかりカード、画鋲、赤い糸で結ぶ街の地図"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "page"
     }
   },
   {
@@ -137,6 +220,10 @@
     "description": {
       "en": "Transit line strip diagram synced with a geographic map",
       "ja": "路線図の帯と実際の地図が連動する交通案内"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
     }
   },
   {
@@ -144,6 +231,10 @@
     "description": {
       "en": "Glossy sky-and-glass look — map window with clock, compass and places gadgets",
       "ja": "光沢のある空とガラスの質感 — 時計・方位・スポットのガジェット付き地図ウィンドウ"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "sidebar"
     }
   },
   {
@@ -151,6 +242,10 @@
     "description": {
       "en": "Warm chat assistant — replies with place cards that pin to the map",
       "ja": "温かみのあるチャットアシスタント — 返信のスポットカードが地図にピン留め"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "sidebar"
     }
   },
   {
@@ -158,6 +253,10 @@
     "description": {
       "en": "Museum-style timeline — histogram range brush filters a globe",
       "ja": "博物館の展示風タイムライン — ヒストグラムの範囲選択で地球儀を絞り込み"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "split"
     }
   },
   {
@@ -165,6 +264,10 @@
     "description": {
       "en": "Sports TV graphics — live race tracker with leaderboard and ticker",
       "ja": "スポーツ中継風グラフィック — 順位表とテロップ付きのライブ追跡"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "overlay"
     }
   },
   {
@@ -172,6 +275,10 @@
     "description": {
       "en": "Native-feeling mobile app — draggable bottom sheet, floating card on desktop",
       "ja": "ネイティブアプリ風 — ドラッグできるボトムシート、デスクトップではフローティングカード"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "overlay"
     }
   },
   {
@@ -179,6 +286,10 @@
     "description": {
       "en": "Rugged outdoor brand — 3D terrain route with an elevation profile",
       "ja": "アウトドアブランド風 — 3D地形のルートと標高プロファイル"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "split"
     }
   },
   {
@@ -186,6 +297,10 @@
     "description": {
       "en": "Naturalist's notebook spread — sightings list and a taped-in sepia map",
       "ja": "博物学者のフィールドノート風 — 観察記録と貼り付けたセピア色の地図"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
     }
   },
   {
@@ -193,6 +308,10 @@
     "description": {
       "en": "Mechanical railway departure board — flipping letters over a route map",
       "ja": "駅の反転フラップ式発車標 — 文字がパタパタ切り替わる路線マップ"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "split"
     }
   },
   {
@@ -200,6 +319,10 @@
     "description": {
       "en": "Retro comic book page — halftone panels, speech balloons and a map panel",
       "ja": "レトロなコミック誌面 — 網点のコマ、吹き出し、地図のコマ"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
     }
   },
   {
@@ -207,6 +330,10 @@
     "description": {
       "en": "Analyst's code notebook — editable parameters drive map, chart and table outputs",
       "ja": "分析用コードノートブック — パラメータ編集で地図・グラフ・表を出力"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
     }
   },
   {
@@ -214,6 +341,10 @@
     "description": {
       "en": "Delivery order on a thermal receipt that prints as the courier moves",
       "ja": "配達状況に合わせて印字が進む感熱レシート"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "sidebar"
     }
   },
   {
@@ -221,6 +352,10 @@
     "description": {
       "en": "Kids' sticker activity book — drag stickers onto the right places",
       "ja": "子ども向けシール帳 — シールを正しい場所にドラッグ"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "sidebar"
     }
   },
   {
@@ -228,6 +363,10 @@
     "description": {
       "en": "Amber CRT terminal with text windows — typed commands drive the map",
       "ja": "琥珀色のCRT端末 — コマンド入力で地図を操作"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "device"
     }
   },
   {
@@ -235,6 +374,10 @@
     "description": {
       "en": "Quiet-luxury property listings with price-pin map",
       "ja": "上質な不動産物件一覧と価格ピンの地図"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "sidebar"
     }
   },
   {
@@ -242,6 +385,10 @@
     "description": {
       "en": "Wood-type stagecoach handbill — timetable and 3D terrain route",
       "ja": "木活字の駅馬車ポスター — 時刻表と3D地形のルート"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
     }
   },
   {
@@ -249,6 +396,10 @@
     "description": {
       "en": "Accessibility-first service locator — keyboard and screen-reader friendly",
       "ja": "アクセシビリティ重視の施設検索 — キーボード・読み上げ対応"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "sidebar"
     }
   },
   {
@@ -256,6 +407,10 @@
     "description": {
       "en": "Synthwave sunset drive — map in a retro TV with a cassette playlist",
       "ja": "シンセウェーブの夕暮れドライブ — レトロTVの地図とカセットのプレイリスト"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "device"
     }
   },
   {
@@ -263,6 +418,10 @@
     "description": {
       "en": "Family board game — tile ring around the map and a rolling die",
       "ja": "家族向けボードゲーム — 地図を囲むマスとサイコロ"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
     }
   },
   {
@@ -270,6 +429,10 @@
     "description": {
       "en": "Typeset journal article — the map is an interactive Figure 1",
       "ja": "論文誌風のレイアウト — 地図はインタラクティブな図1"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
     }
   },
   {
@@ -277,6 +440,10 @@
     "description": {
       "en": "Ski resort status board with a 3D piste map",
       "ja": "スキー場のリフト・コース状況ボードと3Dゲレンデマップ"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "sidebar"
     }
   },
   {
@@ -284,6 +451,10 @@
     "description": {
       "en": "Gold foil on midnight blue — flip tarot-style cards to reveal places",
       "ja": "深い藍に金箔 — タロット風カードをめくって場所を表示"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "split"
     }
   },
   {
@@ -291,6 +462,10 @@
     "description": {
       "en": "1930s pictogram statistics poster — repeated icons per district",
       "ja": "1930年代の絵文字統計ポスター — 地区ごとのアイコン列"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
     }
   },
   {
@@ -298,6 +473,10 @@
     "description": {
       "en": "Light enterprise fleet dashboard — KPIs, vehicle table and live map",
       "ja": "明るい業務用フリートダッシュボード — KPI、車両一覧、ライブ地図"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
     }
   },
   {
@@ -305,6 +484,10 @@
     "description": {
       "en": "E-reader device with a greyscale map and e-ink page refresh",
       "ja": "電子ペーパー端末風 — グレースケールの地図とページ書き換え"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "device"
     }
   },
   {
@@ -312,6 +495,10 @@
     "description": {
       "en": "Vintage postcards — flip cards to reveal islands and the ferry route",
       "ja": "ヴィンテージ絵はがき — めくると島とフェリー航路が現れる"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
     }
   },
   {
@@ -319,6 +506,10 @@
     "description": {
       "en": "Streetwear release site — countdown and raffle-store map",
       "ja": "ストリートウェアの発売サイト — カウントダウンと抽選店舗マップ"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "page"
     }
   },
   {
@@ -326,6 +517,10 @@
     "description": {
       "en": "Letterpress wedding invitation — schedule, guest travel map and RSVP",
       "ja": "活版印刷風の招待状 — スケジュール、ゲスト向け地図、出欠フォーム"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
     }
   },
   {
@@ -333,6 +528,10 @@
     "description": {
       "en": "1950s Googie roadside sign — Route 66 road trip with a postcard rack",
       "ja": "1950年代のグーギー様式の看板 — ルート66のドライブと絵はがきラック"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
     }
   },
   {
@@ -340,6 +539,10 @@
     "description": {
       "en": "1920s avant-garde poster — diagonal layout with cycle-route tickets",
       "ja": "1920年代アヴァンギャルドのポスター — 斜めの構図と自転車ルートのチケット"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
     }
   },
   {
@@ -347,6 +550,10 @@
     "description": {
       "en": "Museum audio-guide device — type a stop number on the keypad",
       "ja": "美術館の音声ガイド端末 — キーパッドで番号を入力"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "device"
     }
   },
   {
@@ -354,6 +561,10 @@
     "description": {
       "en": "16-bit RPG overworld — quest log, dialog box and a walking hero",
       "ja": "16ビットRPG風 — クエストログ、会話ウィンドウ、歩くヒーロー"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "overlay"
     }
   },
   {
@@ -361,6 +572,10 @@
     "description": {
       "en": "Seat-back in-flight map — globe, flight info strip and view tabs",
       "ja": "機内エンタメのフライトマップ — 地球儀、飛行情報、表示切り替え"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "device"
     }
   },
   {
@@ -368,6 +583,10 @@
     "description": {
       "en": "Café chalkboard menu — today's food trucks drawn in chalk",
       "ja": "カフェの黒板メニュー — 今日のフードトラックをチョークで"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "sidebar"
     }
   },
   {
@@ -375,6 +594,10 @@
     "description": {
       "en": "Scandinavian cabin booking — date picker, filters and 3D terrain",
       "ja": "北欧のキャビン予約 — 日付選択、絞り込み、3D地形"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "sidebar"
     }
   },
   {
@@ -382,6 +605,10 @@
     "description": {
       "en": "Neumorphic soft UI — EV charger finder with a range dial",
       "ja": "ニューモーフィズムのソフトUI — 航続距離ダイヤル付きEV充電スポット検索"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "sidebar"
     }
   },
   {
@@ -389,6 +616,10 @@
     "description": {
       "en": "1980s Memphis maximalism — collage grid with shape-coded venues",
       "ja": "1980年代メンフィス・デザイン — コラージュと図形で分類した会場"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
     }
   },
   {
@@ -396,6 +627,10 @@
     "description": {
       "en": "Trip-planning kanban — drag place cards between day columns",
       "ja": "旅行計画のカンバン — 日ごとの列へ場所カードをドラッグ"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
     }
   },
   {
@@ -403,6 +638,10 @@
     "description": {
       "en": "Moroccan tilework riad — arched courtyard map and walking route",
       "ja": "モロッコのタイル装飾 — アーチ型の中庭マップと散策ルート"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "sidebar"
     }
   },
   {
@@ -410,6 +649,10 @@
     "description": {
       "en": "Team whiteboard — sticky notes with hand-drawn arrows to the map",
       "ja": "チームのホワイトボード — 付箋から地図へ手描きの矢印"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
     }
   },
   {
@@ -417,6 +660,10 @@
     "description": {
       "en": "Raw concrete architecture guide — index slabs and 3D orbit",
       "ja": "コンクリートの建築ガイド — 一覧スラブと3Dの周回カメラ"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "sidebar"
     }
   },
   {
@@ -424,6 +671,10 @@
     "description": {
       "en": "Gothic stained glass — rose-window navigation and lancet map",
       "ja": "ゴシックのステンドグラス — バラ窓のナビとランセット窓の地図"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "split"
     }
   },
   {
@@ -431,6 +682,10 @@
     "description": {
       "en": "Layered cut-paper diorama — parallax header and 3D lake map",
       "ja": "切り絵のジオラマ — パララックスのヘッダーと3Dの湖畔マップ"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
     }
   }
 ]
