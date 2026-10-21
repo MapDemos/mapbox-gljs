@@ -1,0 +1,589 @@
+/*
+  Whiteboard -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a team planning whiteboard -- white
+  board with faint marker ghosting, a left tool tray, the map taped to the
+  board inside a hand-drawn wobbly frame, tilted sticky notes around it
+  and rough marker arrows pointing from each note to its spot on the map),
+  deliberately distinct from every other pack in this folder: Academic
+  Paper, Aero Gadgets, Amber Terminal, Arena, Aurora Command, Blueprint,
+  Board Game, Bottom Sheet, Broadcast, Case Board, Celestial Tarot, Chat
+  Concierge, Chronicle, Clinic Finder, Comic Panel, Data Notebook, Deco
+  Voyage, Drop Culture, E-Ink, Editorial Paper, Estate Luxe, Event Invite,
+  Field Journal, Fleet Ops, Frontier Poster, Highway Sign, Isotype, Line
+  Diagram, Neon HUD, Pastel Bento, Postcards, Raw Web, Retro OS, Riso Zine,
+  Ski Piste, Slate Console, Split Flap, Sticker Book, Storefront, Story
+  Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt, Trailhead, Vapor
+  Sunset, Vintage Chart, Washi Seasons and Weather Console. (Case Board is
+  a dark corkboard with photos and red string, Sticker Book is die-cut
+  stickers, Field Journal is a notebook page; this is a bright white
+  whiteboard with marker strokes and sticky notes.)
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/whiteboard.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Architects Daughter for marker
+  handwriting and headings; Short Stack for sticky-note text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Short+Stack&display=swap" rel="stylesheet" />
+
+  Signature touch: everything that is "drawn" (the frame around the map,
+  the title underline, the arrows, the map annotation rings) is an inline
+  SVG path with a seeded random wobble and a doubled second stroke, so it
+  looks like it was sketched with a marker and never changes between
+  redraws. Sticky notes have random tilts and a curled-corner shadow.
+
+  Layout: .app is a two-column grid (.toolbar | .board) at 100dvh, never
+  scrolls. .board holds the title, .map-frame (with #map inside, inset so
+  the wobbly border sits OUTSIDE the map and the Mapbox logo and
+  attribution are never covered), .notes (sticky notes, absolutely
+  placed and draggable) and svg.arrows (pointer-events none, drawn over the
+  map; a mask hides arrow strokes near the map's bottom corners). On phones
+  (<= 700px) the toolbar becomes a top row, the map takes ~55dvh, .notes
+  becomes a horizontal strip under it and the arrows are hidden.
+
+  Class/id contract (see whiteboard-template.html in this same folder for
+  a full working example):
+
+  - .app                      page grid, 100dvh
+  - .toolbar                  left tool tray (top row on phones)
+    .tool-group                 vertical group; .tool-title is its tiny label
+    .swatch                     marker-colour button, data-color="blue|red|
+                                 green|black"; aria-pressed marks the pick
+    .tool                       tool button (sticky / eraser / clean);
+                                 aria-pressed="true" = active
+  - .board                    the whiteboard surface (faint ghost smudges)
+    .board-title                scribbled h1 + svg.underline + .hint line
+  - .map-frame                taped map holder; .frame-border is the svg for
+                               the wobbly border, .tape .tape-l/.tape-r the
+                               tape strips; holds #map (demo defines it)
+  - .notes                    sticky-note layer (strip on phones)
+    .note                       one sticky; .yellow .pink .mint .blue colour,
+                                 --tilt custom property, .dragging,
+                                 .selected; inner .note-title / .note-text
+  - svg.arrows                full-board arrow overlay; path.arrow
+  - .sketch-mark              INNER child of a mapboxgl.Marker element --
+                               .mk-ring (rough circle svg), .mk-scribble
+                               (extra scribble drawn on .active), .mk-label;
+                               .pulse = tap ping. Never style the marker root.
+  - .closed-tag               inner child of a Marker: red "street closed"
+                               scrawl
+  - .status-note (+.loading/  small handwritten status line
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --board: #FBFCFD;
+  --ink: #1F2328;
+  --ink-soft: #5B636B;
+  --blue: #2459D9;
+  --red: #D93A2B;
+  --green: #1E9E5A;
+  --sticky-yellow: #FFE873;
+  --sticky-pink: #FFB4C8;
+  --sticky-mint: #B8F0D6;
+  --sticky-blue: #BFDDFF;
+  --tray: #EEF1F4;
+  --tray-edge: #CDD3D9;
+  --success: #1E9E5A;
+  --error: #D93A2B;
+
+  --font-marker: 'Architects Daughter', 'Comic Sans MS', 'Segoe Print', cursive;
+  --font-sticky: 'Short Stack', 'Comic Sans MS', 'Segoe Print', cursive;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--board);
+  color: var(--ink);
+  font-family: var(--font-marker);
+}
+
+button { font-family: inherit; color: inherit; }
+
+:focus-visible { outline: 2px dashed var(--blue); outline-offset: 2px; }
+
+.app {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  height: 100dvh;
+}
+
+/* ---------- tool tray ---------- */
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 8px;
+  background: var(--tray);
+  border-right: 3px solid var(--tray-edge);
+  box-shadow: 4px 0 10px rgba(31, 35, 40, 0.08);
+  z-index: 5;
+  overflow-y: auto;
+}
+
+.tool-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-title {
+  font-size: 11px;
+  color: var(--ink-soft);
+  letter-spacing: 0.04em;
+}
+
+.swatch {
+  width: 40px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid var(--ink);
+  border-radius: 4px 11px 11px 4px;
+  background: var(--sw, var(--ink));
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.12s ease;
+}
+
+.swatch[data-color="blue"] { --sw: var(--blue); }
+.swatch[data-color="red"] { --sw: var(--red); }
+.swatch[data-color="green"] { --sw: var(--green); }
+.swatch[data-color="black"] { --sw: var(--ink); }
+
+.swatch::after {
+  content: '';
+  position: absolute;
+  right: 5px;
+  top: 3px;
+  width: 8px;
+  height: 12px;
+  background: #fff;
+  opacity: 0.85;
+  border-radius: 2px;
+}
+
+.swatch[aria-pressed="true"] { transform: translateX(8px) scale(1.08); }
+
+.tool {
+  width: 62px;
+  padding: 8px 4px 6px;
+  background: #fff;
+  border: 2px solid var(--ink);
+  border-radius: 10px 6px 12px 7px;
+  font-size: 12px;
+  line-height: 1.1;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 2px 3px 0 rgba(31, 35, 40, 0.25);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+.tool svg { display: block; margin: 0 auto 4px; }
+.tool:hover { transform: translateY(-1px) rotate(-1deg); }
+
+.tool[aria-pressed="true"] {
+  background: var(--sticky-yellow);
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  transform: translate(2px, 3px);
+}
+
+/* ---------- board ---------- */
+.board {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  background-color: var(--board);
+  /* faint marker ghosting: smears left behind by an old eraser */
+  background-image:
+    radial-gradient(ellipse 260px 40px at 18% 22%, rgba(31, 35, 40, 0.035), transparent 70%),
+    radial-gradient(ellipse 320px 50px at 78% 70%, rgba(36, 89, 217, 0.04), transparent 70%),
+    radial-gradient(ellipse 200px 36px at 60% 12%, rgba(217, 58, 43, 0.035), transparent 70%),
+    radial-gradient(ellipse 280px 44px at 30% 88%, rgba(30, 158, 90, 0.035), transparent 70%),
+    radial-gradient(ellipse 160px 90px at 92% 30%, rgba(31, 35, 40, 0.03), transparent 70%);
+}
+
+.board-title {
+  position: absolute;
+  top: 12px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.board-title h1 {
+  display: inline-block;
+  margin: 0;
+  font-weight: 400;
+  font-size: clamp(22px, 2.7vw, 38px);
+  line-height: 1.1;
+  color: var(--ink);
+  transform: rotate(-1deg);
+}
+
+.board-title .underline {
+  display: block;
+  margin: -2px auto 0;
+  width: min(520px, 70%);
+  height: 14px;
+  overflow: visible;
+}
+
+.board-title .hint {
+  justify-content: center;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.map-frame {
+  position: absolute;
+  top: 84px;
+  bottom: 20px;
+  left: clamp(176px, 19vw, 300px);
+  right: clamp(176px, 19vw, 300px);
+  padding: 12px;
+  z-index: 1;
+}
+
+.map-frame > #map {
+  position: absolute;
+  inset: 12px;
+  background: #fff;
+}
+
+.frame-border {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 2;
+}
+
+.tape {
+  position: absolute;
+  top: -8px;
+  width: 78px;
+  height: 24px;
+  background: rgba(255, 232, 115, 0.72);
+  border-left: 2px dotted rgba(31, 35, 40, 0.18);
+  border-right: 2px dotted rgba(31, 35, 40, 0.18);
+  box-shadow: 0 1px 3px rgba(31, 35, 40, 0.18);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.tape-l { left: 18px; transform: rotate(-24deg); }
+.tape-r { right: 18px; transform: rotate(21deg); }
+
+/* ---------- sticky notes ---------- */
+.notes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.note {
+  --tilt: 0deg;
+  position: absolute;
+  width: 168px;
+  padding: 14px 12px 12px;
+  background: var(--sticky-yellow);
+  color: var(--ink);
+  transform: rotate(var(--tilt));
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow: 0 1px 2px rgba(31, 35, 40, 0.2);
+  transition: box-shadow 0.15s ease, scale 0.15s ease;
+  isolation: isolate;
+}
+
+.note.yellow { background: var(--sticky-yellow); }
+.note.pink { background: var(--sticky-pink); }
+.note.mint { background: var(--sticky-mint); }
+.note.blue { background: var(--sticky-blue); }
+
+/* curled-corner shadow: a skewed shadow-only strip under the bottom edge */
+.note::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 8%;
+  right: 8%;
+  bottom: 3px;
+  height: 28%;
+  box-shadow: 0 12px 10px rgba(31, 35, 40, 0.3);
+  transform: rotate(-2.5deg);
+}
+
+/* sticky strip at the top edge */
+.note::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.note-title {
+  display: block;
+  font-family: var(--font-marker);
+  font-size: 21px;
+  line-height: 1.05;
+  margin-bottom: 4px;
+}
+
+.note-text {
+  display: block;
+  font-family: var(--font-sticky);
+  font-size: 13px;
+  line-height: 1.35;
+  color: #3A3F45;
+  overflow-wrap: anywhere;
+}
+
+.note.dragging {
+  cursor: grabbing;
+  scale: 1.05;
+  z-index: 6;
+  box-shadow: 4px 10px 18px rgba(31, 35, 40, 0.2);
+}
+
+.note.selected { outline: 3px solid rgba(31, 35, 40, 0.55); outline-offset: 3px; }
+.eraser-on .note { cursor: not-allowed; }
+.eraser-on .note:hover { opacity: 0.55; }
+.sticky-on #map .mapboxgl-canvas { cursor: crosshair; }
+
+/* ---------- arrows overlay ---------- */
+svg.arrows {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+}
+
+path.arrow {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.95;
+}
+
+path.arrow.faint { stroke-width: 1.6; opacity: 0.5; }
+
+/* ---------- map annotations (inner children of Markers) ---------- */
+.sketch-mark {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  cursor: pointer;
+  --mk: var(--red);
+}
+
+.sketch-mark svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.sketch-mark .mk-ring path,
+.sketch-mark .mk-scribble path {
+  fill: none;
+  stroke: var(--mk);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sketch-mark .mk-fill { fill: rgba(255, 255, 255, 0.55); stroke: none; }
+
+.sketch-mark .mk-scribble path {
+  stroke-width: 3.5;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+}
+
+.sketch-mark.active .mk-scribble path {
+  opacity: 1;
+  animation: wb-scribble 0.9s ease-out forwards;
+}
+
+.sketch-mark.active { animation: wb-wiggle 0.5s ease-in-out 0.8s 2; }
+
+.sketch-mark.pulse::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border: 4px solid var(--mk);
+  border-radius: 50%;
+  animation: wb-ping 0.9s ease-out 2;
+  pointer-events: none;
+}
+
+.mk-label {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  translate: -50% 0;
+  white-space: nowrap;
+  font-family: var(--font-marker);
+  font-size: 15px;
+  color: var(--mk);
+  text-shadow: -1.5px 0 #fff, 1.5px 0 #fff, 0 -1.5px #fff, 0 1.5px #fff, 0 0 4px #fff;
+  pointer-events: none;
+}
+
+.closed-tag {
+  font-family: var(--font-marker);
+  font-size: 15px;
+  color: var(--red);
+  white-space: nowrap;
+  padding: 1px 6px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 2px solid var(--red);
+  border-radius: 6px 3px 7px 4px;
+  rotate: -33deg;
+  pointer-events: none;
+}
+
+@keyframes wb-scribble { to { stroke-dashoffset: 0; } }
+@keyframes wb-wiggle {
+  0%, 100% { rotate: 0deg; }
+  30% { rotate: -5deg; }
+  70% { rotate: 5deg; }
+}
+@keyframes wb-ping {
+  from { transform: scale(0.7); opacity: 1; }
+  to { transform: scale(1.7); opacity: 0; }
+}
+
+/* ---------- status note ---------- */
+.status-note {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.status-note .status-icon { flex: none; }
+.status-note.loading .status-icon { display: inline-block; animation: wb-spin 1s linear infinite; }
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); }
+
+@keyframes wb-spin { to { transform: rotate(360deg); } }
+
+.hidden { display: none !important; }
+
+/* ---------- phones ---------- */
+@media (max-width: 700px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .toolbar {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    border-right: 0;
+    border-bottom: 3px solid var(--tray-edge);
+    box-shadow: 0 4px 10px rgba(31, 35, 40, 0.08);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .tool-group { flex-direction: row; flex: none; gap: 8px; }
+  .tool-title { display: none; }
+  .swatch { width: 30px; height: 18px; }
+  .swatch[aria-pressed="true"] { transform: translateY(-3px) scale(1.08); }
+  .swatch::after { right: 3px; top: 2px; width: 6px; height: 10px; }
+
+  .tool {
+    width: auto;
+    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .tool svg { margin: 0; width: 20px; height: 20px; }
+  .tool-name { display: none; }
+
+  .board {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 62dvh minmax(0, 1fr);
+  }
+
+  .board-title { position: static; padding: 8px 16px 0; }
+  .board-title h1 { font-size: 21px; }
+  .board-title .underline { height: 10px; margin-top: -4px; }
+  .board-title .hint { display: none; }
+
+  .map-frame {
+    position: relative;
+    top: auto; bottom: auto; left: auto; right: auto;
+    margin: 4px 16px 0;
+    min-height: 0;
+  }
+
+  .notes {
+    position: static;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 16px 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    pointer-events: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .note {
+    position: relative;
+    left: auto !important;
+    top: auto !important;
+    flex: none;
+    width: 148px;
+    scroll-snap-align: start;
+    cursor: pointer;
+    touch-action: pan-x;
+  }
+
+  .note-title { font-size: 19px; }
+
+  svg.arrows { display: none; }
+  .tape { width: 56px; height: 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sketch-mark.active .mk-scribble path { animation: none; stroke-dashoffset: 0; }
+  .sketch-mark.active, .sketch-mark.pulse::before { animation: none; }
+  .note, .swatch, .tool { transition: none; }
+}

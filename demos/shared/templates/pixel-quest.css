@@ -1,0 +1,807 @@
+/*
+  Pixel Quest -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a 16-bit fantasy RPG overworld -- a
+  limited navy / royal blue / grass / sand / parchment palette, crisp
+  stepped pixel borders, a party status window, a quest log, and a dialog
+  box with a blinking down-arrow over a flat recoloured map), deliberately
+  distinct from every other pack in this folder: Academic Paper is a
+  journal-article layout, Aero Gadgets is glossy early-2000s skeuomorphism,
+  Amber Terminal is a phosphor CRT, Arena is a dark stadium scoreboard,
+  Aurora Command is a gradient-glow control room, Blueprint is white-on-
+  blue drafting lines, Board Game is a tabletop with cards and tokens,
+  Bottom Sheet is a native-style draggable sheet, Broadcast is a TV news
+  lower-third, Case Board is a pinboard with string, Celestial Tarot is
+  gilded cards and star charts, Chat Concierge is a messaging thread,
+  Chronicle is a long-form timeline, Clinic Finder is a calm healthcare
+  locator, Comic Panel is halftone panels and speech balloons, Data
+  Notebook is a computational notebook, Deco Voyage is gold-on-black Art
+  Deco, Drop Culture is streetwear hype, E-Ink is a monochrome reader,
+  Editorial Paper is warm paper and serif headlines, Estate Luxe is
+  refined real-estate listings, Event Invite is a festive invitation, Field
+  Journal is a naturalist's notebook, Fleet Ops is a dispatch dashboard,
+  Frontier Poster is wood-type wanted posters, Highway Sign is cream/green
+  road signage, Isotype is pictogram statistics, Line Diagram is a transit
+  schematic, Neon HUD is glowing sci-fi overlays, Pastel Bento is soft
+  rounded tiles, Postcards is stamped travel cards, Raw Web is unstyled
+  brutalist HTML, Retro OS is a desktop-window UI, Riso Zine is two-colour
+  misregistered print, Ski Piste is a trail-grade board, Slate Console is a
+  cool-grey ops console, Split Flap is a departures board, Sticker Book is
+  die-cut stickers, Storefront is a light retail locator, Story Scroll is
+  a scrolling narrative, Swiss Grid is white/black/red typography, Tarmac
+  Glass is dark blur-glass + amber, Thermal Receipt is a till-roll printout,
+  Trailhead is rugged olive and orange outdoor gear, Vapor Sunset is
+  gradient synthwave, Vintage Chart is navy/parchment/brass, Washi Seasons
+  is quiet Japanese paper, and Weather Console is a dense forecast
+  dashboard.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/pixel-quest.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Press Start 2P for headings, HP/XP
+  labels and buttons -- it is wide, use it sparingly; Handjet for dialog
+  text and lists):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Handjet:wght@400;600&display=swap" rel="stylesheet" />
+
+  Signature touch: every window and button has NOTCHED pixel corners made
+  of stepped box-shadows (a 4px cross of parchment around a navy body with
+  a royal-blue inner ring), segmented HP/MP/XP bars, a stepped-pyramid
+  blinking "down arrow" in the dialog box, and a pixel-art hero sprite
+  drawn on a tiny canvas and scaled with image-rendering: pixelated.
+
+  Layout: .app is the full-viewport stage; #map is full-bleed behind
+  absolutely-positioned HUD windows: .status-win (top-left), .quest-log
+  (right; on phones a toggle button opens it), .dialog (bottom-centre,
+  lifted 48px so the Mapbox logo and attribution stay clear) and the
+  transient .banner. Windows draw their notched border OUTSIDE their box
+  (box-shadow), so keep a 4px+ margin from the viewport edge.
+
+  Class/id contract (see pixel-quest-template.html in this same folder
+  for a full working example):
+
+  - .app                      full-viewport stage, never scrolls
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .win                      notched pixel window (add to any panel)
+  - .status-win               top-left party status window
+    .hero-row                   portrait canvas (.portrait) + .hero-name
+                                 + .hero-lv chip (+ .hero-class)
+    .bar-row (+.hp/.mp/.xp)     .bar-label + .bar > i (fill, width %)
+                                 + .bar-val; add data-opt to hide on phones
+    .gold-row                   gold coin + .gold-val
+  - .quest-toggle             phone-only button that opens the quest log
+                               (.btn); hidden on wider screens
+  - .quest-log (+.open)       right-side window; on phones hidden until
+                               .open is added
+    .ql-head                    title (.ql-title) + count (.ql-count)
+    .quest-list > li > .quest   quest button; .q-box (checkbox), .q-title;
+                                 states .done, .active
+    .ql-hint                    small keyboard hint
+  - .dialog                   bottom-centre dialog box
+    .dlg-name                   speaker name tab
+    .dlg-text                   typewriter text (the dialog is the live region)
+    .dlg-next                   blinking stepped down-arrow; add .hidden
+                                 while typing
+  - .banner (+.show)          "QUEST COMPLETE!" banner (.banner-title,
+                               .banner-sub); toggled with .hidden
+  - .btn, .btn-small          gold pixel button (notched, bevelled)
+  - .hero                     inner child of the hero's mapboxgl.Marker
+                               (canvas .hero-cv + .hero-shadow); .walking,
+                               .left modifiers. Never style the marker root.
+  - .qm                       inner child of a quest-point Marker:
+                               .qm-name, .qm-bubble (+.done), .qm-stem;
+                               .active modifier; .qm-name shows only on
+                               hover/focus/.active
+  - .px                       image-rendering: pixelated utility
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --navy: #1B1F3B;
+  --blue: #3A5BA0;
+  --grass: #5BB04B;
+  --forest: #2E6B3A;
+  --sand: #E8C170;
+  --grey: #8B8C99;
+  --parch: #F4E4BC;
+  --red: #D8434B;
+  --gold: #F2C14E;
+  --ink: rgba(10, 12, 28, 0.5);
+  --success: #5BB04B;
+  --error: #D8434B;
+
+  --font-heading: 'Press Start 2P', 'Courier New', monospace;
+  --font-body: 'Handjet', 'Courier New', monospace;
+  --font-label: var(--font-heading);
+
+  /* Pixel check mark (7x5 grid), navy. */
+  --check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 5' shape-rendering='crispEdges'%3E%3Cg fill='%231B1F3B'%3E%3Crect x='6' y='0' width='1' height='1'/%3E%3Crect x='5' y='1' width='1' height='1'/%3E%3Crect x='0' y='2' width='1' height='1'/%3E%3Crect x='4' y='2' width='1' height='1'/%3E%3Crect x='1' y='3' width='1' height='1'/%3E%3Crect x='3' y='3' width='1' height='1'/%3E%3Crect x='2' y='4' width='1' height='1'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--navy);
+  color: var(--parch);
+  font-family: var(--font-body);
+  font-weight: 600;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 4px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.px {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.app {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* Notched pixel window: navy body, royal inner ring, parchment cross
+   outside (that makes the notched corners) and a hard drop shadow. */
+.win {
+  position: absolute;
+  z-index: 2;
+  background: var(--navy);
+  color: var(--parch);
+  box-shadow:
+    inset 0 0 0 4px var(--blue),
+    0 -4px 0 0 var(--parch),
+    0 4px 0 0 var(--parch),
+    -4px 0 0 0 var(--parch),
+    4px 0 0 0 var(--parch),
+    0 8px 0 0 var(--ink);
+}
+
+/* Party status window -- top left */
+.status-win {
+  top: 20px;
+  left: 20px;
+  width: 288px;
+  padding: 16px 16px 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 9px;
+}
+
+.hero-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.portrait {
+  flex: none;
+  width: 36px;
+  height: 42px;
+  background: var(--blue);
+  box-shadow: 0 0 0 3px var(--parch);
+  margin: 3px;
+  image-rendering: pixelated;
+}
+
+.hero-name {
+  font-family: var(--font-heading);
+  font-size: 13px;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+}
+
+.hero-class {
+  margin-top: 4px;
+  font-size: 19px;
+  line-height: 1;
+  color: var(--parch);
+}
+
+.hero-lv {
+  margin-left: auto;
+  flex: none;
+  padding: 4px 6px 3px;
+  background: var(--parch);
+  color: var(--navy);
+  font-family: var(--font-heading);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.hero-lv.flash {
+  animation: pq-flash 0.3s steps(2, jump-none) 6;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 58px;
+  align-items: center;
+  gap: 8px;
+}
+
+.bar-label {
+  font-family: var(--font-label);
+  font-size: 10px;
+  color: var(--parch);
+}
+
+.bar-val {
+  font-family: var(--font-label);
+  font-size: 9px;
+  text-align: right;
+  color: var(--parch);
+  white-space: nowrap;
+}
+
+/* Segmented bar: dark trough, coloured fill, 4px notches drawn on top. */
+.bar {
+  position: relative;
+  height: 14px;
+  background: #0E1128;
+  box-shadow: 0 0 0 2px var(--parch);
+  margin: 2px;
+}
+
+.bar i {
+  display: block;
+  height: 100%;
+  width: 50%;
+  background: var(--red);
+  transition: width 0.5s steps(8, end);
+}
+
+.bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 6px, #0E1128 6px 8px);
+  pointer-events: none;
+}
+
+.bar-row.mp .bar i {
+  background: #6C8FE0;
+}
+
+.bar-row.xp .bar i {
+  background: var(--gold);
+}
+
+.gold-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-label);
+  font-size: 12px;
+  color: var(--gold);
+}
+
+.gold-row::before {
+  content: '';
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background: var(--gold);
+  box-shadow: inset -3px -3px 0 0 #B88A1E, 0 0 0 2px var(--navy), 0 0 0 4px var(--gold);
+  margin: 4px 6px 4px 4px;
+}
+
+/* Gold pixel buttons -- notched cross in navy, bevelled body */
+.btn {
+  display: inline-block;
+  margin: 4px;
+  padding: 10px 14px 9px;
+  border: 0;
+  background: var(--gold);
+  color: var(--navy);
+  font-family: var(--font-label);
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  box-shadow:
+    inset 4px 4px 0 0 rgba(255, 255, 255, 0.4),
+    inset -4px -4px 0 0 rgba(0, 0, 0, 0.25),
+    0 -4px 0 0 var(--parch),
+    0 4px 0 0 var(--parch),
+    -4px 0 0 0 var(--parch),
+    4px 0 0 0 var(--parch);
+}
+
+.btn:hover {
+  background: var(--parch);
+}
+
+.btn:active {
+  transform: translateY(2px);
+}
+
+.btn-small {
+  padding: 7px 10px 6px;
+  font-size: 9px;
+}
+
+.quest-toggle {
+  position: absolute;
+  z-index: 3;
+  display: none;
+}
+
+/* Quest log -- right side */
+.quest-log {
+  top: 20px;
+  right: 20px;
+  width: 308px;
+  padding: 14px 14px 12px;
+  max-height: calc(100% - 240px);
+  overflow-y: auto;
+}
+
+.ql-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 2px 4px 10px;
+}
+
+.ql-title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+}
+
+.ql-count {
+  font-family: var(--font-label);
+  font-size: 10px;
+  color: var(--parch);
+}
+
+.quest-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+
+.quest {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--parch);
+  font-size: 23px;
+  line-height: 1;
+  text-align: left;
+  cursor: pointer;
+}
+
+.quest:hover {
+  background: var(--blue);
+}
+
+.q-box {
+  position: relative;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  background: var(--navy);
+  box-shadow: 0 0 0 3px var(--parch);
+  margin: 3px;
+}
+
+.q-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.quest.done {
+  color: var(--grey);
+}
+
+.quest.done .q-title {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+
+.quest.done .q-box,
+.qm-bubble.done {
+  background-color: var(--grass);
+}
+
+.quest.done .q-box::after,
+.qm-bubble.done::after {
+  content: '';
+  position: absolute;
+  inset: 4px 2px;
+  background: var(--check) center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+}
+
+.quest.active {
+  background: var(--gold);
+  color: var(--navy);
+}
+
+.quest.active .q-box {
+  box-shadow: 0 0 0 3px var(--navy);
+  animation: pq-flash 0.5s steps(2, jump-none) infinite;
+}
+
+.ql-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ql-hint {
+  margin: 0 4px;
+  font-size: 18px;
+  line-height: 1.1;
+  color: var(--grey);
+}
+
+/* Dialog box -- bottom centre, lifted so the logo/attribution stay clear */
+.dialog {
+  left: 0;
+  right: 0;
+  bottom: 48px;
+  margin: 0 auto;
+  width: min(620px, calc(100% - 40px));
+  padding: 22px 24px 18px;
+  cursor: pointer;
+}
+
+.dlg-name {
+  position: absolute;
+  top: -22px;
+  left: 20px;
+  padding: 6px 10px 5px;
+  background: var(--gold);
+  color: var(--navy);
+  font-family: var(--font-heading);
+  font-size: 10px;
+  line-height: 1.2;
+  box-shadow: 0 -4px 0 0 var(--parch), -4px 0 0 0 var(--parch), 4px 0 0 0 var(--parch);
+}
+
+.dlg-text {
+  margin: 0;
+  min-height: 3.75em;
+  font-size: 25px;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  color: var(--parch);
+}
+
+.dlg-next {
+  position: absolute;
+  right: 22px;
+  bottom: 14px;
+  width: 20px;
+  height: 12px;
+  background: var(--gold);
+  clip-path: polygon(0 0, 100% 0, 100% 34%, 80% 34%, 80% 67%, 60% 67%, 60% 100%, 40% 100%, 40% 67%, 20% 67%, 20% 34%, 0 34%);
+  animation: pq-flash 0.8s steps(1, end) infinite;
+}
+
+/* Quest-complete banner */
+.banner {
+  position: absolute;
+  z-index: 4;
+  top: 22%;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  width: max-content;
+  max-width: calc(100% - 48px);
+  padding: 18px 26px 16px;
+  text-align: center;
+  background: var(--gold);
+  color: var(--navy);
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 4px var(--parch),
+    0 -4px 0 0 var(--navy),
+    0 4px 0 0 var(--navy),
+    -4px 0 0 0 var(--navy),
+    4px 0 0 0 var(--navy),
+    0 8px 0 0 var(--ink);
+}
+
+.banner.show {
+  animation: pq-pop 0.5s steps(5, end);
+}
+
+.banner-title {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  line-height: 1.35;
+  letter-spacing: 0.03em;
+}
+
+.banner-sub {
+  margin-top: 8px;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--navy);
+}
+
+/* Hero sprite -- inner child of a Marker (anchor 'bottom') */
+.hero {
+  position: relative;
+  width: 36px;
+  height: 46px;
+  pointer-events: none;
+}
+
+.hero-cv {
+  display: block;
+  width: 36px;
+  height: 42px;
+  image-rendering: pixelated;
+  animation: pq-bob 0.9s steps(1, end) infinite;
+}
+
+.hero.walking .hero-cv {
+  animation: none;
+}
+
+.hero.left .hero-cv {
+  transform: scaleX(-1);
+}
+
+.hero-shadow {
+  position: absolute;
+  left: 4px;
+  bottom: 0;
+  width: 28px;
+  height: 6px;
+  background: var(--ink);
+  clip-path: polygon(15% 0, 85% 0, 85% 34%, 100% 34%, 100% 67%, 85% 67%, 85% 100%, 15% 100%, 15% 67%, 0 67%, 0 34%, 15% 34%);
+}
+
+/* Quest point marker -- inner child of a Marker (anchor 'bottom') */
+.qm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+
+.qm-name {
+  display: none;
+  margin-bottom: 6px;
+  padding: 2px 7px 1px;
+  background: var(--navy);
+  color: var(--parch);
+  font-size: 19px;
+  line-height: 1.1;
+  white-space: nowrap;
+  box-shadow: 0 0 0 2px var(--parch);
+}
+
+.qm:hover .qm-name,
+.qm:focus-visible .qm-name,
+.qm.active .qm-name {
+  display: block;
+}
+
+.qm-bubble {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: var(--gold);
+  color: var(--navy);
+  font-family: var(--font-heading);
+  font-size: 12px;
+  line-height: 1;
+  box-shadow:
+    inset -3px -3px 0 0 rgba(0, 0, 0, 0.22),
+    0 -3px 0 0 var(--navy),
+    0 3px 0 0 var(--navy),
+    -3px 0 0 0 var(--navy),
+    3px 0 0 0 var(--navy);
+  animation: pq-bob 1s steps(1, end) infinite;
+}
+
+.qm-bubble.done {
+  animation: none;
+}
+
+.qm-bubble.done {
+  color: transparent;
+}
+
+.qm.active .qm-bubble {
+  background: var(--parch);
+}
+
+.qm-stem {
+  display: block;
+  width: 6px;
+  height: 10px;
+  margin-top: 3px;
+  background: var(--navy);
+  box-shadow: 0 0 0 0 var(--navy);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Map chrome re-skinned to match */
+.mapboxgl-ctrl-group {
+  border-radius: 0 !important;
+  background: var(--navy) !important;
+  box-shadow: 0 0 0 3px var(--parch) !important;
+}
+
+/* A raster-dem (terrain) source makes GL JS hide the Mapbox logo (the DEM
+   TileJSON has mapbox_logo:false). Force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+@keyframes pq-flash {
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes pq-bob {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes pq-pop {
+  0% { transform: translateY(-28px); opacity: 0; }
+  60% { transform: translateY(6px); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@media (max-width: 640px) {
+  /* Status collapses to one compact row across the top */
+  .status-win {
+    top: 14px;
+    left: 20px;
+    right: 20px;
+    width: auto;
+    padding: 9px 12px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .portrait,
+  .hero-class,
+  .bar-row[data-opt],
+  .bar-row .bar-val,
+  .bar-row .bar-label {
+    display: none;
+  }
+
+  .bar-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hero-row {
+    gap: 8px;
+  }
+
+  .hero-name {
+    font-size: 11px;
+  }
+
+  .hero-lv {
+    margin-left: 0;
+    font-size: 9px;
+  }
+
+  .gold-row {
+    font-size: 10px;
+    gap: 4px;
+  }
+
+  .gold-row::before {
+    margin: 2px 4px;
+  }
+
+  .quest-toggle {
+    display: inline-block;
+    top: 74px;
+    right: 16px;
+  }
+
+  .quest-log {
+    display: none;
+    top: 126px;
+    left: 20px;
+    right: 20px;
+    width: auto;
+    max-height: calc(100% - 340px);
+    z-index: 5;
+  }
+
+  .quest-log.open {
+    display: block;
+  }
+
+  .quest {
+    font-size: 22px;
+  }
+
+  .dialog {
+    width: calc(100% - 40px);
+    padding: 20px 16px 16px;
+  }
+
+  .dlg-text {
+    min-height: 5em;
+    font-size: 22px;
+  }
+
+  .banner {
+    top: 30%;
+    padding: 14px 16px 12px;
+  }
+
+  .banner-title {
+    font-size: 13px;
+  }
+
+  .banner-sub {
+    font-size: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-cv,
+  .qm-bubble,
+  .dlg-next,
+  .hero-lv.flash,
+  .quest.active .q-box,
+  .banner.show {
+    animation: none;
+  }
+
+  .bar i {
+    transition: none;
+  }
+}

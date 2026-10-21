@@ -1,0 +1,592 @@
+/*
+  Constructivist -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: 1920s avant-garde poster language used
+  purely as a graphic style -- signal red, black and cream paper, hard
+  diagonals, big circles and wedges, heavy rules, zero rounded corners and
+  zero shadows), deliberately distinct from every other style pack in this
+  folder: Academic Paper, Aero Gadgets, Amber Terminal, Arena, Aurora
+  Command, Blueprint, Board Game, Bottom Sheet, Broadcast, Case Board,
+  Celestial Tarot, Chat Concierge, Chronicle, Clinic Finder, Comic Panel,
+  Data Notebook, Deco Voyage, Drop Culture, E-Ink, Editorial Paper, Estate
+  Luxe, Event Invite, Field Journal, Fleet Ops, Frontier Poster, Highway
+  Sign, Isotype, Line Diagram, Neon HUD, Pastel Bento, Postcards, Raw Web,
+  Retro OS, Riso Zine, Ski Piste, Slate Console, Split Flap, Sticker Book,
+  Storefront, Story Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt,
+  Trailhead, Vapor Sunset, Vintage Chart, Washi Seasons and Weather
+  Console.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/constructivist.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Unbounded for the poster headline,
+  numerals and labels; Golos Text for body copy):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;900&family=Golos+Text:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  Signature touch: a DIAGONAL POSTER COMPOSITION -- a red band cut across
+  the top-left with clip-path, a giant stacked headline, a black circle
+  holding the figures, and a map set in a tilted-looking frame (two
+  rotated red/black blocks sit BEHIND the frame; the map canvas itself is
+  never rotated, so its Mapbox logo and attribution stay in plain view).
+
+  Layout: .poster is a three-column grid on desktop (.poster-left |
+  .map-frame | .poster-right), 100dvh, never scrolls. On phones (<= 760px)
+  it becomes a stacked vertical poster that scrolls: headline, disc, map
+  (~50dvh), toggle, tickets. Everything decorative is aria-hidden and
+  pointer-events:none.
+
+  Class/id contract (see constructivist-template.html in this same folder
+  for a full working example):
+
+  - .poster                   page root; clips the decorative shapes
+    .band, .band-2, .wedge      decorative diagonal shapes (aria-hidden)
+  - .poster-left              left column: .headline then .disc
+    .headline                   <h1> holding three <span>s (RIDE / THE /
+                                 CITY); .kicker is a small label above it
+  - .disc                     black circle holding the figures
+    .disc-title                 tiny uppercase label (NETWORK / ROUTE 03)
+    .disc-big                   huge number; .disc-unit is its unit label
+    .disc-row > .disc-stat      two small figures; .disc-stat b = value,
+                                 .disc-stat span = label
+  - .map-frame                column 2: .arrow-row on top, then #map; the
+                               rotated blocks are its ::before / ::after
+    .arrow-row > .arrow-label   wedge-shaped label that animates in; add
+                                 the .go class to (re)play the animation
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here, but
+                               .map-frame gives it a heavy black border)
+  - .poster-right             right column: .toggle, .ticket-list and a
+                               .status-note
+    .toggle > .toggle-btn       segmented two-way switch; aria-pressed
+    .ticket-list > .ticket      one button per item: .ticket-no (black
+                                 numeral block), .ticket-name,
+                                 .ticket-len, .ticket-bar > i (width set
+                                 inline); .ticket.is-active = selected
+  - .btn, .btn-primary        hard-edged buttons
+  - .status-note (+.loading/  a one-line ruled note with a square marker
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --red: #D7261E;
+  --red-deep: #A91A14;
+  --black: #111111;
+  --cream: #F2E8D5;
+  --cream-hi: #FAF4E6;
+  --cream-lo: #E6DAC1;
+  --grey: #8C8C8C;
+  --water: #CFCAC0;
+  --success: #111111;
+  --error: #D7261E;
+  --rule: 4px;
+
+  --font-display: 'Unbounded', 'Arial Black', 'Helvetica Neue', sans-serif;
+  --font-body: 'Golos Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-label: var(--font-display);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--cream);
+  color: var(--black);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+
+button { font-family: inherit; border-radius: 0; }
+
+:focus-visible {
+  outline: 3px solid var(--black);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------ poster */
+
+.poster {
+  position: relative;
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: clamp(300px, 29vw, 430px) minmax(0, 1fr) clamp(250px, 21vw, 310px);
+  gap: clamp(20px, 2.4vw, 40px);
+  padding: 22px clamp(18px, 2vw, 32px) 24px;
+  overflow: hidden;
+  background: var(--cream);
+}
+
+.poster > * { position: relative; z-index: 1; }
+.poster > .band,
+.poster > .band-2,
+.poster > .wedge { position: absolute; z-index: 0; pointer-events: none; }
+
+/* Red diagonal slash across the top-left */
+.band {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 300px;
+  background: var(--red);
+  clip-path: polygon(0 0, 66% 0, 36% 100%, 0 100%);
+}
+
+/* Black stripe riding the band's slanted edge */
+.band-2 {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 300px;
+  background: var(--black);
+  clip-path: polygon(66% 0, 69% 0, 39% 100%, 36% 100%);
+}
+
+/* Black wedge in the bottom-left corner */
+.wedge {
+  left: 0;
+  bottom: 0;
+  width: 220px;
+  height: 120px;
+  background: var(--black);
+  clip-path: polygon(0 0, 100% 100%, 0 100%);
+}
+
+/* ------------------------------------------------------------ left column */
+
+.poster-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.kicker {
+  display: inline-block;
+  margin: 0 0 10px;
+  padding: 5px 9px;
+  background: var(--black);
+  color: var(--cream);
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.headline {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: clamp(46px, min(6.1vw, 11.2vh), 100px);
+  line-height: 0.88;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: var(--cream);
+}
+
+.headline span { display: block; }
+.headline span:nth-child(2) {
+  padding-left: 0.9em;
+  color: var(--black);
+}
+.headline span:nth-child(3) { padding-left: 0.15em; }
+
+/* Big black circle with the figures */
+.disc {
+  container-type: size;
+  align-self: flex-start;
+  width: min(100%, 40vh, 340px);
+  aspect-ratio: 1;
+  margin-bottom: 8px;
+  border-radius: 50%;
+  background: var(--black);
+  color: var(--cream);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border: 0;
+  outline: 0 solid var(--red);
+  position: relative;
+  z-index: 2;
+}
+
+/* red ring, drawn outside the disc so the black stays a clean circle */
+.disc::before {
+  content: '';
+  position: absolute;
+  inset: -9px;
+  border-radius: 50%;
+  border: 5px solid var(--red);
+  pointer-events: none;
+}
+
+.disc-title {
+  font-family: var(--font-label);
+  font-size: 4.4cqw;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--red);
+  margin-bottom: 1cqw;
+}
+
+.disc-big {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 27cqw;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--cream);
+}
+
+.disc-unit {
+  font-family: var(--font-label);
+  font-size: 4cqw;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 4cqw;
+}
+
+.disc-row {
+  display: flex;
+  align-items: stretch;
+  border-top: 3px solid var(--red);
+  padding-top: 3cqw;
+  gap: 6cqw;
+}
+
+.disc-stat { min-width: 0; }
+.disc-stat + .disc-stat { border-left: 3px solid var(--red); padding-left: 6cqw; }
+
+.disc-stat b {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 9.5cqw;
+  line-height: 1.05;
+}
+
+.disc-stat span {
+  display: block;
+  font-size: 3.5cqw;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cream-lo);
+}
+
+/* ------------------------------------------------------------ map frame */
+
+.map-frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  margin: 8px 6px 0;
+}
+
+/* tilted decorative blocks BEHIND the frame; the map itself stays square */
+.map-frame::before,
+.map-frame::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.map-frame::before {
+  left: -14px;
+  right: -10px;
+  top: 34px;
+  bottom: -14px;
+  background: var(--red);
+  transform: rotate(-2.2deg);
+}
+
+.map-frame::after {
+  left: -8px;
+  right: -16px;
+  top: 44px;
+  bottom: -20px;
+  background: var(--black);
+  transform: rotate(1.6deg);
+}
+
+.arrow-row {
+  height: 44px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.arrow-label {
+  display: inline-block;
+  max-width: 100%;
+  padding: 9px 38px 9px 22px;
+  background: var(--black);
+  color: var(--cream);
+  font-family: var(--font-label);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 50%, calc(100% - 22px) 100%, 0 100%, 14px 50%);
+}
+
+.arrow-label em {
+  font-style: normal;
+  color: var(--red);
+  margin-right: 8px;
+}
+
+.arrow-label.go { animation: constructivist-arrow 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+@keyframes constructivist-arrow {
+  from { transform: translateX(-110%); }
+  to   { transform: translateX(0); }
+}
+
+.map-frame #map {
+  flex: 1;
+  min-height: 0;
+  border: 6px solid var(--black);
+  background: var(--water);
+}
+
+/* square controls inside the map */
+.map-frame .mapboxgl-ctrl-group {
+  border-radius: 0;
+  box-shadow: none;
+  border: 3px solid var(--black);
+  background: var(--cream);
+}
+.map-frame .mapboxgl-ctrl-group button { border-radius: 0 !important; }
+
+/* ------------------------------------------------------------ right column */
+
+.poster-right {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  padding-top: 4px;
+}
+
+.toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: var(--rule) solid var(--black);
+  background: var(--cream-hi);
+}
+
+.toggle-btn {
+  padding: 10px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--black);
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.toggle-btn + .toggle-btn { border-left: var(--rule) solid var(--black); }
+.toggle-btn[aria-pressed="true"] { background: var(--black); color: var(--cream); }
+.toggle-btn:not([aria-pressed="true"]):hover { background: var(--cream-lo); }
+
+.ticket-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+}
+
+.ticket {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  align-items: stretch;
+  padding: 0;
+  text-align: left;
+  border: 3px solid var(--black);
+  background: var(--cream-hi);
+  color: var(--black);
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.12s ease;
+}
+
+.ticket:hover { transform: translateX(-6px); }
+
+.ticket-no {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--black);
+  color: var(--cream);
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 18px;
+}
+
+.ticket-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px 6px 12px;
+  min-width: 0;
+  border-left: 3px dashed var(--black);
+}
+
+.ticket-name {
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.15;
+}
+
+.ticket-meta { display: flex; align-items: center; gap: 10px; }
+
+.ticket-len {
+  flex: none;
+  font-family: var(--font-label);
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.ticket-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--cream-lo);
+}
+.ticket-bar i { display: block; height: 100%; background: var(--black); }
+
+.ticket.is-active { background: var(--red); color: var(--cream-hi); transform: translateX(-10px); }
+.ticket.is-active .ticket-no { background: var(--cream); color: var(--red); }
+.ticket.is-active .ticket-body { border-left-color: var(--cream-hi); }
+.ticket.is-active .ticket-bar { background: var(--red-deep); }
+.ticket.is-active .ticket-bar i { background: var(--cream); }
+
+/* ------------------------------------------------------------ buttons / status */
+
+.btn {
+  display: inline-block;
+  padding: 10px 16px;
+  border: var(--rule) solid var(--black);
+  background: var(--cream-hi);
+  color: var(--black);
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.btn:hover { background: var(--black); color: var(--cream); }
+.btn-primary { background: var(--red); border-color: var(--red); color: var(--cream-hi); }
+.btn-primary:hover { background: var(--black); border-color: var(--black); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.status-note {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: var(--rule) solid var(--black);
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 500;
+}
+
+.status-note::before {
+  content: '';
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 3px;
+  background: var(--black);
+}
+.status-note.loading::before { background: var(--grey); animation: constructivist-blink 0.9s steps(2) infinite; }
+.status-note.success::before { background: var(--black); }
+.status-note.error { color: var(--error); }
+.status-note.error::before { background: var(--red); }
+
+@keyframes constructivist-blink { 50% { opacity: 0.2; } }
+
+.hidden { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .arrow-label.go,
+  .status-note.loading::before { animation: none; }
+  .ticket { transition: none; }
+}
+
+/* ------------------------------------------------------------ short desktops */
+
+@media (min-width: 761px) and (max-height: 700px) {
+  .ticket-name { font-size: 12px; }
+  .ticket-body { gap: 3px; }
+  .kicker { margin-bottom: 6px; }
+}
+
+/* ------------------------------------------------------------ phone: stacked poster */
+
+@media (max-width: 760px) {
+  html, body { overflow: auto; height: auto; }
+
+  .poster {
+    height: auto;
+    display: block;
+    padding: 16px 16px 72px; /* bottom room keeps the wedge clear of the last text */
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+
+  .band { height: 250px; clip-path: polygon(0 0, 100% 0, 62% 100%, 0 100%); }
+  .band-2 { height: 250px; clip-path: polygon(100% 0, 100% 3.5%, 63.5% 100%, 62% 100%); }
+  .wedge { width: 110px; height: 54px; }
+
+  .poster-left { gap: 0; }
+
+  .headline { font-size: clamp(48px, 17vw, 76px); }
+
+  .disc {
+    width: min(78vw, 280px);
+    margin: -18px 6px 26px auto;
+    align-self: flex-end;
+  }
+
+  .map-frame {
+    height: 50dvh;
+    min-height: 300px;
+    margin: 0 4px;
+  }
+
+  .arrow-label { font-size: 11px; padding-right: 32px; }
+
+  .poster-right { display: block; padding-top: 22px; }
+  .toggle { margin-bottom: 12px; }
+  .ticket-list { gap: 8px; }
+  .ticket { flex: none; min-height: 64px; }
+  .ticket.is-active { transform: none; box-shadow: none; border-left-width: 10px; }
+  .ticket:hover { transform: none; }
+  .status-note { margin-top: 14px; }
+}

@@ -1,0 +1,981 @@
+/*
+  Memphis -- a new style pack, not extracted from an existing demo (built
+  from a fresh design brief: 1980s Memphis-design maximalism -- black
+  squiggles, terrazzo confetti, zigzags, grid paper and half-circles over
+  clashing bubblegum / lemon / mint / cobalt / tomato, with CSS cylinders,
+  cones and triangles floating in the margins; a collage page where the map
+  is one big framed rectangle among tilted blocks and patterned cards),
+  deliberately distinct from every other pack in this folder:
+  Academic Paper is a journal article, Aero Gadgets is chrome 2000s
+  gadgetry, Amber Terminal is a phosphor CRT, Arena is a dark stadium
+  scoreboard, Aurora Command is a gradient-glow control room, Blueprint is
+  white-on-blue drafting lines, Board Game is a tabletop board, Bottom Sheet
+  is a mobile map sheet, Broadcast is a TV news lower-third, Case Board is a
+  pinned-evidence corkboard, Celestial Tarot is mystic card art, Chat
+  Concierge is a messaging thread, Chronicle is a newspaper front page,
+  Clinic Finder is calm healthcare UI, Comic Panel is inked comic frames,
+  Data Notebook is a literate-programming page, Deco Voyage is gold-on-black
+  Art Deco, Drop Culture is streetwear hype, E-Ink is greyscale e-paper,
+  Editorial Paper is warm paper and serif headlines, Estate Luxe is
+  understated property marketing, Event Invite is a party invitation, Field
+  Journal is a naturalist's notebook, Fleet Ops is a dispatch dashboard,
+  Frontier Poster is a wanted-poster woodcut, Highway Sign is cream/green
+  MUTCD signage, Isotype is pictogram statistics, Line Diagram is a transit
+  schematic, Neon HUD is glowing sci-fi overlays, Pastel Bento is soft
+  rounded tiles, Postcards is stamped travel mail, Raw Web is unstyled
+  brutalist HTML, Retro OS is a desktop-window UI, Riso Zine is two-colour
+  misregistered print, Ski Piste is a trail-map board, Slate Console is a
+  cool-grey ops console, Split Flap is an airport departures board, Sticker
+  Book is peel-off stickers, Storefront is a light retail locator, Story
+  Scroll is a scrolling narrative, Swiss Grid is white/black/red
+  typographic grid, Tarmac Glass is dark blur-glass + amber, Thermal Receipt
+  is a till slip, Trailhead is olive/orange outdoor gear, Vapor Sunset is
+  retro-synth gradients, Vintage Chart is navy/parchment/brass, Washi
+  Seasons is quiet Japanese paper and seasonal colour, and Weather Console
+  is a dense forecast dashboard.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/memphis.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Bungee for display type, Darker
+  Grotesque for body text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Darker+Grotesque:wght@500;600;700;800&display=swap" rel="stylesheet" />
+
+  Signature touch: pattern-filled geometry everywhere -- card headers,
+  the map's offset shadow, pills and popups use inline-SVG squiggle,
+  terrazzo, zigzag, grid-paper and half-circle tiles -- all with thick black
+  outlines and hard offset shadows in a contrasting palette colour.
+
+  Layout: .page is a scrolling 12-column collage grid -- tilted .title-block
+  and a .deco margin zone on top, .day-bar, the framed .map-wrap beside an
+  .aside, then a .cards grid. Decorative .shape elements live only in .deco
+  zones, never over the map. On phones everything stacks and the map is
+  50dvh. The map sits in its own box with its own bottom corners, so the
+  Mapbox logo and attribution are never covered.
+
+  Class/id contract (see memphis-template.html in this same folder for a
+  full working example):
+
+  - .page                     scrolling collage grid (12 columns)
+  - .title-block              tilted giant title; .title, .title-sub,
+                               .title-stamp (round sticker)
+  - .deco                     margin zone that holds absolutely placed
+                               .shape elements (.shape-cyl, .shape-cone,
+                               .shape-tri, .shape-half, .shape-ring,
+                               .shape-squig); .deco-top / .deco-aside
+  - .day-bar                  row holding .day-label, .pills and the route
+                               toggle .btn
+    .pills > .pill            chunky day buttons (aria-pressed="true" =
+                               selected); <small> holds the venue count
+  - .btn (+.btn-alt)          chunky button, aria-pressed for toggles
+  - .map-wrap                 framed map box (thick border, patterned
+                               offset shadow); holds #map
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .aside                    side column: .panel (white card), .legend >
+                               .legend-item (+ svg), .route-readout
+  - .cards > .card            venue card grid; .card.on = selected;
+                               .card-head (+ .pat-1 ... .pat-5 patterns)
+                               .card-type, .card-body, .card-name,
+                               .card-meta, .card-text, .card-days >
+                               .day-chip (.day-chip.on = the active day)
+  - .mk                       inner child of a mapboxgl.Marker element
+                               (geometric SVG; .on = selected; .routed shows
+                               the .mk-n order badge). Never style the
+                               marker root itself.
+  - .memphis-popup            className for mapboxgl.Popup; .pop-head
+                               (+ .pat-N), .pop-body, .pop-name, .pop-meta
+  - .status-note (+.loading/  small status line with a square icon
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --bubblegum: #FF8AC6;
+  --lemon: #FFE45C;
+  --mint: #6EE7C8;
+  --cobalt: #2F5BFF;
+  --tomato: #FF5A3C;
+  --black: #111111;
+  --white: #FFFFFF;
+  --cream: #FFF8E6;
+  --sky: #8FB0FF;
+  --success: #1FA67F;
+  --error: #D63A1F;
+
+  --font-display: 'Bungee', 'Arial Black', Impact, sans-serif;
+  --font-body: 'Darker Grotesque', 'Helvetica Neue', Arial, sans-serif;
+  --font-label: var(--font-display);
+
+  /* Pattern tiles (inline SVG data URIs); each is laid over a colour. */
+  --p-squiggle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='24' viewBox='0 0 40 24'%3E%3Cpath d='M0 12Q10 0 20 12T40 12' fill='none' stroke='%23111' stroke-width='3.5'/%3E%3C/svg%3E");
+  --p-terrazzo: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cpolygon points='8,10 20,6 18,18' fill='%232F5BFF'/%3E%3Ccircle cx='50' cy='14' r='4' fill='%23FF5A3C'/%3E%3Cpolygon points='64,40 76,44 68,54' fill='%23111'/%3E%3Cellipse cx='24' cy='46' rx='7' ry='4' fill='%236EE7C8' transform='rotate(-25 24 46)'/%3E%3Ccircle cx='46' cy='68' r='3' fill='%23111'/%3E%3Cpolygon points='8,66 18,62 16,74' fill='%23FF8AC6'/%3E%3Crect x='60' y='8' width='9' height='5' fill='%23111' transform='rotate(30 64 10)'/%3E%3C/svg%3E");
+  --p-zigzag: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='14' viewBox='0 0 24 14'%3E%3Cpath d='M0 11L6 3L12 11L18 3L24 11' fill='none' stroke='%23111' stroke-width='3'/%3E%3C/svg%3E");
+  --p-grid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath d='M20 0H0V20' fill='none' stroke='%232F5BFF' stroke-width='1.6'/%3E%3C/svg%3E");
+  --p-halves: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='20' viewBox='0 0 40 20'%3E%3Cpath d='M1 20a9 9 0 0 1 18 0z' fill='%23FF5A3C' stroke='%23111' stroke-width='2'/%3E%3Cpath d='M21 20a9 9 0 0 1 18 0z' fill='%232F5BFF' stroke='%23111' stroke-width='2'/%3E%3C/svg%3E");
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--cream);
+}
+
+html, body {
+  margin: 0;
+  color: var(--black);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 20px;
+  line-height: 1.15;
+  overflow-x: hidden;
+}
+
+/* Faint terrazzo confetti behind everything */
+body {
+  position: relative;
+  min-height: 100vh;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: var(--p-terrazzo);
+  background-size: 120px 120px;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 4px solid var(--cobalt);
+  outline-offset: 3px;
+}
+
+/* Collage grid */
+.page {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: 32px;
+  row-gap: 30px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 32px 40px 70px;
+}
+
+/* Tilted giant title block */
+.title-block {
+  position: relative;
+  grid-column: 1 / 10;
+  align-self: start;
+  margin: 8px 0 0 6px;
+  padding: 22px 28px 20px;
+  background-color: var(--lemon);
+  background-image: var(--p-zigzag);
+  background-size: 36px 21px;
+  background-position: 0 0;
+  border: 6px solid var(--black);
+  box-shadow: 14px 14px 0 var(--cobalt);
+  transform: rotate(-2deg);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(44px, 6.6vw, 98px);
+  line-height: 0.92;
+  text-transform: uppercase;
+  color: var(--black);
+  text-shadow: 5px 5px 0 var(--bubblegum);
+}
+
+.title em {
+  font-style: normal;
+  color: var(--white);
+  -webkit-text-stroke: 3px var(--black);
+  paint-order: stroke fill;
+  text-shadow: 5px 5px 0 var(--tomato);
+}
+
+.title-sub {
+  display: inline-block;
+  margin: 18px 0 0;
+  padding: 4px 12px;
+  background: var(--black);
+  color: var(--lemon);
+  font-family: var(--font-display);
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.title-stamp {
+  position: absolute;
+  right: -26px;
+  top: -34px;
+  display: grid;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+  border: 5px solid var(--black);
+  border-radius: 50%;
+  background: var(--mint);
+  box-shadow: 5px 5px 0 var(--black);
+  font-family: var(--font-display);
+  font-size: 16px;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  transform: rotate(14deg);
+}
+
+/* Margin zones for floating geometric primitives */
+.deco {
+  position: relative;
+  pointer-events: none;
+  min-height: 120px;
+}
+
+.deco-top {
+  grid-column: 10 / 13;
+  align-self: stretch;
+}
+
+.shape {
+  position: absolute;
+  display: block;
+  animation: memphis-bob 5s ease-in-out infinite alternate;
+}
+
+@keyframes memphis-bob {
+  from { translate: 0 0; }
+  to { translate: 0 -10px; }
+}
+
+.shape-cyl {
+  width: 62px;
+  height: 84px;
+  background: var(--cobalt);
+  border: 4px solid var(--black);
+  border-radius: 50% / 14%;
+  box-shadow: 6px 6px 0 var(--black);
+}
+
+.shape-cyl::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  top: -4px;
+  height: 26px;
+  background: var(--lemon);
+  border: 4px solid var(--black);
+  border-radius: 50%;
+}
+
+.shape-tri,
+.shape-cone {
+  background: var(--black);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.shape-tri {
+  width: 84px;
+  height: 74px;
+}
+
+.shape-tri::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--tomato);
+  clip-path: polygon(50% 16%, 86% 90%, 14% 90%);
+}
+
+.shape-cone {
+  width: 56px;
+  height: 100px;
+}
+
+.shape-cone::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(180deg, var(--mint) 0 12px, var(--white) 12px 24px);
+  clip-path: polygon(50% 7%, 84% 93%, 16% 93%);
+}
+
+.shape-half {
+  width: 96px;
+  height: 48px;
+  background-color: var(--bubblegum);
+  background-image: var(--p-squiggle);
+  background-size: 32px 19px;
+  border: 5px solid var(--black);
+  border-bottom-width: 5px;
+  border-radius: 96px 96px 0 0;
+  box-shadow: 5px 5px 0 var(--black);
+}
+
+.shape-ring {
+  width: 72px;
+  height: 72px;
+  border: 14px solid var(--lemon);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px var(--black), inset 0 0 0 4px var(--black);
+}
+
+.shape-squig {
+  width: 130px;
+  height: 30px;
+  background-image: var(--p-squiggle);
+  background-size: 52px 31px;
+  background-repeat: repeat-x;
+}
+
+/* Day bar: label, chunky pills, route toggle */
+.day-bar {
+  grid-column: 1 / 13;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 14px;
+}
+
+.day-label {
+  margin-right: 4px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  text-transform: uppercase;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pill,
+.btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 20px 8px;
+  border: 4px solid var(--black);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--black);
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 5px 5px 0 var(--black);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.pill small {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  border: 3px solid var(--black);
+  border-radius: 50%;
+  background: var(--white);
+  color: var(--black);
+  font-size: 11px;
+}
+
+.pill:nth-child(5n+1) { background: var(--bubblegum); }
+.pill:nth-child(5n+2) { background: var(--mint); }
+.pill:nth-child(5n+3) { background: var(--lemon); }
+.pill:nth-child(5n+4) { background: var(--sky); }
+.pill:nth-child(5n+5) { background: var(--tomato); }
+
+.pill:hover,
+.btn:hover {
+  transform: translate(-2px, -2px) rotate(-1.5deg);
+  box-shadow: 7px 7px 0 var(--black);
+}
+
+.pill:active,
+.btn:active {
+  transform: translate(4px, 4px);
+  box-shadow: 1px 1px 0 var(--black);
+}
+
+.pill[aria-pressed="true"] {
+  background: var(--black);
+  color: var(--lemon);
+  box-shadow: 5px 5px 0 var(--tomato);
+}
+
+.btn {
+  margin-left: auto;
+  background: var(--cobalt);
+  color: var(--white);
+}
+
+.btn[aria-pressed="true"] {
+  background: var(--tomato);
+  color: var(--black);
+  box-shadow: 5px 5px 0 var(--black);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Framed map: thick black border + pattern-filled offset shadow */
+.map-wrap {
+  position: relative;
+  grid-column: 1 / 9;
+  height: 640px;
+  isolation: isolate;
+  border: 6px solid var(--black);
+  background: var(--sky);
+}
+
+.map-wrap::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  transform: translate(20px, 20px);
+  border: 6px solid var(--black);
+  background-color: var(--bubblegum);
+  background-image: var(--p-squiggle);
+  background-size: 40px 24px;
+}
+
+.aside {
+  grid-column: 9 / 13;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  min-width: 0;
+}
+
+.panel {
+  position: relative;
+  padding: 16px 18px 18px;
+  background: var(--white);
+  border: 5px solid var(--black);
+  box-shadow: 8px 8px 0 var(--mint);
+}
+
+.panel:nth-of-type(2) {
+  box-shadow: 8px 8px 0 var(--tomato);
+  transform: rotate(0.8deg);
+}
+
+.panel h2 {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 18px;
+  text-transform: uppercase;
+}
+
+.panel p {
+  margin: 0;
+  font-size: 21px;
+}
+
+.legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.legend-item svg {
+  flex: none;
+  width: 28px;
+  height: 28px;
+}
+
+.route-readout {
+  margin-top: 8px;
+  font-size: 21px;
+  font-weight: 800;
+}
+
+.aside .deco-aside {
+  flex: 1;
+  min-height: 150px;
+}
+
+/* Venue cards: scattered grid, tilted, patterned headers, coloured shadows */
+.cards {
+  grid-column: 1 / 13;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 34px 30px;
+  align-items: start;
+  margin-top: 14px;
+}
+
+.card {
+  position: relative;
+  background: var(--white);
+  border: 5px solid var(--black);
+  box-shadow: 9px 9px 0 var(--tomato);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card:nth-child(5n+2) { box-shadow: 9px 9px 0 var(--cobalt); }
+.card:nth-child(5n+3) { box-shadow: 9px 9px 0 var(--mint); }
+.card:nth-child(5n+4) { box-shadow: 9px 9px 0 var(--bubblegum); }
+.card:nth-child(5n+5) { box-shadow: 9px 9px 0 var(--lemon); }
+
+.card:nth-child(4n+1) { transform: rotate(-1.2deg); }
+.card:nth-child(4n+2) { transform: rotate(1deg); margin-top: 26px; }
+.card:nth-child(4n+3) { transform: rotate(-0.6deg); }
+.card:nth-child(4n+4) { transform: rotate(1.4deg); margin-top: 14px; }
+
+.card:hover,
+.card.on {
+  transform: rotate(0) translate(-3px, -3px);
+  box-shadow: 13px 13px 0 var(--black);
+}
+
+.card.on {
+  outline: 5px solid var(--cobalt);
+  outline-offset: 3px;
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 74px;
+  padding: 8px 10px;
+  border-bottom: 5px solid var(--black);
+  background-color: var(--bubblegum);
+}
+
+.card-head svg {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  filter: drop-shadow(3px 3px 0 var(--black));
+}
+
+.card-type {
+  padding: 3px 8px 2px;
+  background: var(--black);
+  color: var(--white);
+  font-family: var(--font-display);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.pat-1 { background-color: var(--bubblegum); background-image: var(--p-squiggle); background-size: 40px 24px; }
+.pat-2 { background-color: var(--lemon); background-image: var(--p-zigzag); background-size: 36px 21px; }
+.pat-3 { background-color: var(--white); background-image: var(--p-terrazzo); background-size: 80px 80px; }
+.pat-4 { background-color: var(--white); background-image: var(--p-grid); background-size: 20px 20px; }
+.pat-5 { background-color: var(--mint); background-image: var(--p-halves); background-size: 40px 20px; }
+
+.card-body {
+  padding: 12px 14px 14px;
+}
+
+.card-name {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 19px;
+  line-height: 1.05;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.card-meta {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--cobalt);
+}
+
+.card-text {
+  margin: 0 0 10px;
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.card-days,
+.pop-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.day-chip {
+  padding: 2px 6px 1px;
+  border: 2px solid var(--black);
+  border-radius: 999px;
+  background: var(--white);
+  font-family: var(--font-display);
+  font-size: 10px;
+}
+
+.day-chip.on {
+  background: var(--black);
+  color: var(--lemon);
+}
+
+/* Markers: inner child of a mapboxgl.Marker root -- never style the root */
+.mk {
+  position: relative;
+  display: block;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+  filter: drop-shadow(2px 2px 0 var(--black));
+  transition: transform 0.15s ease;
+}
+
+.mk svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.mk:hover,
+.mk.on {
+  transform: scale(1.3);
+}
+
+.mk-n {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  display: none;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 3px;
+  border: 2px solid var(--white);
+  border-radius: 50%;
+  background: var(--black);
+  color: var(--white);
+  font-family: var(--font-display);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.mk.routed .mk-n {
+  display: grid;
+}
+
+/* Popup */
+.memphis-popup .mapboxgl-popup-content {
+  padding: 0;
+  border: 5px solid var(--black);
+  border-radius: 0;
+  background: var(--white);
+  box-shadow: 8px 8px 0 var(--tomato);
+  font-family: var(--font-body);
+  color: var(--black);
+}
+
+.memphis-popup .mapboxgl-popup-tip {
+  border-top-color: var(--black);
+  border-bottom-color: var(--black);
+  border-left-color: var(--black);
+  border-right-color: var(--black);
+}
+
+.memphis-popup .mapboxgl-popup-close-button {
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--black);
+  border-radius: 50%;
+  background: var(--white);
+  color: var(--black);
+  font-family: var(--font-display);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.pop-head {
+  height: 46px;
+  border-bottom: 5px solid var(--black);
+  background-color: var(--bubblegum);
+}
+
+.pop-body {
+  padding: 10px 14px 14px;
+}
+
+.pop-name {
+  margin: 0 0 2px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 17px;
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+.pop-meta {
+  margin: 0 0 6px;
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--cobalt);
+}
+
+.pop-text {
+  margin: 0 0 8px;
+  font-size: 19px;
+  line-height: 1.1;
+}
+
+/* Status note */
+.status-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px 4px;
+  border: 4px solid var(--black);
+  border-radius: 999px;
+  background: var(--white);
+  font-family: var(--font-display);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.status-note::before {
+  content: '';
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 3px solid var(--black);
+  background: var(--mint);
+}
+
+.status-note.loading::before {
+  background: var(--lemon);
+  animation: memphis-blink 0.8s steps(2, jump-none) infinite;
+}
+
+.status-note.success::before {
+  background: var(--success);
+}
+
+.status-note.error {
+  color: var(--error);
+}
+
+.status-note.error::before {
+  background: var(--error);
+}
+
+@keyframes memphis-blink {
+  0% { transform: rotate(0); }
+  100% { transform: rotate(45deg); }
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Mapbox controls re-skinned to match */
+.mapboxgl-ctrl-group {
+  border: 3px solid var(--black);
+  border-radius: 0 !important;
+  background: var(--white) !important;
+  box-shadow: 4px 4px 0 var(--black) !important;
+}
+
+/* A raster-dem (terrain) source makes GL JS hide the Mapbox logo (the DEM
+   TileJSON has mapbox_logo:false). Force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+@media (max-width: 1100px) {
+  .page {
+    padding: 28px 24px 60px;
+    column-gap: 24px;
+  }
+
+  .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .map-wrap {
+    grid-column: 1 / 13;
+    height: 560px;
+  }
+
+  .aside {
+    grid-column: 1 / 13;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .aside .panel {
+    flex: 1 1 280px;
+  }
+
+  .aside .deco-aside {
+    display: none;
+  }
+
+  .title-block {
+    grid-column: 1 / 13;
+  }
+
+  .deco-top {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  html, body {
+    font-size: 19px;
+  }
+
+  .page {
+    row-gap: 24px;
+    padding: 20px 16px 50px;
+  }
+
+  .title-block {
+    margin: 14px 12px 0 0;
+    padding: 16px 16px 14px;
+    border-width: 5px;
+    box-shadow: 9px 9px 0 var(--cobalt);
+  }
+
+  .title {
+    font-size: clamp(36px, 12.5vw, 52px);
+    text-shadow: 3px 3px 0 var(--bubblegum);
+  }
+
+  .title em {
+    -webkit-text-stroke-width: 2px;
+    text-shadow: 3px 3px 0 var(--tomato);
+  }
+
+  .title-stamp {
+    right: -8px;
+    top: -30px;
+    width: 76px;
+    height: 76px;
+    border-width: 4px;
+    font-size: 12px;
+  }
+
+  .title-sub {
+    font-size: 11px;
+  }
+
+  .day-bar {
+    gap: 12px;
+  }
+
+  .day-label {
+    width: 100%;
+  }
+
+  .pills {
+    gap: 9px;
+  }
+
+  .pill,
+  .btn {
+    padding: 8px 12px 7px;
+    border-width: 3px;
+    font-size: 15px;
+    box-shadow: 4px 4px 0 var(--black);
+  }
+
+  .pill small {
+    display: none;
+  }
+
+  .btn {
+    margin-left: 0;
+  }
+
+  .map-wrap {
+    height: 50dvh;
+    min-height: 320px;
+    border-width: 5px;
+    margin-right: 14px;
+  }
+
+  .map-wrap::before {
+    transform: translate(12px, 12px);
+    border-width: 5px;
+  }
+
+  .aside {
+    flex-direction: column;
+    gap: 22px;
+    margin-right: 8px;
+  }
+
+  .aside .panel {
+    flex: none;
+  }
+
+  .cards {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    margin: 6px 8px 0 0;
+  }
+
+  .card:nth-child(n) {
+    margin-top: 0;
+  }
+
+  .card:nth-child(odd) { transform: rotate(-0.8deg); }
+  .card:nth-child(even) { transform: rotate(0.8deg); }
+
+  .card-name {
+    font-size: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shape,
+  .status-note.loading::before {
+    animation: none;
+  }
+
+  .pill,
+  .btn,
+  .card,
+  .mk {
+    transition: none;
+  }
+}

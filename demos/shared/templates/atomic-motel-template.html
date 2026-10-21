@@ -1,0 +1,375 @@
+<!--
+  Working EXAMPLE of the Atomic Motel style pack (atomic-motel.css, in this
+  same folder). Open this file directly to see the pattern working with a
+  road trip along old Route 66 in New Mexico (Albuquerque to Tucumcari) on
+  a Streets style recoloured into a sun-bleached 1950s road map. A tall
+  Googie roadside sign holds the current stop and the distance to the next
+  exit; click a postcard card or a starburst marker to fly to a stop and
+  watch the neon letters flicker on, or press "Hit the road" to drive a
+  little tail-finned car along the route with the sign updating at each
+  stop. Copy the markup below into your own demo and link atomic-motel.css
+  from its <head> -- see the class/id contract documented at the top of
+  that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (1950s Googie roadside Americana: turquoise, flamingo,
+  tangerine, cream, starbursts and neon) at the user's request for
+  something distinct from every other pack in this folder. The towns are
+  real and the route follows real roads (Mapbox Directions, driving,
+  simplified), but every motel, diner and sign name here is a fictional
+  placeholder -- swap in your own.
+
+  What's NOT included: live routing (the route is embedded), search,
+  popups, or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Atomic Motel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Righteous&family=Questrial&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="atomic-motel.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stage">
+    <div id="map"></div>
+
+    <aside class="sign" aria-live="polite">
+      <div class="sign-topper" id="topper"></div>
+      <div class="sign-board">
+        <p class="sign-brand">Atomic Motel &middot; Route 66</p>
+        <div class="vacancy" aria-hidden="true">VACANCY</div>
+        <span class="sign-type" id="sign-type">Motel</span>
+        <h1 class="sign-name" id="sign-name">Atomic Motel</h1>
+        <p class="sign-town" id="sign-town"></p>
+        <div class="sign-next">
+          <span class="exit-label">Next exit</span>
+          <b id="sign-miles">&mdash;</b>
+          <small id="sign-to"></small>
+        </div>
+      </div>
+      <div class="sign-post"></div>
+    </aside>
+  </div>
+
+  <section class="rack" aria-label="Stops along the road">
+    <div class="rack-head">
+      <span class="rack-title">Postcard rack<small>Albuquerque to Tucumcari, NM</small></span>
+      <button class="btn btn-road" id="road-btn">Hit the road</button>
+    </div>
+    <div class="cards" id="cards"></div>
+    <div class="odo">
+      <div class="odo-track"><div class="odo-fill" id="odo-fill"></div></div>
+      <span class="odo-text" id="odo-text">Mile 0 of 0</span>
+    </div>
+  </section>
+</div>
+
+<script>
+// Driving route [lng, lat], Albuquerque to Tucumcari (I-40 / historic 66).
+// Geometry: Mapbox Directions (driving), simplified.
+const ROUTE = [
+  [-106.65, 35.084], [-106.6363, 35.0825], [-106.629, 35.104], [-106.6153, 35.1073],
+  [-106.583, 35.103], [-106.4812, 35.063], [-106.4692, 35.063], [-106.4604, 35.0608],
+  [-106.4461, 35.0616], [-106.4241, 35.066], [-106.406, 35.0805], [-106.3868, 35.0815],
+  [-106.3727, 35.092], [-106.3678, 35.0986], [-106.3493, 35.1023], [-106.3294, 35.1145],
+  [-106.3233, 35.1151], [-106.307, 35.1096], [-106.2995, 35.1043], [-106.2839, 35.1009],
+  [-106.216, 35.0726], [-106.1681, 35.0549], [-106.086, 35.02], [-106.0449, 35.0073],
+  [-106.046, 35.0047], [-106.0434, 35.0047], [-106.0437, 34.9997], [-106.0434, 35.0048],
+  [-106.0457, 35.0051], [-106.0449, 35.0073], [-106.0398, 35.0078], [-106.0121, 35.0045],
+  [-105.9404, 35.0047], [-105.9233, 35.0067], [-105.7234, 35.0041], [-105.7061, 35.0105],
+  [-105.6635, 35.0073], [-105.7093, 35.0891], [-105.7148, 35.0814], [-105.7148, 35.0851],
+  [-105.7122, 35.0853], [-105.7093, 35.0891], [-105.6636, 35.0072], [-105.5542, 35.0018],
+  [-105.5417, 35.0056], [-105.5284, 35.0062], [-105.4942, 35.0044], [-105.4604, 34.9994],
+  [-104.8589, 34.9695], [-104.787, 34.9687], [-104.7399, 34.9631], [-104.6955, 34.9385],
+  [-104.6881, 34.9413], [-104.6844, 34.9375], [-104.6775, 34.9444], [-104.6662, 34.9433],
+  [-104.6367, 34.9492], [-104.516, 35.0066], [-104.4975, 35.0113], [-104.4658, 35.0112],
+  [-104.4448, 35.0156], [-104.3762, 35.0473], [-104.3367, 35.0521], [-104.2988, 35.0621],
+  [-104.228, 35.0697], [-104.1879, 35.0663], [-104.1769, 35.0669], [-104.0615, 35.0942],
+  [-104.0491, 35.0997], [-103.9521, 35.1254], [-103.941, 35.1256], [-103.8701, 35.1164],
+  [-103.8251, 35.1401], [-103.8004, 35.1467], [-103.781, 35.1494], [-103.7657, 35.1563],
+  [-103.744, 35.1517], [-103.725, 35.1509], [-103.725, 35.1717]
+];
+// Fictional businesses in real towns; coords are snapped onto the route.
+const STOPS = [
+  { name: 'Sunbeam Court Motel', type: 'Motel', town: 'Albuquerque', coord: [-106.65, 35.084], note: 'Pink doors, a pool shaped like a boomerang, and a neon sun out front.' },
+  { name: 'Rocket Rest Diner', type: 'Diner', town: 'Tijeras', coord: [-106.38, 35.08], note: 'Chrome stools and pie in the canyon pass.' },
+  { name: 'Pink Flamingo Lodge', type: 'Motel', town: 'Moriarty', coord: [-106.0443, 34.9993], note: 'Two dozen rooms and one very proud lawn flamingo.' },
+  { name: 'Dusty Boomerang Trading Post', type: 'Trading post', town: 'Clines Corners', coord: [-105.6717, 35.017], note: 'Souvenirs, snacks and a mile-high rack of postcards.' },
+  { name: 'Atomic Orbit Diner', type: 'Diner', town: 'Santa Rosa', coord: [-104.6825, 34.9387], note: 'Milkshakes under a ceiling of tiny orbiting planets.' },
+  { name: 'Sunburst Neon Sign', type: 'Neon sign', town: 'Newkirk', coord: [-104.27, 35.09], note: 'A restored roadside sign that still buzzes at dusk.' },
+  { name: 'Cactus Comet Cafe', type: 'Diner', town: 'Montoya', coord: [-104.03, 35.12], note: 'Green chile burgers and a view of the mesa.' },
+  { name: 'Mesa Moon Motor Lodge', type: 'Motel', town: 'Tucumcari', coord: [-103.725, 35.1717], note: 'Last stop: a glowing arrow sign and a cool turquoise pool.' },
+];
+
+const $ = (id) => document.getElementById(id);
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = () => window.matchMedia('(max-width: 640px)').matches;
+const KM_MI = 0.621371;
+
+/* ---- Geometry ---- */
+function hav(a, b) {
+  const R = 6371, rad = Math.PI / 180;
+  const dLat = (b[1] - a[1]) * rad, dLng = (b[0] - a[0]) * rad;
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * rad) * Math.cos(b[1] * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+const cum = [0];
+for (let i = 1; i < ROUTE.length; i++) cum.push(cum[i - 1] + hav(ROUTE[i - 1], ROUTE[i]));
+const TOTAL = cum[cum.length - 1];
+
+// Closest point on the route to a coordinate: { coord, d (km from start) }.
+function snap(c) {
+  const k = Math.cos(c[1] * Math.PI / 180);
+  let best = { dist: Infinity };
+  for (let i = 0; i < ROUTE.length - 1; i++) {
+    const a = ROUTE[i], b = ROUTE[i + 1];
+    const dx = (b[0] - a[0]) * k, dy = b[1] - a[1];
+    const len2 = dx * dx + dy * dy || 1e-12;
+    const t = Math.max(0, Math.min(1, (((c[0] - a[0]) * k) * dx + (c[1] - a[1]) * dy) / len2));
+    const p = [a[0] + (b[0] - a[0]) * t, a[1] + dy * t];
+    const dist = ((p[0] - c[0]) * k) ** 2 + (p[1] - c[1]) ** 2;
+    if (dist < best.dist) best = { dist, coord: p, d: cum[i] + (cum[i + 1] - cum[i]) * t };
+  }
+  return best;
+}
+
+function pointAt(d) {
+  let i = 0;
+  while (i < ROUTE.length - 2 && cum[i + 1] < d) i++;
+  const t = Math.min(1, Math.max(0, (d - cum[i]) / (cum[i + 1] - cum[i] || 1)));
+  const a = ROUTE[i], b = ROUTE[i + 1];
+  const k = Math.cos(a[1] * Math.PI / 180);
+  return {
+    coord: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t],
+    angle: Math.atan2(-(b[1] - a[1]), (b[0] - a[0]) * k) * 180 / Math.PI,
+  };
+}
+
+STOPS.forEach((s) => { const p = snap(s.coord); s.coord = p.coord; s.d = p.d; });
+
+/* ---- SVG helpers ---- */
+function star(n, R, r, rot = -90) {
+  let out = '';
+  for (let i = 0; i < n * 2; i++) {
+    const a = (rot + (i * 180) / n) * Math.PI / 180, rad = i % 2 ? r : R;
+    out += `${(Math.cos(a) * rad).toFixed(1)},${(Math.sin(a) * rad).toFixed(1)} `;
+  }
+  return out.trim();
+}
+
+// Sign topper: 8-point starburst, glinting 4-point star, two atomic orbits
+$('topper').innerHTML =
+  `<svg viewBox="-60 -50 120 100" aria-hidden="true">` +
+  `<ellipse class="orbit" rx="54" ry="15" transform="rotate(28)"/><ellipse class="orbit" rx="54" ry="15" transform="rotate(-28)"/>` +
+  `<polygon class="burst" points="${star(8, 38, 19)}"/>` +
+  `<polygon class="glint" points="${star(4, 17, 4.5)}"/><circle class="nucleus" r="4"/></svg>`;
+
+/* ---- Sign ---- */
+let active = -1;
+function setName(name) {
+  const el = $('sign-name');
+  el.setAttribute('aria-label', name);
+  el.classList.remove('lit');
+  let n = 0;
+  el.innerHTML = name.split(' ').map((w) => '<span class="word" aria-hidden="true">' +
+    [...w].map((ch) => `<span class="ch" style="--d:${(0.07 * n++ + Math.random() * 0.12).toFixed(2)}s">${ch}</span>`).join('') + '</span>').join(' ');
+  void el.offsetWidth;            // restart the flicker-on animation
+  el.classList.add('lit');
+}
+
+// Distance to the next stop ahead of km-mark d
+function setNext(d) {
+  const nxt = STOPS.find((s) => s.d > d + 0.3);
+  if (!nxt) {
+    $('sign-miles').textContent = '0 mi';
+    $('sign-to').textContent = 'End of the road';
+  } else {
+    $('sign-miles').textContent = `${Math.round((nxt.d - d) * KM_MI)} mi`;
+    $('sign-to').textContent = `to ${nxt.town}`;
+  }
+  $('odo-fill').style.width = `${(d / TOTAL) * 100}%`;
+  $('odo-text').textContent = `Mile ${Math.round(d * KM_MI)} of ${Math.round(TOTAL * KM_MI)}`;
+}
+
+function light(i) {
+  if (i === active) return;
+  active = i;
+  const s = STOPS[i];
+  $('sign-type').textContent = s.type;
+  $('sign-town').textContent = `${s.town}, New Mexico`;
+  setName(s.name);
+  document.querySelectorAll('.card').forEach((c, k) => c.classList.toggle('active', k === i));
+  document.querySelectorAll('.star-marker').forEach((m, k) => m.classList.toggle('active', k === i));
+  const card = document.querySelectorAll('.card')[i], rack = $('cards');
+  rack.scrollTo({ left: card.offsetLeft - (rack.clientWidth - card.offsetWidth) / 2, behavior: reduce ? 'auto' : 'smooth' });
+}
+
+/* ---- Map ---- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/streets-v12',
+  center: [-105, 35.05],
+  zoom: 6.5,
+});
+
+const pad = () => phone() ? { top: 120, bottom: 64, left: 44, right: 44 } : { top: 40, bottom: 70, left: 340, right: 50 };
+
+function goTo(i) {
+  stopDrive();
+  light(i);
+  setNext(STOPS[i].d);
+  const opts = { center: STOPS[i].coord, zoom: 9.2, padding: pad() };
+  if (reduce) map.jumpTo(opts); else map.flyTo({ ...opts, duration: 1800 });
+}
+
+// Sun-bleached 1950s road map: cream land, pale-turquoise water, tangerine highways
+function tintStyle() {
+  const green = '#CFE6B4', cream = '#F6EAC8', water = '#A9E4DC', ink = '#26292E';
+  map.getStyle().layers.forEach((l) => {
+    const id = l.id;
+    try {
+      if (l.type === 'background') map.setPaintProperty(id, 'background-color', cream);
+      else if (l.type === 'fill' && /water/.test(id)) map.setPaintProperty(id, 'fill-color', water);
+      else if (l.type === 'line' && /waterway/.test(id)) map.setPaintProperty(id, 'line-color', '#7FD3C8');
+      else if (l.type === 'fill' && /national-park/.test(id)) map.setPaintProperty(id, 'fill-color', green);
+      else if (l.type === 'fill' && id === 'landuse') {
+        map.setPaintProperty(id, 'fill-color', ['match', ['get', 'class'],
+          ['park', 'pitch', 'cemetery'], green, 'sand', '#F2DFAE', '#F0E0B8']);
+      } else if (l.type === 'fill' && id === 'landcover') map.setPaintProperty(id, 'fill-color', '#E5E8BD');
+      else if (l.type === 'fill' && /^(building|aeroway)/.test(id)) map.setPaintProperty(id, 'fill-color', '#EBD9AA');
+      else if (l.type === 'line' && /^(road|bridge|tunnel)-/.test(id) && !/path|rail|ferry|steps|pedestrian/.test(id)) {
+        const major = /motorway|trunk/.test(id), casing = /case/.test(id);
+        map.setPaintProperty(id, 'line-color', major ? (casing ? '#D77E08' : '#FF9F1C') : (casing ? '#E3D1A3' : '#FFFBF0'));
+      } else if (l.type === 'symbol') {
+        if (/^(poi|transit|airport|natural-point)/.test(id)) map.setLayoutProperty(id, 'visibility', 'none');
+        else if (map.getPaintProperty(id, 'text-color') !== undefined) {
+          map.setPaintProperty(id, 'text-color', ink);
+          map.setPaintProperty(id, 'text-halo-color', 'rgba(255, 243, 214, 0.9)');
+        }
+      }
+    } catch (err) { /* layer shape differs; skip */ }
+  });
+}
+
+map.on('style.load', () => {
+  tintStyle();
+  const firstSymbol = (map.getStyle().layers.find((l) => l.type === 'symbol') || {}).id;
+  map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE } } });
+  const join = { 'line-join': 'round', 'line-cap': 'round' };
+  const w = (a, b) => ['interpolate', ['linear'], ['zoom'], 5, a, 11, b];
+  // Fat tangerine road with a charcoal rim and dashed centre stripe
+  map.addLayer({ id: 'route-rim', type: 'line', source: 'route', layout: join,
+    paint: { 'line-color': '#26292E', 'line-width': w(7, 26) } }, firstSymbol);
+  map.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: join,
+    paint: { 'line-color': '#FF9F1C', 'line-width': w(4.5, 20) } }, firstSymbol);
+  map.addLayer({ id: 'route-stripe', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'butt' },
+    paint: { 'line-color': '#26292E', 'line-width': w(1, 2.5), 'line-dasharray': [3, 3] } }, firstSymbol);
+
+  const b = ROUTE.reduce((bb, c) => bb.extend(c), new mapboxgl.LngLatBounds(ROUTE[0], ROUTE[0]));
+  map.fitBounds(b, { padding: pad(), bearing: 0, pitch: 0, duration: 0 });
+});
+
+/* ---- Cards and starburst markers ---- */
+STOPS.forEach((s, i) => {
+  const card = document.createElement('button');
+  card.className = 'card';
+  card.innerHTML = `<span class="card-num"><svg viewBox="-20 -20 40 40" aria-hidden="true"><polygon points="${star(8, 19, 11)}"/></svg><span>${i + 1}</span></span>` +
+    `<span class="card-type">${s.type}</span><span class="card-name">${s.name}</span>` +
+    `<span class="card-town">${s.town}, NM</span><span class="card-note">${s.note}</span>`;
+  card.addEventListener('click', () => goTo(i));
+  $('cards').appendChild(card);
+
+  const root = document.createElement('div');
+  root.innerHTML = `<div class="star-marker" title="${s.name}"><svg class="star-svg" viewBox="-20 -20 40 40" aria-hidden="true">` +
+    `<polygon points="${star(8, 19, 11)}"/><text class="star-num">${i + 1}</text></svg></div>`;
+  root.addEventListener('click', () => goTo(i));
+  new mapboxgl.Marker({ element: root }).setLngLat(s.coord).addTo(map);
+});
+
+/* ---- Hit the road: a tail-finned car drives the route ---- */
+const carEl = document.createElement('div');
+carEl.innerHTML = `<div class="car" id="car"><svg viewBox="0 0 56 28" aria-hidden="true">` +
+  `<path d="M3 18 L1 5 L13 13 Z" fill="#FF6F91" stroke="#26292E" stroke-width="1.8" stroke-linejoin="round"/>` +
+  `<path d="M3 20 Q3 13 9 13 L19 13 L25 6 Q27 4 31 4 L39 4 Q43 4 45 8 L48 13 Q54 14 54 19 L54 21 L3 21 Z" fill="#2EC4B6" stroke="#26292E" stroke-width="2" stroke-linejoin="round"/>` +
+  `<path d="M24 13 L28 7.5 L33 7.5 L33 13 Z M36 7.5 L40 7.5 L43 13 L36 13 Z" fill="#FFF3D6" stroke="#26292E" stroke-width="1.2"/>` +
+  `<path d="M6 17.5 H50" stroke="#FFF3D6" stroke-width="1.6"/>` +
+  `<circle cx="14" cy="22" r="5" fill="#26292E"/><circle cx="14" cy="22" r="2" fill="#FFF3D6"/>` +
+  `<circle cx="44" cy="22" r="5" fill="#26292E"/><circle cx="44" cy="22" r="2" fill="#FFF3D6"/></svg></div>`;
+const carMarker = new mapboxgl.Marker({ element: carEl });
+
+const roadBtn = $('road-btn');
+let driving = false, carD = 0, nextStop = 0, pauseUntil = 0, lastT = 0;
+const SPEED = TOTAL / 34;            // km per second: whole trip in ~34s
+
+function placeCar(d) {
+  const p = pointAt(d);
+  carMarker.setLngLat(p.coord).addTo(map);
+  $('car').style.transform = `rotate(${Math.max(-35, Math.min(35, p.angle))}deg)`;
+  return p;
+}
+
+function frame(now) {
+  if (!driving) return;
+  const dt = Math.min(0.1, (now - lastT) / 1000);
+  lastT = now;
+  if (now >= pauseUntil) {
+    carD = Math.min(carD + SPEED * dt, STOPS[nextStop].d);
+    if (carD >= STOPS[nextStop].d) {
+      light(nextStop);
+      pauseUntil = now + 1500;
+      if (++nextStop >= STOPS.length) { placeCar(carD); setNext(carD); stopDrive(); return; }
+    }
+    const p = placeCar(carD);
+    setNext(carD);
+    map.jumpTo({ center: p.coord, zoom: map.getZoom() + (8.6 - map.getZoom()) * 0.06, padding: pad() });
+  }
+  requestAnimationFrame(frame);
+}
+
+function stopDrive() {
+  if (!driving) return;
+  driving = false;
+  roadBtn.textContent = 'Hit the road';
+}
+
+if (reduce) roadBtn.textContent = 'Next stop';
+roadBtn.addEventListener('click', () => {
+  if (reduce) {                       // no animation: hop stop to stop
+    const i = (active + 1) % STOPS.length;
+    goTo(i);
+    placeCar(STOPS[i].d);
+    return;
+  }
+  if (driving) { stopDrive(); return; }
+  driving = true;
+  roadBtn.textContent = 'Pull over';
+  carD = 0; nextStop = 0; pauseUntil = performance.now() + 500; lastT = performance.now();
+  light(0);
+  placeCar(0);
+  requestAnimationFrame(frame);
+});
+['mousedown', 'touchstart', 'wheel'].forEach((ev) => map.on(ev, stopDrive));
+
+map.on('error', (e) => {
+  $('sign-town').textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+light(0);
+setNext(STOPS[0].d);
+</script>
+</body>
+</html>

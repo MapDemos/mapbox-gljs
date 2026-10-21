@@ -1,0 +1,388 @@
+<!--
+  Working EXAMPLE of the Stained Glass style pack (stained-glass.css, in
+  this same folder). Open this file directly to see the pattern working
+  with one road trip -- eight Gothic cathedrals of northern France (Notre-
+  Dame de Paris, Reims, Laon, Amiens, Beauvais, Rouen, Chartres, Bourges)
+  on Mapbox Standard at dusk. A ROSE WINDOW is the primary navigation:
+  click a petal (or a gem on the map, or press 1-8) and the petal lights
+  up, the map flies there with padding and the three lancet panels show
+  the year begun, the nave height and a one-line note. "Light the window"
+  plays the whole trip in route order, lighting the petals one by one.
+  Copy the markup below into your own demo and link stained-glass.css from
+  its <head> -- see the class/id contract documented at the top of that
+  CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (Gothic stained glass: black lead came, jewel glass
+  lit from behind, limestone tracery, pointed lancet frames) at the user's
+  request for something distinct from every other pack in this folder. The
+  cathedrals are real (architecture and heritage framing only); the dates
+  and nave heights are rounded approximations and "The Glass Road" is a
+  fictional title -- swap in your own content.
+
+  What's NOT included: search/geocoding, live routing (the route line is
+  one embedded Directions API driving result, simplified), popups, or a
+  hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Glass Road</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Uncial+Antiqua&family=Crimson+Pro:wght@400;600;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="stained-glass.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="rose-col" aria-label="Cathedral navigation">
+    <p class="kicker">Northern France &middot; 811 km</p>
+    <h1 class="title">The Glass Road</h1>
+    <div class="rose-wrap">
+      <svg id="rose" viewBox="0 0 400 400" role="group" aria-label="Rose window: choose a cathedral"></svg>
+    </div>
+    <p class="rose-caption" id="caption"></p>
+    <div class="rose-actions">
+      <button class="btn btn-primary" id="play-btn">Light the window</button>
+      <button class="btn" id="all-btn">Whole route</button>
+    </div>
+  </section>
+
+  <section class="main-col">
+    <div class="lancet-stage">
+      <div class="lancet">
+        <div class="lancet-lead">
+          <div class="lancet-glass"><div id="map"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panels" id="panels" aria-live="polite">
+      <div class="panel panel-name"><div class="panel-in">
+        <span class="panel-label" id="p-stop">Stop 1 of 8</span>
+        <span class="panel-value" id="p-name"></span>
+        <span class="panel-sub" id="p-city"></span>
+      </div></div>
+      <div class="panel"><div class="panel-in">
+        <span class="panel-label">Begun</span>
+        <span class="panel-value" id="p-begun"></span>
+      </div></div>
+      <div class="panel"><div class="panel-in">
+        <span class="panel-label">Nave height</span>
+        <span class="panel-value" id="p-nave"></span>
+      </div></div>
+      <div class="panel panel-wide"><div class="panel-in">
+        <span class="panel-label">In a line</span>
+        <p class="panel-note" id="p-note"></p>
+      </div></div>
+    </div>
+  </section>
+</div>
+
+<script>
+// Road-trip line [lng, lat]: one Mapbox Directions (driving) request per leg,
+// joined and simplified. Order: Paris, Reims, Laon, Amiens, Beauvais, Rouen,
+// Chartres, Bourges.
+const ROUTE = [
+  [2.349,48.854], [2.361,48.852], [2.397,48.822], [2.416,48.817], [2.453,48.817], [2.466,48.826],
+  [2.488,48.83], [2.522,48.826], [2.544,48.837], [2.73,48.829], [2.806,48.835], [2.828,48.844],
+  [2.854,48.868], [2.914,48.897], [3.019,48.928], [3.078,48.981], [3.146,49.01], [3.169,49.029],
+  [3.191,49.038], [3.308,49.05], [3.352,49.075], [3.4,49.08], [3.529,49.125], [3.592,49.129],
+  [3.643,49.146], [3.711,49.154], [3.74,49.169], [3.766,49.203], [3.835,49.231], [3.98,49.256],
+  [4.036,49.253], [4.03,49.246], [3.998,49.255], [3.961,49.252], [3.962,49.273], [3.992,49.294],
+  [3.995,49.309], [3.953,49.361], [3.922,49.458], [3.89,49.506], [3.848,49.545], [3.791,49.562],
+  [3.723,49.568], [3.658,49.608], [3.665,49.607], [3.659,49.594], [3.631,49.566], [3.619,49.565],
+  [3.629,49.564], [3.626,49.559], [3.638,49.57], [3.66,49.567], [3.658,49.588], [3.666,49.607],
+  [3.653,49.61], [3.592,49.647], [3.446,49.697], [3.419,49.717], [3.393,49.747], [3.302,49.806],
+  [3.246,49.828], [3.237,49.847], [3.151,49.84], [3.103,49.848], [3.046,49.831], [3.006,49.839],
+  [2.904,49.835], [2.781,49.858], [2.742,49.853], [2.675,49.862], [2.631,49.854], [2.577,49.86],
+  [2.516,49.854], [2.419,49.857], [2.377,49.861], [2.369,49.876], [2.375,49.895], [2.363,49.903],
+  [2.316,49.903], [2.299,49.892], [2.309,49.861], [2.263,49.858], [2.239,49.848], [2.254,49.833],
+  [2.23,49.758], [2.24,49.711], [2.209,49.671], [2.216,49.646], [2.203,49.6], [2.204,49.578],
+  [2.185,49.536], [2.186,49.517], [2.168,49.494], [2.151,49.444], [2.135,49.433], [2.086,49.435],
+  [2.077,49.426], [2.056,49.428], [2.051,49.435], [2.004,49.417], [1.976,49.423], [1.938,49.418],
+  [1.921,49.434], [1.809,49.445], [1.78,49.459], [1.756,49.463], [1.727,49.486], [1.702,49.485],
+  [1.629,49.466], [1.511,49.46], [1.44,49.466], [1.372,49.447], [1.247,49.464], [1.227,49.462],
+  [1.192,49.442], [1.154,49.445], [1.141,49.436], [1.093,49.439], [1.09,49.436], [1.108,49.418],
+  [1.109,49.382], [1.116,49.372], [1.089,49.366], [1.07,49.338], [1.108,49.316], [1.14,49.265],
+  [1.186,49.243], [1.181,49.208], [1.17,49.19], [1.17,49.172], [1.182,49.157], [1.189,49.117],
+  [1.188,49.08], [1.174,49.059], [1.191,49.024], [1.186,49.009], [1.208,48.936], [1.202,48.922],
+  [1.176,48.907], [1.171,48.897], [1.183,48.836], [1.193,48.818], [1.193,48.781], [1.21,48.777],
+  [1.227,48.762], [1.286,48.744], [1.346,48.744], [1.342,48.733], [1.348,48.719], [1.368,48.712],
+  [1.384,48.674], [1.415,48.626], [1.472,48.492], [1.461,48.48], [1.465,48.468], [1.458,48.455],
+  [1.487,48.448], [1.486,48.443], [1.497,48.445], [1.586,48.38], [1.599,48.364], [1.758,48.267],
+  [1.763,48.255], [1.821,48.207], [1.849,48.203], [1.856,48.145], [1.851,48.083], [1.84,48.033],
+  [1.859,47.98], [1.849,47.948], [1.846,47.904], [1.861,47.885], [1.866,47.848], [1.846,47.783],
+  [1.86,47.751], [1.899,47.711], [1.907,47.682], [1.93,47.661], [2.007,47.564], [2.005,47.448],
+  [2.054,47.373], [2.044,47.262], [2.055,47.251], [2.101,47.23], [2.122,47.207], [2.171,47.184],
+  [2.181,47.169], [2.19,47.128], [2.202,47.112], [2.326,47.048], [2.339,47.042], [2.39,47.08],
+  [2.401,47.08], [2.398,47.083]
+];
+
+// Glass colours: base, light (where the sun comes through), deep (edges).
+const GLASS = {
+  ruby:     { base: '#A3122A', hi: '#E8475F', lo: '#6E0A1B', ink: '#FFF6E0' },
+  sapphire: { base: '#1D3F9B', hi: '#5C86E8', lo: '#122A6B', ink: '#FFF6E0' },
+  emerald:  { base: '#1C7A4E', hi: '#4FD08F', lo: '#0F4F31', ink: '#FFF6E0' },
+  amber:    { base: '#E2A21B', hi: '#FFD878', lo: '#A9710A', ink: '#1A1A1F' },
+  violet:   { base: '#5B2A86', hi: '#A072D6', lo: '#3A1A5C', ink: '#FFF6E0' },
+};
+
+// In route order. Dates and heights are rounded approximations.
+const CATHEDRALS = [
+  { short: 'Notre-Dame', name: 'Notre-Dame de Paris', city: 'Paris · Île-de-France', coord: [2.3499, 48.8530], color: 'ruby',
+    begun: '1163', nave: 33, note: 'Flying buttresses and a great rose window defined the High Gothic.' },
+  { short: 'Reims', name: 'Reims Cathedral', city: 'Reims · Grand Est', coord: [4.0340, 49.2538], color: 'sapphire',
+    begun: '1211', nave: 38, note: 'The coronation church of French kings, home of the Smiling Angel.' },
+  { short: 'Laon', name: 'Laon Cathedral', city: 'Laon · Hauts-de-France', coord: [3.6246, 49.5638], color: 'emerald',
+    begun: '1155', nave: 24, note: 'An early Gothic giant on a hilltop, with carved oxen in its towers.' },
+  { short: 'Amiens', name: 'Amiens Cathedral', city: 'Amiens · Hauts-de-France', coord: [2.3010, 49.8947], color: 'amber',
+    begun: '1220', nave: 42, note: 'The tallest complete nave in France, built in one confident sweep.' },
+  { short: 'Beauvais', name: 'Beauvais Cathedral', city: 'Beauvais · Hauts-de-France', coord: [2.0817, 49.4303], color: 'violet',
+    begun: '1225', nave: 48, note: 'The loftiest Gothic choir ever raised, an ambition that outran its vault.' },
+  { short: 'Rouen', name: 'Rouen Cathedral', city: 'Rouen · Normandy', coord: [1.0950, 49.4402], color: 'ruby',
+    begun: '1202', nave: 28, note: 'Lace-like facade that Monet painted again and again in changing light.' },
+  { short: 'Chartres', name: 'Chartres Cathedral', city: 'Chartres · Centre-Val de Loire', coord: [1.4877, 48.4477], color: 'sapphire',
+    begun: '1194', nave: 37, note: 'Most of its medieval glass survives, a deep-blue sea of light.' },
+  { short: 'Bourges', name: 'Bourges Cathedral', city: 'Bourges · Centre-Val de Loire', coord: [2.3980, 47.0827], color: 'emerald',
+    begun: '1195', nave: 37, note: 'No transepts and five aisles: a nave that opens like a vast hall.' },
+];
+
+const $ = (id) => document.getElementById(id);
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const isPhone = () => window.matchMedia('(max-width: 760px)').matches;
+const NS = 'http://www.' + 'w3.org/2000/svg'; // SVG namespace (not a network request)
+const mk = (tag, attrs, parent) => {
+  const el = document.createElementNS(NS, tag);
+  Object.entries(attrs || {}).forEach(([k, v]) => el.setAttribute(k, v));
+  if (parent) parent.appendChild(el);
+  return el;
+};
+
+/* ---- Rose window (svg#rose) ---- */
+const rose = $('rose');
+const pt = (r, deg) => {
+  const a = (deg * Math.PI) / 180;
+  return `${(200 + r * Math.sin(a)).toFixed(1)} ${(200 - r * Math.cos(a)).toFixed(1)}`;
+};
+const petals = [];
+
+function buildRose() {
+  // Gradients: per-colour "sun behind the glass" (light centre, deep edge).
+  const defs = mk('defs', {}, rose);
+  Object.entries(GLASS).forEach(([k, g]) => {
+    const rg = mk('radialGradient', { id: `gl-${k}`, gradientUnits: 'userSpaceOnUse', cx: 200, cy: 200, r: 185 }, defs);
+    [[0.25, g.hi], [0.7, g.base], [1, g.lo]].forEach(([o, c]) => mk('stop', { offset: o, 'stop-color': c }, rg));
+  });
+  const light = mk('radialGradient', { id: 'petal-light', cx: '50%', cy: '60%', r: '55%' }, defs);
+  mk('stop', { offset: 0, 'stop-color': '#FFFFFF', 'stop-opacity': 0.55 }, light);
+  mk('stop', { offset: 1, 'stop-color': '#FFFFFF', 'stop-opacity': 0 }, light);
+  const stone = mk('radialGradient', { id: 'stone', cx: '50%', cy: '35%', r: '70%' }, defs);
+  mk('stop', { offset: 0, 'stop-color': '#EFE8DA' }, stone);
+  mk('stop', { offset: 1, 'stop-color': '#B9AE9B' }, stone);
+
+  // Limestone ring, black lead disc behind the petals.
+  mk('circle', { cx: 200, cy: 200, r: 198, fill: 'url(#stone)', stroke: '#1A1A1F', 'stroke-width': 4 }, rose);
+  mk('circle', { cx: 200, cy: 200, r: 184, fill: '#1A1A1F' }, rose);
+  const keys = Object.keys(GLASS);
+  for (let k = 0; k < 16; k++) {
+    const [x, y] = pt(191, k * 22.5 + 11.25).split(' ');
+    mk('circle', { cx: x, cy: y, r: 4.2, fill: GLASS[keys[k % 5]].base, stroke: '#1A1A1F', 'stroke-width': 1.5 }, rose);
+  }
+
+  CATHEDRALS.forEach((c, i) => {
+    const mid = i * 45, a0 = mid - 22.5 + 2, a1 = mid + 22.5 - 2;
+    const d = `M${pt(64, a0)} L${pt(150, a0)} Q${pt(172, a0 + 2)} ${pt(180, mid)} ` +
+              `Q${pt(172, a1 - 2)} ${pt(150, a1)} L${pt(64, a1)} A64 64 0 0 0 ${pt(64, a0)}Z`;
+    const g = mk('g', { class: 'petal', tabindex: 0, role: 'button', 'data-i': i,
+      'aria-label': `${i + 1}. ${c.name}`, style: `--i:${i}` }, rose);
+    mk('path', { class: 'glass', d, fill: `url(#gl-${c.color})` }, g);
+    mk('path', { class: 'glow', d }, g);
+    mk('path', { class: 'lead', d }, g);
+    mk('path', { class: 'sel-ring', d }, g);
+    const [nx, ny] = pt(160, mid).split(' ');
+    mk('circle', { class: 'petal-num', cx: nx, cy: ny, r: 9 }, g);
+    mk('text', { class: 'petal-num-t', x: nx, y: ny, style: 'font-size:11px' }, g).textContent = i + 1;
+    const [tx, ty] = pt(112, mid).split(' ');
+    const t = mk('text', { class: 'petal-label' + (GLASS[c.color].ink === '#1A1A1F' ? ' dark' : ''), x: tx, y: ty,
+      fill: GLASS[c.color].ink, style: 'font-size:12.5px;letter-spacing:0.03em' }, g);
+    t.textContent = c.short;
+    g.addEventListener('click', () => { stopPlay(); select(i, { fly: true }); });
+    g.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); stopPlay(); select(i, { fly: true }); }
+    });
+    petals.push(g);
+  });
+
+  // Hub: a small amber star in a lead ring.
+  mk('circle', { cx: 200, cy: 200, r: 60, fill: '#1A1A1F' }, rose);
+  mk('circle', { cx: 200, cy: 200, r: 54, fill: '#E2A21B', stroke: '#D8CFC0', 'stroke-width': 2 }, rose);
+  const star = [];
+  for (let k = 0; k < 16; k++) star.push(pt(k % 2 ? 24 : 46, k * 22.5));
+  mk('polygon', { class: 'hub-star', points: star.join(' '), fill: '#FFD878', stroke: '#1A1A1F', 'stroke-width': 3, 'stroke-linejoin': 'round' }, rose);
+  mk('circle', { cx: 200, cy: 200, r: 9, fill: '#A3122A', stroke: '#1A1A1F', 'stroke-width': 3 }, rose);
+}
+buildRose();
+
+/* ---- Map ---- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: { basemap: { lightPreset: 'dusk', theme: 'default', showPointOfInterestLabels: false, showTransitLabels: false } },
+  bounds: [[0.75, 46.95], [4.3, 50.0]],
+  fitBoundsOptions: { padding: overviewPad() },
+  attributionControl: true,
+});
+
+const gems = [];
+function overviewPad() {
+  // Phone: clear the arch (--arch0 = 90px) plus a margin; bottom clears the logo.
+  return isPhone() ? { top: 106, bottom: 64, left: 24, right: 24 } : { top: 100, bottom: 72, left: 70, right: 70 };
+}
+function gemSvg(g) {
+  return `<svg viewBox="0 0 32 36" aria-hidden="true">` +
+    `<polygon points="2,11 16,14 16,35 2,25" fill="${g.base}"/>` +
+    `<polygon points="16,14 30,11 30,25 16,35" fill="${g.lo}"/>` +
+    `<polygon points="16,1 30,11 16,14 2,11" fill="${g.hi}"/>` +
+    `<polygon points="16,1 30,11 30,25 16,35 2,25 2,11" fill="none" stroke="#1A1A1F" stroke-width="2.6" stroke-linejoin="round"/>` +
+    `<path d="M2 11 L16 14 L30 11 M16 14 V35" fill="none" stroke="#1A1A1F" stroke-width="1.6"/>` +
+    `<path d="M9 8 L14 5" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity="0.8"/></svg>`;
+}
+
+CATHEDRALS.forEach((c, i) => {
+  const root = document.createElement('div');
+  root.innerHTML = `<div class="gem" role="button" tabindex="-1" aria-label="${c.name}">${gemSvg(GLASS[c.color])}<span class="gem-name">${c.short}</span></div>`;
+  root.addEventListener('click', () => { stopPlay(); select(i, { fly: true }); });
+  new mapboxgl.Marker({ element: root, anchor: 'center' }).setLngLat(c.coord).addTo(map);
+  gems.push(root.firstChild);
+});
+
+map.on('style.load', () => {
+  map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE } } });
+  const join = { 'line-join': 'round', 'line-cap': 'round' };
+  const w = (a, b) => ['interpolate', ['linear'], ['zoom'], 5, a, 10, b, 15, b * 1.8];
+  // A "lead line": soft amber glow, black casing, amber glass core.
+  map.addLayer({ id: 'route-glow', type: 'line', source: 'route', slot: 'top', layout: join,
+    paint: { 'line-color': '#E2A21B', 'line-width': w(10, 20), 'line-blur': 6, 'line-opacity': 0.4, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'route-casing', type: 'line', source: 'route', slot: 'top', layout: join,
+    paint: { 'line-color': '#1A1A1F', 'line-width': w(7, 13), 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'route-core', type: 'line', source: 'route', slot: 'top', layout: join,
+    paint: { 'line-color': '#F2B72E', 'line-width': w(3, 6), 'line-emissive-strength': 1 } });
+});
+
+/* ---- Selection: petals, gems and panels move together ---- */
+let sel = -1;
+let lit = null; // Set of lit petals while "Light the window" plays; null = all lit
+
+function paintPetals() {
+  petals.forEach((g, i) => {
+    g.classList.toggle('sel', i === sel);
+    g.classList.toggle('dim', !!lit && !lit.has(i));
+    g.setAttribute('aria-pressed', i === sel ? 'true' : 'false');
+  });
+  gems.forEach((g, i) => g.classList.toggle('on', i === sel));
+}
+
+function select(i, { fly = false, duration = 2600 } = {}) {
+  sel = i;
+  const c = CATHEDRALS[i], g = GLASS[c.color];
+  const panels = $('panels');
+  panels.style.setProperty('--glass', g.base);
+  panels.style.setProperty('--ink', g.ink);
+  $('p-stop').textContent = `Stop ${i + 1} of ${CATHEDRALS.length}`;
+  $('p-name').textContent = c.name;
+  $('p-city').textContent = c.city;
+  $('p-begun').textContent = c.begun;
+  $('p-nave').innerHTML = `${c.nave}<small>m</small>`;
+  $('p-note').textContent = c.note;
+  $('caption').innerHTML = `${c.name}<small>Stop ${i + 1} of ${CATHEDRALS.length} &middot; ${c.city.split(' · ')[1]}</small>`;
+  paintPetals();
+  if (map.loaded()) declutter();
+  if (!fly) return;
+  const opts = {
+    center: c.coord, zoom: 14.6, pitch: 58, bearing: i % 2 ? 24 : -24,
+    padding: isPhone() ? { top: 60, bottom: 50, left: 20, right: 20 } : { top: 90, bottom: 70, left: 60, right: 60 },
+  };
+  if (reduce) map.jumpTo(opts); else map.flyTo({ ...opts, duration });
+}
+
+function showAll() {
+  const b = new mapboxgl.LngLatBounds([0.75, 46.95], [4.3, 50.0]);
+  const opts = { padding: overviewPad(), pitch: 0, bearing: 0 };
+  if (reduce) map.jumpTo({ ...map.cameraForBounds(b, opts), pitch: 0, bearing: 0 });
+  else map.fitBounds(b, { ...opts, duration: 2200 });
+}
+
+/* ---- Light the window: visit every cathedral in route order ---- */
+let playToken = 0;
+const playBtn = $('play-btn');
+
+function stopPlay() {
+  if (!lit) return;
+  playToken++;
+  lit = null;
+  playBtn.textContent = 'Light the window';
+  paintPetals();
+}
+
+async function playWindow() {
+  const token = ++playToken;
+  lit = new Set();
+  playBtn.textContent = 'Stop';
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  for (let i = 0; i < CATHEDRALS.length; i++) {
+    if (token !== playToken) return;
+    lit.add(i);
+    select(i, { fly: true, duration: i === 0 ? 2400 : 2200 });
+    await wait(reduce ? 1600 : 3600);
+  }
+  if (token !== playToken) return;
+  lit = null;
+  playBtn.textContent = 'Light the window';
+  paintPetals();
+  showAll();
+}
+
+playBtn.addEventListener('click', () => { if (lit) stopPlay(); else playWindow(); });
+$('all-btn').addEventListener('click', () => { stopPlay(); showAll(); });
+
+// Keys 1-8 pick a cathedral.
+document.addEventListener('keydown', (e) => {
+  const n = Number(e.key);
+  if (n >= 1 && n <= CATHEDRALS.length && !e.metaKey && !e.ctrlKey && !e.altKey) { stopPlay(); select(n - 1, { fly: true }); }
+});
+
+/* Hide a gem's name label if it would sit on a neighbouring gem or label. */
+function declutter() {
+  const hit = (a, b) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+  const gemBox = (p) => ({ x0: p.x - 16, x1: p.x + 16, y0: p.y - 18, y1: p.y + 18 });
+  const pos = CATHEDRALS.map((c) => map.project(c.coord));
+  const order = CATHEDRALS.map((_, i) => i).sort((a, b) => (b === sel) - (a === sel));
+  const taken = [];
+  order.forEach((i) => {
+    const w = CATHEDRALS[i].short.length * 8.5 + 22, p = pos[i];
+    const lb = { x0: p.x - w / 2, x1: p.x + w / 2, y0: p.y + 18, y1: p.y + 44 };
+    const clash = i !== sel && (
+      pos.some((q, j) => j !== i && hit(lb, gemBox(q))) || taken.some((t) => hit(lb, t)));
+    gems[i].classList.toggle('nolabel', clash);
+    if (!clash) taken.push(lb);
+  });
+}
+map.on('move', declutter);
+map.on('load', declutter);
+
+select(0);
+</script>
+</body>
+</html>

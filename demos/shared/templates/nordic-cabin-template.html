@@ -1,0 +1,403 @@
+<!--
+  Working EXAMPLE of the Nordic Cabin style pack (nordic-cabin.css, in this
+  same folder). Open this file directly to see the pattern working with a
+  fictional cabin-rental booking flow ("Fjellro Cabins") across the Lofoten
+  islands, Norway, on Mapbox Standard in the calm 'dusk' preset with 3D
+  terrain. Pick check-in and check-out in the inline two-month calendar,
+  set the guests, filter by sauna / fireplace / aurora view / sleeps 4+,
+  then choose a cabin from the list or a roof-pill on the map -- the list
+  and map stay in sync, every price and total follows the dates, and
+  "Request booking" ends in a gentle confirmation. Copy the markup below
+  into your own demo and link nordic-cabin.css from its <head> -- see the
+  class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (Scandinavian hygge: birch white, pale oak, fjord
+  blue-grey, moss and one falu red accent, knitted-wool and wood-grain
+  hints) at the user's request for something distinct from every other pack
+  in this folder. The villages are real but the cabin positions are
+  approximate, and "Fjellro Cabins", the cabin names, the prices and the
+  availability rules are fictional placeholders -- swap in your own.
+
+  What's NOT included: a real booking back end, availability, payment,
+  search/geocoding, or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fjellro Cabins</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;500;600&family=Young+Serif&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="nordic-cabin.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<!-- Hand-written icon sprite (no icon fonts) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-sauna" viewBox="0 0 24 24"><path d="M8 3c-1 1.6 1 2.6 0 4.4M12 3c-1 1.6 1 2.6 0 4.4M16 3c-1 1.6 1 2.6 0 4.4M3 12h18v4H3zM6 16v4M18 16v4"/></symbol>
+  <symbol id="i-fire" viewBox="0 0 24 24"><path d="M12 3c1 3.2 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3.2 2-4.2.3 1.4 1 2.2 2 2.2-1-3-.5-5.3 1-8z"/></symbol>
+  <symbol id="i-aurora" viewBox="0 0 24 24"><path d="M3 9c3-4 6 4 9 0s6 4 9 0M3 15c3-4 6 4 9 0s6 4 9 0M5 20h.01M12 20h.01M19 20h.01"/></symbol>
+  <symbol id="i-guests" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6M16 5.5a3 3 0 0 1 0 5.5M18 14.3c1.8.7 3 2.6 3 5.7"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+</svg>
+
+<div class="app">
+  <aside class="booking-panel" id="panel" aria-label="Cabin booking">
+    <header class="panel-head">
+      <h1 class="brand">Fjellro Cabins</h1>
+      <p class="brand-sub">Lofoten &middot; Norway &middot; Winter stays</p>
+    </header>
+
+    <section class="panel-section" aria-labelledby="h-dates">
+      <h2 class="section-label" id="h-dates">Your dates</h2>
+      <div class="calendar">
+        <div class="cal-head">
+          <button class="cal-nav cal-prev" id="cal-prev" aria-label="Earlier months"><svg class="ico"><use href="#i-prev"/></svg></button>
+          <span class="cal-range" id="cal-range"></span>
+          <button class="cal-nav cal-next" id="cal-next" aria-label="Later months"><svg class="ico"><use href="#i-next"/></svg></button>
+        </div>
+        <div class="cal-months" id="cal-months"></div>
+      </div>
+      <p class="stay-line" id="stay-line"></p>
+    </section>
+
+    <section class="panel-section" aria-labelledby="h-guests">
+      <h2 class="section-label" id="h-guests">Guests</h2>
+      <div class="stepper">
+        <button class="step-btn" id="g-minus" aria-label="Fewer guests">&minus;</button>
+        <span class="step-val" id="g-val" aria-live="polite"></span>
+        <button class="step-btn" id="g-plus" aria-label="More guests">+</button>
+      </div>
+    </section>
+
+    <section class="panel-section" aria-label="Filters">
+      <div class="filter-row" id="filters">
+        <button class="chip" data-f="sauna" aria-pressed="false"><svg class="ico"><use href="#i-sauna"/></svg>Sauna</button>
+        <button class="chip" data-f="fire" aria-pressed="false"><svg class="ico"><use href="#i-fire"/></svg>Fireplace</button>
+        <button class="chip" data-f="aurora" aria-pressed="false"><svg class="ico"><use href="#i-aurora"/></svg>Aurora view</button>
+        <button class="chip" data-f="big" aria-pressed="false"><svg class="ico"><use href="#i-guests"/></svg>Sleeps 4+</button>
+      </div>
+    </section>
+
+    <section class="panel-section" aria-labelledby="h-list">
+      <div class="list-head">
+        <h2 class="section-label" id="h-list" style="margin:0">Cabins</h2>
+        <span class="list-count" id="list-count"></span>
+      </div>
+    </section>
+    <ul class="cabin-list" id="cabin-list"></ul>
+    <p class="status-note error hidden" id="status-note" style="margin:0 24px 24px"></p>
+
+    <div class="summary hidden" id="summary"></div>
+  </aside>
+
+  <main class="stage">
+    <div id="map"></div>
+  </main>
+</div>
+
+<script>
+// Fictional cabins at real Lofoten villages (positions approximate, on land
+// by the water). bearing = camera heading when flying there, chosen to face
+// the fjord and the peaks behind.
+const CABINS = [
+  { id: 'reine-rorbu',  name: 'Rorbu at Reinefjord', place: 'Reine',       coord: [13.0905, 67.9335], bearing: 340, base: 2450, sleeps: 4, sauna: true,  fire: true,  aurora: true,  aurora_c: '#6FD6A0', wall: '#8E2C22' },
+  { id: 'reine-loft',   name: 'Bergloft',            place: 'Reine',       coord: [13.0842, 67.9318], bearing: 70,  base: 1850, sleeps: 2, sauna: false, fire: true,  aurora: true,  aurora_c: '#7FE0C8', wall: '#B5532E' },
+  { id: 'sakrisoy',     name: 'Gule Sakrisøy',       place: 'Sakrisøy',    coord: [13.1135, 67.9350], bearing: 340, base: 2100, sleeps: 3, sauna: false, fire: false, aurora: true,  aurora_c: '#8AE08F', wall: '#D9A93A' },
+  { id: 'hamnoy',       name: 'Hamnøy Brygge',       place: 'Hamnøy',      coord: [13.1275, 67.9435], bearing: 300, base: 3200, sleeps: 6, sauna: true,  fire: true,  aurora: true,  aurora_c: '#6FD6A0', wall: '#8E2C22' },
+  { id: 'nusfjord',     name: 'Nusfjord Naust',      place: 'Nusfjord',    coord: [13.3350, 68.0215], bearing: 200, base: 1650, sleeps: 4, sauna: false, fire: true,  aurora: false, aurora_c: '#9BD0E8', wall: '#6E7F5B' },
+  { id: 'ramberg',      name: 'Strandhytta',         place: 'Ramberg',     coord: [13.2265, 68.0900], bearing: 270, base: 1950, sleeps: 5, sauna: true,  fire: false, aurora: true,  aurora_c: '#6FD6A0', wall: '#5F7A89' },
+  { id: 'henningsvaer', name: 'Bryggekai Hus',       place: 'Henningsvær', coord: [14.2020, 68.1500], bearing: 30,  base: 2750, sleeps: 4, sauna: true,  fire: true,  aurora: false, aurora_c: '#A9C8F0', wall: '#B5532E' },
+  { id: 'svolvaer',     name: 'Geita View Lodge',    place: 'Svolvær',     coord: [14.5640, 68.2330], bearing: 330, base: 2300, sleeps: 6, sauna: false, fire: true,  aurora: true,  aurora_c: '#7FE0C8', wall: '#D9A93A' },
+];
+const CLEANING = 450;
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = () => window.matchMedia('(max-width: 720px)').matches;
+const $ = (id) => document.getElementById(id);
+
+/* ---- State ---- */
+const DAY = 86400000;
+const today = new Date(); today.setHours(0, 0, 0, 0);
+const addDays = (t, n) => { const d = new Date(t); d.setDate(d.getDate() + n); return d.getTime(); };
+const state = {
+  start: addDays(today.getTime(), 28),
+  end: addDays(today.getTime(), 32),
+  guests: 2,
+  filters: new Set(),
+  selected: null,
+  confirmed: false,
+  viewY: 0, viewM: 0,
+};
+{ const s = new Date(state.start); state.viewY = s.getFullYear(); state.viewM = s.getMonth(); }
+
+/* ---- Prices: weekend nights +10%, Christmas weeks +25% ---- */
+const nok = (n) => 'kr ' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+function nightPrice(c, t) {
+  const d = new Date(t);
+  const dow = d.getDay(), m = d.getMonth(), day = d.getDate();
+  let f = (dow === 5 || dow === 6) ? 1.1 : 1;
+  if ((m === 11 && day >= 20) || (m === 0 && day <= 3)) f *= 1.25;
+  return Math.round((c.base * f) / 10) * 10;
+}
+function stay(c) {
+  if (!state.start) return { nights: 0, sum: 0, avg: c.base };
+  if (!state.end) return { nights: 0, sum: 0, avg: nightPrice(c, state.start) };
+  let sum = 0, nights = 0;
+  for (let t = state.start; t < state.end; t = addDays(t, 1)) { sum += nightPrice(c, t); nights++; }
+  return { nights, sum, avg: Math.round(sum / nights / 10) * 10 };
+}
+const fmtDate = (t) => new Date(t).toLocaleDateString('en', { day: 'numeric', month: 'short' });
+
+/* ---- Calendar ---- */
+function monthHTML(y, m) {
+  const title = new Date(y, m, 1).toLocaleDateString('en', { month: 'long', year: 'numeric' });
+  const lead = (new Date(y, m, 1).getDay() + 6) % 7;
+  const count = new Date(y, m + 1, 0).getDate();
+  let h = `<div class="cal-month"><div class="cal-title">${title}</div><div class="cal-grid">`;
+  'MTWTFSS'.split('').forEach((d) => { h += `<span class="cal-dow" aria-hidden="true">${d}</span>`; });
+  for (let i = 0; i < lead; i++) h += '<span class="cal-blank"></span>';
+  for (let d = 1; d <= count; d++) {
+    const t = new Date(y, m, d).getTime();
+    const cls = ['cal-day'];
+    if (t === today.getTime()) cls.push('is-today');
+    if (t === state.start) { cls.push('is-start'); if (state.end) cls.push('has-range'); }
+    if (state.end && t === state.end) cls.push('is-end');
+    if (state.end && t > state.start && t < state.end) cls.push('is-range');
+    const label = new Date(t).toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long' });
+    h += `<button class="${cls.join(' ')}" data-t="${t}" aria-label="${label}"${t < today.getTime() ? ' disabled' : ''}>${d}</button>`;
+  }
+  return h + '</div></div>';
+}
+function renderCalendar() {
+  const y2 = state.viewM === 11 ? state.viewY + 1 : state.viewY;
+  const m2 = (state.viewM + 1) % 12;
+  $('cal-months').innerHTML = monthHTML(state.viewY, state.viewM) + monthHTML(y2, m2);
+  const idx = (state.viewY - today.getFullYear()) * 12 + state.viewM - today.getMonth();
+  const mn = (y, m) => new Date(y, m, 1).toLocaleDateString('en', { month: 'short' });
+  $('cal-range').textContent = `${mn(state.viewY, state.viewM)} \u2013 ${mn(y2, m2)} ${y2}`;
+  $('cal-prev').disabled = idx <= 0;
+  $('cal-next').disabled = idx >= 10;
+  const sl = $('stay-line');
+  if (state.start && state.end) {
+    const n = Math.round((state.end - state.start) / DAY);
+    sl.textContent = `${fmtDate(state.start)} → ${fmtDate(state.end)} · ${n} night${n > 1 ? 's' : ''}`;
+  } else if (state.start) {
+    sl.textContent = `Check-in ${fmtDate(state.start)} · now choose check-out`;
+  } else sl.textContent = 'Choose a check-in date';
+}
+$('cal-months').addEventListener('click', (e) => {
+  const b = e.target.closest('.cal-day');
+  if (!b) return;
+  const t = Number(b.dataset.t);
+  if (!state.start || state.end || t <= state.start) { state.start = t; state.end = null; }
+  else state.end = t;
+  state.confirmed = false;
+  renderAll();
+});
+function shiftMonth(n) {
+  const d = new Date(state.viewY, state.viewM + n, 1);
+  state.viewY = d.getFullYear(); state.viewM = d.getMonth();
+  renderCalendar();
+}
+$('cal-prev').addEventListener('click', () => shiftMonth(-1));
+$('cal-next').addEventListener('click', () => shiftMonth(1));
+
+/* ---- Guests and filters ---- */
+function renderGuests() {
+  $('g-val').textContent = `${state.guests} guest${state.guests > 1 ? 's' : ''}`;
+  $('g-minus').disabled = state.guests <= 1;
+  $('g-plus').disabled = state.guests >= 8;
+}
+$('g-minus').addEventListener('click', () => { state.guests--; renderAll(); });
+$('g-plus').addEventListener('click', () => { state.guests++; renderAll(); });
+$('filters').addEventListener('click', (e) => {
+  const b = e.target.closest('.chip');
+  if (!b) return;
+  const f = b.dataset.f;
+  if (state.filters.has(f)) state.filters.delete(f); else state.filters.add(f);
+  b.setAttribute('aria-pressed', state.filters.has(f));
+  renderAll();
+});
+function visible(c) {
+  if (c.sleeps < state.guests) return false;
+  if (state.filters.has('sauna') && !c.sauna) return false;
+  if (state.filters.has('fire') && !c.fire) return false;
+  if (state.filters.has('aurora') && !c.aurora) return false;
+  if (state.filters.has('big') && c.sleeps < 4) return false;
+  return true;
+}
+
+/* ---- Map ---- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [13.9, 68.08],
+  zoom: 7.6,
+  pitch: 55,
+  bearing: 65,
+  config: { basemap: { lightPreset: 'dusk', theme: 'faded', showPointOfInterestLabels: false } },
+});
+map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
+
+// Reine / Sakrisøy / Hamnøy sit within a few km: fan their pills out at low zoom.
+const FAN = { 'reine-loft': [-46, 14], 'reine-rorbu': [46, 18], sakrisoy: [-46, -24], hamnoy: [46, -28] };
+let fanned = null;
+function updateFan() {
+  const on = map.getZoom() < 10.5;
+  if (on === fanned) return;
+  fanned = on;
+  CABINS.forEach((c) => { if (FAN[c.id]) markers[c.id].marker.setOffset(on ? FAN[c.id] : [0, 0]); });
+}
+const markers = {};
+CABINS.forEach((c) => {
+  const root = document.createElement('div');
+  root.innerHTML = '<div class="roof-pill"></div>';
+  root.firstChild.addEventListener('click', (e) => { e.stopPropagation(); select(c.id, { fly: true, scroll: true }); });
+  markers[c.id] = { root, pill: root.firstChild };
+  markers[c.id].marker = new mapboxgl.Marker({ element: root, anchor: 'bottom' }).setLngLat(c.coord).addTo(map);
+});
+map.on('zoom', updateFan);
+
+function frameAll(duration) {
+  const ids = CABINS.filter(visible);
+  const list = ids.length ? ids : CABINS;
+  const b = list.reduce((bb, c) => bb.extend(c.coord), new mapboxgl.LngLatBounds(list[0].coord, list[0].coord));
+  // Look north-west across the island chain so the peaks rise behind the
+  // cabins. fitBounds leaves slack on a pitched camera, so tighten the zoom
+  // while every cabin still projects inside the padding.
+  const pad = { top: 48, bottom: 72, left: 40, right: 40 };
+  const cam = map.cameraForBounds(b, { padding: pad, pitch: 55, bearing: -35, maxZoom: 12 });
+  if (!cam) return;
+  const c = map.getCanvas(), w = c.clientWidth, h = c.clientHeight;
+  const before = { center: map.getCenter(), zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() };
+  map.jumpTo(cam);
+  const fits = () => list.every((cb) => {
+    const q = map.project(cb.coord);
+    return q.x >= pad.left && q.x <= w - pad.right && q.y >= pad.top && q.y <= h - pad.bottom;
+  });
+  for (let i = 0; i < 25 && map.getZoom() < 12; i++) {
+    const z = map.getZoom();
+    map.jumpTo({ zoom: z + 0.1 });
+    if (!fits()) { map.jumpTo({ zoom: z }); break; }
+  }
+  const target = { center: map.getCenter(), zoom: map.getZoom(), pitch: 55, bearing: -35 };
+  if (duration) { map.jumpTo(before); map.easeTo({ ...target, duration }); }
+}
+
+map.on('style.load', () => {
+  if (!map.getSource('fjell-dem')) {
+    map.addSource('fjell-dem', { type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14 });
+  }
+  map.setTerrain({ source: 'fjell-dem', exaggeration: 1.2 });
+  frameAll(0);
+  updateFan();
+});
+map.on('error', (e) => {
+  const n = $('status-note');
+  n.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+  n.classList.remove('hidden');
+});
+
+function flyTo(c) {
+  const opts = {
+    center: c.coord, zoom: 13.2, pitch: 58, bearing: c.bearing,
+    padding: { top: 60, bottom: 90, left: 40, right: 40 },
+  };
+  if (reduce) map.jumpTo(opts); else map.flyTo({ ...opts, duration: 2400, essential: false });
+}
+
+/* ---- List, markers, summary ---- */
+const amenity = (on, icon, label) => on ? `<li><svg class="ico"><use href="#${icon}"/></svg>${label}</li>` : '';
+function renderList() {
+  const shown = CABINS.filter(visible);
+  $('list-count').textContent = `${shown.length} of ${CABINS.length} cabins`;
+  $('cabin-list').innerHTML = shown.length ? shown.map((c) => {
+    const s = stay(c);
+    return `<li class="cabin${c.id === state.selected ? ' is-selected' : ''}" data-id="${c.id}" tabindex="0" role="button" aria-pressed="${c.id === state.selected}">
+      <div class="photo" style="--aurora:${c.aurora_c};--wall:${c.wall}"></div>
+      <div class="cabin-body">
+        <h3 class="cabin-name">${c.name}</h3>
+        <p class="cabin-place">${c.place} &middot; sleeps ${c.sleeps}</p>
+        <ul class="amen">${amenity(c.sauna, 'i-sauna', 'Sauna')}${amenity(c.fire, 'i-fire', 'Fireplace')}${amenity(c.aurora, 'i-aurora', 'Aurora')}</ul>
+        <p class="cabin-price">${nok(s.avg)} <small>/ night</small></p>
+      </div></li>`;
+  }).join('') : '<li class="empty-note">No cabins match these guests and filters. Try fewer filters.</li>';
+}
+$('cabin-list').addEventListener('click', (e) => {
+  const li = e.target.closest('.cabin');
+  if (li) select(li.dataset.id, { fly: true });
+});
+$('cabin-list').addEventListener('keydown', (e) => {
+  const li = e.target.closest('.cabin');
+  if (li && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); select(li.dataset.id, { fly: true }); }
+});
+
+function renderMarkers() {
+  CABINS.forEach((c) => {
+    const m = markers[c.id];
+    m.pill.textContent = nok(stay(c).avg);
+    m.pill.classList.toggle('hidden', !visible(c));
+    m.pill.classList.toggle('is-selected', c.id === state.selected);
+    m.root.style.zIndex = c.id === state.selected ? 2 : 1;
+  });
+}
+
+function renderSummary() {
+  const el = $('summary');
+  const c = CABINS.find((x) => x.id === state.selected);
+  if (!c || !visible(c)) { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  if (state.confirmed) {
+    el.innerHTML = `<div class="confirm">
+      <svg class="ico"><use href="#i-check"/></svg>
+      <div><h3 class="sum-title">Request sent</h3>
+      <p>Thank you. Our host at ${c.place} will reply within a day. Nothing is charged until you confirm.</p></div>
+      <button class="btn btn-quiet" id="sum-done">Done</button></div>`;
+    $('sum-done').addEventListener('click', () => { state.confirmed = false; renderSummary(); });
+    return;
+  }
+  const s = stay(c);
+  const ready = s.nights > 0;
+  el.innerHTML = `<h3 class="sum-title">${c.name}, ${c.place}</h3>
+    <div class="sum-row"><span>${ready ? `${s.nights} night${s.nights > 1 ? 's' : ''} &times; ${nok(s.avg)}` : 'Choose your dates above'}</span><span>${ready ? nok(s.sum) : ''}</span></div>
+    <div class="sum-row"><span>Cleaning &amp; linen</span><span>${nok(CLEANING)}</span></div>
+    <div class="sum-total"><span>Total</span><span>${ready ? nok(s.sum + CLEANING) : '—'}</span></div>
+    <button class="btn btn-book" id="sum-book"${ready ? '' : ' disabled'}>${ready ? 'Request booking' : 'Pick check-out'}</button>`;
+  $('sum-book').addEventListener('click', () => { state.confirmed = true; renderSummary(); });
+}
+
+function select(id, { fly = false, scroll = false } = {}) {
+  const c = CABINS.find((x) => x.id === id);
+  if (!c) return;
+  state.selected = id;
+  state.confirmed = false;
+  renderList(); renderMarkers(); renderSummary();
+  if (scroll) {
+    const li = document.querySelector(`.cabin[data-id="${id}"]`);
+    if (li) li.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+  }
+  if (fly) flyTo(c);
+}
+
+function renderAll() {
+  const sel = CABINS.find((x) => x.id === state.selected);
+  if (sel && !visible(sel)) state.selected = null;
+  renderCalendar(); renderGuests(); renderList(); renderMarkers(); renderSummary();
+}
+renderAll();
+</script>
+</body>
+</html>

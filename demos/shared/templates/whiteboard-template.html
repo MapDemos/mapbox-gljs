@@ -1,0 +1,462 @@
+<!--
+  Working EXAMPLE of the Whiteboard style pack (whiteboard.css, in this
+  same folder). Open this file directly to see the pattern working: a team
+  planning board for a (fictional) neighbourhood street festival in
+  Montreal's Plateau Mont-Royal -- the map is taped to the board inside a
+  wobbly hand-drawn frame, six draggable sticky notes sit around it and
+  marker arrows point from each note to its spot. Copy the markup + script
+  into your own demo and link whiteboard.css from its <head>; see the
+  class/id contract at the top of that CSS file.
+
+  What's NOT included: no real event, brand or organiser (the festival,
+  its date and the note copy are placeholders), no persistence (reload =
+  fresh board), no photos or icon fonts -- every stroke is inline SVG with
+  a seeded wobble. The map style is light-v11 recoloured to near-greyscale
+  in JS (guarded, so it degrades gracefully if layer ids change).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Plateau Street Fest planning board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Short+Stack&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="whiteboard.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: #map fills the inset of .map-frame (see whiteboard.css). */
+  #map { position: absolute; inset: 12px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="toolbar" aria-label="Board tools">
+    <div class="tool-group" role="group" aria-label="Marker colour">
+      <span class="tool-title">markers</span>
+      <button class="swatch" data-color="blue" aria-pressed="true" title="Blue marker" aria-label="Blue marker"></button>
+      <button class="swatch" data-color="red" aria-pressed="false" title="Red marker" aria-label="Red marker"></button>
+      <button class="swatch" data-color="green" aria-pressed="false" title="Green marker" aria-label="Green marker"></button>
+      <button class="swatch" data-color="black" aria-pressed="false" title="Black marker" aria-label="Black marker"></button>
+    </div>
+    <div class="tool-group">
+      <span class="tool-title">tools</span>
+      <button class="tool" id="tool-sticky" aria-pressed="false" title="Sticky: click the map to drop a pin and a note">
+        <svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#1F2328" stroke-width="2" stroke-linejoin="round"><path d="M3 3h20v13l-7 7H3z" fill="#FFE873"/><path d="M16 23v-7h7"/></svg><span class="tool-name">sticky</span>
+      </button>
+      <button class="tool" id="tool-eraser" aria-pressed="false" title="Eraser: click a note to rub it out">
+        <svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#1F2328" stroke-width="2" stroke-linejoin="round"><path d="M4 16 15 5l7 7-8 9H8z" fill="#FFB4C8"/><path d="M9 11l7 7"/></svg><span class="tool-name">eraser</span>
+      </button>
+      <button class="tool" id="tool-clean" title="Clean board: reset everything">
+        <svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#1F2328" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h16M10 8V5h6v3M7 8l1 14h10l1-14"/></svg><span class="tool-name">clean</span>
+      </button>
+    </div>
+  </aside>
+
+  <main class="board" id="board">
+    <header class="board-title">
+      <h1>Plateau Street Fest &mdash; Sat 14 June</h1>
+      <svg class="underline" id="underline" viewBox="0 0 520 14" preserveAspectRatio="none" aria-hidden="true"></svg>
+      <div class="hint status-note" id="hint"><span class="status-icon">&#9998;</span><span id="hint-text"></span></div>
+    </header>
+
+    <div class="map-frame" id="frame">
+      <div id="map"></div>
+      <svg class="frame-border" id="frame-border" aria-hidden="true"></svg>
+      <i class="tape tape-l"></i><i class="tape tape-r"></i>
+    </div>
+
+    <svg class="arrows" id="arrows" aria-hidden="true">
+      <defs>
+        <mask id="arrow-mask" maskUnits="userSpaceOnUse">
+          <rect id="m-all" x="0" y="0" fill="#fff" />
+          <rect id="m-l" fill="#000" /><rect id="m-r" fill="#000" />
+        </mask>
+      </defs>
+      <g id="arrow-g" mask="url(#arrow-mask)"></g>
+    </svg>
+
+    <div class="notes" id="notes"></div>
+  </main>
+</div>
+
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const $ = (s) => document.querySelector(s);
+const COLORS = { blue: '#2459D9', red: '#D93A2B', green: '#1E9E5A', black: '#1F2328' };
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const isPhone = () => matchMedia('(max-width: 700px)').matches;
+const f = (n) => n.toFixed(1);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/* ---------- seeded wobble: same seed = same sketch on every redraw ---------- */
+function rng(seed) {
+  return () => {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+// quadratic curve through the midpoints of a jittered polyline
+function smooth(pts) {
+  const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  let d = `M${f(pts[0][0])} ${f(pts[0][1])}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const m = mid(pts[i], pts[i + 1]);
+    d += `Q${f(pts[i][0])} ${f(pts[i][1])} ${f(m[0])} ${f(m[1])}`;
+  }
+  const l = pts[pts.length - 1];
+  return d + `L${f(l[0])} ${f(l[1])}`;
+}
+function roughRing(cx, cy, r, seed, loops) {
+  const R = rng(seed), n = 14, a0 = R() * 6.28, pts = [];
+  for (let i = 0; i <= Math.round(n * loops); i++) {
+    const a = a0 + (i / n) * 6.283, rr = r * (1 + (R() - 0.5) * 0.16) + (i / n) * 1.6;
+    pts.push([cx + Math.cos(a) * rr * 1.04, cy + Math.sin(a) * rr * 0.96]);
+  }
+  return smooth(pts);
+}
+function roughRect(x, y, w, h, seed, j, passes) {
+  const R = rng(seed); let d = '';
+  for (let p = 0; p < passes; p++) {
+    const c = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]].map(([a, b]) => [a + (R() - 0.5) * j * 2, b + (R() - 0.5) * j * 2]);
+    for (let i = 0; i < 4; i++) {
+      const a = c[i], b = c[(i + 1) % 4], ox = b[0] - a[0], oy = b[1] - a[1], len = Math.hypot(ox, oy) || 1;
+      const s = [a[0] - (ox / len) * 5 * R(), a[1] - (oy / len) * 5 * R()];
+      const e = [b[0] + (ox / len) * 6 * R(), b[1] + (oy / len) * 6 * R()];
+      d += `M${f(s[0])} ${f(s[1])}Q${f((a[0] + b[0]) / 2 + (R() - 0.5) * j * 2)} ${f((a[1] + b[1]) / 2 + (R() - 0.5) * j * 2)} ${f(e[0])} ${f(e[1])}`;
+    }
+  }
+  return d;
+}
+function roughLine(x1, y1, x2, y2, seed, bow) {
+  const R = rng(seed);
+  return `M${f(x1)} ${f(y1)}Q${f((x1 + x2) / 2)} ${f((y1 + y2) / 2 + (R() - 0.5) * bow * 2)} ${f(x2)} ${f(y2)}`;
+}
+// curved marker arrow: returns { main (shaft + head), faint (second pass) }
+function roughArrow(x1, y1, x2, y2, seed) {
+  const R = rng(seed), dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
+  const bow = (R() < 0.5 ? -1 : 1) * len * (0.1 + R() * 0.1);
+  const cx = (x1 + x2) / 2 - (dy / len) * bow, cy = (y1 + y2) / 2 + (dx / len) * bow;
+  let tx = x2 - cx, ty = y2 - cy; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+  const head = (ang) => {
+    const c = Math.cos(ang), s = Math.sin(ang), L = 15 + R() * 4;
+    return `M${f(x2)} ${f(y2)}L${f(x2 - (tx * c - ty * s) * L)} ${f(y2 - (tx * s + ty * c) * L)}`;
+  };
+  const j = () => (R() - 0.5) * 5;
+  return {
+    main: `M${f(x1)} ${f(y1)}Q${f(cx)} ${f(cy)} ${f(x2)} ${f(y2)}` + head(0.5) + head(-0.5),
+    faint: `M${f(x1 + j())} ${f(y1 + j())}Q${f(cx + j())} ${f(cy + j())} ${f(x2 + j())} ${f(y2 + j())}`,
+  };
+}
+function svgPath(parent, d, attrs) {
+  const p = document.createElementNS(NS, 'path');
+  p.setAttribute('d', d);
+  for (const k in attrs) p.setAttribute(k, attrs[k]);
+  parent.appendChild(p);
+  return p;
+}
+
+/* ---------- festival data (fictional event, real Plateau streets) ---------- */
+const MONT_ROYAL = [[-73.58638, 45.52012], [-73.58283, 45.52398]]; // St-Laurent -> St-Denis (verified road tiles)
+const lerp = (t) => [MONT_ROYAL[0][0] + (MONT_ROYAL[1][0] - MONT_ROYAL[0][0]) * t, MONT_ROYAL[0][1] + (MONT_ROYAL[1][1] - MONT_ROYAL[0][1]) * t];
+const SPOTS = [
+  { title: 'Toilets', text: 'Portable block at Saint-Denis and Rachel', ll: [-73.57765, 45.52257], color: 'green', tint: 'mint', side: 'L', fy: 0.17, shape: 'box' },
+  { title: 'First aid', text: 'Red tent, NE corner of Saint-Denis and Mont-Royal', ll: [-73.58245, 45.52425], color: 'red', tint: 'pink', side: 'L', fy: 0.36, shape: 'box' },
+  { title: 'Food trucks', text: 'Eight trucks, Mont-Royal closed to cars', ll: lerp(0.35), color: 'blue', tint: 'yellow', side: 'L', fy: 0.55, shape: 'ring' },
+  { title: 'Bike parking', text: 'Free valet by Saint-Laurent', ll: MONT_ROYAL[0], color: 'black', tint: 'blue', side: 'L', fy: 0.74, shape: 'box' },
+  { title: 'Main stage', text: 'Bands from 2 pm, park bandshell', ll: [-73.5675, 45.5258], color: 'red', tint: 'yellow', side: 'R', fy: 0.2, shape: 'ring' },
+  { title: 'Kids zone', text: 'Face paint, bubbles, chalk wall', ll: [-73.5718, 45.5268], color: 'green', tint: 'pink', side: 'R', fy: 0.5, shape: 'ring' },
+];
+
+const BOUNDS = SPOTS.reduce((b, s) => b.extend(s.ll), new mapboxgl.LngLatBounds(SPOTS[0].ll, SPOTS[0].ll));
+
+/* ---------- map ---------- */
+const board = $('#board'), frame = $('#frame'), mapEl = $('#map'), notesEl = $('#notes');
+const arrowsSvg = $('#arrows'), arrowG = $('#arrow-g');
+const framePad = () => isPhone() ? { top: 52, bottom: 84, left: 44, right: 44 } : { top: 56, bottom: 100, left: 70, right: 70 };
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  bounds: BOUNDS,
+  fitBoundsOptions: { padding: framePad(), maxZoom: 16 },
+  attributionControl: true,
+  dragRotate: false,
+});
+
+// near-greyscale marker-sketch look: white land, pale-blue water, light-grey roads
+function recolour() {
+  const set = (id, kind, prop, val) => { try { if (map.getLayer(id)) (kind === 'p' ? map.setPaintProperty : map.setLayoutProperty).call(map, id, prop, val); } catch (e) { /* skip */ } };
+  map.getStyle().layers.forEach((l) => {
+    const id = l.id;
+    if (l.type === 'background') set(id, 'p', 'background-color', '#FFFFFF');
+    else if (l.type === 'fill') set(id, 'p', 'fill-color', /water/.test(id) ? '#D6E6F5' : /park|pitch|wood|grass|national/.test(id) ? '#F4F7F4' : '#FFFFFF');
+    else if (l.type === 'fill-extrusion') set(id, 'p', 'fill-extrusion-color', '#EEF0F2');
+    else if (l.type === 'line') {
+      if (/waterway/.test(id)) set(id, 'p', 'line-color', '#C3D9EE');
+      else if (/admin/.test(id)) set(id, 'p', 'line-color', '#C9CDD2');
+      else if (/road|bridge|tunnel|street|path|pedestrian|ferry/.test(id)) set(id, 'p', 'line-color', /case/.test(id) ? '#E4E7EA' : '#D3D6DA');
+    } else if (l.type === 'symbol') {
+      if (/poi|transit|airport|rail/.test(id)) set(id, 'l', 'visibility', 'none');
+      else { set(id, 'p', 'text-color', '#7D848C'); set(id, 'p', 'text-halo-color', '#FFFFFF'); }
+    }
+  });
+}
+
+// closed street: a wobbly thin polygon around Mont-Royal, drawn with a red marker
+function closedStreet() {
+  const [a, b] = MONT_ROYAL, mx = 111320 * Math.cos((a[1] * Math.PI) / 180), my = 110540;
+  const dx = (b[0] - a[0]) * mx, dy = (b[1] - a[1]) * my, L = Math.hypot(dx, dy);
+  const ux = dx / L, uy = dy / L, nx = -uy, ny = ux, R = rng(7);
+  const side = (sg) => Array.from({ length: 11 }, (_, i) => {
+    const t = -12 + (i / 10) * (L + 24), w = 14 * sg + (R() - 0.5) * 4;
+    return [a[0] + (ux * t + nx * w) / mx, a[1] + (uy * t + ny * w) / my];
+  });
+  const s1 = side(1), s2 = side(-1).reverse();
+  map.addSource('closed', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[...s1, ...s2, s1[0]]] } } });
+  const first = map.getStyle().layers.find((l) => l.type === 'symbol');
+  const before = first && first.id;
+  map.addLayer({ id: 'closed-fill', type: 'fill', source: 'closed', paint: { 'fill-color': '#D93A2B', 'fill-opacity': 0.13 } }, before);
+  map.addLayer({ id: 'closed-line', type: 'line', source: 'closed', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#D93A2B', 'line-width': 3 } }, before);
+  map.addLayer({ id: 'closed-line2', type: 'line', source: 'closed', paint: { 'line-color': '#D93A2B', 'line-width': 1.4, 'line-opacity': 0.55, 'line-translate': [2, 2] } }, before);
+  const tag = document.createElement('div'), inner = document.createElement('div');
+  inner.className = 'closed-tag'; inner.textContent = 'street closed!';
+  tag.appendChild(inner);
+  // Beside the band, clear of the spots: left of it on desktop, above its
+  // north end on phones (where the left side runs off the map edge).
+  const narrow = window.matchMedia('(max-width: 760px)').matches;
+  new mapboxgl.Marker({ element: tag, offset: narrow ? [10, -48] : [-58, -14] })
+    .setLngLat(lerp(narrow ? 0.9 : 0.5)).addTo(map);
+}
+
+map.on('style.load', () => { recolour(); closedStreet(); });
+
+/* ---------- spots: map mark + sticky note + arrow ---------- */
+let spots = [], mode = 'select', pen = 'blue', userCount = 0, seedN = 1;
+const TINTS = ['yellow', 'pink', 'mint', 'blue'];
+const hintText = $('#hint-text');
+const say = (t) => { hintText.textContent = t; };
+const DEFAULT_HINT = 'psst: drag the notes around, click one to fly to its spot';
+
+function makeMark(spot) {
+  const inner = document.createElement('div');
+  inner.className = 'sketch-mark';
+  inner.style.setProperty('--mk', COLORS[spot.color]);
+  const s = spot.seed;
+  const ring = spot.shape === 'box' ? roughRect(8, 10, 30, 26, s, 1.6, 2) : roughRing(23, 23, 17, s, 1.15);
+  inner.innerHTML = `<svg viewBox="0 0 46 46" aria-hidden="true"><circle class="mk-fill" cx="23" cy="23" r="19"/>` +
+    `<g class="mk-ring"><path d="${ring}"/></g><g class="mk-scribble"><path pathLength="1" d="${roughRing(23, 23, 25, s + 9, 2.2)}"/></g></svg>` +
+    `<span class="mk-label"></span>`;
+  inner.querySelector('.mk-label').textContent = spot.title;
+  const root = document.createElement('div');
+  root.appendChild(inner);
+  inner.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (mode === 'eraser') removeSpot(spot); else select(spot);
+  });
+  spot.markEl = inner;
+  spot.marker = new mapboxgl.Marker({ element: root, anchor: 'center' }).setLngLat(spot.ll).addTo(map);
+}
+
+function makeNote(spot) {
+  const el = document.createElement('div');
+  el.className = `note ${spot.tint}`;
+  el.style.setProperty('--tilt', `${spot.tilt.toFixed(1)}deg`);
+  el.style.left = `${(spot.fx * 100).toFixed(2)}%`;
+  el.style.top = `${(spot.fy * 100).toFixed(2)}%`;
+  el.innerHTML = '<span class="note-title"></span><span class="note-text"></span>';
+  el.querySelector('.note-title').textContent = spot.title;
+  el.querySelector('.note-text').textContent = spot.text;
+  notesEl.appendChild(el);
+  spot.noteEl = el;
+  el.addEventListener('click', () => {
+    if (mode === 'eraser') removeSpot(spot); else if (isPhone()) select(spot);
+  });
+  el.addEventListener('dblclick', () => rename(spot));
+  enableDrag(spot);
+}
+
+function addSpot(d) {
+  const R = rng(seedN * 977 + 5);
+  const spot = Object.assign({ seed: seedN * 31 + 3, tilt: (R() - 0.5) * 7 }, d);
+  seedN++;
+  spot.arrow = svgPath(arrowG, '', { class: 'arrow', stroke: COLORS[spot.color] });
+  spot.arrow2 = svgPath(arrowG, '', { class: 'arrow faint', stroke: COLORS[spot.color] });
+  makeMark(spot);
+  makeNote(spot);
+  spots.push(spot);
+  return spot;
+}
+
+function removeSpot(spot) {
+  spot.marker.remove(); spot.noteEl.remove(); spot.arrow.remove(); spot.arrow2.remove();
+  spots = spots.filter((s) => s !== spot);
+  say(`rubbed out "${spot.title}"`);
+}
+
+function rename(spot) {
+  const t = spot.noteEl.querySelector('.note-title');
+  t.contentEditable = 'true'; t.focus();
+  const done = () => {
+    t.contentEditable = 'false';
+    spot.title = t.textContent.trim() || 'New idea';
+    t.textContent = spot.title;
+    spot.markEl.querySelector('.mk-label').textContent = spot.title;
+    t.removeEventListener('blur', done);
+  };
+  t.addEventListener('blur', done);
+  t.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); t.blur(); } });
+}
+
+function buildBoard() {
+  const W = board.clientWidth, H = board.clientHeight, nw = 168;
+  const mkR = rng(11);
+  SPOTS.forEach((d) => {
+    addSpot(Object.assign({}, d, { fx: (d.side === 'L' ? 14 : W - nw - 14) / W, fy: d.fy, tilt: (mkR() - 0.5) * 8 }));
+  });
+  drawArrows();
+}
+
+function clearBoard() {
+  spots.slice().forEach((s) => { s.marker.remove(); s.noteEl.remove(); s.arrow.remove(); s.arrow2.remove(); });
+  spots = []; userCount = 0; seedN = 1;
+}
+
+/* ---------- selecting + flying ---------- */
+function select(spot) {
+  spots.forEach((s) => { s.markEl.classList.remove('active', 'pulse'); s.noteEl.classList.remove('selected'); });
+  void spot.markEl.offsetWidth; // restart the scribble animation
+  spot.markEl.classList.add('active');
+  if (isPhone() && !reduceMotion) spot.markEl.classList.add('pulse');
+  spot.noteEl.classList.add('selected');
+  say(spot.title);
+  const cam = { center: spot.ll, zoom: 16.2, padding: framePad() };
+  if (reduceMotion) map.jumpTo(cam); else map.flyTo(Object.assign(cam, { duration: 1400, essential: false }));
+}
+
+/* ---------- dragging notes (desktop) ---------- */
+function enableDrag(spot) {
+  const el = spot.noteEl;
+  let drag = false, moved = false, sx = 0, sy = 0, fx0 = 0, fy0 = 0;
+  el.addEventListener('pointerdown', (e) => {
+    if (isPhone() || mode === 'eraser' || el.querySelector('[contenteditable="true"]') || e.button > 0) return;
+    drag = true; moved = false; sx = e.clientX; sy = e.clientY; fx0 = spot.fx; fy0 = spot.fy;
+    el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (!moved && Math.hypot(dx, dy) < 4) return;
+    moved = true; el.classList.add('dragging');
+    const W = board.clientWidth, H = board.clientHeight;
+    spot.fx = clamp(fx0 + dx / W, 0, 1 - el.offsetWidth / W);
+    spot.fy = clamp(fy0 + dy / H, 0, 1 - el.offsetHeight / H);
+    el.style.left = `${(spot.fx * 100).toFixed(2)}%`;
+    el.style.top = `${(spot.fy * 100).toFixed(2)}%`;
+    drawArrows();
+  });
+  const end = () => {
+    if (!drag) return;
+    drag = false; el.classList.remove('dragging');
+    if (!moved) select(spot);
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', () => { drag = false; el.classList.remove('dragging'); });
+}
+
+/* ---------- arrows: note edge -> map point, recomputed on every move ---------- */
+function drawArrows() {
+  if (isPhone()) return;
+  const b = board.getBoundingClientRect(), m = mapEl.getBoundingClientRect();
+  const ml = m.left - b.left, mt = m.top - b.top;
+  arrowsSvg.setAttribute('viewBox', `0 0 ${b.width} ${b.height}`);
+  const setR = (id, x, y, w, h) => { const r = $(id); r.setAttribute('x', x); r.setAttribute('y', y); r.setAttribute('width', w); r.setAttribute('height', h); };
+  setR('#m-all', 0, 0, b.width, b.height);
+  // keep strokes off the Mapbox logo (bottom-left) and attribution (bottom-right)
+  setR('#m-l', ml, mt + m.height - 84, 150, 84);
+  setR('#m-r', ml + m.width - 300, mt + m.height - 44, 300, 44);
+  spots.forEach((s) => {
+    const p = map.project(s.ll), tx = ml + p.x, ty = mt + p.y;
+    const inside = p.x > 10 && p.x < m.width - 10 && p.y > 10 && p.y < m.height - 10;
+    const n = s.noteEl.getBoundingClientRect();
+    const cx = n.left - b.left + n.width / 2, cy = n.top - b.top + n.height / 2;
+    const dx = tx - cx, dy = ty - cy, len = Math.hypot(dx, dy);
+    if (!inside || len < 90) { s.arrow.setAttribute('d', ''); s.arrow2.setAttribute('d', ''); return; }
+    const k = Math.min((n.width / 2 + 8) / Math.abs(dx || 1e-6), (n.height / 2 + 8) / Math.abs(dy || 1e-6));
+    const a = roughArrow(cx + dx * k, cy + dy * k, tx - (dx / len) * 28, ty - (dy / len) * 28, s.seed);
+    s.arrow.setAttribute('d', a.main); s.arrow2.setAttribute('d', a.faint);
+  });
+}
+map.on('move', drawArrows);
+map.on('resize', drawArrows);
+
+/* ---------- hand-drawn frame + title underline ---------- */
+function drawFrame() {
+  const svg = $('#frame-border'), w = frame.clientWidth, h = frame.clientHeight;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.innerHTML = '';
+  svgPath(svg, roughRect(5, 5, w - 10, h - 10, 21, 2.4, 2), { fill: 'none', stroke: '#1F2328', 'stroke-width': 2.8, 'stroke-linecap': 'round' });
+}
+function drawUnderline() {
+  const u = $('#underline');
+  u.innerHTML = '';
+  const c = COLORS[pen];
+  svgPath(u, roughLine(6, 8, 514, 6, 3, 4), { fill: 'none', stroke: c, 'stroke-width': 3, 'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke' });
+  svgPath(u, roughLine(40, 12, 470, 11, 8, 3), { fill: 'none', stroke: c, 'stroke-width': 2, 'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke' });
+}
+new ResizeObserver(() => { drawFrame(); drawArrows(); }).observe(frame);
+
+/* ---------- tools ---------- */
+function setMode(m) {
+  mode = mode === m ? 'select' : m;
+  $('#tool-sticky').setAttribute('aria-pressed', mode === 'sticky');
+  $('#tool-eraser').setAttribute('aria-pressed', mode === 'eraser');
+  document.body.classList.toggle('sticky-on', mode === 'sticky');
+  document.body.classList.toggle('eraser-on', mode === 'eraser');
+  say(mode === 'sticky' ? 'sticky tool: click the map to drop a pin + note' : mode === 'eraser' ? 'eraser: click a note or pin to rub it out' : DEFAULT_HINT);
+}
+$('#tool-sticky').addEventListener('click', () => setMode('sticky'));
+$('#tool-eraser').addEventListener('click', () => setMode('eraser'));
+document.querySelectorAll('.swatch').forEach((b) => b.addEventListener('click', () => {
+  pen = b.dataset.color;
+  document.querySelectorAll('.swatch').forEach((x) => x.setAttribute('aria-pressed', x === b));
+  drawUnderline();
+  say(`${pen} marker picked up`);
+}));
+$('#tool-clean').addEventListener('click', () => {
+  clearBoard(); buildBoard();
+  if (mode !== 'select') setMode(mode);
+  const cam = { padding: framePad(), maxZoom: 16 };
+  if (reduceMotion) map.fitBounds(BOUNDS, Object.assign(cam, { duration: 0 })); else map.fitBounds(BOUNDS, Object.assign(cam, { duration: 1000 }));
+  say('board wiped clean');
+});
+
+map.on('click', (e) => {
+  if (mode !== 'sticky') return;
+  userCount++;
+  const b = board.getBoundingClientRect(), m = mapEl.getBoundingClientRect(), W = b.width, H = b.height;
+  const left = e.point.x < m.width / 2, nw = 168;
+  const fy = clamp((m.top - b.top + e.point.y - 40) / H, 0.02, 0.78);
+  const spot = addSpot({
+    title: 'New idea', text: 'Double-click to rename me', ll: [e.lngLat.lng, e.lngLat.lat], color: pen,
+    tint: TINTS[userCount % 4], shape: userCount % 2 ? 'ring' : 'box',
+    fx: ((left ? 14 : W - nw - 14) + (userCount % 3) * (left ? 6 : -6)) / W, fy,
+  });
+  if (isPhone()) spot.noteEl.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' });
+  drawArrows();
+  say('pin dropped, sticky tool is still on (click it to stop)');
+});
+
+/* ---------- go ---------- */
+say(DEFAULT_HINT);
+drawFrame();
+drawUnderline();
+buildBoard();
+</script>
+</body>
+</html>

@@ -1,0 +1,412 @@
+<!--
+  Working EXAMPLE of the Chalkboard style pack (chalkboard.css, in this same
+  folder). Open this file directly to see the pattern working: a wooden-framed
+  cafe chalkboard whose left half is a "TODAY'S TRUCKS" menu and whose right
+  half is a map recoloured into chalk-on-slate (mapbox dark-v11, repainted on
+  style.load) with ten fictional food trucks around Austin, TX. Click a menu
+  entry or a numbered marker and a chalk circle is DRAWN around the truck
+  (stroke-dashoffset animation) while the map flies there and a chalk speech
+  bubble opens; cuisine chips filter the board and the "Open now" box erases
+  the closed trucks. Copy the markup below into your own demo and link
+  chalkboard.css from its <head> -- see the class/id contract documented at
+  the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (slate, chalk colours, wooden frame, hand-drawn
+  doodles) at the user's request for something distinct from every other
+  pack in this folder. The trucks, dishes, prices and opening hours are
+  fictional placeholders and the pins sit at approximate public locations in
+  Austin -- swap in your own.
+
+  What's NOT included: real vendor data, live "open now" times (open/closed
+  is a fixed flag per truck), search/geocoding, routing, or a hard-coded
+  access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chalkboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Cabin+Sketch:wght@400;700&family=Patrick+Hand&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="chalkboard.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- Chalk doodle sprite: wobbly strokes, coloured via currentColor -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-taco" viewBox="0 0 48 48"><path d="M5 33 C5 17 17 9 25 9 C37 9 44 20 43 33 C30 35 18 34 5 33 Z"/><path d="M11 29 q4 -5 8 0 t8 0 t8 0"/><path d="M15 21 q3 -3 6 -1"/></symbol>
+  <symbol id="i-flame" viewBox="0 0 48 48"><path d="M24 5 C28 14 39 18 37 30 C36 38 30 43 24 43 C17 43 11 38 12 29 C13 23 18 22 18 16 C21 18 22 11 24 5 Z"/><path d="M24 37 C19 37 20 31 24 27 C28 31 29 37 24 37 Z"/></symbol>
+  <symbol id="i-cup" viewBox="0 0 48 48"><path d="M9 19 C16 20 28 18 35 19 L34 30 C33 37 29 41 22 41 C15 41 11 37 10 30 Z"/><path d="M35 22 C43 20 44 31 34 33"/><path d="M16 13 C13 9 19 8 16 4 M25 13 C22 9 28 8 25 4"/></symbol>
+  <symbol id="i-leaf" viewBox="0 0 48 48"><path d="M9 39 C7 19 22 8 41 8 C41 27 32 39 14 38 Z"/><path d="M9 41 C17 31 24 24 32 17"/></symbol>
+  <symbol id="i-cake" viewBox="0 0 48 48"><path d="M11 25 C9 14 18 10 24 8 C31 10 39 14 37 25 Z"/><path d="M13 26 L17 41 C22 42 27 42 31 41 L35 26"/><path d="M21 30 V38 M27 30 V38"/><circle cx="24" cy="5" r="2"/></symbol>
+  <symbol id="i-star" viewBox="0 0 48 48"><path d="M24 5 L29 18 L43 19 L32 28 L36 42 L24 34 L12 42 L16 28 L5 19 L19 18 Z"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 48 48"><path d="M5 34 C10 14 28 8 41 15"/><path d="M41 15 L31 12 M41 15 L37 25"/></symbol>
+</svg>
+
+<div class="app">
+  <div class="board">
+
+    <section class="menu" aria-label="Today's food trucks">
+      <header class="menu-head">
+        <div>
+          <h1 class="menu-title">Today's Trucks</h1>
+          <p class="menu-sub">Austin, TX &mdash; tap a number to find the wheels</p>
+        </div>
+        <div class="menu-doodles" aria-hidden="true">
+          <svg class="doodle ink-yellow" viewBox="0 0 48 48"><use href="#i-taco"/></svg>
+          <svg class="doodle ink-blue" viewBox="0 0 48 48"><use href="#i-cup"/></svg>
+          <svg class="doodle ink-pink" viewBox="0 0 48 48"><use href="#i-star"/></svg>
+        </div>
+      </header>
+
+      <div class="controls">
+        <div class="chips" id="chips" role="group" aria-label="Filter by cuisine"></div>
+        <button class="toggle" id="open-toggle" role="switch" aria-checked="false" type="button">
+          <span class="toggle-box"><svg viewBox="0 0 26 26"><path pathLength="1" d="M5 14 C8 16 9 19 11 21 C14 14 18 8 23 4"/></svg></span>
+          <span>Open now</span>
+        </button>
+      </div>
+
+      <div class="menu-status" id="status"><span class="status-note loading">Chalking up the board...</span></div>
+
+      <div class="truck-list" id="truck-list"></div>
+    </section>
+
+    <section class="stage" aria-label="Map of today's trucks">
+      <div id="map"></div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+// Fictional trucks around Austin, TX. Pins sit on/near the named streets.
+const TRUCKS = [
+  { name: "Lola's Lone Star Tacos", cuisine: 'tacos', spot: 'South Congress', lngLat: [-97.7502, 30.2490], open: true, hours: 'open till 9pm',
+    dishes: [['Brisket breakfast taco', '$4.50'], ['Elote cup', '$5'], ['Three-taco plate', '$11']] },
+  { name: 'Smoke & Mesquite', cuisine: 'bbq', spot: 'East 6th', lngLat: [-97.7262, 30.2641], open: true, hours: 'open till 10pm',
+    dishes: [['Half-pound brisket', '$16'], ['Jalapeno sausage link', '$7'], ['Banana pudding', '$5']] },
+  { name: 'Bean There, Brewed That', cuisine: 'coffee', spot: 'Rainey St', lngLat: [-97.7388, 30.2584], open: true, hours: 'open till 6pm',
+    dishes: [['Cold brew', '$4.50'], ['Honey lavender latte', '$5.75'], ['Almond croissant', '$4']] },
+  { name: 'Green Wagon', cuisine: 'vegan', spot: 'Zilker Park', lngLat: [-97.7712, 30.2655], open: false, hours: 'opens 5pm',
+    dishes: [['Jackfruit carnitas bowl', '$12'], ['Cauli-wing basket', '$10'], ['Mango lassi', '$5']] },
+  { name: 'Honey Pie Cart', cuisine: 'sweet', spot: 'Mueller', lngLat: [-97.7040, 30.2985], open: true, hours: 'open till 8pm',
+    dishes: [['Pecan hand pie', '$5'], ['Peach cobbler cup', '$6'], ['Honey soft-serve', '$4.50']] },
+  { name: 'Brisket Bros Roadside', cuisine: 'bbq', spot: 'The Domain', lngLat: [-97.7253, 30.4021], open: false, hours: 'back tomorrow 11am',
+    dishes: [['Smoked turkey plate', '$14'], ['Mac and cheese', '$5'], ['Pulled pork slider', '$6']] },
+  { name: "Abuela's Al Pastor", cuisine: 'tacos', spot: 'East Cesar Chavez', lngLat: [-97.7255, 30.2556], open: true, hours: 'open till 2am',
+    dishes: [['Al pastor taco', '$3.75'], ['Quesabirria', '$9'], ['Horchata', '$4']] },
+  { name: 'Sunrise Roast Co.', cuisine: 'coffee', spot: 'South Congress', lngLat: [-97.7485, 30.2395], open: false, hours: 'closed, day off',
+    dishes: [['Flat white', '$4.75'], ['Oat milk cortado', '$4.50'], ['Kolache', '$3.50']] },
+  { name: 'Sugar Skull Churros', cuisine: 'sweet', spot: 'East 6th', lngLat: [-97.7345, 30.2655], open: true, hours: 'open till midnight',
+    dishes: [['Cinnamon churros', '$6'], ['Dulce de leche dip', '$1.50'], ['Mexican hot chocolate', '$4.50']] },
+  { name: 'Plant Power Plates', cuisine: 'vegan', spot: 'The Domain', lngLat: [-97.7215, 30.4035], open: true, hours: 'open till 7pm',
+    dishes: [['Chickpea smash wrap', '$10'], ['Sweet potato fries', '$5'], ['Green machine juice', '$7']] },
+];
+
+const CUISINES = [
+  { key: 'all', label: 'All' },
+  { key: 'tacos', label: 'Tacos' },
+  { key: 'bbq', label: 'BBQ' },
+  { key: 'coffee', label: 'Coffee' },
+  { key: 'vegan', label: 'Vegan' },
+  { key: 'sweet', label: 'Sweet' },
+];
+const ICONS = { tacos: 'i-taco', bbq: 'i-flame', coffee: 'i-cup', vegan: 'i-leaf', sweet: 'i-cake' };
+const SVGNS = 'http://www.w3.org/2000/svg';
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const isPhone = () => window.matchMedia('(max-width: 760px)').matches;
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/dark-v11',
+  center: [-97.74, 30.28],
+  zoom: 10.4,
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+// ---- Chalk-on-slate recolour of dark-v11 (guarded per layer) ----
+const COLORS = { land: '#2B3A33', land2: '#2F3F38', park: '#365238', water: '#24323A', chalk: '#F4F1E8' };
+
+function recolour() {
+  const layers = (map.getStyle() || {}).layers || [];
+  const paint = (id, prop, val) => { try { map.setPaintProperty(id, prop, val); } catch (e) { /* layer lacks this property */ } };
+  layers.forEach(({ id, type }) => {
+    if (!map.getLayer(id)) return;
+    if (type === 'background') {
+      paint(id, 'background-color', COLORS.land);
+    } else if (type === 'fill') {
+      let color = COLORS.land2;
+      if (/water/.test(id)) color = COLORS.water;
+      else if (/park|wood|grass|golf|pitch|scrub|national/.test(id)) color = COLORS.park;
+      else if (/^land$|landcover/.test(id)) color = COLORS.land;
+      else if (/building/.test(id)) color = '#33453D';
+      paint(id, 'fill-color', color);
+      paint(id, 'fill-opacity', 1);
+    } else if (type === 'fill-extrusion') {
+      paint(id, 'fill-extrusion-color', '#33453D');
+    } else if (type === 'line') {
+      if (/admin/.test(id)) {
+        paint(id, 'line-color', COLORS.chalk);
+        paint(id, 'line-opacity', 0.25);
+      } else if (/water/.test(id)) {
+        paint(id, 'line-color', '#2E4651');
+      } else if (/case|casing/.test(id)) {
+        paint(id, 'line-opacity', 0);
+      } else if (/road|bridge|tunnel|street|motorway|trunk|path|ferry/.test(id)) {
+        paint(id, 'line-color', COLORS.chalk);
+        paint(id, 'line-opacity', 0.34);
+        paint(id, 'line-blur', 0.7);
+      }
+    } else if (type === 'symbol') {
+      paint(id, 'text-color', /water/.test(id) ? '#9AD0EC' : /park/.test(id) ? '#B5E48C' : COLORS.chalk);
+      paint(id, 'text-halo-width', 0);
+      paint(id, 'text-halo-blur', 0);
+      paint(id, 'icon-opacity', 0.45);
+    }
+  });
+}
+map.on('style.load', recolour);
+
+// ---- Menu, markers, filtering ----
+const listEl = document.getElementById('truck-list');
+const chipsEl = document.getElementById('chips');
+const toggleEl = document.getElementById('open-toggle');
+const statusEl = document.getElementById('status');
+const stageEl = document.querySelector('.stage');
+
+let filter = 'all';
+let openOnly = false;
+let activeIndex = -1;
+let popup = null;
+
+function el(tag, cls, text) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text != null) node.textContent = text;
+  return node;
+}
+
+function svg(tag, attrs) {
+  const node = document.createElementNS(SVGNS, tag);
+  Object.entries(attrs || {}).forEach(([k, v]) => node.setAttribute(k, v));
+  return node;
+}
+
+function doodle(iconId, cls) {
+  const s = svg('svg', { class: 'doodle ' + (cls || ''), viewBox: '0 0 48 48' });
+  s.appendChild(svg('use', { href: '#' + iconId }));
+  return s;
+}
+
+// Wobbly closed loop around a pin (72x72 box); overshoots the start a little
+const PIN_RING = 'M36 6 C54 5 66 18 66 36 C66 55 53 67 35 66 C17 65 6 53 6 35 C6 18 19 8 40 7';
+const PIN_LINE = 'M17 3 C25 2 31 9 31 17 C31 25 25 31 17 31 C9 31 3 25 3 17 C3 9 9 4 20 3.5';
+
+TRUCKS.forEach((t, i) => {
+  // Menu entry
+  const card = el('article', 'truck c-' + t.cuisine);
+  card.tabIndex = 0;
+  card.setAttribute('role', 'button');
+  card.setAttribute('aria-label', `${i + 1}. ${t.name}, ${t.spot}, ${t.hours}`);
+  const badge = el('div', 'truck-badge');
+  badge.appendChild(doodle(ICONS[t.cuisine]));
+  badge.appendChild(el('span', 'truck-num', String(i + 1)));
+  const body = el('div', 'truck-body');
+  body.appendChild(el('h3', 'truck-name', t.name));
+  body.appendChild(el('p', 'truck-spot', `${CUISINES.find((c) => c.key === t.cuisine).label} @ ${t.spot}`));
+  const ul = el('ul', 'dishes');
+  t.dishes.forEach(([dish, price]) => {
+    const li = el('li');
+    li.append(el('span', 'dish-name', dish), el('i', 'leader'), el('span', 'price', price));
+    ul.appendChild(li);
+  });
+  body.appendChild(ul);
+  body.appendChild(el('p', 'truck-hours', t.hours));
+  card.append(badge, body);
+  listEl.appendChild(card);
+  card.addEventListener('click', () => select(i, { fromMenu: true }));
+  card.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(i, { fromMenu: true }); }
+  });
+
+  // Map marker: root element is Mapbox's; everything styled lives in .chalk-pin
+  const root = document.createElement('div');
+  const pin = el('div', 'chalk-pin c-' + t.cuisine);
+  pin.tabIndex = 0;
+  pin.setAttribute('role', 'button');
+  pin.setAttribute('aria-label', `${i + 1}. ${t.name}`);
+  const ringSvg = svg('svg', { class: 'pin-ring', viewBox: '0 0 72 72' });
+  ringSvg.appendChild(svg('path', { d: PIN_RING, pathLength: '1' }));
+  const bodySvg = svg('svg', { class: 'pin-body', viewBox: '0 0 34 34' });
+  bodySvg.appendChild(svg('circle', { class: 'pin-fill', cx: 17, cy: 17, r: 14.5 }));
+  bodySvg.appendChild(svg('path', { class: 'pin-line', d: PIN_LINE }));
+  const num = svg('text', { x: 17, y: 22.8 });
+  num.textContent = String(i + 1);
+  bodySvg.appendChild(num);
+  pin.append(ringSvg, bodySvg);
+  root.appendChild(pin);
+  pin.addEventListener('click', (e) => { e.stopPropagation(); select(i); });
+  pin.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(i); }
+  });
+  t.marker = new mapboxgl.Marker({ element: root, anchor: 'center' }).setLngLat(t.lngLat).addTo(map);
+  t.card = card;
+  t.pin = pin;
+  t.ring = ringSvg.querySelector('path');
+});
+
+CUISINES.forEach((c) => {
+  const b = el('button', 'chip c-' + c.key, c.label);
+  b.type = 'button';
+  b.setAttribute('aria-pressed', String(c.key === filter));
+  b.addEventListener('click', () => {
+    filter = c.key;
+    chipsEl.querySelectorAll('.chip').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    applyFilters(true);
+  });
+  chipsEl.appendChild(b);
+});
+
+toggleEl.addEventListener('click', () => {
+  openOnly = !openOnly;
+  toggleEl.setAttribute('aria-checked', String(openOnly));
+  applyFilters(false);
+});
+
+function visible(t) {
+  return filter === 'all' || t.cuisine === filter;
+}
+
+function setStatus(text) {
+  statusEl.replaceChildren(el('span', 'status-note success', text));
+}
+
+function applyFilters(refit) {
+  let shown = 0;
+  let open = 0;
+  TRUCKS.forEach((t, i) => {
+    const show = visible(t);
+    t.card.classList.toggle('hidden', !show);
+    t.pin.classList.toggle('hidden', !show);
+    t.card.classList.toggle('erased', openOnly && !t.open);
+    t.pin.classList.toggle('erased', openOnly && !t.open);
+    if (show) { shown += 1; if (t.open) open += 1; }
+    if (!show && i === activeIndex) clearActive();
+  });
+  setStatus(`${shown} truck${shown === 1 ? '' : 's'} on the board, ${open} open now`);
+  if (refit) fitTrucks();
+}
+
+function fitTrucks() {
+  const b = new mapboxgl.LngLatBounds();
+  TRUCKS.filter(visible).forEach((t) => b.extend(t.lngLat));
+  if (b.isEmpty()) return;
+  map.fitBounds(b, {
+    padding: { top: 70, bottom: 76, left: 60, right: 60 },
+    maxZoom: 14,
+    duration: reduce ? 0 : 1200,
+  });
+}
+
+// ---- Selection: draw chalk rings, fly, speech bubble ----
+function restartDraw(path) {
+  path.classList.remove('draw');
+  void path.getBoundingClientRect(); // force reflow so the animation restarts
+  path.classList.add('draw');
+}
+
+// Wobbly loop sized to the entry card; --len drives the dash animation
+function drawCardRing(card) {
+  card.querySelector('.truck-ring')?.remove();
+  const w = card.offsetWidth;
+  const h = card.offsetHeight;
+  const s = svg('svg', { class: 'truck-ring', viewBox: `0 0 ${w} ${h}` });
+  const d = `M6 9 C${w * 0.3} 3 ${w * 0.7} 8 ${w - 6} 7 C${w - 2} ${h * 0.35} ${w - 3} ${h * 0.7} ${w - 7} ${h - 7} `
+    + `C${w * 0.7} ${h - 2} ${w * 0.3} ${h - 8} 8 ${h - 6} C3 ${h * 0.7} 4 ${h * 0.3} 9 10 L11 18`;
+  const p = svg('path', { d });
+  s.appendChild(p);
+  card.appendChild(s);
+  p.style.setProperty('--len', String(Math.ceil(p.getTotalLength())));
+  restartDraw(p);
+}
+
+function clearActive() {
+  if (activeIndex >= 0) {
+    const prev = TRUCKS[activeIndex];
+    prev.card.classList.remove('active');
+    prev.card.querySelector('.truck-ring')?.remove();
+    prev.ring.classList.remove('draw');
+  }
+  activeIndex = -1;
+  if (popup) { popup.remove(); popup = null; }
+}
+
+function bubbleContent(t, i) {
+  const wrap = el('div');
+  wrap.appendChild(el('h4', 'pop-name', `${i + 1}. ${t.name}`));
+  wrap.appendChild(el('p', 'pop-spot', `${t.spot}, Austin`));
+  wrap.appendChild(el('p', 'pop-dish', `Try: ${t.dishes[0][0]}, ${t.dishes[0][1]}`));
+  wrap.appendChild(el('p', 'pop-hours', t.open ? t.hours : `closed, ${t.hours}`));
+  return wrap;
+}
+
+function select(i, opts = {}) {
+  const t = TRUCKS[i];
+  clearActive();
+  activeIndex = i;
+  t.card.classList.add('active');
+  drawCardRing(t.card);
+  restartDraw(t.ring);
+
+  popup = new mapboxgl.Popup({ className: 'chalk-bubble', offset: 42, maxWidth: '260px', closeButton: true, closeOnClick: false })
+    .setLngLat(t.lngLat)
+    .setDOMContent(bubbleContent(t, i))
+    .addTo(map);
+  popup.on('close', () => {
+    if (activeIndex === i) {
+      t.card.classList.remove('active');
+      t.card.querySelector('.truck-ring')?.remove();
+      t.ring.classList.remove('draw');
+      activeIndex = -1;
+      popup = null;
+    }
+  });
+
+  if (isPhone()) {
+    if (opts.fromMenu) stageEl.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  } else {
+    t.card.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+  }
+
+  // The bubble opens upward, so keep generous top padding; bottom >= 64 clears the logo
+  const target = { center: t.lngLat, zoom: Math.max(map.getZoom(), 14.2), padding: { top: 130, bottom: 70, left: 40, right: 40 } };
+  if (reduce) map.jumpTo(target);
+  else map.flyTo({ ...target, duration: 1500, essential: false });
+}
+
+map.on('load', () => {
+  applyFilters(false);
+  fitTrucks();
+});
+map.on('error', (e) => {
+  if (e && e.error && /style|access/i.test(String(e.error.message))) {
+    statusEl.replaceChildren(el('span', 'status-note error', 'The map could not load. Check the access token.'));
+  }
+});
+</script>
+</body>
+</html>

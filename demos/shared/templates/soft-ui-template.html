@@ -1,0 +1,372 @@
+<!--
+  Working EXAMPLE of the Soft UI style pack (soft-ui.css, in this same
+  folder). Open this file directly to see the pattern working with an EV
+  charging-station finder for Oslo ("Volta Grid", a fictional network): an
+  extruded range dial, an inset search field, pressed-in connector and power
+  toggles, raised station cards, and the Mapbox Standard map (faded theme,
+  day preset, land/roads toned toward the page surface) sitting in a deep
+  inset well. Filters update the list and the map pins; click a station to fly
+  there and open a soft popup with plug availability and a "Start route"
+  button; the dial arc animates to the range left on arrival. Copy the markup
+  below into your own demo and link soft-ui.css from its <head> -- see the
+  class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (neumorphism: one pale surface, paired white/cool-grey
+  shadows, lime-teal accent) at the user's request for something distinct
+  from every other pack in this folder. The streets and districts are real;
+  "Volta Grid", every station name, plug count, power rating and the 186 km
+  range are fictional placeholders -- swap in your own. Station positions are
+  hand-approximated.
+
+  What's NOT included: live availability, live routing (four driving routes
+  from the "you are here" point were fetched once from the Directions API and
+  embedded; other stations get a dashed straight-line preview), real
+  charging-network data, or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Soft UI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@600;700;800&family=Onest:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="soft-ui.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="panel-top">
+    <div class="hero">
+      <div class="hero-text">
+        <h1 class="brand-name">Volta Grid</h1>
+        <p class="brand-sub">Oslo &middot; battery 78%</p>
+      </div>
+      <div class="dial" role="img" aria-label="Range 186 kilometres" id="dial">
+        <svg class="dial-svg" viewBox="0 0 212 212" aria-hidden="true">
+          <circle class="dial-track" cx="106" cy="106" r="92" />
+          <circle class="dial-arc" id="dial-arc" cx="106" cy="106" r="92" />
+        </svg>
+        <div class="dial-face">
+          <span class="dial-value" id="dial-value">186</span>
+          <span class="dial-unit">KM RANGE</span>
+          <p class="dial-sub" id="dial-sub">Pick a station</p>
+        </div>
+      </div>
+    </div>
+
+    <label class="search">
+      <svg class="search-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="6" /><path d="M13 13l5 5" /></svg>
+      <input class="search-input" id="search" type="search" placeholder="Search a station or area" autocomplete="off" aria-label="Search stations" />
+    </label>
+
+    <div class="filter-block">
+      <span class="filter-label">Connector</span>
+      <div class="toggle-row" id="conn-row">
+        <button class="toggle" data-conn="CCS" aria-pressed="false"><i class="toggle-dot"></i>CCS</button>
+        <button class="toggle" data-conn="Type 2" aria-pressed="false"><i class="toggle-dot"></i>Type 2</button>
+        <button class="toggle" data-conn="CHAdeMO" aria-pressed="false"><i class="toggle-dot"></i>CHAdeMO</button>
+      </div>
+    </div>
+    <div class="filter-block">
+      <span class="filter-label">Power</span>
+      <div class="toggle-row" id="kw-row">
+        <button class="toggle" data-kw="50" aria-pressed="false"><i class="toggle-dot"></i>&ge; 50 kW</button>
+        <button class="toggle" data-kw="150" aria-pressed="false"><i class="toggle-dot"></i>&ge; 150 kW</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div class="well">
+      <div id="map"></div>
+      <div class="route-note hidden" id="route-note"></div>
+    </div>
+  </main>
+
+  <section class="panel-list" aria-label="Charging stations">
+    <div class="list-head">
+      <span class="list-count" id="list-count"></span>
+      <span class="list-sort">Nearest first</span>
+    </div>
+    <div class="station-list" id="station-list"></div>
+    <p class="empty-note hidden" id="empty-note">No station matches these filters.</p>
+  </section>
+</div>
+
+<script>
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = () => window.matchMedia('(max-width: 760px)').matches;
+const $ = (id) => document.getElementById(id);
+
+const RANGE = 186;          // km shown on the dial
+const RANGE_MAX = 320;      // km at a full charge (arc scale)
+const YOU = [10.7345, 59.914]; // "you are here" (Nationaltheatret)
+
+// plugs: f = free, b = in use, o = out of service
+const STATIONS = [
+  { id: 'aker', name: 'Aker Brygge Quay', area: 'Aker Brygge', c: [10.7295, 59.9105], kw: 150, plugs: 'ffb', conn: ['CCS', 'Type 2'] },
+  { id: 'grun', name: 'Olaf Ryes Plass Hub', area: 'Grünerløkka', c: [10.7585, 59.9225], kw: 50, plugs: 'fbbb', conn: ['Type 2', 'CHAdeMO'] },
+  { id: 'maj', name: 'Majorstuen Torg', area: 'Majorstuen', c: [10.7135, 59.9298], kw: 100, plugs: 'fff', conn: ['CCS', 'Type 2'] },
+  { id: 'bjor', name: 'Opera Bay Fast', area: 'Bjørvika', c: [10.754, 59.908], kw: 350, plugs: 'ffbb', conn: ['CCS'] },
+  { id: 'frog', name: 'Frogner Plass Pods', area: 'Frogner', c: [10.7075, 59.9215], kw: 22, plugs: 'ffff', conn: ['Type 2'] },
+  { id: 'nyd', name: 'Nydalen Works', area: 'Nydalen', c: [10.7665, 59.9495], kw: 150, plugs: 'bbo', conn: ['CCS', 'CHAdeMO'] },
+  { id: 'lys', name: 'Lysaker Brygge', area: 'Lysaker', c: [10.6385, 59.9115], kw: 150, plugs: 'fffb', conn: ['CCS', 'Type 2'] },
+  { id: 'sent', name: 'Youngstorget Rapid', area: 'Sentrum', c: [10.7485, 59.9162], kw: 50, plugs: 'bbb', conn: ['CCS', 'CHAdeMO'] },
+  { id: 'sko', name: 'Skøyen Station', area: 'Skøyen', c: [10.6785, 59.9225], kw: 100, plugs: 'fb', conn: ['CCS', 'Type 2'] },
+  { id: 'tors', name: 'Torshov Park', area: 'Torshov', c: [10.765, 59.9335], kw: 22, plugs: 'ooo', conn: ['Type 2'] },
+  { id: 'sth', name: 'St. Hanshaugen Lane', area: 'St. Hanshaugen', c: [10.7405, 59.9265], kw: 50, plugs: 'ffb', conn: ['Type 2', 'CHAdeMO'] },
+  { id: 'toy', name: 'Tøyen Hage Charge', area: 'Tøyen', c: [10.7745, 59.9145], kw: 150, plugs: 'fbf', conn: ['CCS', 'Type 2'] },
+  { id: 'ull', name: 'Ullevål Stadion', area: 'Ullevål', c: [10.7345, 59.9475], kw: 100, plugs: 'ffbb', conn: ['CCS'] },
+  { id: 'ekeb', name: 'Ekeberg Hillside', area: 'Ekeberg', c: [10.762, 59.9], kw: 50, plugs: 'fb', conn: ['Type 2', 'CHAdeMO'] },
+];
+
+// Driving routes from YOU, fetched once from the Directions API and simplified.
+const ROUTES = {
+  aker: { km: 0.9, min: 4, coords: [[10.7345,59.914],[10.7338,59.9142],[10.7335,59.9144],[10.733,59.9147],[10.7326,59.9149],[10.7325,59.9151],[10.7323,59.9152],[10.7321,59.9152],[10.7319,59.9151],[10.7313,59.9149],[10.7303,59.9145],[10.7302,59.9144],[10.7304,59.9138],[10.7291,59.9132],[10.7284,59.9128],[10.728,59.9127],[10.7272,59.9123],[10.7265,59.9119],[10.7264,59.9118],[10.7267,59.9117],[10.7279,59.9112],[10.7286,59.9108],[10.7289,59.9107],[10.729,59.9106],[10.7295,59.9105]] },
+  grun: { km: 3.6, min: 13, coords: [[10.7345,59.914],[10.7333,59.9145],[10.733,59.9153],[10.7338,59.9159],[10.7355,59.9173],[10.7379,59.9179],[10.738,59.918],[10.7363,59.9192],[10.7355,59.9202],[10.7372,59.9212],[10.7411,59.9223],[10.7401,59.9236],[10.7429,59.9249],[10.7445,59.9256],[10.746,59.9264],[10.7496,59.928],[10.7501,59.9255],[10.7507,59.9239],[10.7509,59.9228],[10.7507,59.9217],[10.751,59.9212],[10.7513,59.9212],[10.7544,59.9211],[10.7574,59.9215],[10.7585,59.9225]] },
+  maj: { km: 2.4, min: 12, coords: [[10.7345,59.914],[10.7335,59.9144],[10.7326,59.9149],[10.7331,59.9153],[10.7337,59.9158],[10.7342,59.9167],[10.7321,59.9173],[10.7317,59.9185],[10.7309,59.919],[10.7281,59.9203],[10.7285,59.9207],[10.7283,59.9208],[10.727,59.9216],[10.7263,59.923],[10.726,59.9236],[10.7255,59.924],[10.7236,59.925],[10.7223,59.9257],[10.7201,59.9272],[10.7187,59.928],[10.7167,59.9292],[10.7162,59.9293],[10.7149,59.929],[10.7135,59.9298]] },
+  bjor: { km: 3.6, min: 10, coords: [[10.7345,59.914],[10.7334,59.9145],[10.7325,59.9151],[10.732,59.9152],[10.7313,59.9149],[10.7305,59.914],[10.7315,59.9124],[10.7309,59.9122],[10.726,59.9114],[10.724,59.9105],[10.7243,59.9098],[10.7257,59.9096],[10.7264,59.9104],[10.7272,59.911],[10.7347,59.9106],[10.7374,59.9075],[10.7417,59.9056],[10.7434,59.9055],[10.7447,59.9067],[10.7463,59.907],[10.7485,59.908],[10.7496,59.9086],[10.7517,59.9086],[10.754,59.908]] },
+};
+
+/* ---- Helpers ---- */
+function hav(a, b) {
+  const R = 6371, rad = Math.PI / 180;
+  const dLat = (b[1] - a[1]) * rad, dLng = (b[0] - a[0]) * rad;
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * rad) * Math.cos(b[1] * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+STATIONS.forEach((s) => {
+  s.dist = hav(YOU, s.c);
+  const f = s.plugs.split('f').length - 1;
+  s.free = f;
+  s.state = f > 0 ? 'free' : (s.plugs.includes('b') ? 'busy' : 'off');
+  s.label = { free: `${f}/${s.plugs.length} free`, busy: 'All in use', off: 'Out of service' }[s.state];
+  s.long = { free: 'Available', busy: 'Busy', off: 'Out of service' }[s.state];
+});
+STATIONS.sort((a, b) => a.dist - b.dist);
+const fmtKm = (k) => (k < 10 ? k.toFixed(1) : Math.round(k)) + ' km';
+const plugHtml = (str) => '<span class="plugs">' + [...str].map((p) => `<i class="plug ${{ f: 'free', b: 'busy', o: 'off' }[p]}"></i>`).join('') + '</span>';
+
+/* ---- Map ---- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [10.72, 59.925],
+  zoom: 11.2,
+  config: {
+    basemap: {
+      theme: 'faded',
+      lightPreset: 'day',
+      showPointOfInterestLabels: false,
+      showTransitLabels: false,
+      // Push the basemap toward the page surface (#E6EBF1).
+      colorLand: '#E6EBF1',
+      colorRoads: '#F6F8FB',
+      colorMotorways: '#FFFFFF',
+      colorTrunks: '#FFFFFF',
+      colorWater: '#BFD0E2',
+      colorGreenspace: '#D3E3DA',
+      colorBuildings: '#DCE3EB',
+      colorPlaceLabels: '#2E3A4B',
+      colorRoadLabels: '#6F7C8F',
+    },
+  },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+const you = new mapboxgl.Marker({ element: Object.assign(document.createElement('div'), { innerHTML: '<span class="you-dot" title="You are here"></span>' }) })
+  .setLngLat(YOU).addTo(map);
+
+const allBounds = () => STATIONS.reduce((b, s) => b.extend(s.c), new mapboxgl.LngLatBounds(YOU, YOU));
+const fitAll = (duration) => map.fitBounds(allBounds(), {
+  padding: phone() ? { top: 32, bottom: 64, left: 24, right: 24 } : { top: 60, bottom: 80, left: 50, right: 50 },
+  duration: reduce ? 0 : duration,
+});
+map.on('style.load', () => {
+  fitAll(0);
+  map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  const join = { 'line-join': 'round', 'line-cap': 'round' };
+  map.addLayer({ id: 'route-casing', type: 'line', source: 'route', slot: 'top', layout: join,
+    filter: ['==', ['get', 'kind'], 'road'],
+    paint: { 'line-color': '#FFFFFF', 'line-width': 11, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'route-line', type: 'line', source: 'route', slot: 'top', layout: join,
+    filter: ['==', ['get', 'kind'], 'road'],
+    paint: { 'line-color': '#19C3A6', 'line-width': 6, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'route-dash', type: 'line', source: 'route', slot: 'top',
+    filter: ['==', ['get', 'kind'], 'straight'],
+    paint: { 'line-color': '#2E3A4B', 'line-width': 3.5, 'line-dasharray': [1.6, 1.6], 'line-emissive-strength': 1 } });
+});
+
+/* ---- Dial ---- */
+const arc = $('dial-arc');
+const CIRC = 2 * Math.PI * 92;
+arc.style.strokeDasharray = CIRC;
+let dialShown = RANGE;
+function setDial(km, sub, state) {
+  const frac = Math.max(0.02, Math.min(1, km / RANGE_MAX));
+  arc.style.strokeDashoffset = CIRC * (1 - frac);
+  arc.style.stroke = km < 40 ? 'var(--busy)' : 'var(--accent)';
+  $('dial-sub').textContent = sub;
+  $('dial').setAttribute('aria-label', `Range ${Math.round(km)} kilometres. ${sub}`);
+  const from = dialShown, t0 = performance.now();
+  dialShown = km;
+  if (reduce) { $('dial-value').textContent = Math.round(km); return; }
+  (function tick(t) {
+    const k = Math.min(1, (t - t0) / 900), e = 1 - Math.pow(1 - k, 3);
+    $('dial-value').textContent = Math.round(from + (km - from) * e);
+    if (k < 1) requestAnimationFrame(tick);
+  })(t0);
+}
+setDial(RANGE, 'Pick a station');
+
+/* ---- Filters ---- */
+const filters = { q: '', conns: new Set(), kw: 0 };
+const visible = () => STATIONS.filter((s) =>
+  (!filters.q || (s.name + ' ' + s.area).toLowerCase().includes(filters.q)) &&
+  (!filters.conns.size || s.conn.some((c) => filters.conns.has(c))) &&
+  s.kw >= filters.kw);
+
+let markers = new Map(), selected = null, popup = null;
+
+function render() {
+  const list = visible();
+  $('list-count').textContent = `${list.length} station${list.length === 1 ? '' : 's'}`;
+  $('empty-note').classList.toggle('hidden', list.length > 0);
+  $('station-list').innerHTML = list.map((s) => `
+    <button class="station-card${s === selected ? ' is-active' : ''}" data-id="${s.id}">
+      <span class="st-name">${s.name}</span>
+      <span class="st-kw">${s.kw}<small>kW</small></span>
+      <span class="st-meta">${s.area} &middot; ${fmtKm(s.dist)}</span>
+      <span class="st-foot"><span class="st-status ${s.state}">${s.label}</span>${plugHtml(s.plugs)}</span>
+    </button>`).join('');
+
+  markers.forEach((m) => m.remove());
+  markers = new Map();
+  list.forEach((s) => {
+    const root = document.createElement('div');
+    root.innerHTML = `<div class="pin ${s.state}${s === selected ? ' is-active' : ''}" role="button" aria-label="${s.name}, ${s.kw} kW, ${s.long}"><span class="pin-ring"></span><span class="pin-kw">${s.kw}</span></div>`;
+    root.addEventListener('click', (e) => { e.stopPropagation(); select(s); });
+    markers.set(s.id, new mapboxgl.Marker({ element: root }).setLngLat(s.c).addTo(map));
+  });
+  if (selected && !list.includes(selected)) clearSelection();
+}
+
+function bindToggles(rowId, attr, onChange, exclusive) {
+  $(rowId).addEventListener('click', (e) => {
+    const btn = e.target.closest('.toggle');
+    if (!btn) return;
+    const on = btn.getAttribute('aria-pressed') !== 'true';
+    if (exclusive) $(rowId).querySelectorAll('.toggle').forEach((b) => b.setAttribute('aria-pressed', 'false'));
+    btn.setAttribute('aria-pressed', String(on));
+    onChange(btn.dataset[attr], on);
+    render();
+  });
+}
+bindToggles('conn-row', 'conn', (v, on) => (on ? filters.conns.add(v) : filters.conns.delete(v)));
+bindToggles('kw-row', 'kw', (v, on) => { filters.kw = on ? +v : 0; }, true);
+$('search').addEventListener('input', (e) => { filters.q = e.target.value.trim().toLowerCase(); render(); });
+
+/* ---- Selection, popup, route ---- */
+function setRoute(s) {
+  const src = map.getSource('route');
+  if (!src) return;
+  const r = ROUTES[s.id];
+  const feature = r
+    ? { type: 'Feature', properties: { kind: 'road' }, geometry: { type: 'LineString', coordinates: r.coords } }
+    : { type: 'Feature', properties: { kind: 'straight' }, geometry: { type: 'LineString', coordinates: [YOU, s.c] } };
+  src.setData({ type: 'FeatureCollection', features: [feature] });
+  const km = r ? r.km : s.dist * 1.35;
+  $('route-note').textContent = r ? `${fmtKm(km)} by road · ${r.min} min` : `~${fmtKm(km)} · straight-line preview`;
+  $('route-note').classList.remove('hidden');
+  const left = Math.max(0, RANGE - km * 1.1);
+  setDial(left, `left on arrival at ${s.area}`);
+  const b = new mapboxgl.LngLatBounds(YOU, YOU).extend(s.c);
+  map.fitBounds(b, {
+    padding: phone() ? { top: 190, bottom: 64, left: 40, right: 40 } : { top: 230, bottom: 80, left: 80, right: 80 },
+    maxZoom: 15, duration: reduce ? 0 : 1200,
+  });
+}
+
+function clearRoute() {
+  const src = map.getSource('route');
+  if (src) src.setData({ type: 'FeatureCollection', features: [] });
+  $('route-note').classList.add('hidden');
+}
+
+function clearSelection() {
+  selected = null;
+  if (popup) { const p = popup; popup = null; p.remove(); }
+  clearRoute();
+  setDial(RANGE, 'Pick a station');
+  document.querySelectorAll('.station-card.is-active, .pin.is-active').forEach((el) => el.classList.remove('is-active'));
+}
+
+function select(s) {
+  if (popup) { const p = popup; popup = null; p.remove(); }
+  clearRoute();
+  selected = s;
+  document.querySelectorAll('.station-card').forEach((el) => el.classList.toggle('is-active', el.dataset.id === s.id));
+  markers.forEach((m, id) => m.getElement().firstElementChild.classList.toggle('is-active', id === s.id));
+  const active = document.querySelector('.station-card.is-active');
+  if (active) active.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+
+  const rows = [...s.plugs].map((p, i) => {
+    const k = { f: 'free', b: 'busy', o: 'off' }[p];
+    const t = { f: 'Free', b: 'In use', o: 'Offline' }[p];
+    return `<div class="plug-row"><i class="plug ${k}"></i>Plug ${i + 1} &middot; ${s.conn[i % s.conn.length]}<b>${t}</b></div>`;
+  }).join('');
+  popup = new mapboxgl.Popup({ className: 'soft-popup', offset: 30, maxWidth: '270px', closeOnClick: false })
+    .setLngLat(s.c)
+    .setHTML(`<h3 class="pop-name">${s.name}</h3>
+      <p class="pop-meta">${s.area} &middot; ${fmtKm(s.dist)} &middot; ${s.kw} kW</p>
+      <span class="pop-status ${s.state}">${s.long} &middot; ${s.label}</span>
+      <div class="pop-plugs">${rows}</div>
+      <button class="btn-press" id="route-btn">Start route</button>
+      <p class="pop-route hidden" id="pop-route"></p>`)
+    .addTo(map);
+  popup.on('close', () => { if (popup) clearSelection(); render(); });
+  popup.getElement().querySelector('#route-btn').addEventListener('click', (e) => {
+    e.currentTarget.setAttribute('aria-pressed', 'true');
+    e.currentTarget.textContent = 'Route on map';
+    setRoute(s);
+    const r = ROUTES[s.id];
+    const note = popup.getElement().querySelector('#pop-route');
+    note.textContent = r ? 'Driving route from your location' : 'Straight-line preview only';
+    note.classList.remove('hidden');
+  });
+
+  // Fly with padding: top room for the popup, bottom clear of the logo.
+  const opts = {
+    center: s.c, zoom: Math.max(map.getZoom(), 13.4),
+    padding: phone() ? { top: 170, bottom: 64, left: 30, right: 30 } : { top: 230, bottom: 80, left: 60, right: 60 },
+  };
+  if (reduce) map.jumpTo(opts); else map.flyTo({ ...opts, duration: 1400 });
+  setDial(RANGE - (ROUTES[s.id] ? ROUTES[s.id].km : s.dist * 1.35) * 1.1, `left on arrival at ${s.area}`);
+}
+
+$('station-list').addEventListener('click', (e) => {
+  const card = e.target.closest('.station-card');
+  if (!card) return;
+  const s = STATIONS.find((x) => x.id === card.dataset.id);
+  if (!s) return;
+  if (phone()) $('map').scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+  select(s);
+});
+
+map.on('click', () => { if (selected) { clearSelection(); render(); fitAll(900); } });
+map.on('load', () => map.resize());
+render();
+</script>
+</body>
+</html>

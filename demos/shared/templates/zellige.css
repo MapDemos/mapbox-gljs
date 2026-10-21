@@ -1,0 +1,843 @@
+/*
+  Zellige -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: Moroccan geometric tilework and riad
+  architecture -- a courtyard layout where the MAP is the courtyard, framed
+  by a tiled zellige border with a pointed-arch top, between two arcaded
+  side galleries; majorelle blue, emerald, saffron, terracotta, rose-clay
+  walls and ivory plaster; geometric patterns used purely as decoration),
+  deliberately distinct from every other pack in this folder: Academic
+  Paper, Aero Gadgets, Amber Terminal, Arena, Aurora Command, Blueprint,
+  Board Game, Bottom Sheet, Broadcast, Case Board, Celestial Tarot, Chat
+  Concierge, Chronicle, Clinic Finder, Comic Panel, Data Notebook, Deco
+  Voyage, Drop Culture, E-Ink, Editorial Paper, Estate Luxe, Event Invite,
+  Field Journal, Fleet Ops, Frontier Poster, Highway Sign, Isotype, Line
+  Diagram, Neon HUD, Pastel Bento, Postcards, Raw Web, Retro OS, Riso Zine,
+  Ski Piste, Slate Console, Split Flap, Sticker Book, Storefront, Story
+  Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt, Trailhead, Vapor
+  Sunset, Vintage Chart, Washi Seasons and Weather Console. (Deco Voyage is
+  gold-on-black Art Deco, Board Game is a tabletop board, Washi Seasons is
+  quiet paper; none uses an arched tiled frame around the map.)
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/zellige.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Marcellus for headings, Alegreya Sans
+  for body text and labels):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Alegreya+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  Signature touch: the map sits in a "courtyard" whose frame is a band of
+  8-point-star (khatam) tilework with a pointed-arch top (clip-path, top
+  corners only -- the bottom corners stay square so the Mapbox logo and
+  attribution are never clipped); the side galleries carry a strip of
+  pointed arches; the detail panel changes with a "tile wipe" -- a band of
+  star tiles sweeps across it while the text swaps. Patterns are decoration
+  only (no lettering or sacred symbols).
+
+  Layout: desktop -- .app is a 2-row grid: .riad-head (title, compass
+  ornament, actions) over .riad-main, a 3-column grid: .gallery.wander
+  (left), .courtyard (the map, centre), .gallery.detail (right). Phone
+  (<= 760px) -- the page scrolls: arch header, the courtyard at 50dvh, then
+  the galleries stacked (detail first, then the wander list).
+
+  Class/id contract (see zellige-template.html in this same folder for a
+  full working example):
+
+  - .app                      page grid; 100dvh and non-scrolling on
+                               desktop, normal scrolling page on phones
+  - .riad-head                top band: .head-title (h1 + .head-sub),
+                               .compass (SVG ornament; the template rotates
+                               its .compass-needle), .head-actions
+  - .riad-main                the three-column body
+  - .gallery                  an arcaded side column (.wander on the left,
+                               .detail on the right); .arcade is the strip
+                               of pointed arches at its top
+    .gallery-title            small heading under the arcade
+  - .stop-list > .stop        wander list; a <button>; .is-active marks the
+                               selected stop; children .stop-star (inline
+                               SVG star, .star-fill / .star-num inside),
+                               .stop-name, .stop-quarter, .stop-walk
+  - .courtyard                positioned map holder, grid cell 2
+    .courtyard-frame            the tiled, arched band (decoration)
+    .courtyard-map              inset, arch-clipped window that holds #map
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .detail-body              panel content swapped by the tile wipe
+    .detail-tiles               inline SVG header (pattern fill) with the
+                                 .detail-cartouche name plate over it
+    .detail-name, .detail-quarter, .facts > .fact (.fact-label/.fact-val),
+    .tea (+ .tea-icon, .tea-title, .tea-text), .fine (small print)
+  - .tile-wipe (+ .wiping)    overlay that sweeps across .detail
+  - .btn, .btn-primary        tiled-edge buttons; .btn-ghost for quiet ones
+  - .star-marker              inner child of a mapboxgl.Marker element: an
+                               8-point star (.star-marker-star holds the
+                               SVG) plus .marker-label; .is-active for the
+                               selected stop. Never style the marker root.
+  - .status-note (+.loading/.success/.error)  small status line
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --majorelle: #2C4BB8;
+  --majorelle-deep: #1E3688;
+  --emerald: #1B7A5A;
+  --saffron: #E6A93B;
+  --terracotta: #C65B3A;
+  --clay: #E9B9A0;
+  --clay-deep: #D79C80;
+  --ivory: #F6EEE2;
+  --ink: #2A2320;
+  --ink-soft: #5B4B43;
+  --line: rgba(42, 35, 32, 0.16);
+  --success: #1B7A5A;
+  --error: #B03A22;
+  --band: 18px;
+
+  --font-heading: 'Marcellus', 'Palatino Linotype', Georgia, serif;
+  --font-body: 'Alegreya Sans', 'Segoe UI', -apple-system, sans-serif;
+  --font-label: var(--font-body);
+
+  /* Pointed arch, top only: x in %, y in px, bottom corners square. */
+  --arch: polygon(0% 100%, 0.0% 130.0px, 4.2% 87.5px, 8.3% 72.0px, 12.5% 60.3px, 16.7% 50.7px, 20.8% 42.3px, 25.0% 34.8px, 29.2% 28.0px, 33.3% 21.7px, 37.5% 15.8px, 41.7% 10.2px, 45.8% 5.0px, 50.0% 0.0px, 54.2% 5.0px, 58.3% 10.2px, 62.5% 15.8px, 66.7% 21.7px, 70.8% 28.0px, 75.0% 34.8px, 79.2% 42.3px, 83.3% 50.7px, 87.5% 60.3px, 91.7% 72.0px, 95.8% 87.5px, 100.0% 130.0px, 100% 100%);
+
+  /* Khatam tile 48x48: ivory 8-point star + saffron core on majorelle. */
+  --tile-khatam: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' fill='%232C4BB8'/%3E%3Cpolygon points='24,3 28.6,12.9 38.8,9.2 35.1,19.4 45,24 35.1,28.6 38.8,38.8 28.6,35.1 24,45 19.4,35.1 9.2,38.8 12.9,28.6 3,24 12.9,19.4 9.2,9.2 19.4,12.9' fill='%23F6EEE2'/%3E%3Cpolygon points='24,12 26.4,19.2 33.9,14.1 28.8,21.6 36,24 28.8,26.4 33.9,33.9 26.4,28.8 24,36 21.6,28.8 14.1,33.9 19.2,26.4 12,24 19.2,21.6 14.1,14.1 21.6,19.2' fill='%23E6A93B'/%3E%3Ccircle cx='24' cy='24' r='3' fill='%231B7A5A'/%3E%3Ccircle cx='0' cy='0' r='4' fill='%231B7A5A'/%3E%3Ccircle cx='48' cy='0' r='4' fill='%231B7A5A'/%3E%3Ccircle cx='0' cy='48' r='4' fill='%231B7A5A'/%3E%3Ccircle cx='48' cy='48' r='4' fill='%231B7A5A'/%3E%3C/svg%3E");
+
+  /* Interlace tile 40x40: crossing diagonals on emerald. */
+  --tile-interlace: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' fill='%231B7A5A'/%3E%3Cpath d='M0 20L20 0L40 20L20 40Z' fill='none' stroke='%23F6EEE2' stroke-width='3'/%3E%3Cpath d='M-20 20L0 0M40 40L60 20M-20 20L0 40M40 0L60 20' fill='none' stroke='%23F6EEE2' stroke-width='3'/%3E%3Cpath d='M0 20L20 0M20 40L40 20' fill='none' stroke='%23E6A93B' stroke-width='3'/%3E%3Ccircle cx='20' cy='20' r='3.4' fill='%23E6A93B'/%3E%3C/svg%3E");
+
+  /* Arcade strip 56x30: row of pointed arches on rose clay. */
+  --tile-arcade: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='30' viewBox='0 0 56 30'%3E%3Crect width='56' height='30' fill='%23E9B9A0'/%3E%3Cpath d='M8 30V15Q8 6 28 1Q48 6 48 15V30Z' fill='%23C65B3A' stroke='%23F6EEE2' stroke-width='2.5'/%3E%3Cpath d='M15 30V17Q15 11 28 7Q41 11 41 17V30Z' fill='%232A2320' opacity='0.78'/%3E%3C/svg%3E");
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background-color: var(--ivory);
+  background-image: radial-gradient(circle at 20% 0%, rgba(233, 185, 160, 0.35), transparent 55%);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--majorelle);
+  outline-offset: 2px;
+}
+
+/* Page: header band over the three-column riad */
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.riad-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 8px 24px 0;
+}
+
+.head-title {
+  min-width: 0;
+}
+
+.head-title h1 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: 32px;
+  line-height: 1.05;
+  letter-spacing: 0.04em;
+  color: var(--majorelle-deep);
+}
+
+.head-sub {
+  margin: 4px 0 0;
+  font-size: 16px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--terracotta);
+  font-weight: 700;
+}
+
+.compass {
+  display: block;
+  width: 84px;
+  height: 84px;
+  cursor: pointer;
+}
+
+.compass-ring {
+  fill: var(--ivory);
+  stroke: var(--majorelle);
+  stroke-width: 3;
+}
+
+.compass-ring2 {
+  fill: none;
+  stroke: var(--saffron);
+  stroke-width: 2;
+}
+
+.compass-star {
+  fill: var(--majorelle);
+}
+
+.compass-core {
+  fill: var(--saffron);
+  stroke: var(--ivory);
+  stroke-width: 1.5;
+}
+
+.compass-tick {
+  stroke: var(--terracotta);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.compass-needle {
+  transform-origin: 40px 40px;
+  transition: transform 0.4s ease;
+}
+
+.compass-n {
+  fill: var(--ink);
+  font-family: var(--font-heading);
+  font-size: 11px;
+  text-anchor: middle;
+}
+
+.head-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Buttons -- ivory plate, majorelle border, saffron underline tile */
+.btn {
+  display: inline-block;
+  padding: 9px 18px;
+  border: 2px solid var(--majorelle);
+  border-radius: 999px;
+  background: var(--ivory);
+  color: var(--majorelle-deep);
+  font-family: var(--font-label);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.btn:hover {
+  background: var(--majorelle);
+  color: var(--ivory);
+}
+
+.btn-primary {
+  background: var(--majorelle);
+  color: var(--ivory);
+  box-shadow: inset 0 -4px 0 var(--saffron);
+  padding-bottom: 11px;
+}
+
+.btn-primary:hover {
+  background: var(--majorelle-deep);
+}
+
+.btn-ghost {
+  border-color: var(--line);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.riad-main {
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr) 330px;
+  gap: 18px;
+  min-height: 0;
+  padding: 6px 24px 22px;
+}
+
+/* Arcaded galleries */
+.gallery {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border: 2px solid var(--terracotta);
+  border-radius: 0 0 6px 6px;
+  background: var(--ivory);
+}
+
+.gallery.wander {
+  background: var(--clay);
+}
+
+.arcade {
+  flex: none;
+  height: 30px;
+  background-image: var(--tile-arcade);
+  background-repeat: repeat-x;
+  background-position: center top;
+  border-bottom: 3px solid var(--terracotta);
+}
+
+.gallery-title {
+  flex: none;
+  margin: 0;
+  padding: 12px 16px 6px;
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: 0.03em;
+  color: var(--majorelle-deep);
+}
+
+.stop-list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 4px 10px 12px;
+  list-style: none;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 6px;
+}
+
+.stop {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-areas: "star name" "star quarter" "star walk";
+  column-gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 7px 10px;
+  border: 2px solid transparent;
+  border-left: 5px solid transparent;
+  border-radius: 4px;
+  background: rgba(246, 238, 226, 0.55);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.stop:hover {
+  background: var(--ivory);
+}
+
+.stop.is-active {
+  background: var(--ivory);
+  border-color: var(--majorelle);
+  border-left-color: var(--saffron);
+}
+
+.stop-star {
+  grid-area: star;
+  width: 40px;
+  height: 40px;
+}
+
+.star-fill {
+  fill: var(--majorelle);
+  stroke: var(--saffron);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.star-num {
+  fill: var(--ivory);
+  font-family: var(--font-heading);
+  font-size: 19px;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.is-active .star-fill {
+  fill: var(--saffron);
+  stroke: var(--majorelle-deep);
+}
+
+.is-active .star-num {
+  fill: var(--ink);
+}
+
+.stop-name {
+  grid-area: name;
+  font-family: var(--font-heading);
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.stop-quarter {
+  grid-area: quarter;
+  font-size: 15px;
+  color: var(--ink-soft);
+}
+
+.stop-walk {
+  grid-area: walk;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--emerald);
+}
+
+/* Courtyard: the map, framed by a tiled arch */
+.courtyard {
+  position: relative;
+  min-height: 0;
+}
+
+.courtyard-frame {
+  position: absolute;
+  inset: 0;
+  background-color: var(--majorelle);
+  background-image: var(--tile-khatam);
+  background-position: center top;
+  clip-path: var(--arch);
+}
+
+.courtyard-map {
+  position: absolute;
+  inset: var(--band);
+  clip-path: var(--arch);
+  background: var(--ink);
+}
+
+/* Detail gallery */
+.detail {
+  position: relative;
+}
+
+.detail-body {
+  flex: 1;
+  min-height: 0;
+  padding: 0 0 16px;
+  overflow-y: auto;
+}
+
+.detail-tiles {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 112px;
+}
+
+.detail-cartouche {
+  fill: var(--ivory);
+  stroke: var(--saffron);
+  stroke-width: 3;
+}
+
+.detail-no {
+  fill: var(--majorelle-deep);
+  font-family: var(--font-heading);
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  text-anchor: middle;
+}
+
+.detail-name,
+.detail-quarter,
+.facts,
+.tea,
+.fine {
+  margin-left: 18px;
+  margin-right: 18px;
+}
+
+.detail-name {
+  margin-top: 14px;
+  margin-bottom: 2px;
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: 27px;
+  line-height: 1.12;
+  color: var(--majorelle-deep);
+}
+
+.detail-quarter {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--terracotta);
+}
+
+.detail-note {
+  margin: 0 18px 12px;
+  line-height: 1.4;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  border-top: 2px solid var(--line);
+}
+
+.fact {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 2px solid var(--line);
+}
+
+.fact-label {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--emerald);
+  padding-top: 2px;
+}
+
+.fact-val {
+  margin: 0;
+  line-height: 1.3;
+}
+
+.tea {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  margin-top: 14px;
+  padding: 12px;
+  border: 2px solid var(--saffron);
+  border-radius: 4px;
+  background: rgba(230, 169, 59, 0.16);
+}
+
+.tea-icon {
+  width: 44px;
+  height: 44px;
+}
+
+.tea-title {
+  margin: 0 0 2px;
+  font-family: var(--font-heading);
+  font-size: 18px;
+  color: var(--ink);
+}
+
+.tea-text {
+  margin: 0;
+  line-height: 1.3;
+  font-size: 16px;
+}
+
+.fine {
+  margin-top: 10px;
+  margin-bottom: 0;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+/* Tile wipe: a band of star tiles sweeps across the detail gallery */
+.tile-wipe {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background-color: var(--majorelle);
+  background-image: var(--tile-khatam);
+  clip-path: inset(0 100% 0 0);
+  pointer-events: none;
+}
+
+.tile-wipe.wiping {
+  animation: zellige-wipe 0.75s ease-in-out;
+}
+
+@keyframes zellige-wipe {
+  0% { clip-path: inset(0 100% 0 0); }
+  45%, 55% { clip-path: inset(0 0 0 0); }
+  100% { clip-path: inset(0 0 0 100%); }
+}
+
+/* Status note */
+.status-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border: 2px solid var(--majorelle);
+  border-radius: 999px;
+  background: var(--ivory);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--majorelle-deep);
+}
+
+.status-note::before {
+  content: '';
+  flex: none;
+  width: 10px;
+  height: 10px;
+  background: var(--saffron);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  transform: scale(1.5);
+}
+
+.status-note.loading::before {
+  animation: zellige-spin 1.6s linear infinite;
+}
+
+.status-note.success::before {
+  background: var(--success);
+}
+
+.status-note.error {
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.status-note.error::before {
+  background: var(--error);
+}
+
+@keyframes zellige-spin {
+  to { transform: scale(1.5) rotate(360deg); }
+}
+
+/* Map star marker -- inner child of a mapboxgl.Marker root (the root is
+   positioned by Mapbox via transform; never style it). Anchor 'center'. */
+.star-marker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+
+.star-marker-star {
+  display: block;
+  width: 44px;
+  height: 44px;
+  filter: drop-shadow(0 2px 3px rgba(42, 35, 32, 0.55));
+  transition: transform 0.2s ease;
+}
+
+.star-marker.is-active .star-marker-star {
+  transform: scale(1.22);
+}
+
+.star-marker .star-fill {
+  fill: var(--majorelle);
+  stroke: var(--saffron);
+}
+
+.star-marker .star-num {
+  fill: var(--ivory);
+}
+
+.star-marker.is-active .star-fill {
+  fill: var(--saffron);
+  stroke: var(--majorelle-deep);
+}
+
+.star-marker.is-active .star-num {
+  fill: var(--ink);
+}
+
+.marker-label {
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  margin-left: 2px;
+  transform: translateY(-50%);
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--ivory);
+  border: 1.5px solid var(--majorelle);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.star-marker.label-left .marker-label {
+  left: auto;
+  right: 100%;
+  margin-left: 0;
+  margin-right: 2px;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Keep the top-right controls below the arch shoulder */
+.courtyard .mapboxgl-ctrl-top-right {
+  top: 96px;
+}
+
+/* Mapbox controls re-skinned to match */
+.mapboxgl-ctrl-group {
+  border-radius: 8px !important;
+  border: 2px solid var(--majorelle);
+  background: var(--ivory) !important;
+  box-shadow: none !important;
+}
+
+/* A raster-dem (terrain) source makes GL JS hide the Mapbox logo (the DEM
+   TileJSON has mapbox_logo:false). Force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+/* Narrow desktops: slimmer galleries */
+@media (max-width: 1180px) {
+  .riad-main {
+    grid-template-columns: 240px minmax(0, 1fr) 280px;
+    gap: 12px;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .riad-head {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}
+
+/* Phone / tablet portrait: arch header, 50dvh courtyard, stacked galleries */
+@media (max-width: 760px) {
+  :root {
+    --band: 12px;
+    --arch: polygon(0% 100%, 0.0% 64.0px, 4.2% 43.1px, 8.3% 35.4px, 12.5% 29.7px, 16.7% 25.0px, 20.8% 20.8px, 25.0% 17.1px, 29.2% 13.8px, 33.3% 10.7px, 37.5% 7.8px, 41.7% 5.0px, 45.8% 2.5px, 50.0% 0.0px, 54.2% 2.5px, 58.3% 5.0px, 62.5% 7.8px, 66.7% 10.7px, 70.8% 13.8px, 75.0% 17.1px, 79.2% 20.8px, 83.3% 25.0px, 87.5% 29.7px, 91.7% 35.4px, 95.8% 43.1px, 100.0% 64.0px, 100% 100%);
+  }
+
+  html, body {
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .app {
+    display: block;
+    height: auto;
+    overflow: visible;
+  }
+
+  .riad-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "compass compass" "title actions";
+    justify-items: center;
+    gap: 4px 12px;
+    padding: 10px 16px 8px;
+    text-align: center;
+  }
+
+  .compass {
+    grid-area: compass;
+    width: 64px;
+    height: 64px;
+  }
+
+  .head-title {
+    grid-area: title;
+    justify-self: start;
+    text-align: left;
+  }
+
+  .head-title h1 {
+    font-size: 24px;
+  }
+
+  .head-sub {
+    font-size: 13px;
+  }
+
+  .head-actions {
+    grid-area: actions;
+  }
+
+  .btn {
+    padding: 7px 14px;
+    font-size: 16px;
+  }
+
+  .riad-main {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 0 16px 24px;
+  }
+
+  .courtyard {
+    flex: none;
+    height: 50dvh;
+    min-height: 300px;
+    order: 1;
+  }
+
+  .gallery.detail {
+    order: 2;
+  }
+
+  .gallery.wander {
+    order: 3;
+  }
+
+  .stop-list {
+    overflow: visible;
+  }
+
+  .detail-body {
+    overflow: visible;
+  }
+
+  .courtyard .mapboxgl-ctrl-top-right {
+    top: 52px;
+  }
+
+  .marker-label {
+    display: none;
+  }
+
+  .star-marker.is-active .marker-label {
+    display: block;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-note.loading::before,
+  .tile-wipe.wiping {
+    animation: none;
+  }
+
+  .compass-needle,
+  .star-marker-star,
+  .btn,
+  .stop {
+    transition: none;
+  }
+}

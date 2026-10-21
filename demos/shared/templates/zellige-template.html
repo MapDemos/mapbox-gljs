@@ -1,0 +1,350 @@
+<!--
+  Working EXAMPLE of the Zellige style pack (zellige.css, in this same
+  folder). Open this file directly to see the pattern working with one
+  guided walk through the Marrakech medina on Mapbox Standard (dusk): the
+  map is the "courtyard", framed by a tiled arch between two arcaded
+  galleries. The left gallery lists six stops; the right one shows the
+  selected stop (with a tile-wipe transition). Click a stop in the list or
+  a star on the map to fly there and highlight the leg to the next stop,
+  or press "Begin wander" to step through them with a gentle camera. Copy
+  the markup below into your own demo and link zellige.css from its <head>
+  -- see the class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (Moroccan geometric tilework and riad architecture,
+  used as decoration only) at the user's request for something distinct
+  from every other pack in this folder. The landmarks are real public
+  places; the walking route is real Mapbox Directions (walking) geometry
+  fetched once and embedded; the opening hours, the tea-break cafes and
+  their names ("Cafe Zahra", "Qamar Terrace", "Riad Yasmine") are
+  fictional placeholders -- swap in your own.
+
+  What's NOT included: live Directions calls, search/geocoding, popups,
+  live opening hours, or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Zellige</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Alegreya+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="zellige.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+  .map-status {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+  }
+</style>
+</head>
+<body>
+<!-- Shared SVG patterns (decoration only), referenced by url(#...) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <pattern id="pat-khatam" width="48" height="48" patternUnits="userSpaceOnUse">
+      <rect width="48" height="48" fill="#2C4BB8"/>
+      <polygon points="24,3 28.6,12.9 38.8,9.2 35.1,19.4 45,24 35.1,28.6 38.8,38.8 28.6,35.1 24,45 19.4,35.1 9.2,38.8 12.9,28.6 3,24 12.9,19.4 9.2,9.2 19.4,12.9" fill="#F6EEE2"/>
+      <polygon points="24,12 26.4,19.2 33.9,14.1 28.8,21.6 36,24 28.8,26.4 33.9,33.9 26.4,28.8 24,36 21.6,28.8 14.1,33.9 19.2,26.4 12,24 19.2,21.6 14.1,14.1 21.6,19.2" fill="#E6A93B"/>
+      <circle cx="24" cy="24" r="3" fill="#1B7A5A"/>
+      <circle cx="0" cy="0" r="4" fill="#1B7A5A"/><circle cx="48" cy="0" r="4" fill="#1B7A5A"/>
+      <circle cx="0" cy="48" r="4" fill="#1B7A5A"/><circle cx="48" cy="48" r="4" fill="#1B7A5A"/>
+    </pattern>
+    <pattern id="pat-interlace" width="40" height="40" patternUnits="userSpaceOnUse">
+      <rect width="40" height="40" fill="#1B7A5A"/>
+      <path d="M0 20L20 0L40 20L20 40Z" fill="none" stroke="#F6EEE2" stroke-width="3"/>
+      <path d="M-20 20L0 0M40 40L60 20M-20 20L0 40M40 0L60 20" fill="none" stroke="#F6EEE2" stroke-width="3"/>
+      <path d="M0 20L20 0M20 40L40 20" fill="none" stroke="#E6A93B" stroke-width="3"/>
+      <circle cx="20" cy="20" r="3.4" fill="#E6A93B"/>
+    </pattern>
+    <pattern id="pat-terracotta" width="32" height="32" patternUnits="userSpaceOnUse">
+      <rect width="32" height="32" fill="#C65B3A"/>
+      <path d="M16 2L30 16L16 30L2 16Z" fill="none" stroke="#F6EEE2" stroke-width="2.5"/>
+      <path d="M16 9L23 16L16 23L9 16Z" fill="#E6A93B"/>
+    </pattern>
+  </defs>
+</svg>
+
+<div class="app">
+  <header class="riad-head">
+    <div class="head-title">
+      <h1>Medina Wander</h1>
+      <p class="head-sub">Marrakech &middot; an evening on foot</p>
+    </div>
+
+    <svg class="compass" id="compass" viewBox="0 0 80 80" role="img" aria-label="Compass; click to face north">
+      <circle class="compass-ring" cx="40" cy="40" r="38"/>
+      <circle class="compass-ring2" cx="40" cy="40" r="35"/>
+      <g class="compass-needle" id="needle">
+        <polygon class="compass-star" points="40,6 47.7,21.5 64,16 58.5,32.3 74,40 58.5,47.7 64,64 47.7,58.5 40,74 32.3,58.5 16,64 21.5,47.7 6,40 21.5,32.3 16,16 32.3,21.5"/>
+        <polygon points="40,10 45,40 40,36 35,40" fill="#C65B3A" stroke="#F6EEE2" stroke-width="1.2" stroke-linejoin="round"/>
+        <polygon points="40,70 45,40 40,44 35,40" fill="#F6EEE2" stroke="#2A2320" stroke-width="1" stroke-linejoin="round"/>
+      </g>
+      <circle class="compass-core" cx="40" cy="40" r="5"/>
+    </svg>
+
+    <div class="head-actions">
+      <button class="btn btn-primary" id="wander-btn" type="button">Begin wander</button>
+    </div>
+  </header>
+
+  <main class="riad-main">
+    <section class="gallery wander" aria-label="Today's wander">
+      <div class="arcade"></div>
+      <h2 class="gallery-title">Today's wander</h2>
+      <ul class="stop-list" id="stop-list"></ul>
+    </section>
+
+    <section class="courtyard" aria-label="Map of the medina">
+      <div class="courtyard-frame"></div>
+      <div class="courtyard-map">
+        <div id="map"></div>
+        <div class="status-note error map-status hidden" id="map-status"></div>
+      </div>
+    </section>
+
+    <section class="gallery detail" aria-label="Selected stop" aria-live="polite">
+      <div class="arcade"></div>
+      <div class="detail-body" id="detail"></div>
+      <div class="tile-wipe" id="wipe"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+// Walking route, one array per leg (stop i to stop i+1) [lng, lat].
+// Geometry: Mapbox Directions (walking) through the six stops, simplified.
+const LEGS = [
+[[-7.99405,31.62352],[-7.99441,31.62425],[-7.99412,31.62441],[-7.99393,31.62449],[-7.99374,31.62458],[-7.99358,31.62465],[-7.99349,31.62468],[-7.99329,31.62476],[-7.99308,31.62483],[-7.99281,31.62481],[-7.99277,31.62487],[-7.99272,31.62496],[-7.99264,31.62499],[-7.99251,31.62505],[-7.99240,31.62512],[-7.99232,31.62517],[-7.99226,31.62513],[-7.99170,31.62559],[-7.99159,31.62569],[-7.99138,31.62586],[-7.99130,31.62595],[-7.99129,31.62607],[-7.99098,31.62628],[-7.99111,31.62642],[-7.99118,31.62650],[-7.99127,31.62662],[-7.99137,31.62663],[-7.99147,31.62666],[-7.99154,31.62668],[-7.99158,31.62671],[-7.99152,31.62687],[-7.99156,31.62692],[-7.99169,31.62696],[-7.99173,31.62705],[-7.99175,31.62712],[-7.99179,31.62721],[-7.99184,31.62731],[-7.99197,31.62752],[-7.99181,31.62768],[-7.99173,31.62773],[-7.99164,31.62762],[-7.99151,31.62761],[-7.99130,31.62759],[-7.99121,31.62760],[-7.99106,31.62753],[-7.99110,31.62737],[-7.99106,31.62732],[-7.99096,31.62728],[-7.99083,31.62722],[-7.99071,31.62718],[-7.99053,31.62711],[-7.99040,31.62703],[-7.99033,31.62704],[-7.98995,31.62717],[-7.98981,31.62722],[-7.98964,31.62729],[-7.98956,31.62734],[-7.98945,31.62729],[-7.98937,31.62723],[-7.98918,31.62724],[-7.98919,31.62709],[-7.98914,31.62696],[-7.98913,31.62688],[-7.98918,31.62662],[-7.98929,31.62645],[-7.98901,31.62627],[-7.98921,31.62606],[-7.98899,31.62592]],
+[[-7.98899,31.62592],[-7.98921,31.62606],[-7.98901,31.62627],[-7.98890,31.62640],[-7.98919,31.62656],[-7.98913,31.62688],[-7.98914,31.62696],[-7.98919,31.62709],[-7.98918,31.62724],[-7.98902,31.62725],[-7.98855,31.62730],[-7.98841,31.62730],[-7.98819,31.62731],[-7.98813,31.62771],[-7.98799,31.62837],[-7.98795,31.62851],[-7.98777,31.62876],[-7.98763,31.62908]],
+[[-7.98763,31.62908],[-7.98753,31.62943],[-7.98750,31.62956],[-7.98748,31.62965],[-7.98745,31.62978],[-7.98742,31.62987],[-7.98740,31.62994],[-7.98737,31.63005],[-7.98733,31.63014],[-7.98727,31.63026],[-7.98723,31.63034],[-7.98719,31.63041],[-7.98712,31.63047],[-7.98703,31.63054],[-7.98689,31.63063],[-7.98672,31.63074],[-7.98664,31.63081],[-7.98670,31.63085],[-7.98672,31.63095],[-7.98670,31.63108],[-7.98666,31.63116],[-7.98661,31.63132],[-7.98655,31.63155],[-7.98677,31.63159],[-7.98687,31.63165],[-7.98688,31.63165]],
+[[-7.98688,31.63165],[-7.98677,31.63159],[-7.98653,31.63159],[-7.98661,31.63132],[-7.98666,31.63116],[-7.98670,31.63108],[-7.98672,31.63100],[-7.98671,31.63089],[-7.98664,31.63081],[-7.98651,31.63072],[-7.98644,31.63068],[-7.98633,31.63061],[-7.98629,31.63052],[-7.98622,31.63046],[-7.98616,31.63044],[-7.98605,31.63040],[-7.98607,31.63027],[-7.98615,31.63011],[-7.98620,31.62998],[-7.98628,31.62986],[-7.98635,31.62984],[-7.98642,31.62969],[-7.98648,31.62958],[-7.98658,31.62935],[-7.98663,31.62919],[-7.98662,31.62902],[-7.98650,31.62884],[-7.98642,31.62859],[-7.98637,31.62846],[-7.98633,31.62834],[-7.98625,31.62813],[-7.98615,31.62801],[-7.98609,31.62787],[-7.98605,31.62776],[-7.98622,31.62773],[-7.98627,31.62749],[-7.98630,31.62737],[-7.98631,31.62728],[-7.98630,31.62701],[-7.98630,31.62689],[-7.98626,31.62652],[-7.98626,31.62638],[-7.98624,31.62615],[-7.98622,31.62578],[-7.98616,31.62551],[-7.98613,31.62543],[-7.98606,31.62536],[-7.98599,31.62528],[-7.98585,31.62517],[-7.98574,31.62507],[-7.98564,31.62498],[-7.98558,31.62491],[-7.98550,31.62483],[-7.98545,31.62476],[-7.98536,31.62464],[-7.98532,31.62458],[-7.98528,31.62449],[-7.98522,31.62437],[-7.98519,31.62431],[-7.98514,31.62420],[-7.98512,31.62413],[-7.98509,31.62406],[-7.98497,31.62370],[-7.98485,31.62328],[-7.98478,31.62300],[-7.98474,31.62289],[-7.98467,31.62265],[-7.98459,31.62241],[-7.98456,31.62230],[-7.98374,31.62239],[-7.98354,31.62240],[-7.98349,31.62225],[-7.98345,31.62209],[-7.98341,31.62197],[-7.98332,31.62181],[-7.98318,31.62158],[-7.98336,31.62155]],
+[[-7.98336,31.62155],[-7.98318,31.62158],[-7.98326,31.62183],[-7.98341,31.62197],[-7.98344,31.62205],[-7.98349,31.62225],[-7.98354,31.62240],[-7.98374,31.62239],[-7.98454,31.62225],[-7.98451,31.62215],[-7.98442,31.62185],[-7.98438,31.62174],[-7.98431,31.62148],[-7.98420,31.62112],[-7.98415,31.62091],[-7.98411,31.62078],[-7.98448,31.62069],[-7.98455,31.62066],[-7.98459,31.62056],[-7.98460,31.62048],[-7.98466,31.62039],[-7.98470,31.62035],[-7.98491,31.62024],[-7.98528,31.62004],[-7.98539,31.61996],[-7.98537,31.61989],[-7.98542,31.61973],[-7.98638,31.61954],[-7.98699,31.61942],[-7.98696,31.61927],[-7.98688,31.61894],[-7.98704,31.61888],[-7.98717,31.61886],[-7.98733,31.61885],[-7.98769,31.61879],[-7.98758,31.61833],[-7.98805,31.61822],[-7.98832,31.61819],[-7.98847,31.61816],[-7.98853,31.61804],[-7.98857,31.61814],[-7.98917,31.61796]]
+];
+const LEG_DIST = [1226, 485, 353, 1406, 1091]; // metres
+const LEG_MIN = [15, 6, 4, 17, 13];            // minutes on foot
+
+const STOPS = [
+  { name: 'Koutoubia Gardens', quarter: 'Koutoubia, western edge', tiles: 'pat-interlace',
+    note: 'Begin where the minaret rises over the palm walks; admire it from the gardens as the light turns copper.',
+    hours: 'Gardens open from early morning to dusk', tea: 'Cafe Zahra', teaText: 'Garden-side glasses of mint tea under orange trees, ten minutes before you set off.' },
+  { name: 'Jemaa el-Fnaa', quarter: 'Place Jemaa el-Fnaa', tiles: 'pat-khatam',
+    note: 'The great square changes shift at sunset: juice carts give way to lantern-lit food stalls.',
+    hours: 'Open all day; busiest from late afternoon', tea: 'Qamar Terrace', teaText: 'A rooftop table over the square. Order mint tea and watch the smoke rise.' },
+  { name: 'Souk Semmarine', quarter: 'Souks, north of the square', tiles: 'pat-terracotta',
+    note: 'The main spine of the souks: lanterns, leather, spices. Follow the lane and let the side alleys pull you.',
+    hours: '9:00 to 19:30; calmer before 10:00', tea: 'Riad Yasmine tea court', teaText: 'A quiet courtyard with a fountain; the host pours from a height, so sit near the pot.' },
+  { name: 'Ben Youssef Madrasa area', quarter: 'Mouassine and Ben Youssef', tiles: 'pat-interlace',
+    note: 'A calm pocket of carved-plaster courtyards. Le Jardin Secret is a few steps away for a green pause.',
+    hours: '9:00 to 18:00 (last entry 30 minutes earlier)', tea: 'Cafe Nour', teaText: 'A shaded corner table between the courtyards; the saffron-ginger tea is the house choice.' },
+  { name: 'Bahia Palace', quarter: 'Bahia, beside the Mellah', tiles: 'pat-khatam',
+    note: 'Painted ceilings and tiled courtyards. The lanes of the Mellah begin just beyond the walls.',
+    hours: '8:30 to 17:00', tea: 'Riad Safran', teaText: 'Terrace seats looking over the rooftops toward the Atlas, with warm almond pastries.' },
+  { name: 'Saadian Tombs', quarter: 'Kasbah', tiles: 'pat-terracotta',
+    note: 'End the wander in the Kasbah, in a small garden courtyard with its carved cedar and tile.',
+    hours: '9:00 to 17:00', tea: 'Cafe Atlas Light', teaText: 'A last glass at a street-side table as the call of evening sets in.' },
+];
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const phone = () => window.matchMedia('(max-width: 760px)').matches;
+const STAR = '22,1 26.8,10.5 36.8,7.2 33.5,17.2 43,22 33.5,26.8 36.8,36.8 26.8,33.5 22,43 17.2,33.5 7.2,36.8 10.5,26.8 1,22 10.5,17.2 7.2,7.2 17.2,10.5';
+const starSvg = (cls, n) =>
+  `<svg class="${cls}" viewBox="0 0 44 44" aria-hidden="true"><polygon class="star-fill" points="${STAR}"/><text class="star-num" x="22" y="23">${n}</text></svg>`;
+
+const coordOf = (i) => (i < LEGS.length ? LEGS[i][0] : LEGS[LEGS.length - 1][LEGS[LEGS.length - 1].length - 1]);
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [-7.988, 31.626],
+  zoom: 14.3,
+  pitch: 35,
+  config: { basemap: { lightPreset: 'dusk', theme: 'default', showPointOfInterestLabels: false } },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+/* ---- Camera ---- */
+function padding() {
+  return phone()
+    ? { top: 76, bottom: 70, left: 28, right: 28 }
+    : { top: 110, bottom: 72, left: 56, right: 56 };
+}
+
+function frame(coords, opts) {
+  const b = coords.reduce((bb, c) => bb.extend(c), new mapboxgl.LngLatBounds(coords[0], coords[0]));
+  const cam = map.cameraForBounds(b, { padding: padding(), maxZoom: 16.2 });
+  if (!cam) return;
+  const target = { center: cam.center, zoom: cam.zoom, pitch: 40, bearing: 0 };
+  if (reduce || (opts && opts.jump)) map.jumpTo(target);
+  else map.flyTo({ ...target, duration: (opts && opts.duration) || 2200, essential: false });
+}
+
+/* ---- Selection ---- */
+let sel = 0;
+let wandering = false;
+let wanderTimer = null;
+const markerEls = [];
+
+function legFilter(i) {
+  if (map.getLayer('leg-hi')) map.setFilter('leg-hi', ['==', ['get', 'leg'], i < LEGS.length ? i : -1]);
+  if (map.getLayer('leg-hi-casing')) map.setFilter('leg-hi-casing', ['==', ['get', 'leg'], i < LEGS.length ? i : -1]);
+}
+
+function detailHtml(i) {
+  const s = STOPS[i];
+  const walk = i < LEGS.length
+    ? `${LEG_MIN[i]} min on foot &middot; ${(LEG_DIST[i] / 1000).toFixed(1)} km to ${STOPS[i + 1].name}`
+    : 'The wander ends here';
+  return `
+    <svg class="detail-tiles" viewBox="0 0 330 112" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Decorative tile band">
+      <rect width="330" height="112" fill="url(#${s.tiles})"/>
+      <path class="detail-cartouche" d="M100 112V66Q100 40 165 18Q230 40 230 66V112Z"/>
+      <text class="detail-no" x="165" y="92">STOP ${i + 1} OF ${STOPS.length}</text>
+    </svg>
+    <h2 class="detail-name">${s.name}</h2>
+    <p class="detail-quarter">${s.quarter}</p>
+    <p class="detail-note">${s.note}</p>
+    <div class="facts">
+      <div class="fact"><span class="fact-label">Hours</span><p class="fact-val">${s.hours}</p></div>
+      <div class="fact"><span class="fact-label">Next</span><p class="fact-val">${walk}</p></div>
+    </div>
+    <div class="tea">
+      <svg class="tea-icon" viewBox="0 0 44 44" aria-hidden="true">
+        <ellipse cx="22" cy="37" rx="18" ry="4" fill="#E6A93B" stroke="#C65B3A" stroke-width="1.5"/>
+        <path d="M11 14H33L30 35Q29.5 36.5 28 36.5H16Q14.5 36.5 14 35Z" fill="#C65B3A" fill-opacity="0.35" stroke="#2A2320" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M11 14H33" stroke="#E6A93B" stroke-width="3.5" stroke-linecap="round"/>
+        <path d="M22 16C16 12 15 6 20 4C25 6 26 11 22 16Z" fill="#1B7A5A"/>
+        <path d="M24 16C29 13 32 8 28 5C23 7 22 12 24 16Z" fill="#1B7A5A"/>
+      </svg>
+      <div><h3 class="tea-title">Mint tea break &middot; ${s.tea}</h3><p class="tea-text">${s.teaText}</p></div>
+    </div>
+    <p class="fine">Hours and cafes are illustrative; check locally before you go.</p>`;
+}
+
+function renderDetail(i, animate) {
+  const body = $('detail');
+  const wipe = $('wipe');
+  if (!animate || reduce) { body.innerHTML = detailHtml(i); return; }
+  wipe.classList.remove('wiping');
+  void wipe.offsetWidth; // restart the animation
+  wipe.classList.add('wiping');
+  setTimeout(() => { body.innerHTML = detailHtml(i); body.scrollTop = 0; }, 340);
+  wipe.addEventListener('animationend', () => wipe.classList.remove('wiping'), { once: true });
+}
+
+function select(i, o) {
+  o = o || {};
+  sel = i;
+  document.querySelectorAll('.stop').forEach((el, k) => {
+    el.classList.toggle('is-active', k === i);
+    el.setAttribute('aria-current', k === i ? 'true' : 'false');
+  });
+  markerEls.forEach((el, k) => el.classList.toggle('is-active', k === i));
+  renderDetail(i, o.animate !== false);
+  legFilter(i);
+  if (o.fly !== false) {
+    frame(i < LEGS.length ? LEGS[i] : [coordOf(i)], { duration: o.duration });
+  }
+  if (o.scroll && phone()) $('map').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+}
+
+/* ---- Wander ---- */
+const wanderBtn = $('wander-btn');
+function stopWander() {
+  wandering = false;
+  clearTimeout(wanderTimer);
+  wanderBtn.textContent = 'Begin wander';
+}
+function wanderStep() {
+  if (!wandering) return;
+  wanderTimer = setTimeout(() => {
+    if (!wandering) return;
+    if (sel >= STOPS.length - 1) { stopWander(); return; }
+    select(sel + 1, { duration: 2600 });
+    wanderStep();
+  }, 5200);
+}
+wanderBtn.addEventListener('click', () => {
+  if (wandering) { stopWander(); return; }
+  wandering = true;
+  wanderBtn.textContent = 'Pause wander';
+  if (sel >= STOPS.length - 1) select(0, { duration: 2600 });
+  else select(sel, { duration: 2000 });
+  wanderStep();
+});
+['mousedown', 'touchstart', 'wheel'].forEach((ev) => map.on(ev, stopWander));
+
+/* ---- List and markers ---- */
+STOPS.forEach((s, i) => {
+  const li = document.createElement('li');
+  const walk = i < LEGS.length ? `${LEG_MIN[i]} min to next` : 'Final stop';
+  li.innerHTML = `<button class="stop" type="button">${starSvg('stop-star', i + 1)}` +
+    `<span class="stop-name">${s.name}</span><span class="stop-quarter">${s.quarter}</span>` +
+    `<span class="stop-walk">${walk}</span></button>`;
+  li.firstChild.addEventListener('click', () => { stopWander(); select(i, { scroll: true }); });
+  $('stop-list').appendChild(li);
+
+  const root = document.createElement('div');
+  root.innerHTML = `<div class="star-marker">${starSvg('star-marker-star', i + 1)}<span class="marker-label">${s.name}</span></div>`;
+  const inner = root.firstChild;
+  if (i === 3 || i === 4) inner.classList.add('label-left'); // keep labels off neighbouring stars and the map edge
+  markerEls.push(inner);
+  root.addEventListener('click', () => { stopWander(); select(i); });
+  new mapboxgl.Marker({ element: root, anchor: 'center' }).setLngLat(coordOf(i)).addTo(map);
+});
+
+/* ---- Compass ---- */
+map.on('rotate', () => { $('needle').style.transform = `rotate(${-map.getBearing()}deg)`; });
+$('compass').addEventListener('click', () => {
+  if (reduce) map.jumpTo({ bearing: 0 }); else map.easeTo({ bearing: 0, duration: 700 });
+});
+
+/* ---- Route ---- */
+map.on('style.load', () => {
+  map.addSource('route', {
+    type: 'geojson',
+    data: {
+      type: 'FeatureCollection',
+      features: LEGS.map((c, i) => ({ type: 'Feature', properties: { leg: i }, geometry: { type: 'LineString', coordinates: c } })),
+    },
+  });
+  const join = { 'line-join': 'round', 'line-cap': 'butt' };
+  const base = { type: 'line', source: 'route', slot: 'top' };
+  map.addLayer({ ...base, id: 'route-casing', layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: { 'line-color': '#F6EEE2', 'line-width': 8, 'line-opacity': 0.9, 'line-emissive-strength': 1 } });
+  map.addLayer({ ...base, id: 'route-line', layout: join,
+    paint: { 'line-color': '#E6A93B', 'line-width': 4, 'line-dasharray': [2, 1.4], 'line-emissive-strength': 1 } });
+  map.addLayer({ ...base, id: 'leg-hi-casing', filter: ['==', ['get', 'leg'], 0], layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: { 'line-color': '#2A2320', 'line-width': 13, 'line-opacity': 0.9, 'line-emissive-strength': 1 } });
+  map.addLayer({ ...base, id: 'leg-hi', filter: ['==', ['get', 'leg'], 0], layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: { 'line-color': '#E6A93B', 'line-width': 8, 'line-emissive-strength': 1 } });
+  legFilter(sel);
+});
+
+map.on('load', () => {
+  const all = LEGS.flat();
+  frame(all, { jump: true });
+});
+
+map.on('error', (e) => {
+  const el = $('map-status');
+  el.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+  el.classList.remove('hidden');
+});
+
+select(0, { fly: false, animate: false });
+</script>
+</body>
+</html>

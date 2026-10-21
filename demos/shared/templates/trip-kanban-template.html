@@ -1,0 +1,488 @@
+<!--
+  Working EXAMPLE of the Trip Kanban style pack (trip-kanban.css, in this
+  same folder). Open this file directly to see the pattern working with a
+  three-day Istanbul trip: fourteen place cards live in four columns
+  (Ideas, Day 1, Day 2, Day 3). Drag a card by its handle to reorder it or
+  move it to another day, or use the "Move to..." button on each card
+  (touch-friendly; focus a card and press M for the same menu). Every
+  change renumbers the day's map pins, redraws its route line, updates the
+  per-day totals and fits the map to the changed day. The "Show day"
+  control filters the map to one day. Copy the markup and script below
+  into your own demo and link trip-kanban.css from its <head> -- see the
+  class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (a collaborative trip-planning board with one colour
+  per day) at the user's request for something distinct from every other
+  pack in this folder. The places are real Istanbul landmarks with
+  approximate coordinates; "Itinera", the visit-time estimates and the
+  itinerary are fictional placeholders -- swap in your own.
+
+  What's NOT included: real routing (lines are straight segments, "as the
+  crow flies"), saving or sharing the board, search/geocoding, popups, or
+  a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Itinera &ndash; Trip Kanban</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Fragment+Mono&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="trip-kanban.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stage">
+    <div id="map"></div>
+    <div class="topbar">
+      <div class="brand">
+        <span class="brand-mark"></span>
+        <span class="brand-name">Itinera</span>
+        <span class="brand-trip">Istanbul &middot; 3 days</span>
+      </div>
+      <div class="seg" id="seg" role="group" aria-label="Show day on map">
+        <span class="seg-label">Show day</span>
+        <button type="button" data-day="all" aria-pressed="true">All</button>
+        <button type="button" data-day="1" aria-pressed="false">1</button>
+        <button type="button" data-day="2" aria-pressed="false">2</button>
+        <button type="button" data-day="3" aria-pressed="false">3</button>
+      </div>
+      <p class="crow">Route lines are straight segments, as the crow flies</p>
+    </div>
+  </div>
+
+  <div class="board" id="board">
+    <section class="col" data-col="ideas" aria-label="Ideas">
+      <header class="col-head"><span class="col-dot"></span><h2 class="col-title">Ideas</h2><span class="col-meta"></span></header>
+      <div class="list" role="list"></div>
+    </section>
+    <section class="col" data-col="d1" aria-label="Day 1">
+      <header class="col-head"><span class="col-dot">1</span><h2 class="col-title">Day 1</h2><span class="col-meta"></span></header>
+      <div class="list" role="list"></div>
+    </section>
+    <section class="col" data-col="d2" aria-label="Day 2">
+      <header class="col-head"><span class="col-dot">2</span><h2 class="col-title">Day 2</h2><span class="col-meta"></span></header>
+      <div class="list" role="list"></div>
+    </section>
+    <section class="col" data-col="d3" aria-label="Day 3">
+      <header class="col-head"><span class="col-dot">3</span><h2 class="col-title">Day 3</h2><span class="col-meta"></span></header>
+      <div class="list" role="list"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+const COLS = ['ideas', 'd1', 'd2', 'd3'];
+const COL_LABEL = { ideas: 'Ideas', d1: 'Day 1', d2: 'Day 2', d3: 'Day 3' };
+const COL_COLOR = { ideas: '#8C857A', d1: '#E9A23B', d2: '#2A9D8F', d3: '#8E5BA6' };
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Approximate public locations; mins = estimated visit time.
+const PLACES = {
+  hagia:    { name: 'Hagia Sophia',       area: 'Sultanahmet', cat: 'History', mins: 90,  ll: [28.9800, 41.0086] },
+  blue:     { name: 'Blue Mosque',        area: 'Sultanahmet', cat: 'History', mins: 45,  ll: [28.9768, 41.0054] },
+  cistern:  { name: 'Basilica Cistern',   area: 'Sultanahmet', cat: 'Sight',   mins: 45,  ll: [28.9779, 41.0084] },
+  topkapi:  { name: 'Topkapı Palace',     area: 'Sarayburnu',  cat: 'History', mins: 120, ll: [28.9834, 41.0115] },
+  bazaar:   { name: 'Grand Bazaar',       area: 'Beyazıt',     cat: 'Market',  mins: 90,  ll: [28.9680, 41.0107] },
+  suley:    { name: 'Süleymaniye Mosque', area: 'Süleymaniye', cat: 'History', mins: 60,  ll: [28.9640, 41.0162] },
+  spice:    { name: 'Spice Bazaar',       area: 'Eminönü',     cat: 'Market',  mins: 45,  ll: [28.9707, 41.0166] },
+  karakoy:  { name: 'Karaköy',            area: 'Beyoğlu',     cat: 'Food',    mins: 60,  ll: [28.9774, 41.0225] },
+  galata:   { name: 'Galata Tower',       area: 'Galata',      cat: 'View',    mins: 45,  ll: [28.9742, 41.0256] },
+  dolma:    { name: 'Dolmabahçe Palace',  area: 'Beşiktaş',    cat: 'History', mins: 90,  ll: [29.0004, 41.0392] },
+  ortakoy:  { name: 'Ortaköy',            area: 'Beşiktaş',    cat: 'Stroll',  mins: 60,  ll: [29.0262, 41.0478] },
+  istiklal: { name: 'İstiklal Avenue',    area: 'Beyoğlu',     cat: 'Stroll',  mins: 60,  ll: [28.9784, 41.0340] },
+  kadikoy:  { name: 'Kadıköy Market',     area: 'Kadıköy',     cat: 'Food',    mins: 90,  ll: [29.0260, 40.9905] },
+  balat:    { name: 'Balat',              area: 'Fatih',       cat: 'Stroll',  mins: 90,  ll: [28.9486, 41.0295] },
+};
+
+const state = {
+  ideas: ['istiklal', 'kadikoy', 'balat'],
+  d1: ['hagia', 'blue', 'cistern', 'topkapi'],
+  d2: ['suley', 'bazaar', 'spice', 'karakoy', 'galata'],
+  d3: ['dolma', 'ortakoy'],
+};
+let filter = 'all';
+
+const $board = document.getElementById('board');
+const colEl = (c) => $board.querySelector(`.col[data-col="${c}"]`);
+const colOf = (id) => COLS.find((c) => state[c].includes(id));
+const fmt = (m) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${String(m % 60).padStart(2, '0')}m` : ''}` : `${m}m`);
+const GRIP = '<svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor" aria-hidden="true"><circle cx="3" cy="3" r="1.6"/><circle cx="9" cy="3" r="1.6"/><circle cx="3" cy="9" r="1.6"/><circle cx="9" cy="9" r="1.6"/><circle cx="3" cy="15" r="1.6"/><circle cx="9" cy="15" r="1.6"/></svg>';
+
+/* ---------- map ---------- */
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: { basemap: { lightPreset: 'day', showPointOfInterestLabels: false, showTransitLabels: false } },
+  center: [28.99, 41.02],
+  zoom: 11.5,
+  attributionControl: true,
+});
+
+const markers = {};
+let mapReady = false;
+let hlId = null;
+
+function pad() {
+  const narrow = innerWidth <= 900;
+  // Clear the floating top bar and the crow note, whatever height they wrap to.
+  const stage = document.querySelector('.stage').getBoundingClientRect();
+  const crow = document.querySelector('.crow').getBoundingClientRect();
+  return { top: Math.round(crow.bottom - stage.top) + 24, bottom: 64, left: narrow ? 32 : 48, right: narrow ? 32 : 48 };
+}
+
+function fitPoints(ids) {
+  if (!mapReady || !ids.length) return;
+  const opts = { padding: pad(), maxZoom: 15.2, duration: REDUCED ? 0 : 900 };
+  if (ids.length === 1) {
+    map.easeTo({ center: PLACES[ids[0]].ll, zoom: 14.5, duration: opts.duration, padding: opts.padding });
+    return;
+  }
+  const b = new mapboxgl.LngLatBounds();
+  ids.forEach((id) => b.extend(PLACES[id].ll));
+  map.fitBounds(b, opts);
+}
+
+// Fit to a column's stops (or, with a day filter on, that day; with none, every planned stop).
+function fitTo(col) {
+  let target = filter === 'all' ? col : 'd' + filter;
+  const ids = COLS.includes(target) && target !== 'ideas' && state[target].length ? state[target] : null;
+  fitPoints(ids || (filter === 'all' ? [...state.d1, ...state.d2, ...state.d3] : []));
+}
+
+function setHl(id) {
+  if (hlId === id) return;
+  if (hlId) {
+    markers[hlId]?.pin.classList.remove('hl');
+    markers[hlId] && (markers[hlId].el.style.zIndex = '');
+    $board.querySelector(`.card[data-id="${hlId}"]`)?.classList.remove('hl');
+  }
+  hlId = id;
+  if (id) {
+    markers[id]?.pin.classList.add('hl');
+    markers[id] && (markers[id].el.style.zIndex = '5');
+    $board.querySelector(`.card[data-id="${id}"]`)?.classList.add('hl');
+  }
+}
+
+function ensureMarker(id) {
+  if (markers[id]) return markers[id];
+  const el = document.createElement('div'); // marker root: never styled
+  const pin = document.createElement('div');
+  pin.dataset.name = PLACES[id].name;
+  el.appendChild(pin);
+  el.addEventListener('mouseenter', () => setHl(id));
+  el.addEventListener('mouseleave', () => setHl(null));
+  el.addEventListener('click', () => {
+    const card = $board.querySelector(`.card[data-id="${id}"]`);
+    card?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: REDUCED ? 'auto' : 'smooth' });
+    card?.classList.remove('flash');
+    void card?.offsetWidth;
+    card?.classList.add('flash');
+  });
+  const marker = new mapboxgl.Marker({ element: el }).setLngLat(PLACES[id].ll).addTo(map);
+  return (markers[id] = { marker, el, pin });
+}
+
+function renderMap() {
+  if (!mapReady) return;
+  Object.keys(PLACES).forEach((id) => {
+    const { el, pin } = ensureMarker(id);
+    const col = colOf(id);
+    const idea = col === 'ideas';
+    pin.className = 'pin ' + (idea ? 'idea' : col) + (id === hlId ? ' hl' : '');
+    pin.textContent = idea ? '' : state[col].indexOf(id) + 1;
+    pin.classList.toggle('off', !idea && filter !== 'all' && col !== 'd' + filter);
+    el.style.zIndex = id === hlId ? '5' : idea ? '1' : '2';
+  });
+  const features = ['d1', 'd2', 'd3']
+    .filter((c) => (filter === 'all' || c === 'd' + filter) && state[c].length > 1)
+    .map((c) => ({
+      type: 'Feature',
+      properties: { color: COL_COLOR[c] },
+      geometry: { type: 'LineString', coordinates: state[c].map((id) => PLACES[id].ll) },
+    }));
+  map.getSource('routes')?.setData({ type: 'FeatureCollection', features });
+}
+
+map.on('style.load', () => {
+  map.addSource('routes', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: 'routes-casing', type: 'line', source: 'routes', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.9, 'line-emissive-strength': 1 },
+  });
+  map.addLayer({
+    id: 'routes', type: 'line', source: 'routes', slot: 'top',
+    layout: { 'line-join': 'round' },
+    paint: { 'line-color': ['get', 'color'], 'line-width': 3.5, 'line-dasharray': [2, 1.2], 'line-emissive-strength': 1 },
+  });
+  mapReady = true;
+  renderMap();
+  const fitAll = () => {
+    map.resize();
+    const b = new mapboxgl.LngLatBounds();
+    Object.values(PLACES).forEach((p) => b.extend(p.ll));
+    map.fitBounds(b, { padding: pad(), maxZoom: 15.2, duration: 0 });
+  };
+  fitAll();
+  map.once('load', fitAll); // re-fit once the grid layout has settled
+});
+
+/* ---------- board ---------- */
+
+function cardEl(id) {
+  const p = PLACES[id];
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.dataset.id = id;
+  el.tabIndex = 0;
+  el.setAttribute('role', 'listitem');
+  el.setAttribute('aria-keyshortcuts', 'M');
+  el.title = 'Press M to move this place';
+  el.innerHTML =
+    `<span class="grip" role="button" aria-label="Drag ${p.name}" title="Drag to reorder or move">${GRIP}</span>` +
+    `<div class="card-body"><div class="card-top"><span class="card-name">${p.name}</span><span class="card-time">~${fmt(p.mins)}</span></div>` +
+    `<div class="card-sub"><span class="card-area">${p.area}</span><span class="chip">${p.cat}</span></div></div>` +
+    `<button type="button" class="card-move" aria-haspopup="menu" aria-expanded="false">Move to…</button>`;
+  return el;
+}
+
+function renderBoard() {
+  COLS.forEach((c) => {
+    const col = colEl(c);
+    const list = col.querySelector('.list');
+    const top = list.scrollTop;
+    list.replaceChildren(...state[c].map(cardEl));
+    if (!state[c].length) {
+      const e = document.createElement('div');
+      e.className = 'empty';
+      e.textContent = c === 'ideas' ? 'No ideas parked' : 'Drop a place here';
+      list.appendChild(e);
+    }
+    list.scrollTop = top;
+    const n = state[c].length;
+    const mins = state[c].reduce((s, id) => s + PLACES[id].mins, 0);
+    col.querySelector('.col-meta').textContent =
+      c === 'ideas' ? `${n} ${n === 1 ? 'idea' : 'ideas'}` : n ? `${n} ${n === 1 ? 'stop' : 'stops'} · ~${fmt(mins)}` : '0 stops';
+  });
+}
+
+function render() {
+  renderBoard();
+  renderMap();
+}
+
+function moveTo(id, col, index) {
+  const from = colOf(id);
+  state[from].splice(state[from].indexOf(id), 1);
+  state[col].splice(index ?? state[col].length, 0, id);
+  render();
+  fitTo(col === 'ideas' ? from : col);
+  const card = $board.querySelector(`.card[data-id="${id}"]`);
+  card?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+  card?.classList.add('flash');
+  return card;
+}
+
+/* ---------- "Move to..." menu ---------- */
+
+let menu = null;
+let menuAnchor = null;
+
+function closeMenu(restoreFocus) {
+  if (!menu) return;
+  menu.remove();
+  menuAnchor?.setAttribute('aria-expanded', 'false');
+  if (restoreFocus) menuAnchor?.closest('.card')?.focus();
+  menu = menuAnchor = null;
+}
+
+function openMenu(id, anchor) {
+  closeMenu();
+  const here = colOf(id);
+  menu = document.createElement('div');
+  menu.className = 'menu';
+  menu.setAttribute('role', 'menu');
+  menu.innerHTML = `<div class="menu-title">Move ${PLACES[id].name} to…</div>` +
+    COLS.map((c) => `<button type="button" role="menuitem" class="menu-item" data-col="${c}"${c === here ? ' disabled' : ''}>` +
+      `<span class="menu-dot" style="background:${COL_COLOR[c]}"></span>${COL_LABEL[c]}${c === here ? ' (here)' : ''}</button>`).join('');
+  document.body.appendChild(menu);
+  menuAnchor = anchor;
+  anchor.setAttribute('aria-expanded', 'true');
+  const r = anchor.getBoundingClientRect();
+  const w = menu.offsetWidth, h = menu.offsetHeight;
+  menu.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px';
+  menu.style.top = (r.bottom + 4 + h > innerHeight - 8 ? Math.max(8, r.top - h - 4) : r.bottom + 4) + 'px';
+  menu.querySelector('.menu-item:not(:disabled)').focus();
+  menu.addEventListener('click', (e) => {
+    const item = e.target.closest('.menu-item');
+    if (!item || item.disabled) return;
+    closeMenu();
+    moveTo(id, item.dataset.col)?.focus();
+  });
+  menu.addEventListener('keydown', (e) => {
+    const items = [...menu.querySelectorAll('.menu-item:not(:disabled)')];
+    const i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') items[(i + 1) % items.length].focus();
+    else if (e.key === 'ArrowUp') items[(i - 1 + items.length) % items.length].focus();
+    else if (e.key === 'Escape') closeMenu(true);
+    else if (e.key === 'Tab') closeMenu(true);
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
+  });
+}
+
+document.addEventListener('pointerdown', (e) => {
+  if (menu && !menu.contains(e.target) && !e.target.closest('.card-move')) closeMenu();
+});
+
+$board.addEventListener('click', (e) => {
+  const btn = e.target.closest('.card-move');
+  if (!btn) return;
+  const open = menu && menuAnchor === btn;
+  closeMenu();
+  if (!open) openMenu(btn.closest('.card').dataset.id, btn);
+});
+
+$board.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() === 'm' && e.target.classList.contains('card') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    e.preventDefault();
+    openMenu(e.target.dataset.id, e.target.querySelector('.card-move'));
+  }
+});
+
+/* ---------- hover link between cards and pins ---------- */
+
+$board.addEventListener('pointerover', (e) => {
+  if (drag) return;
+  const card = e.target.closest('.card');
+  if (card) setHl(card.dataset.id);
+});
+$board.addEventListener('pointerout', (e) => {
+  if (!drag && e.target.closest('.card') && !e.relatedTarget?.closest?.('.card')) setHl(null);
+});
+$board.addEventListener('focusin', (e) => { const c = e.target.closest('.card'); if (c) setHl(c.dataset.id); });
+$board.addEventListener('focusout', () => setHl(null));
+
+/* ---------- pointer drag and drop ---------- */
+
+let drag = null;
+
+$board.addEventListener('pointerdown', (e) => {
+  const grip = e.target.closest('.grip');
+  if (!grip || e.button !== 0 || drag) return;
+  e.preventDefault();
+  closeMenu();
+  const card = grip.closest('.card');
+  const r = card.getBoundingClientRect();
+  const ghost = card.cloneNode(true);
+  ghost.classList.add('ghost');
+  ghost.style.width = r.width + 'px';
+  document.body.appendChild(ghost);
+  drag = {
+    card, ghost, id: card.dataset.id, dx: e.clientX - r.left, dy: e.clientY - r.top,
+    x: e.clientX, y: e.clientY, pointerId: e.pointerId,
+    home: card.parentNode, next: card.nextSibling, snap: $board.style.scrollSnapType,
+  };
+  card.classList.add('is-ph'); // the original becomes the dashed placeholder gap
+  $board.style.scrollSnapType = 'none';
+  document.body.style.cursor = 'grabbing';
+  placeGhost();
+  requestAnimationFrame(autoScroll);
+});
+
+function placeGhost() {
+  drag.ghost.style.transform = `translate(${drag.x - drag.dx}px, ${drag.y - drag.dy}px)`;
+}
+
+function updateTarget() {
+  const col = document.elementFromPoint(drag.x, drag.y)?.closest('.col');
+  $board.querySelectorAll('.col.drop-target').forEach((c) => c !== col && c.classList.remove('drop-target'));
+  if (!col) return;
+  col.classList.add('drop-target');
+  const list = col.querySelector('.list');
+  const after = [...list.querySelectorAll('.card:not(.is-ph)')].find((c) => {
+    const b = c.getBoundingClientRect();
+    return drag.y < b.top + b.height / 2;
+  }) || null;
+  if (drag.card.parentNode !== list || drag.card.nextElementSibling !== after) {
+    list.insertBefore(drag.card, after);
+  }
+}
+
+function autoScroll() {
+  if (!drag) return;
+  const edge = 48;
+  const br = $board.getBoundingClientRect();
+  if (drag.x < br.left + edge) $board.scrollLeft -= 12;
+  else if (drag.x > br.right - edge) $board.scrollLeft += 12;
+  const list = document.elementFromPoint(drag.x, drag.y)?.closest('.col')?.querySelector('.list');
+  if (list) {
+    const lr = list.getBoundingClientRect();
+    if (drag.y < lr.top + edge) list.scrollTop -= 10;
+    else if (drag.y > lr.bottom - edge) list.scrollTop += 10;
+  }
+  updateTarget();
+  requestAnimationFrame(autoScroll);
+}
+
+window.addEventListener('pointermove', (e) => {
+  if (!drag || e.pointerId !== drag.pointerId) return;
+  drag.x = e.clientX;
+  drag.y = e.clientY;
+  placeGhost();
+  updateTarget();
+});
+
+function endDrag(commit) {
+  if (!drag) return;
+  const d = drag;
+  drag = null;
+  d.ghost.remove();
+  document.body.style.cursor = '';
+  $board.style.scrollSnapType = d.snap;
+  $board.querySelectorAll('.col.drop-target').forEach((c) => c.classList.remove('drop-target'));
+  const col = d.card.closest('.col')?.dataset.col;
+  if (commit && col) {
+    const index = [...d.card.parentNode.querySelectorAll('.card')].indexOf(d.card);
+    moveTo(d.id, col, index);
+  } else {
+    d.home.insertBefore(d.card, d.next);
+    d.card.classList.remove('is-ph');
+  }
+}
+
+window.addEventListener('pointerup', (e) => { if (drag && e.pointerId === drag.pointerId) endDrag(true); });
+window.addEventListener('pointercancel', () => endDrag(false));
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && drag) endDrag(false); });
+
+/* ---------- day filter ---------- */
+
+document.getElementById('seg').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  filter = btn.dataset.day;
+  document.querySelectorAll('#seg button').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+  renderMap();
+  fitTo(null);
+});
+
+render();
+</script>
+</body>
+</html>

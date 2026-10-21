@@ -1,0 +1,277 @@
+<!--
+  Working EXAMPLE of the Papercraft style pack (papercraft.css, in this
+  same folder). Open this file directly to see the pattern working with six
+  illustrative stops around Hallstatt, Austria on Mapbox Standard (day,
+  faded theme) with 3D terrain: a pop-up diorama header of six cut-paper
+  SVG layers with pointer parallax, the map framed as a paper card, and a
+  column of bookmark tabs -- click one to pull it out, fly the map there
+  (facing across the lake) and unfold a paper caption. A Day / Dusk switch
+  flips Standard's lightPreset and re-tints the diorama. Copy the markup
+  below into your own demo and link papercraft.css from its <head> -- see
+  the class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (layered cut-paper pop-up storybook, lakeside alpine
+  village) at the user's request for something distinct from every other
+  pack in this folder. The places are real but the coordinates are
+  hand-approximated, and the title and captions are illustrative
+  placeholders -- swap in your own.
+
+  What's NOT included: search/geocoding, routing, popups, real attraction
+  data (opening hours, prices), or a hard-coded access token (demo-kit.js
+  sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Papercraft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@600;800&family=Mali:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="papercraft.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="pine" viewBox="0 0 20 40" preserveAspectRatio="none"><path d="M10 0 L17 13 H13 L20 27 H12 V40 H8 V27 H0 L7 13 H3 Z"/></symbol>
+</svg>
+
+<div class="app">
+  <header class="diorama" id="diorama" aria-label="Paper diorama of a lakeside alpine village">
+    <svg class="layer l-sky" style="--d:-3" viewBox="0 0 1440 360" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <rect class="f-sky" width="1440" height="360"/>
+      <g class="f-cloud"><ellipse cx="240" cy="74" rx="46" ry="16"/><ellipse cx="270" cy="62" rx="30" ry="16"/><ellipse cx="620" cy="52" rx="54" ry="15"/><ellipse cx="650" cy="40" rx="30" ry="14"/><ellipse cx="930" cy="96" rx="44" ry="14"/><ellipse cx="955" cy="84" rx="26" ry="13"/></g>
+    </svg>
+    <svg class="layer l-sun" style="--d:-6" viewBox="0 0 1440 360" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <g class="sun-disc"><circle class="f-sun" cx="1100" cy="112" r="62" opacity="0.4"/><circle class="f-sun" cx="1100" cy="112" r="44"/></g>
+    </svg>
+    <svg class="layer l-far" style="--d:-10" viewBox="0 0 1440 360" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <path class="f-far" d="M0 360V200L110 130L190 180L300 90L420 190L520 140L640 200L760 110L880 190L1000 120L1120 195L1240 100L1340 170L1440 130V360Z"/>
+      <g class="f-paper"><polygon points="300,90 276,118 292,112 300,124 312,112 326,118"/><polygon points="760,110 738,134 752,129 760,140 770,129 784,134"/><polygon points="1240,100 1218,126 1232,120 1240,132 1250,120 1264,126"/></g>
+    </svg>
+    <svg class="layer l-near" style="--d:-18" viewBox="0 0 1440 360" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <path class="f-near" d="M0 360V250L140 170L260 240L400 160L560 250L700 200L820 260L980 180L1120 250L1300 170L1440 240V360Z"/>
+    </svg>
+    <svg class="layer l-forest" style="--d:-28" viewBox="0 0 1440 360" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <path class="f-forest" d="M0 360V292Q180 270 360 290T720 296T1080 288T1440 292V360Z"/>
+      <use href="#pine" class="f-near" x="20" y="262" width="23" height="49"/>
+      <use href="#pine" class="f-forest" x="70" y="270" width="18" height="38"/>
+      <use href="#pine" class="f-near" x="120" y="258" width="26" height="54"/>
+      <use href="#pine" class="f-forest" x="175" y="272" width="18" height="38"/>
+      <use href="#pine" class="f-near" x="230" y="264" width="23" height="49"/>
+      <use href="#pine" class="f-forest" x="290" y="268" width="21" height="43"/>
+      <use href="#pine" class="f-near" x="350" y="258" width="26" height="54"/>
+      <use href="#pine" class="f-forest" x="410" y="270" width="20" height="40"/>
+      <use href="#pine" class="f-near" x="470" y="262" width="23" height="49"/>
+      <use href="#pine" class="f-forest" x="870" y="266" width="23" height="49"/>
+      <use href="#pine" class="f-near" x="920" y="256" width="26" height="54"/>
+      <use href="#pine" class="f-forest" x="975" y="270" width="18" height="38"/>
+      <use href="#pine" class="f-near" x="1030" y="262" width="23" height="49"/>
+      <use href="#pine" class="f-forest" x="1085" y="268" width="21" height="43"/>
+      <use href="#pine" class="f-near" x="1140" y="256" width="27" height="57"/>
+      <use href="#pine" class="f-forest" x="1200" y="270" width="18" height="38"/>
+      <use href="#pine" class="f-near" x="1255" y="262" width="23" height="49"/>
+      <use href="#pine" class="f-forest" x="1310" y="254" width="29" height="59"/>
+      <use href="#pine" class="f-near" x="1370" y="268" width="21" height="43"/>
+      <use href="#pine" class="f-forest" x="1415" y="260" width="25" height="51"/>
+      <rect class="f-cream" x="520" y="286" width="34" height="26"/><polygon class="f-roof" points="516,286 537.0,268 558,286"/>
+      <rect class="f-cream" x="562" y="280" width="40" height="32"/><polygon class="f-roof" points="558,280 582.0,258 606,280"/>
+      <rect class="f-cream" x="610" y="290" width="30" height="22"/><polygon class="f-roof" points="606,290 625.0,275 644,290"/>
+      <rect class="f-cream" x="740" y="288" width="34" height="24"/><polygon class="f-roof" points="736,288 757.0,271 778,288"/>
+      <rect class="f-cream" x="784" y="282" width="38" height="30"/><polygon class="f-roof" points="780,282 803.0,261 826,282"/>
+      <rect class="f-cream" x="832" y="292" width="28" height="20"/><polygon class="f-roof" points="828,292 846.0,278 864,292"/>
+      <rect class="f-cream" x="660" y="272" width="30" height="40"/><polygon class="f-roof" points="656,272 675,226 694,272"/><rect class="f-paper" x="670" y="282" width="10" height="12"/>
+    </svg>
+    <svg class="layer l-lake" style="--d:-40" viewBox="0 0 1440 360" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <path class="f-lake" d="M0 360V326q30 -10 60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0V360Z"/>
+      <g transform="translate(1000 336)"><g class="boat"><path class="f-roof" d="M-20 0H20L13 10H-13Z"/><rect class="f-paper" x="-1" y="-30" width="2" height="30"/><polygon class="f-paper" points="2,-28 2,-4 18,-4"/></g></g>
+    </svg>
+
+    <div class="plaque paper">
+      <span class="kicker">A pocket guide in paper</span>
+      <h1>Hallstatt by the Lake</h1>
+    </div>
+    <button class="mode-toggle paper" id="mode-toggle" role="switch" aria-checked="false" aria-label="Switch between day and dusk">
+      <span class="knob"></span><span class="opt">Day</span><span class="opt">Dusk</span>
+    </button>
+  </header>
+
+  <main class="stage">
+    <div class="map-frame paper">
+      <div class="map-wrap"><div id="map"></div></div>
+    </div>
+
+    <aside class="side">
+      <nav class="tabs" id="tabs" aria-label="Stops"></nav>
+      <section class="caption paper" id="caption" aria-live="polite">
+        <h2 class="caption-title" id="cap-title">Pick a tab</h2>
+        <p class="caption-body" id="cap-body">Pull a bookmark tab to plant a paper flag on the map and fly there.</p>
+        <div class="caption-meta" id="cap-meta"><span class="status-note loading" id="status-note">Folding the map&hellip;</span></div>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<script>
+// Approximate [lng, lat] points on real public places around Hallstatt.
+// bearing = camera heading, chosen to look across / down the lake.
+const STOPS = [
+  { name: 'Marktplatz', sub: 'The village square', coord: [13.6493, 47.5622], zoom: 16.2, bearing: 85, color: '#D9553F',
+    text: 'Pastel gabled houses crowd around the little square, with the lake a few steps to the east.', meta: 'Old town' },
+  { name: 'Skywalk viewpoint', sub: 'High above the roofs', coord: [13.6411, 47.5589], zoom: 15.6, bearing: 60, color: '#E9A23B',
+    text: 'A platform that juts out over the slope, with the whole village and the lake laid out below.', meta: 'Viewpoint' },
+  { name: 'Salt mine entrance', sub: 'Ancient salt, up the hill', coord: [13.6378, 47.5598], zoom: 15.6, bearing: 70, color: '#4E7A58',
+    text: 'Salt has been mined in the mountain above town for thousands of years. A funicular climbs to the entrance.', meta: 'Underground' },
+  { name: 'Lake promenade', sub: 'Water at your toes', coord: [13.6486, 47.5584], zoom: 16, bearing: 140, color: '#4C93C0',
+    text: 'A lakeside stroll with boats, swans and mirror-flat water on a still morning.', meta: 'Easy walk' },
+  { name: 'Obertraun', sub: 'The quiet far shore', coord: [13.6713, 47.5603], zoom: 14.8, bearing: 285, color: '#8E6BB5',
+    text: 'A calm village at the south end of the lake, facing back across the water to Hallstatt.', meta: 'Lake end' },
+  { name: 'Five Fingers', sub: 'Dachstein lookout', coord: [13.6985, 47.5220], zoom: 14.2, bearing: 330, color: '#C9617F',
+    text: 'Five viewing arms reach out over a sheer drop on the Dachstein plateau.', meta: 'Mountain' },
+];
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+const phone = window.matchMedia('(max-width: 860px)');
+const $ = (id) => document.getElementById(id);
+let mode = 'day';
+let current = -1;
+let styleReady = false;
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [13.67, 47.54],
+  zoom: 11.5,
+  pitch: 50,
+  config: { basemap: { lightPreset: 'day', theme: 'faded', showPointOfInterestLabels: false } },
+});
+
+/* ---- Diorama parallax (off on phones and for reduced motion) ---- */
+const dio = $('diorama');
+window.addEventListener('pointermove', (e) => {
+  if (reduce.matches || phone.matches) return;
+  const r = dio.getBoundingClientRect();
+  dio.style.setProperty('--px', (((e.clientX - r.left) / r.width - 0.5) * 2).toFixed(3));
+  dio.style.setProperty('--py', (Math.max(-1, Math.min(1, (e.clientY - r.top) / r.height - 0.5) * 2)).toFixed(3));
+});
+
+/* ---- Day / Dusk ---- */
+function setMode(m) {
+  mode = m;
+  document.documentElement.dataset.mode = m;
+  $('mode-toggle').setAttribute('aria-checked', String(m === 'dusk'));
+  if (styleReady) map.setConfigProperty('basemap', 'lightPreset', m);
+}
+$('mode-toggle').addEventListener('click', () => setMode(mode === 'day' ? 'dusk' : 'day'));
+
+/* ---- Tabs, flags, caption ---- */
+const flags = [];
+const tabBtns = [];
+
+function flagEl(i, s) {
+  const root = document.createElement('div');
+  root.innerHTML =
+    '<span class="flag"><svg viewBox="0 0 44 66" aria-hidden="true">' +
+    '<rect x="20" y="3" width="3" height="63" rx="1.5" fill="#E3C48C"/>' +
+    '<path class="cloth" d="M23 4Q34 0 43 6Q34 16 23 20Z" fill="' + s.color + '" stroke="#FFFDF8" stroke-width="1.2"/>' +
+    '<text x="31" y="14.5" text-anchor="middle" font-family="Grandstander,sans-serif" font-weight="800" font-size="12" fill="#FFFDF8">' + (i + 1) + '</text>' +
+    '</svg></span>';
+  root.addEventListener('click', () => select(i));
+  return root;
+}
+
+STOPS.forEach((s, i) => {
+  const b = document.createElement('button');
+  b.className = 'tab paper';
+  b.innerHTML = '<span class="tab-num">' + (i + 1) + '</span><span><span class="tab-name">' + s.name + '</span><span class="tab-sub">' + s.sub + '</span></span>';
+  b.addEventListener('click', () => select(i));
+  $('tabs').appendChild(b);
+  tabBtns.push(b);
+
+  const el = flagEl(i, s);
+  flags.push(el.firstChild);
+  new mapboxgl.Marker({ element: el, anchor: 'bottom' }).setLngLat(s.coord).addTo(map);
+});
+
+function select(i) {
+  const s = STOPS[i];
+  current = i;
+  tabBtns.forEach((b, k) => {
+    b.classList.toggle('is-active', k === i);
+    b.setAttribute('aria-pressed', String(k === i));
+    flags[k].classList.toggle('is-active', k === i);
+  });
+  $('cap-title').textContent = s.name;
+  $('cap-body').textContent = s.text;
+  $('cap-meta').textContent = (i + 1) + ' of ' + STOPS.length + ' \u00b7 ' + s.meta;
+  const cap = $('caption');
+  cap.classList.remove('unfold');
+  void cap.offsetWidth;
+  cap.classList.add('unfold');
+
+  const opts = {
+    center: s.coord, zoom: s.zoom, bearing: s.bearing, pitch: 55,
+    padding: { top: 50, bottom: 80, left: 40, right: 40 },
+  };
+  if (reduce.matches) map.jumpTo(opts); else map.flyTo({ ...opts, duration: 2400, essential: false });
+}
+
+function frameAll() {
+  // Try a few headings (looking across the lake toward Hallstatt), zoom in
+  // while every flag still projects inside the padding, keep the tightest.
+  const pad = { top: 40, bottom: 72, left: 40, right: 40 };
+  const c = map.getContainer();
+  const w = c.clientWidth, h = c.clientHeight;
+  const center = STOPS.reduce((m, s) => [m[0] + s.coord[0] / STOPS.length, m[1] + s.coord[1] / STOPS.length], [0, 0]);
+  const fits = () => STOPS.every((s) => {
+    const p = map.project(s.coord);
+    return p.x >= pad.left + 14 && p.x <= w - pad.right - 14 && p.y >= pad.top + 66 && p.y <= h - pad.bottom;
+  });
+  let best = null;
+  [20, 45, 300].forEach((bearing) => {
+    let z = 9;
+    map.jumpTo({ center, zoom: z, bearing, pitch: 50, padding: pad });
+    if (!fits()) return;
+    while (z < 16) {
+      map.jumpTo({ zoom: z + 0.1 });
+      if (!fits()) break;
+      z += 0.1;
+    }
+    if (!best || z > best.z) best = { z, bearing };
+  });
+  // map.project() ignores terrain height, but the flags sit on the terrain, so
+  // a high stop (Five Fingers at ~2,100 m) lands further up-screen than
+  // projected. Back off a little to keep every flag in the frame.
+  if (best) map.jumpTo({ center, zoom: best.z - 0.5, bearing: best.bearing, pitch: 50, padding: pad });
+}
+
+map.on('style.load', () => {
+  styleReady = true;
+  map.addSource('mapbox-dem', { type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14 });
+  map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.3 });
+  if (mode !== 'day') map.setConfigProperty('basemap', 'lightPreset', mode);
+  frameAll();
+});
+
+map.once('idle', () => {
+  const note = $('status-note');
+  if (note && current < 0) $('cap-meta').textContent = STOPS.length + ' stops \u00b7 tap a tab';
+});
+
+map.on('error', (e) => {
+  if (current >= 0) return;
+  $('cap-meta').innerHTML = '<span class="status-note error">Map error: ' + ((e.error && e.error.message) || 'unknown') + '</span>';
+});
+</script>
+</body>
+</html>

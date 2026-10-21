@@ -1,0 +1,730 @@
+/*
+  Audio Guide -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a museum-district handheld audio guide --
+  a tall rounded device with a quiet screen showing the current stop number,
+  a serif transcript and a waveform progress bar, plus a physical numeric
+  keypad; gallery white, warm stone, deep museum green and brass), deliberately
+  distinct from every other pack in this folder: Academic Paper, Aero Gadgets,
+  Amber Terminal, Arena, Aurora Command, Blueprint, Board Game, Bottom Sheet,
+  Broadcast, Case Board, Celestial Tarot, Chat Concierge, Chronicle, Clinic
+  Finder, Comic Panel, Data Notebook, Deco Voyage, Drop Culture, E-Ink,
+  Editorial Paper, Estate Luxe, Event Invite, Field Journal, Fleet Ops,
+  Frontier Poster, Highway Sign, Isotype, Line Diagram, Neon HUD, Pastel
+  Bento, Postcards, Raw Web, Retro OS, Riso Zine, Ski Piste, Slate Console,
+  Split Flap, Sticker Book, Storefront, Story Scroll, Swiss Grid, Tarmac
+  Glass, Thermal Receipt, Trailhead, Vapor Sunset, Vintage Chart, Washi
+  Seasons and Weather Console. (Estate Luxe and Chronicle also use serif
+  type, but neither is a physical device with a keypad.)
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/audio-guide.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Instrument Sans for numerals, labels and
+  UI; Newsreader for stop titles and the transcript):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+
+  Signature touch: a physical keypad. Type a stop number (2-1-4) and press
+  the brass play key -- the screen "loads" the stop, the map flies to it, a
+  brass numbered pin pulses, the waveform fills and the transcript lights up
+  sentence by sentence.
+
+  Layout: .app is a two-column grid on desktop -- .map-pane (~62%, holds
+  #map) and .device-pane (~38%, holds the handheld .device, the "All stops"
+  toggle and the stop list). On phones the grid is two rows: the map on top
+  and .device-pane as a bottom-docked panel (the keypad is collapsed until
+  the Keypad button is pressed). The map ends ABOVE the panel, so the Mapbox
+  logo and attribution are never covered. If you add a raster-dem source
+  (terrain), GL JS hides the logo; the rule near the bottom of this file
+  forces it back.
+
+  Class/id contract (see audio-guide-template.html in this same folder for
+  a full working example):
+
+  - .app                      page grid, 100dvh
+  - .map-pane                 positioned map column/row; holds #map
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .map-badge                small label chip over the map (pointer-events
+                               none): .map-badge-mark + text
+  - .device-pane              right column / bottom dock (scrolls on its own)
+  - .device                   the handheld shell; .kp-open on phones shows
+                               the keypad
+    .device-top               speaker grille + .device-brand
+    .screen                   the inset display
+    .screen-head              row: .stop-label/.stop-num and .stop-info
+    .stop-num                 big stop numeral (.typing while a number is
+                               being keyed in)
+    .stop-title, .stop-meta   title (Newsreader) and small meta line
+    .stop-msg                 status line (.error for "No stop 999")
+    .transcript > .sent       sentences; .on = being read, .past = read
+    .player                   .wave (inline <svg>, .bar / .bar.done) and
+                               .time (.t-now / .t-total)
+    .ctrls                    .ctl-btn (-15 / +15), .ctl-play (.playing),
+                               .ctl-keypad (phones only)
+    .keypad-wrap > .keypad    grid of .key; .key-del and .key-go variants
+  - .dock-bar                 row under the device with .toggle-btn
+                               (.open when its list is shown)
+  - .stop-list                list of all stops: .stop-item (.active) with
+                               .si-num and .si-title
+  - .stop-dot                 inner child of a mapboxgl.Marker (small
+                               numbered ink dot) -- never style the marker
+                               root itself
+  - .pin                      inner child of the active-stop Marker (brass
+                               numbered pin with a pulse ring)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --gallery: #FAFAF8;
+  --stone: #E7E2DA;
+  --stone-deep: #D3CCC0;
+  --stone-dim: #8C867B;
+  --green: #1F3A33;
+  --green-soft: #2B4C43;
+  --brass: #B08D57;
+  --brass-deep: #8E6E3E;
+  --ink: #161616;
+  --ink-soft: #4A4A46;
+  --error: #9E3B2C;
+  --line: rgba(22, 22, 22, 0.12);
+
+  --font-heading: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --font-body: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-label: var(--font-body);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--stone);
+  color: var(--ink);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 62fr) minmax(0, 38fr);
+  grid-template-areas: "map device";
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.map-pane {
+  grid-area: map;
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.map-badge {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px 8px 10px;
+  background: rgba(250, 250, 248, 0.94);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgba(22, 22, 22, 0.12);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--green);
+  pointer-events: none;
+}
+
+.map-badge-mark {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: inset 0 0 0 4px var(--green), 0 0 0 2px var(--brass);
+  background-image: radial-gradient(circle, var(--brass) 0 3px, transparent 3.5px);
+}
+
+/* Right column: the device, the toggle and the stop list */
+.device-pane {
+  grid-area: device;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  background: var(--stone);
+}
+
+/* The handheld -- deep green shell, soft shadow */
+.device {
+  flex: none;
+  width: 100%;
+  max-width: 360px;
+  padding: 16px 18px 20px;
+  background: linear-gradient(180deg, var(--green-soft), var(--green));
+  border-radius: 40px;
+  box-shadow:
+    0 30px 50px -18px rgba(22, 22, 22, 0.45),
+    0 6px 14px rgba(22, 22, 22, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.device-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 10px 12px;
+}
+
+.device-top::before {
+  content: '';
+  width: 54px;
+  height: 6px;
+  border-radius: 3px;
+  background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.45) 0 4px, transparent 4px 9px);
+}
+
+.device-brand {
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+/* Screen -- gallery white, inset */
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 16px 14px;
+  background: var(--gallery);
+  border-radius: 18px;
+  box-shadow: inset 0 2px 6px rgba(22, 22, 22, 0.22), 0 0 0 3px rgba(0, 0, 0, 0.28);
+}
+
+.screen-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  min-width: 0;
+}
+
+.stop-label {
+  display: block;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--stone-dim);
+}
+
+.stop-num {
+  display: block;
+  font-weight: 600;
+  font-size: 64px;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  color: var(--green);
+  font-variant-numeric: tabular-nums;
+}
+
+.stop-num.typing {
+  color: var(--brass);
+}
+
+.stop-info {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 4px;
+  text-align: right;
+}
+
+.stop-title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 500;
+  font-size: 20px;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.stop-meta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--stone-dim);
+}
+
+.stop-msg {
+  min-height: 16px;
+  margin: 0;
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--brass-deep);
+}
+
+.stop-msg.error {
+  color: var(--error);
+}
+
+.transcript {
+  height: 122px;
+  margin: 0;
+  padding: 10px 0 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-heading);
+  font-size: 15.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  scrollbar-width: thin;
+}
+
+.sent {
+  transition: color 0.3s ease, background-size 0.3s ease;
+  background-image: linear-gradient(var(--brass), var(--brass));
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0 1px;
+}
+
+.sent.past {
+  color: var(--stone-dim);
+}
+
+.sent.on {
+  color: var(--ink);
+  background-size: 100% 1px;
+}
+
+/* Waveform progress */
+.player {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wave {
+  display: block;
+  width: 100%;
+  height: 40px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.bar {
+  fill: var(--stone-deep);
+}
+
+.bar.done {
+  fill: var(--green);
+}
+
+.time {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--stone-dim);
+}
+
+.ctrls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.ctl-btn {
+  min-width: 52px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.ctl-btn:hover {
+  background: var(--stone);
+}
+
+.ctl-play {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--green);
+  color: var(--gallery);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(31, 58, 51, 0.35);
+  transition: background 0.15s ease;
+}
+
+.ctl-play:hover {
+  background: var(--green-soft);
+}
+
+.ctl-keypad {
+  display: none;
+}
+
+/* Keypad -- physical-looking keys */
+.keypad-wrap {
+  padding: 18px 8px 0;
+}
+
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.key {
+  height: 50px;
+  border: 0;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #F1EDE6, var(--stone));
+  box-shadow: 0 3px 0 var(--stone-deep), 0 5px 8px rgba(0, 0, 0, 0.28);
+  font-weight: 600;
+  font-size: 22px;
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+.key:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--stone-deep), 0 2px 4px rgba(0, 0, 0, 0.28);
+}
+
+.key-del {
+  background: linear-gradient(180deg, var(--stone-deep), #C4BCAE);
+  box-shadow: 0 3px 0 #A9A294, 0 5px 8px rgba(0, 0, 0, 0.28);
+  font-size: 20px;
+}
+
+.key-go {
+  background: linear-gradient(180deg, #C4A06A, var(--brass));
+  box-shadow: 0 3px 0 var(--brass-deep), 0 5px 8px rgba(0, 0, 0, 0.28);
+  color: var(--gallery);
+  font-size: 20px;
+}
+
+/* Toggle row and stop list */
+.dock-bar {
+  flex: none;
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  justify-content: center;
+}
+
+.toggle-btn {
+  padding: 9px 18px;
+  border: 1px solid var(--stone-deep);
+  border-radius: 999px;
+  background: var(--gallery);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--green);
+  cursor: pointer;
+}
+
+.toggle-btn:hover,
+.toggle-btn.open {
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--gallery);
+}
+
+.stop-list {
+  flex: none;
+  width: 100%;
+  max-width: 360px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--gallery);
+  border-radius: 18px;
+  box-shadow: 0 6px 18px rgba(22, 22, 22, 0.1);
+}
+
+.stop-item {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stop-item:hover {
+  background: var(--stone);
+}
+
+.stop-item.active {
+  background: var(--green);
+  color: var(--gallery);
+}
+
+.si-num {
+  flex: none;
+  width: 38px;
+  font-weight: 700;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--brass-deep);
+}
+
+.stop-item.active .si-num {
+  color: var(--brass);
+}
+
+.si-title {
+  min-width: 0;
+  font-family: var(--font-heading);
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+/* Map markers -- inner children of mapboxgl.Marker roots */
+.stop-dot {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ink);
+  border: 2px solid var(--gallery);
+  box-shadow: 0 2px 6px rgba(22, 22, 22, 0.35);
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 0;
+  color: var(--gallery);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.pin {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--brass);
+  border: 3px solid var(--gallery);
+  box-shadow: 0 6px 16px rgba(22, 22, 22, 0.4);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--gallery);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.pin::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid var(--brass);
+  animation: guide-pulse 2s ease-out infinite;
+}
+
+@keyframes guide-pulse {
+  0% { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(2.1); opacity: 0; }
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Mapbox controls re-skinned to match */
+.mapboxgl-ctrl-group {
+  border-radius: 12px !important;
+  background: var(--gallery) !important;
+  box-shadow: 0 4px 14px rgba(22, 22, 22, 0.16) !important;
+}
+
+/* A raster-dem (terrain) source makes GL JS hide the Mapbox logo (the DEM
+   TileJSON has mapbox_logo:false). Force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+/* Phones: the device becomes a bottom-docked panel under the map */
+@media (max-width: 760px) {
+  html, body {
+    background: var(--gallery);
+  }
+
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "map" "device";
+  }
+
+  .map-badge {
+    top: 10px;
+    left: 16px;
+    padding: 6px 12px 6px 8px;
+    font-size: 11px;
+  }
+
+  .device-pane {
+    max-height: 56dvh;
+    padding: 12px 16px 14px;
+    gap: 10px;
+    align-items: stretch;
+    background: var(--gallery);
+    border-radius: 22px 22px 0 0;
+    box-shadow: 0 -8px 24px rgba(22, 22, 22, 0.16);
+  }
+
+  .device {
+    max-width: none;
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .device-top {
+    display: none;
+  }
+
+  .screen {
+    gap: 6px;
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .stop-num {
+    font-size: 44px;
+  }
+
+  .stop-info {
+    text-align: left;
+  }
+
+  .stop-title {
+    font-size: 18px;
+  }
+
+  .stop-msg {
+    min-height: 0;
+  }
+
+  .stop-msg:empty {
+    display: none;
+  }
+
+  .transcript {
+    height: 64px;
+    padding-top: 6px;
+    font-size: 15px;
+  }
+
+  .wave {
+    height: 30px;
+  }
+
+  .ctrls {
+    gap: 10px;
+  }
+
+  .ctl-keypad {
+    display: inline-block;
+  }
+
+  .keypad-wrap {
+    display: none;
+    margin-top: 10px;
+    padding: 14px;
+    background: var(--green);
+    border-radius: 22px;
+  }
+
+  .device.kp-open .keypad-wrap {
+    display: block;
+  }
+
+  .key {
+    height: 44px;
+  }
+
+  .dock-bar,
+  .stop-list {
+    max-width: none;
+  }
+
+  .dock-bar {
+    justify-content: flex-start;
+  }
+
+  .stop-list {
+    box-shadow: none;
+    border: 1px solid var(--line);
+  }
+
+  .stop-dot {
+    width: 20px;
+    height: 20px;
+    font-size: 8.5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pin::after {
+    animation: none;
+    opacity: 0.5;
+  }
+
+  .sent,
+  .key,
+  .ctl-btn,
+  .ctl-play {
+    transition: none;
+  }
+}

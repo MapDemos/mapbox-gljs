@@ -1,0 +1,859 @@
+/*
+  Soft UI -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: neumorphism -- extruded soft-plastic
+  controls on ONE pale blue-grey surface, a big circular range dial, pressed-in
+  toggles and an inset search field, the map sitting in a deep inset "well"),
+  deliberately distinct from every other pack in this folder: Academic Paper,
+  Aero Gadgets, Amber Terminal, Arena, Aurora Command, Blueprint, Board Game,
+  Bottom Sheet, Broadcast, Case Board, Celestial Tarot, Chat Concierge,
+  Chronicle, Clinic Finder, Comic Panel, Data Notebook, Deco Voyage, Drop
+  Culture, E-Ink, Editorial Paper, Estate Luxe, Event Invite, Field Journal,
+  Fleet Ops, Frontier Poster, Highway Sign, Isotype, Line Diagram, Neon HUD,
+  Pastel Bento, Postcards, Raw Web, Retro OS, Riso Zine, Ski Piste, Slate
+  Console, Split Flap, Sticker Book, Storefront, Story Scroll, Swiss Grid,
+  Tarmac Glass, Thermal Receipt, Trailhead, Vapor Sunset, Vintage Chart, Washi
+  Seasons and Weather Console. (Pastel Bento is coloured flat tiles; Aero
+  Gadgets is glossy skeuomorphism; Soft UI is monochrome surface + paired
+  light/dark shadows only.)
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/soft-ui.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Urbanist for headings, numbers and
+  buttons; Onest for body text and labels):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@600;700;800&family=Onest:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  Signature touch: every surface is the SAME colour (#E6EBF1); depth comes only
+  from a white highlight shadow (top-left) paired with a cool dark shadow
+  (bottom-right). Raised = outward pair, pressed/inset = the same pair inside.
+  Toggles flip from raised to inset when aria-pressed="true". Status colours
+  (lime-teal available, amber busy, coral out of service) are always paired
+  with a text label.
+
+  Layout: .app is a 2-column grid on desktop -- .panel-top (hero dial, search,
+  filters) over .panel-list (scrolling station cards) in a 400px left column,
+  and .stage (an inset frame holding the .well with #map) on the right. On
+  phones (<= 760px) the page scrolls as one column: dial + filters, the map
+  well (48dvh), then the list. The map fills its own .well, so the Mapbox logo
+  and attribution sit inside it and are never covered. If you add a raster-dem
+  source (terrain), GL JS hides the logo; the rule near the bottom forces it
+  back.
+
+  Class/id contract (see soft-ui-template.html in this same folder):
+
+  - .app                      page grid (100dvh desktop, scrolls on phone)
+  - .panel-top                left column header block
+    .hero                       dial + brand text
+    .brand-name / .brand-sub    app title and one-line caption
+    .dial                       big extruded circle; holds svg.dial-svg
+                                 (.dial-track, .dial-arc#dial-arc) and
+                                 .dial-face (.dial-value, .dial-unit,
+                                 .dial-sub)
+  - .search > .search-input     inset search field (an <input> inside a
+                                 label.search, with .search-icon svg)
+  - .filter-block             labelled group; .filter-label + .toggle-row
+    .toggle                     raised button; aria-pressed="true" = pressed
+                                 in. .toggle-dot is its tiny LED
+  - .panel-list               scrolling station list
+    .list-head                  "14 stations" line (.list-count)
+    .station-card               raised card (button-like); .is-active =
+                                 pressed in. Children: .st-name, .st-meta,
+                                 .st-kw, .st-status (+.free/.busy/.off) and
+                                 .plugs > .plug (+.free/.busy/.off)
+    .empty-note                 shown when no station matches
+  - .stage                    right-hand inset frame (grid column 2)
+    .well                       rounded 28px map holder
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .route-note               floating status chip over the map (top-left)
+  - .pin                      inner child of a station mapboxgl.Marker:
+                               .pin-ring + .pin-kw; .free/.busy/.off set the
+                               ring colour; .is-active = pressed in
+  - .you-dot                  inner child of the "you are here" marker
+  - .soft-popup               className for mapboxgl.Popup: .pop-name,
+                               .pop-meta, .pop-status, .pop-plugs (.plug-row),
+                               .btn-press ("Start route"), .pop-route
+  - .btn-press                pressed-look action button (raised, inset on
+                               :active)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --surface: #E6EBF1;
+  --light: #FFFFFF;
+  --dark: #B8C2CF;
+  --ink: #2E3A4B;
+  --ink-2: #6F7C8F;
+  --ink-2-strong: #5A677A;
+  --accent: #19C3A6;
+  --accent-ink: #0B8A74;
+  --busy: #F2A541;
+  --busy-ink: #A6670F;
+  --off: #F26D6D;
+  --off-ink: #BC3A3A;
+
+  --font-heading: 'Urbanist', 'Avenir Next', 'Helvetica Neue', sans-serif;
+  --font-body: 'Onest', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-label: var(--font-body);
+
+  --raise: 9px 9px 18px var(--dark), -9px -9px 18px var(--light);
+  --raise-sm: 5px 5px 10px var(--dark), -5px -5px 10px var(--light);
+  --raise-xs: 3px 3px 6px var(--dark), -3px -3px 6px var(--light);
+  --inset: inset 6px 6px 12px var(--dark), inset -6px -6px 12px var(--light);
+  --inset-sm: inset 3px 3px 7px var(--dark), inset -3px -3px 7px var(--light);
+
+  --col: 400px;
+  --dial: 212px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+html, body {
+  height: 100%;
+}
+
+button, input {
+  font-family: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* ---- Page grid ---- */
+.app {
+  display: grid;
+  grid-template-columns: var(--col) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "top stage" "list stage";
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.panel-top {
+  grid-area: top;
+  padding: 20px 22px 6px;
+}
+
+.panel-list {
+  grid-area: list;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 22px 28px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dark) transparent;
+}
+
+.stage {
+  grid-area: stage;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  margin: 14px 14px 14px 0;
+  padding: 14px;
+  border-radius: 38px;
+  background: var(--surface);
+  box-shadow: var(--inset);
+}
+
+.well {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 28px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+/* ---- Hero: dial + brand ---- */
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.hero-text {
+  order: -1;
+  align-self: stretch;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.brand-name {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 24px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.brand-sub {
+  margin: 0;
+  font-family: var(--font-label);
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--ink-2-strong);
+}
+
+.dial {
+  position: relative;
+  flex: none;
+  width: var(--dial);
+  height: var(--dial);
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 12px 12px 24px var(--dark), -12px -12px 24px var(--light);
+}
+
+.dial-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.dial-track {
+  fill: none;
+  stroke: var(--surface);
+  stroke-width: 15;
+  filter: drop-shadow(2px 2px 3px var(--dark)) drop-shadow(-2px -2px 3px var(--light));
+}
+
+.dial-arc {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 11;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.9s cubic-bezier(0.3, 0.7, 0.2, 1), stroke 0.4s ease;
+}
+
+.dial-face {
+  position: absolute;
+  inset: 17%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--inset);
+  text-align: center;
+}
+
+.dial-sub {
+  margin: 0;
+  max-width: 100%;
+  font-family: var(--font-label);
+  font-weight: 500;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--ink-2-strong);
+}
+
+.dial-value {
+  display: block;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 44px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.dial-unit {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--accent-ink);
+}
+
+/* ---- Search: inset field ---- */
+.search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 0 16px;
+  height: 50px;
+  border-radius: 25px;
+  background: var(--surface);
+  box-shadow: var(--inset);
+}
+
+.search-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--ink-2-strong);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.search-input::placeholder {
+  color: var(--ink-2);
+}
+
+.search:focus-within {
+  box-shadow: var(--inset), 0 0 0 2px var(--accent);
+}
+
+/* ---- Filters: raised toggles that press in ---- */
+.filter-block {
+  margin-top: 16px;
+}
+
+.filter-label {
+  display: block;
+  margin: 0 0 9px 6px;
+  font-family: var(--font-label);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2-strong);
+}
+
+.toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 0 4px;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--raise-sm);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  color: var(--ink-2-strong);
+  cursor: pointer;
+  transition: box-shadow 0.18s ease, color 0.18s ease;
+}
+
+.toggle-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dark);
+  box-shadow: inset 1px 1px 2px rgba(46, 58, 75, 0.25);
+  transition: background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.toggle:hover {
+  color: var(--ink);
+}
+
+.toggle[aria-pressed="true"] {
+  box-shadow: var(--inset-sm);
+  color: var(--ink);
+}
+
+.toggle[aria-pressed="true"] .toggle-dot {
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(25, 195, 166, 0.7);
+}
+
+/* ---- Station list ---- */
+.list-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 10px 6px 12px;
+}
+
+.list-count {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.list-sort {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2-strong);
+}
+
+.station-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  padding: 2px 4px;
+}
+
+.station-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: center;
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--raise);
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow 0.18s ease;
+}
+
+.station-card:hover {
+  box-shadow: 11px 11px 22px var(--dark), -11px -11px 22px var(--light);
+}
+
+.station-card.is-active {
+  box-shadow: var(--inset);
+}
+
+.st-name {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.st-kw {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 20px;
+  line-height: 1;
+  text-align: right;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.st-kw small {
+  margin-left: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-2-strong);
+}
+
+.st-meta {
+  font-family: var(--font-label);
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--ink-2-strong);
+}
+
+.st-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.st-status {
+  font-family: var(--font-label);
+  font-weight: 600;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.st-status.free { color: var(--accent-ink); }
+.st-status.busy { color: var(--busy-ink); }
+.st-status.off { color: var(--off-ink); }
+
+.plugs {
+  display: inline-flex;
+  gap: 7px;
+}
+
+/* A plug: a small extruded dot with a coloured core */
+.plug {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--raise-xs);
+  position: relative;
+}
+
+.plug::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--dark);
+}
+
+.plug.free::after { background: var(--accent); }
+.plug.busy::after { background: var(--busy); }
+.plug.off::after { background: var(--off); }
+
+.empty-note {
+  padding: 22px 12px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--ink-2-strong);
+}
+
+/* ---- Route note over the map ---- */
+.route-note {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 2;
+  max-width: calc(100% - 80px);
+  padding: 9px 16px;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--raise-sm);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink);
+  pointer-events: none;
+}
+
+/* ---- Map markers: inner children only ---- */
+.pin {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 5px 5px 10px rgba(110, 124, 143, 0.55), -4px -4px 9px rgba(255, 255, 255, 0.95);
+  cursor: pointer;
+  transition: box-shadow 0.18s ease;
+}
+
+.pin-ring {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 3.5px solid var(--dark);
+}
+
+.pin.free .pin-ring { border-color: var(--accent); }
+.pin.busy .pin-ring { border-color: var(--busy); }
+.pin.off .pin-ring { border-color: var(--off); }
+
+.pin-kw {
+  position: relative;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.pin:hover {
+  box-shadow: 6px 6px 12px rgba(110, 124, 143, 0.65), -5px -5px 10px #fff;
+}
+
+.pin.is-active {
+  box-shadow: inset 3px 3px 7px rgba(110, 124, 143, 0.7), inset -3px -3px 6px #fff, 0 0 0 4px rgba(25, 195, 166, 0.35);
+}
+
+.you-dot {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ink);
+  border: 5px solid var(--surface);
+  box-shadow: 0 0 0 4px rgba(46, 58, 75, 0.2), 3px 3px 8px rgba(110, 124, 143, 0.7);
+  pointer-events: none;
+}
+
+/* ---- Popup: soft card ---- */
+.soft-popup .mapboxgl-popup-content {
+  padding: 16px 18px 16px;
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: 9px 9px 20px rgba(110, 124, 143, 0.5), -7px -7px 16px rgba(255, 255, 255, 0.9);
+  font-family: var(--font-body);
+  color: var(--ink);
+}
+
+.soft-popup .mapboxgl-popup-tip {
+  display: none;
+}
+
+.soft-popup .mapboxgl-popup-close-button {
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--raise-xs);
+  font-size: 16px;
+  line-height: 1;
+  color: var(--ink-2-strong);
+}
+
+.soft-popup .mapboxgl-popup-close-button:hover {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.pop-name {
+  margin: 0 30px 2px 0;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.pop-meta {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--ink-2-strong);
+}
+
+.pop-status {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.pop-status.free { color: var(--accent-ink); }
+.pop-status.busy { color: var(--busy-ink); }
+.pop-status.off { color: var(--off-ink); }
+
+.pop-plugs {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  box-shadow: var(--inset-sm);
+}
+
+.plug-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.plug-row b {
+  margin-left: auto;
+  font-weight: 600;
+}
+
+.btn-press {
+  display: block;
+  width: 100%;
+  height: 42px;
+  border: 0;
+  border-radius: 21px;
+  background: var(--surface);
+  box-shadow: var(--raise-sm);
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  color: var(--accent-ink);
+  cursor: pointer;
+  transition: box-shadow 0.15s ease;
+}
+
+.btn-press:active,
+.btn-press[aria-pressed="true"] {
+  box-shadow: var(--inset-sm);
+}
+
+.pop-route {
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2-strong);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Mapbox controls re-skinned: soft raised group */
+.mapboxgl-ctrl-group {
+  border-radius: 16px !important;
+  background: var(--surface) !important;
+  box-shadow: var(--raise-sm) !important;
+  overflow: hidden;
+}
+
+.mapboxgl-ctrl-group button + button {
+  border-top: 1px solid rgba(184, 194, 207, 0.6) !important;
+}
+
+/* A raster-dem (terrain) source makes GL JS hide the Mapbox logo (the DEM
+   TileJSON has mapbox_logo:false). Force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+/* ---- Phone: one scrolling column ---- */
+@media (max-width: 760px) {
+  :root {
+    --dial: 128px;
+  }
+
+  html, body {
+    height: auto;
+  }
+
+  .app {
+    display: block;
+    height: auto;
+    overflow: visible;
+  }
+
+  .panel-top {
+    padding: 16px 16px 4px;
+  }
+
+  .hero {
+    flex-direction: row;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .hero-text {
+    order: 1;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    margin: 0;
+  }
+
+  .brand-name {
+    font-size: 22px;
+  }
+
+  .dial {
+    box-shadow: 8px 8px 16px var(--dark), -8px -8px 16px var(--light);
+  }
+
+  .dial-value {
+    font-size: 26px;
+  }
+
+  .dial-unit {
+    font-size: 10px;
+  }
+
+  .dial-sub {
+    display: none;
+  }
+
+  .search {
+    margin-top: 16px;
+    height: 46px;
+  }
+
+  .filter-block {
+    margin-top: 12px;
+  }
+
+  .toggle-row {
+    gap: 10px;
+  }
+
+  .toggle {
+    height: 38px;
+    padding: 0 14px;
+  }
+
+  .stage {
+    height: 48vh;
+    height: 48dvh;
+    min-height: 340px;
+    margin: 16px 16px 4px;
+    padding: 10px;
+    border-radius: 34px;
+  }
+
+  .panel-list {
+    overflow: visible;
+    padding: 8px 16px 32px;
+  }
+
+  /* Compact pins so the central cluster separates on a small map */
+  .pin {
+    width: 28px;
+    height: 28px;
+    box-shadow: 3px 3px 6px rgba(110, 124, 143, 0.55), -2px -2px 5px rgba(255, 255, 255, 0.95);
+  }
+
+  .pin-ring {
+    inset: 3px;
+    border-width: 2.5px;
+  }
+
+  .pin-kw {
+    font-size: 10px;
+    letter-spacing: -0.04em;
+  }
+
+  .you-dot {
+    width: 18px;
+    height: 18px;
+    border-width: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dial-arc,
+  .toggle,
+  .station-card,
+  .pin,
+  .btn-press {
+    transition: none;
+  }
+}

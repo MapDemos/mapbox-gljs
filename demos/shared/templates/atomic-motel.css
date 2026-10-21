@@ -1,0 +1,889 @@
+/*
+  Atomic Motel -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: 1950s Googie / atomic-age roadside
+  Americana -- turquoise, flamingo pink, tangerine and cream over charcoal,
+  starbursts and atomic orbits, boomerang-cornered cards, and a tall
+  arrow-shaped roadside sign with a flickering neon VACANCY light),
+  deliberately distinct from every other pack in this folder: Academic
+  Paper is a journal article page, Aero Gadgets is glossy early-2000s
+  translucent plastic, Amber Terminal is a monochrome CRT, Arena is a dark
+  stadium scoreboard, Aurora Command is a gradient-glow control room,
+  Blueprint is white-on-blue drafting lines, Board Game is a tabletop with
+  tokens and tiles, Bottom Sheet is a draggable mobile sheet, Broadcast is
+  a TV news lower-third, Case Board is a corkboard of pinned evidence,
+  Celestial Tarot is mystic gold-on-indigo cards, Chat Concierge is a
+  messaging thread, Chronicle is a newspaper front page, Clinic Finder is a
+  calm healthcare locator, Comic Panel is halftone speech-bubble panels,
+  Data Notebook is a literate-programming notebook, Deco Voyage is
+  gold-on-black Art Deco, Drop Culture is a streetwear drop page, E-Ink is
+  grayscale e-reader paper, Editorial Paper is warm paper and serif
+  headlines, Estate Luxe is quiet luxury real estate, Event Invite is a
+  festive invitation card, Field Journal is a naturalist's sketchbook,
+  Fleet Ops is a dispatch dashboard, Frontier Poster is a wood-type Wild
+  West broadside, Highway Sign is cream/green MUTCD signage, Isotype is
+  pictogram statistics, Line Diagram is a transit-line schematic, Neon HUD
+  is glowing sci-fi overlays, Pastel Bento is soft rounded tiles, Postcards
+  is stamped souvenir cards, Raw Web is unstyled brutalist HTML, Retro OS
+  is a desktop-window UI, Riso Zine is two-colour misregistered print, Ski
+  Piste is a trail-grade resort map, Slate Console is a cool-grey ops
+  console, Split Flap is a departures-board flipper, Sticker Book is
+  peel-off die-cut stickers, Storefront is a light retail locator, Story
+  Scroll is a scrolling narrative, Swiss Grid is white/black/red
+  typographic grid, Tarmac Glass is dark blur-glass + amber, Thermal
+  Receipt is a till-roll printout, Trailhead is rugged olive and safety
+  orange, Vapor Sunset is a synthwave gradient horizon, Vintage Chart is
+  navy/parchment/brass, Washi Seasons is quiet Japanese paper and seasonal
+  colour, and Weather Console is a dense forecast dashboard.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/atomic-motel.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Righteous for the sign, headings and
+  labels; Questrial for body text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Righteous&family=Questrial&display=swap" rel="stylesheet" />
+
+  Signature touch: a tall arrow-shaped roadside sign (starburst topper,
+  chrome post) whose neon letters flicker on when a stop is selected,
+  under a flickering neon VACANCY light (steady with reduced motion),
+  plus a "postcard rack" of boomerang-cornered cards under the map.
+
+  Layout: .app is a two-row grid -- .stage (the map) on top and .rack
+  below. The map ends ABOVE the rack, and the desktop sign stops 56px short
+  of the map's bottom edge, so the Mapbox logo and attribution are never
+  covered. On phones the sign becomes a compact banner across the top of
+  the map and the cards scroll horizontally. If you add a raster-dem source
+  (terrain), GL JS hides the logo; the rule near the bottom of this file
+  forces it back.
+
+  Class/id contract (see atomic-motel-template.html in this same folder for
+  a full working example):
+
+  - .app                     page grid, 100dvh, never scrolls
+  - .stage                   positioned map area (grid row 1); holds #map
+                              and the sign
+  - #map                     map container (every demo defines its own,
+                              per convention -- not included here)
+  - .sign                    tall roadside sign over the map's left edge
+                              (a top banner on phones); pointer-events none
+    .sign-topper               starburst + atomic-orbit SVG on top
+    .sign-board                arrow-shaped neon board
+    .sign-brand                small brand line
+    .vacancy                   flickering neon VACANCY light
+    .sign-type                 stop-type tag (Motel / Diner / ...)
+    .sign-name                 stop name; build it from .word > .ch letter
+                                spans -- add .lit to the element to flicker
+                                the letters on
+    .sign-town                 town line
+    .sign-next                 kidney-shaped "next exit" readout; holds
+                                .exit-label, <b> (miles) and <small>
+    .sign-post                 chrome post below the board
+  - .rack                    bottom panel under the map
+    .rack-head                 header row: .rack-title + .btn
+    .cards > .card             horizontally scrolling boomerang-cornered
+                                stop cards; add .active to the selected one.
+                                Inside: .card-num, .card-type, .card-name,
+                                .card-town, .card-note (phones only)
+    .odo                       trip odometer: .odo-track > .odo-fill, and
+                                .odo-text
+  - .btn, .btn-road          chunky pill buttons (.btn-road is flamingo)
+  - .star-marker             inner child of a mapboxgl.Marker element: an
+                              8-point starburst SVG (.star-svg, .star-num);
+                              add .active for the selected stop. Never style
+                              the marker root itself
+  - .car                     inner child of the car marker (tail-finned car
+                              SVG); the demo sets its inline rotation
+  - .status-note (+.loading/ small status pill
+    .success/.error)
+  - .hidden                  utility: display: none !important
+*/
+
+:root {
+  --turq: #2EC4B6;
+  --turq-deep: #168A80;
+  --turq-pale: #BDEBE6;
+  --flamingo: #FF6F91;
+  --flamingo-deep: #D94A6E;
+  --tangerine: #FF9F1C;
+  --cream: #FFF3D6;
+  --cream-dim: #CDBF9C;
+  --charcoal: #26292E;
+  --charcoal-2: #353A41;
+  --chrome: linear-gradient(180deg, #FFFFFF 0%, #D4DADD 42%, #8F989E 54%, #E8EDEF 100%);
+  --chrome-v: linear-gradient(90deg, #8F989E 0%, #F4F7F8 35%, #C5CCD0 65%, #7C858B 100%);
+  --success: var(--turq);
+  --error: var(--flamingo);
+  --rack-h: 236px;
+
+  --font-heading: 'Righteous', 'Trebuchet MS', 'Arial Rounded MT Bold', sans-serif;
+  --font-body: 'Questrial', 'Avenir Next', 'Segoe UI', sans-serif;
+  --font-label: var(--font-heading);
+
+  /* Faint starbursts and orbits tiled behind the rack, 140x140. */
+  --stars: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 140 140'%3E%3Cg fill='%23FFF3D6' opacity='0.09'%3E%3Cpath d='M34 18L38 30L50 34L38 38L34 50L30 38L18 34L30 30Z'/%3E%3Cpath d='M106 88L109 97L118 100L109 103L106 112L103 103L94 100L103 97Z'/%3E%3Ccircle cx='110' cy='28' r='2.5'/%3E%3Ccircle cx='24' cy='108' r='2'/%3E%3C/g%3E%3Cg fill='none' stroke='%232EC4B6' stroke-width='1.2' opacity='0.18'%3E%3Cellipse cx='110' cy='28' rx='20' ry='7' transform='rotate(30 110 28)'/%3E%3Cellipse cx='110' cy='28' rx='20' ry='7' transform='rotate(-30 110 28)'/%3E%3Cellipse cx='24' cy='108' rx='16' ry='5.5' transform='rotate(20 24 108)'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--charcoal);
+  color: var(--charcoal);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--flamingo);
+  outline-offset: 2px;
+}
+
+/* Page grid: map on top, postcard rack below. */
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) var(--rack-h);
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.stage {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---------- Roadside sign ---------- */
+.sign {
+  position: absolute;
+  top: 10px;
+  left: 16px;
+  bottom: 56px;
+  z-index: 2;
+  width: 284px;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+  filter: drop-shadow(4px 5px 0 rgba(38, 41, 46, 0.35));
+}
+
+.sign-topper {
+  flex: none;
+  width: 120px;
+  height: 100px;
+  margin-left: 32px;
+}
+
+.sign-topper svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.sign-topper .burst {
+  fill: var(--tangerine);
+  stroke: var(--charcoal);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+
+.sign-topper .glint {
+  fill: var(--cream);
+  stroke: var(--charcoal);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: motel-twinkle 3.2s ease-in-out infinite;
+}
+
+.sign-topper .orbit {
+  fill: none;
+  stroke: var(--turq);
+  stroke-width: 3;
+}
+
+.sign-topper .nucleus {
+  fill: var(--flamingo);
+  stroke: var(--charcoal);
+  stroke-width: 2;
+}
+
+/* Arrow-shaped board: turquoise rim (the element), charcoal face (::before) */
+.sign-board {
+  position: relative;
+  flex: none;
+  isolation: isolate;
+  margin-top: 6px;
+  padding: 18px 56px 20px 22px;
+  background: var(--turq);
+  clip-path: polygon(0 0, calc(100% - 46px) 0, 100% 50%, calc(100% - 46px) 100%, 0 100%);
+  color: var(--cream);
+}
+
+.sign-board::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  z-index: -1;
+  background: var(--charcoal);
+  clip-path: polygon(0 0, calc(100% - 41px) 0, 100% 50%, calc(100% - 41px) 100%, 0 100%);
+}
+
+.sign-brand {
+  margin: 0 0 6px;
+  font-family: var(--font-label);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  text-transform: uppercase;
+  color: var(--turq);
+}
+
+/* Neon VACANCY light: flamingo tube lettering in a thin neon frame */
+.vacancy {
+  display: inline-block;
+  margin: 0 0 10px;
+  padding: 3px 12px 2px;
+  border: 2px solid var(--flamingo);
+  border-radius: 999px;
+  font-family: var(--font-label);
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: 0.16em;
+  color: #FFD7E0;
+  text-shadow: 0 0 4px var(--flamingo), 0 0 10px var(--flamingo), 0 0 20px var(--flamingo-deep);
+  box-shadow: 0 0 8px rgba(255, 111, 145, 0.7), inset 0 0 8px rgba(255, 111, 145, 0.5);
+  animation: motel-vacancy 7s linear infinite;
+}
+
+.sign-type {
+  display: inline-block;
+  margin: 0 0 6px;
+  padding: 2px 10px 1px;
+  border-radius: 999px;
+  background: var(--tangerine);
+  color: var(--charcoal);
+  font-family: var(--font-label);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sign-name {
+  margin: 0 0 6px;
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.05;
+  color: var(--cream);
+}
+
+.sign-name .word {
+  display: inline-block;
+  white-space: nowrap;
+  margin-right: 0.28em;
+}
+
+.sign-name .ch {
+  display: inline-block;
+  color: var(--cream);
+  opacity: 0.18;
+  text-shadow: none;
+}
+
+.sign-name .word:nth-child(even) .ch {
+  color: #FFC76B;
+}
+
+/* Letters flicker on one after another (--d is set per letter) */
+.sign-name.lit .ch {
+  animation: motel-letter 0.9s steps(1, end) var(--d, 0s) forwards;
+}
+
+.sign-town {
+  margin: 0 0 12px;
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--cream-dim);
+}
+
+/* Kidney-shaped "next exit" readout */
+.sign-next {
+  display: block;
+  padding: 8px 16px 9px;
+  border: 3px solid var(--turq);
+  border-radius: 48% 52% 46% 54% / 62% 44% 56% 40%;
+  background: var(--charcoal-2);
+  line-height: 1.1;
+}
+
+.exit-label {
+  display: block;
+  font-family: var(--font-label);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--turq);
+}
+
+.sign-next b {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: 26px;
+  color: var(--tangerine);
+  font-variant-numeric: tabular-nums;
+}
+
+.sign-next small {
+  display: block;
+  font-size: 14px;
+  color: var(--cream);
+}
+
+.sign-post {
+  flex: 1;
+  min-height: 12px;
+  width: 16px;
+  margin-left: 84px;
+  background: var(--chrome-v);
+  border: 2px solid var(--charcoal);
+  border-top: 0;
+  border-radius: 0 0 4px 4px;
+}
+
+/* ---------- Postcard rack ---------- */
+.rack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-top: 8px;
+  background-color: var(--charcoal);
+  background-image: var(--stars);
+  color: var(--cream);
+}
+
+/* Candy-stripe top edge */
+.rack::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: repeating-linear-gradient(90deg, var(--turq) 0 28px, var(--flamingo) 28px 56px, var(--tangerine) 56px 84px, var(--cream) 84px 112px);
+  border-bottom: 2px solid #8F989E;
+}
+
+.rack-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+  padding: 6px 16px 4px;
+  min-width: 0;
+}
+
+.rack-title {
+  min-width: 0;
+  font-family: var(--font-label);
+  font-size: 15px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--turq);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rack-title small {
+  margin-left: 8px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--cream-dim);
+}
+
+/* Buttons -- chunky pills with a hard shadow */
+.btn {
+  flex: none;
+  display: inline-block;
+  padding: 8px 20px 7px;
+  border: 3px solid var(--charcoal);
+  border-radius: 999px;
+  background: var(--cream);
+  color: var(--charcoal);
+  font-family: var(--font-label);
+  font-size: 16px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px var(--cream), 3px 4px 0 2px rgba(0, 0, 0, 0.35);
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+
+.btn:hover {
+  background: var(--turq-pale);
+}
+
+.btn:active {
+  transform: translate(2px, 3px);
+}
+
+.btn-road {
+  background: var(--flamingo);
+}
+
+.btn-road:hover {
+  background: #FF93AC;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cards {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex: none;
+  padding: 6px 16px 10px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--turq) transparent;
+}
+
+/* Stop card -- cream postcard, boomerang corners (opposite corners swoop) */
+.card {
+  position: relative;
+  flex: none;
+  width: 200px;
+  min-height: 112px;
+  padding: 12px 16px 12px 14px;
+  border: 3px solid var(--turq);
+  border-radius: 38px 10px 38px 10px / 30px 10px 30px 10px;
+  background: var(--cream);
+  color: var(--charcoal);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+}
+
+.card.active {
+  border-color: var(--flamingo);
+  transform: translateY(-4px);
+  box-shadow: 0 0 0 3px var(--cream), 0 0 16px 3px rgba(255, 111, 145, 0.7);
+}
+
+.card-num {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-heading);
+  font-size: 14px;
+  color: var(--charcoal);
+}
+
+.card-num svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.card-num svg polygon {
+  fill: var(--tangerine);
+  stroke: var(--charcoal);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.card.active .card-num svg polygon {
+  fill: var(--flamingo);
+}
+
+.card-num span {
+  position: relative;
+}
+
+.card-type {
+  display: block;
+  margin: 0 36px 4px 0;
+  font-family: var(--font-label);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--turq-deep);
+}
+
+.card-name {
+  display: block;
+  margin: 0 0 4px;
+  font-family: var(--font-heading);
+  font-size: 19px;
+  line-height: 1.1;
+  color: var(--charcoal);
+}
+
+.card-town {
+  display: block;
+  font-size: 14px;
+  color: #5B5F66;
+}
+
+.card-note {
+  display: none;
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.3;
+  color: #5B5F66;
+}
+
+/* Trip odometer */
+.odo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+  padding: 0 16px 10px;
+}
+
+.odo-track {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 12px;
+  border: 2px solid var(--cream-dim);
+  border-radius: 999px;
+  background: var(--charcoal-2);
+  overflow: hidden;
+}
+
+.odo-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: repeating-linear-gradient(90deg, var(--tangerine) 0 10px, #FFC25C 10px 14px);
+  transition: width 0.4s ease;
+}
+
+.odo-text {
+  flex: none;
+  font-family: var(--font-label);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cream);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status note -- small pill with a blinking neon dot */
+.status-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 12px 2px;
+  border: 2px solid var(--turq);
+  border-radius: 999px;
+  font-family: var(--font-label);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cream);
+}
+
+.status-note::before {
+  content: '';
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--turq);
+}
+
+.status-note.loading::before {
+  background: var(--tangerine);
+  animation: motel-blink 0.9s steps(2, jump-none) infinite;
+}
+
+.status-note.success::before {
+  background: var(--success);
+}
+
+.status-note.error {
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.status-note.error::before {
+  background: var(--error);
+}
+
+/* ---------- Map markers (inner children of mapboxgl.Marker roots) ---------- */
+.star-marker {
+  display: block;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  pointer-events: auto;
+  filter: drop-shadow(1px 2px 0 rgba(38, 41, 46, 0.5));
+  transition: transform 0.15s ease;
+}
+
+.star-marker:hover {
+  transform: scale(1.12);
+}
+
+.star-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.star-svg polygon {
+  fill: var(--tangerine);
+  stroke: var(--charcoal);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.star-num {
+  fill: var(--charcoal);
+  font-family: var(--font-heading);
+  font-size: 13px;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.star-marker.active {
+  transform: scale(1.3);
+}
+
+.star-marker.active polygon {
+  fill: var(--flamingo);
+}
+
+.car {
+  display: block;
+  width: 56px;
+  height: 28px;
+  filter: drop-shadow(2px 3px 0 rgba(38, 41, 46, 0.45));
+  pointer-events: none;
+}
+
+.car svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Mapbox controls re-skinned to match */
+.mapboxgl-ctrl-group {
+  border-radius: 18px !important;
+  border: 2px solid var(--charcoal);
+  background: var(--cream) !important;
+  box-shadow: 2px 3px 0 rgba(38, 41, 46, 0.4) !important;
+}
+
+/* A raster-dem (terrain) source makes GL JS hide the Mapbox logo (the DEM
+   TileJSON has mapbox_logo:false). Force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+@keyframes motel-letter {
+  0% { opacity: 0.18; text-shadow: none; }
+  15% { opacity: 1; text-shadow: 0 0 6px currentColor, 0 0 16px currentColor; }
+  30% { opacity: 0.2; text-shadow: none; }
+  45% { opacity: 1; text-shadow: 0 0 6px currentColor, 0 0 16px currentColor; }
+  58% { opacity: 0.35; text-shadow: none; }
+  72%, 100% { opacity: 1; text-shadow: 0 0 5px currentColor, 0 0 14px currentColor; }
+}
+
+@keyframes motel-vacancy {
+  0%, 41%, 45%, 47%, 100% { opacity: 1; }
+  42%, 46% { opacity: 0.35; }
+  43%, 48% { opacity: 1; }
+}
+
+@keyframes motel-twinkle {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.25) rotate(22deg); }
+}
+
+@keyframes motel-blink {
+  0% { opacity: 1; }
+  100% { opacity: 0.25; }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --rack-h: auto;
+  }
+
+  .app {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  /* Sign becomes a compact banner across the top of the map */
+  .sign {
+    top: 8px;
+    left: 12px;
+    right: 12px;
+    bottom: auto;
+    width: auto;
+    filter: drop-shadow(2px 3px 0 rgba(38, 41, 46, 0.35));
+  }
+
+  .sign-topper,
+  .sign-post,
+  .sign-brand,
+  .sign-town {
+    display: none;
+  }
+
+  .sign-board {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "vac type next" "name name next";
+    align-items: center;
+    column-gap: 10px;
+    margin-top: 0;
+    padding: 12px 44px 12px 16px;
+    clip-path: polygon(0 0, calc(100% - 28px) 0, 100% 50%, calc(100% - 28px) 100%, 0 100%);
+  }
+
+  .sign-board::before {
+    inset: 4px;
+    clip-path: polygon(0 0, calc(100% - 25px) 0, 100% 50%, calc(100% - 25px) 100%, 0 100%);
+  }
+
+  .vacancy {
+    grid-area: vac;
+    margin: 0;
+    padding: 1px 8px 0;
+    font-size: 12px;
+    border-width: 1.5px;
+  }
+
+  .sign-type {
+    grid-area: type;
+    justify-self: start;
+    margin: 0;
+    padding: 1px 8px 0;
+    font-size: 11px;
+  }
+
+  .sign-name {
+    grid-area: name;
+    margin: 4px 0 0;
+    font-size: 21px;
+    line-height: 1.05;
+  }
+
+  .sign-next {
+    grid-area: next;
+    padding: 5px 12px 6px;
+    border-width: 2px;
+    text-align: center;
+  }
+
+  .exit-label {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+  }
+
+  .sign-next b {
+    font-size: 20px;
+  }
+
+  .sign-next small {
+    display: none;
+  }
+
+  .rack-head {
+    padding: 4px 16px 2px;
+  }
+
+  .rack-title small {
+    display: none;
+  }
+
+  .btn {
+    padding: 6px 16px 5px;
+    font-size: 15px;
+  }
+
+  .cards {
+    padding: 8px 16px 8px;
+  }
+
+  .card {
+    width: 214px;
+    min-height: 0;
+  }
+
+  .card-note {
+    display: block;
+  }
+
+  .star-marker {
+    width: 26px;
+    height: 26px;
+  }
+
+  .star-num {
+    font-size: 15px;
+  }
+
+  .odo {
+    padding: 0 16px 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vacancy,
+  .sign-topper .glint,
+  .status-note.loading::before {
+    animation: none;
+  }
+
+  .sign-name .ch,
+  .sign-name.lit .ch {
+    animation: none;
+    opacity: 1;
+    text-shadow: 0 0 5px currentColor, 0 0 14px currentColor;
+  }
+
+  .btn,
+  .card,
+  .star-marker,
+  .odo-fill {
+    transition: none;
+  }
+}

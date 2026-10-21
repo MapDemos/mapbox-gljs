@@ -1,0 +1,653 @@
+/*
+  Trip Kanban -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a collaborative trip-planning board --
+  warm off-white canvas, white column cards with hairline borders, one
+  colour per DAY that carries from the column header to the card's left
+  edge, the numbered map markers and the route line), deliberately
+  distinct from every other pack in this folder: Academic Paper, Aero
+  Gadgets, Amber Terminal, Arena, Aurora Command, Blueprint, Board Game,
+  Bottom Sheet, Broadcast, Case Board, Celestial Tarot, Chat Concierge,
+  Chronicle, Clinic Finder, Comic Panel, Data Notebook, Deco Voyage, Drop
+  Culture, E-Ink, Editorial Paper, Estate Luxe, Event Invite, Field
+  Journal, Fleet Ops, Frontier Poster, Highway Sign, Isotype, Line
+  Diagram, Neon HUD, Pastel Bento, Postcards, Raw Web, Retro OS, Riso Zine,
+  Ski Piste, Slate Console, Split Flap, Sticker Book, Storefront, Story
+  Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt, Trailhead, Vapor
+  Sunset, Vintage Chart, Washi Seasons and Weather Console.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/trip-kanban.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Familjen Grotesk for UI text, Fragment
+  Mono for times, durations and counts):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Fragment+Mono&display=swap" rel="stylesheet" />
+
+  Signature touch: the day colour is the through-line -- a coloured top
+  edge on each column, a coloured left edge on each card, and the same
+  colour on the numbered map pins. Dragging lifts a slightly tilted ghost
+  of the card while the original collapses into a dashed placeholder gap.
+
+  Layout: .app is a two-row grid -- .stage (the map, ~48vh; ~52dvh on
+  phones) on top and .board below. The map ends ABOVE the board, so the
+  Mapbox logo and attribution are never covered. On desktop the four
+  columns share the width; on phones the board scrolls horizontally with
+  scroll-snap, one column per snap. If you add a raster-dem source
+  (terrain), GL JS hides the logo; the rule near the bottom of this file
+  forces it back.
+
+  Class/id contract (see trip-kanban-template.html in this same folder for
+  a full working example):
+
+  - .app                      page grid, 100dvh, never scrolls
+  - .stage                    positioned map area (grid row 1); holds #map
+                               and .topbar
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .topbar                   floating top row over the map
+                               (pointer-events none, children auto)
+    .brand                      white pill: .brand-mark + .brand-name +
+                                 .brand-trip
+    .seg > button               "Show day" segmented control; the active
+                                 button has aria-pressed="true"; the day
+                                 buttons carry data-day="1|2|3"
+    .crow                       small "as the crow flies" note
+  - .board                    horizontal column area (grid row 2)
+    .col[data-col]              one column; data-col is ideas|d1|d2|d3
+                                 (sets --c / --on day colours)
+      .col-head                   header: .col-dot, .col-title, .col-meta
+      .list                       vertical card list (scrolls inside)
+        .empty                      "drop here" hint for an empty list
+  - .card[data-id]            place card (tabindex 0): .grip (drag
+                               handle), .card-body (.card-top > .card-name
+                               + .card-time, .card-sub > .card-area +
+                               .chip), .card-move ("Move to..." button)
+    .card.is-ph                 the dashed placeholder gap while dragging
+    .card.hl                    highlighted (map marker hovered)
+    .card.flash                 brief pulse after a move
+  - .ghost                    the floating clone that follows the pointer
+  - .menu                     "Move to..." popover: .menu-title and
+                               button.menu-item (+ .menu-dot)
+  - .pin                      inner child of a mapboxgl.Marker element
+                               (never style the marker root); variants
+                               .d1 .d2 .d3 (numbered), .idea (small grey
+                               dot), .hl (highlighted), .off (hidden);
+                               data-name is shown as a hover label
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --canvas: #F3F1EC;
+  --surface: #FFFFFF;
+  --line: #E2DED6;
+  --ink: #1D1B18;
+  --ink-2: #6E675D;
+  --d1: #E9A23B;
+  --d2: #2A9D8F;
+  --d3: #8E5BA6;
+  --idea: #8C857A;
+  --font-ui: 'Familjen Grotesk', system-ui, sans-serif;
+  --font-mono: 'Fragment Mono', ui-monospace, monospace;
+  --radius: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---------- page grid ---------- */
+
+.app {
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 48vh minmax(0, 1fr);
+}
+
+.stage {
+  position: relative;
+  min-height: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+/* ---------- topbar over the map ---------- */
+
+.topbar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.topbar > * {
+  pointer-events: auto;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px 6px 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 2px 10px rgba(29, 27, 24, 0.12);
+}
+
+.brand-mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: conic-gradient(var(--d1) 0 33%, var(--d2) 0 66%, var(--d3) 0);
+  box-shadow: inset 0 0 0 5px var(--surface);
+}
+
+.brand-name {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.brand-trip {
+  color: var(--ink-2);
+  font-size: 13px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
+
+.seg {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 2px 10px rgba(29, 27, 24, 0.12);
+}
+
+.seg-label {
+  align-self: center;
+  padding: 0 8px 0 10px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.seg button {
+  min-width: 38px;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.seg button:hover {
+  background: var(--canvas);
+}
+
+.seg button[aria-pressed='true'] {
+  background: var(--ink);
+  color: #fff;
+}
+
+.seg button[data-day='1'][aria-pressed='true'] { background: var(--d1); color: var(--ink); }
+.seg button[data-day='2'][aria-pressed='true'] { background: var(--d2); color: #fff; }
+.seg button[data-day='3'][aria-pressed='true'] { background: var(--d3); color: #fff; }
+
+.crow {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  margin: 0;
+  padding: 3px 10px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+/* ---------- board ---------- */
+
+.board {
+  display: flex;
+  gap: 12px;
+  min-height: 0;
+  padding: 12px 16px 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.col {
+  --c: var(--idea);
+  --on: #fff;
+  flex: 1 1 0;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--c);
+  border-radius: var(--radius);
+  transition: box-shadow 0.15s, background 0.15s;
+}
+
+.col[data-col='d1'] { --c: var(--d1); --on: var(--ink); }
+.col[data-col='d2'] { --c: var(--d2); --on: #fff; }
+.col[data-col='d3'] { --c: var(--d3); --on: #fff; }
+
+.col.drop-target {
+  background: #FBFAF7;
+  box-shadow: 0 0 0 2px var(--c);
+}
+
+.col-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: center;
+  padding: 10px 12px 8px;
+}
+
+.col-dot {
+  grid-row: 1 / span 2;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--c);
+  color: var(--on);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.col[data-col='ideas'] .col-dot {
+  background: transparent;
+  border: 2px dashed var(--idea);
+}
+
+.col-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.col-meta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 72px;
+  padding: 4px 8px 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.empty {
+  margin: auto 0;
+  padding: 18px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.list:has(.is-ph) .empty {
+  display: none;
+}
+
+/* ---------- cards ---------- */
+
+.card {
+  --c: var(--idea);
+  flex: none;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  padding: 8px 8px 8px 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--c);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(29, 27, 24, 0.06);
+  transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+}
+
+.col[data-col='d1'] .card { --c: var(--d1); }
+.col[data-col='d2'] .card { --c: var(--d2); }
+.col[data-col='d3'] .card { --c: var(--d3); }
+
+.card:hover,
+.card.hl,
+.card:focus-visible {
+  box-shadow: 0 3px 10px rgba(29, 27, 24, 0.14);
+  border-color: var(--c);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.card.is-ph {
+  background: transparent;
+  border: 1px dashed var(--ink-2);
+  border-left: 4px dashed var(--c);
+  box-shadow: none;
+}
+
+.card.is-ph > * {
+  visibility: hidden;
+}
+
+.card.flash {
+  animation: card-flash 0.9s ease-out;
+}
+
+@keyframes card-flash {
+  0% { box-shadow: 0 0 0 4px var(--c); }
+  100% { box-shadow: 0 1px 2px rgba(29, 27, 24, 0.06); }
+}
+
+.grip {
+  display: grid;
+  place-items: center;
+  height: 40px;
+  color: var(--ink-2);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.grip:active {
+  cursor: grabbing;
+}
+
+.card-body {
+  min-width: 0;
+}
+
+.card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card-name {
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.card-time {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.card-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.chip {
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--canvas);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.card-move {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.card-move:hover,
+.card-move[aria-expanded='true'] {
+  background: var(--canvas);
+}
+
+.card-move:focus-visible,
+.menu-item:focus-visible,
+.seg button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 100;
+  margin: 0;
+  pointer-events: none;
+  rotate: 1.5deg;
+  box-shadow: 0 14px 28px rgba(29, 27, 24, 0.28);
+  cursor: grabbing;
+}
+
+/* ---------- "Move to..." menu ---------- */
+
+.menu {
+  position: fixed;
+  z-index: 90;
+  min-width: 190px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(29, 27, 24, 0.22);
+}
+
+.menu-title {
+  padding: 4px 8px 6px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.menu-item:hover:not(:disabled),
+.menu-item:focus-visible {
+  background: var(--canvas);
+}
+
+.menu-item:disabled {
+  color: var(--ink-2);
+  cursor: default;
+}
+
+.menu-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--idea);
+}
+
+/* ---------- map pins (inner child of Marker root) ---------- */
+
+.pin {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(29, 27, 24, 0.35);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.pin.d1 { background: var(--d1); color: var(--ink); }
+.pin.d2 { background: var(--d2); color: #fff; }
+.pin.d3 { background: var(--d3); color: #fff; }
+
+.pin.idea {
+  width: 16px;
+  height: 16px;
+  background: var(--idea);
+}
+
+.pin.hl {
+  transform: scale(1.3);
+  box-shadow: 0 0 0 4px rgba(29, 27, 24, 0.22), 0 3px 8px rgba(29, 27, 24, 0.4);
+}
+
+.pin.off {
+  display: none;
+}
+
+.pin::after {
+  content: attr(data-name);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  translate: -50% 0;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.pin:hover::after,
+.pin.hl::after {
+  opacity: 1;
+}
+
+/* GL JS hides the Mapbox logo once a raster-dem source is added; force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+/* ---------- phones / narrow ---------- */
+
+@media (max-width: 900px) {
+  .app {
+    grid-template-rows: 52dvh minmax(0, 1fr);
+  }
+
+  .board {
+    gap: 10px;
+    padding: 10px 16px 14px;
+    scroll-snap-type: x mandatory;
+    scroll-padding: 0 16px;
+  }
+
+  .col {
+    flex: 0 0 82%;
+    scroll-snap-align: start;
+  }
+
+  .brand-trip,
+  .seg-label {
+    display: none;
+  }
+
+  .topbar {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .col,
+  .pin,
+  .seg button,
+  .card-move,
+  .pin::after {
+    transition: none;
+  }
+
+  .card.flash {
+    animation: none;
+  }
+}

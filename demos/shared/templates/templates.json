@@ -327,5 +327,110 @@
       "en": "Letterpress wedding invitation — schedule, guest travel map and RSVP",
       "ja": "活版印刷風の招待状 — スケジュール、ゲスト向け地図、出欠フォーム"
     }
+  },
+  {
+    "name": "atomic-motel",
+    "description": {
+      "en": "1950s Googie roadside sign — Route 66 road trip with a postcard rack",
+      "ja": "1950年代のグーギー様式の看板 — ルート66のドライブと絵はがきラック"
+    }
+  },
+  {
+    "name": "constructivist",
+    "description": {
+      "en": "1920s avant-garde poster — diagonal layout with cycle-route tickets",
+      "ja": "1920年代アヴァンギャルドのポスター — 斜めの構図と自転車ルートのチケット"
+    }
+  },
+  {
+    "name": "audio-guide",
+    "description": {
+      "en": "Museum audio-guide device — type a stop number on the keypad",
+      "ja": "美術館の音声ガイド端末 — キーパッドで番号を入力"
+    }
+  },
+  {
+    "name": "pixel-quest",
+    "description": {
+      "en": "16-bit RPG overworld — quest log, dialog box and a walking hero",
+      "ja": "16ビットRPG風 — クエストログ、会話ウィンドウ、歩くヒーロー"
+    }
+  },
+  {
+    "name": "moving-map",
+    "description": {
+      "en": "Seat-back in-flight map — globe, flight info strip and view tabs",
+      "ja": "機内エンタメのフライトマップ — 地球儀、飛行情報、表示切り替え"
+    }
+  },
+  {
+    "name": "chalkboard",
+    "description": {
+      "en": "Café chalkboard menu — today's food trucks drawn in chalk",
+      "ja": "カフェの黒板メニュー — 今日のフードトラックをチョークで"
+    }
+  },
+  {
+    "name": "nordic-cabin",
+    "description": {
+      "en": "Scandinavian cabin booking — date picker, filters and 3D terrain",
+      "ja": "北欧のキャビン予約 — 日付選択、絞り込み、3D地形"
+    }
+  },
+  {
+    "name": "soft-ui",
+    "description": {
+      "en": "Neumorphic soft UI — EV charger finder with a range dial",
+      "ja": "ニューモーフィズムのソフトUI — 航続距離ダイヤル付きEV充電スポット検索"
+    }
+  },
+  {
+    "name": "memphis",
+    "description": {
+      "en": "1980s Memphis maximalism — collage grid with shape-coded venues",
+      "ja": "1980年代メンフィス・デザイン — コラージュと図形で分類した会場"
+    }
+  },
+  {
+    "name": "trip-kanban",
+    "description": {
+      "en": "Trip-planning kanban — drag place cards between day columns",
+      "ja": "旅行計画のカンバン — 日ごとの列へ場所カードをドラッグ"
+    }
+  },
+  {
+    "name": "zellige",
+    "description": {
+      "en": "Moroccan tilework riad — arched courtyard map and walking route",
+      "ja": "モロッコのタイル装飾 — アーチ型の中庭マップと散策ルート"
+    }
+  },
+  {
+    "name": "whiteboard",
+    "description": {
+      "en": "Team whiteboard — sticky notes with hand-drawn arrows to the map",
+      "ja": "チームのホワイトボード — 付箋から地図へ手描きの矢印"
+    }
+  },
+  {
+    "name": "brutalist-guide",
+    "description": {
+      "en": "Raw concrete architecture guide — index slabs and 3D orbit",
+      "ja": "コンクリートの建築ガイド — 一覧スラブと3Dの周回カメラ"
+    }
+  },
+  {
+    "name": "stained-glass",
+    "description": {
+      "en": "Gothic stained glass — rose-window navigation and lancet map",
+      "ja": "ゴシックのステンドグラス — バラ窓のナビとランセット窓の地図"
+    }
+  },
+  {
+    "name": "papercraft",
+    "description": {
+      "en": "Layered cut-paper diorama — parallax header and 3D lake map",
+      "ja": "切り絵のジオラマ — パララックスのヘッダーと3Dの湖畔マップ"
+    }
   }
 ]

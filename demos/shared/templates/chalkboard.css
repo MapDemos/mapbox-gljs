@@ -1,0 +1,801 @@
+/*
+  Chalkboard -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a cafe / food-truck chalkboard menu sign
+  in a wooden frame, hand-lettered headings, chalk-white / yellow / pink /
+  blue / green strokes on dark slate, wobbly hand-drawn doodles), deliberately
+  distinct from every other pack in this folder: Academic Paper, Aero
+  Gadgets, Amber Terminal, Arena, Aurora Command, Blueprint, Board Game,
+  Bottom Sheet, Broadcast, Case Board, Celestial Tarot, Chat Concierge,
+  Chronicle, Clinic Finder, Comic Panel, Data Notebook, Deco Voyage, Drop
+  Culture, E-Ink, Editorial Paper, Estate Luxe, Event Invite, Field Journal,
+  Fleet Ops, Frontier Poster, Highway Sign, Isotype, Line Diagram, Neon HUD,
+  Pastel Bento, Postcards, Raw Web, Retro OS, Riso Zine, Ski Piste, Slate
+  Console, Split Flap, Sticker Book, Storefront, Story Scroll, Swiss Grid,
+  Tarmac Glass, Thermal Receipt, Trailhead, Vapor Sunset, Vintage Chart,
+  Washi Seasons and Weather Console.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/chalkboard.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Cabin Sketch for headings, Patrick Hand
+  for menu items and body text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Cabin+Sketch:wght@400;700&family=Patrick+Hand&display=swap" rel="stylesheet" />
+
+  Signature touch: chalk that is DRAWN, not just shown -- selecting a menu
+  entry or a map marker animates a wobbly chalk circle around it with a
+  stroke-dashoffset animation (.draw), and "closed" entries look chalk-erased
+  (faded, smeared, dashed). Around it all: a wood-grain frame made only from
+  CSS gradients, and chalk-dust smudges (radial-gradients, chrome only --
+  never over the map).
+
+  Layout: .app is the wooden frame (100dvh, never scrolls on desktop); .board
+  is the slate inside it, a two-column grid -- .menu on the left, .stage (the
+  map) on the right. The map ends inside the board, so the Mapbox logo and
+  attribution are never covered. At <= 760px the page scrolls: .stage comes
+  first (~50dvh), the .menu below it.
+
+  Class/id contract (see chalkboard-template.html in this same folder for a
+  full working example):
+
+  - .app                      wooden frame, page root
+  - .board                    slate board (grid: .menu + .stage)
+  - .menu                     left column (flex column); on phones it just
+                               flows below the map
+  - .menu-head                header row: .menu-title + .menu-doodles
+    .menu-title                 big Cabin Sketch title (h1), chalk underline
+    .menu-sub                   one-line Patrick Hand subtitle
+    .menu-doodles               holder of inline-SVG doodles (.doodle)
+  - .doodle                   any inline <svg> chalk doodle: fill none,
+                               currentColor stroke, round caps; colour it
+                               with .ink-yellow/.ink-pink/.ink-blue/
+                               .ink-green/.ink-white
+  - .controls                 filter row: .chips + .toggle
+    .chips > .chip              chalk-boxed cuisine words (buttons,
+                                 aria-pressed); .c-tacos/.c-bbq/.c-coffee/
+                                 .c-vegan/.c-sweet set --c
+    .toggle                     "Open now" chalk checkbox (role=switch,
+                                 aria-checked); .toggle-box holds the check
+  - .menu-status              one-line status note (.status-note works too)
+  - .truck-list               scrolling list of entries (desktop), plain flow
+                               on phones
+    .truck                      one menu entry: .truck-badge (.doodle icon +
+                                 .truck-num), .truck-name, .truck-spot,
+                                 .dishes > li (.dish-name .leader .price),
+                                 .truck-hours
+    .truck.active               selected (yellow wash + drawn ring)
+    .truck.erased               closed while "Open now" is on
+    .truck-ring                 JS-built svg with a <path> that animates in
+                                 via .draw (set --len to the path length)
+  - .stage                    map holder with a chalk-drawn border; holds #map
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .chalk-pin                inner child of a mapboxgl.Marker element: a
+                               hand-drawn numbered circle; .pin-ring is the
+                               selection ring (.draw animates it); .erased
+                               greys it. Never style the marker root.
+  - .chalk-bubble             className for mapboxgl.Popup: a chalk speech
+                               bubble (.pop-name, .pop-spot, .pop-dish,
+                               .pop-hours inside)
+  - .status-note (+.loading/  small status line
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --slate: #2B3A33;
+  --slate-deep: #222E29;
+  --water: #24323A;
+  --chalk: #F4F1E8;
+  --chalk-dim: rgba(244, 241, 232, 0.68);
+  --yellow: #F6D365;
+  --pink: #F29CB2;
+  --blue: #9AD0EC;
+  --green: #B5E48C;
+  --wood: #8A5A33;
+  --wood-dark: #5E3A1E;
+  --success: #B5E48C;
+  --error: #F29CB2;
+
+  --font-heading: 'Cabin Sketch', 'Comic Sans MS', 'Marker Felt', cursive;
+  --font-body: 'Patrick Hand', 'Comic Sans MS', 'Marker Felt', cursive;
+  --font-label: var(--font-body);
+
+  /* Wobbly hand-cut corners reused by chips, boxes and the stage border */
+  --wobble: 255px 14px 225px 14px / 14px 225px 14px 255px;
+  --wobble-sm: 6px 10px 7px 11px / 10px 6px 11px 7px;
+
+  /* A wobbly chalk line, tiled between menu entries (chalk-white, 45%) */
+  --chalk-rule: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='10' viewBox='0 0 300 10'%3E%3Cpath d='M2 5 C30 1 52 9 86 5 S140 2 176 6 S250 9 298 4' fill='none' stroke='%23F4F1E8' stroke-opacity='0.45' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--wood-dark);
+  color: var(--chalk);
+  font-family: var(--font-body);
+  font-size: 18px;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2.5px dashed var(--yellow);
+  outline-offset: 3px;
+}
+
+/* Wooden frame: planks of repeating-linear-gradient grain, a few knots */
+.app {
+  height: 100vh;
+  height: 100dvh;
+  padding: 16px;
+  background-color: var(--wood);
+  background-image:
+    radial-gradient(ellipse 26px 12px at 14% 22%, rgba(50, 26, 10, 0.45), transparent 70%),
+    radial-gradient(ellipse 34px 14px at 78% 84%, rgba(50, 26, 10, 0.4), transparent 70%),
+    radial-gradient(ellipse 20px 10px at 91% 12%, rgba(50, 26, 10, 0.4), transparent 70%),
+    repeating-linear-gradient(90deg, rgba(40, 20, 8, 0.22) 0 2px, transparent 2px 7px, rgba(255, 224, 176, 0.07) 7px 10px, transparent 10px 23px, rgba(40, 20, 8, 0.12) 23px 24px, transparent 24px 41px),
+    repeating-linear-gradient(0deg, rgba(40, 20, 8, 0.18) 0 2px, transparent 2px 9px, rgba(255, 224, 176, 0.06) 9px 12px, transparent 12px 29px),
+    linear-gradient(135deg, #9C6A3C, #7A4F2B 55%, #8F6036);
+  box-shadow: inset 0 0 0 3px rgba(40, 20, 8, 0.5), inset 0 0 0 5px rgba(255, 224, 176, 0.14);
+}
+
+/* The slate itself, with chalk-dust smudges (chrome only, under the content) */
+.board {
+  position: relative;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  padding: 20px;
+  border-radius: 4px;
+  background-color: var(--slate);
+  background-image:
+    radial-gradient(ellipse 38% 22% at 18% 12%, rgba(244, 241, 232, 0.09), transparent 70%),
+    radial-gradient(ellipse 30% 26% at 42% 78%, rgba(244, 241, 232, 0.07), transparent 70%),
+    radial-gradient(ellipse 24% 18% at 8% 62%, rgba(244, 241, 232, 0.06), transparent 70%),
+    radial-gradient(ellipse 34% 20% at 88% 90%, rgba(244, 241, 232, 0.08), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 50% 50%, rgba(255, 255, 255, 0.04), transparent 80%),
+    radial-gradient(ellipse 120% 120% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.32) 100%);
+  box-shadow: inset 0 0 0 3px rgba(20, 14, 8, 0.65), inset 0 6px 18px rgba(0, 0, 0, 0.5), 0 2px 0 rgba(255, 224, 176, 0.18);
+}
+
+/* Left column: the menu */
+.menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.menu-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+}
+
+.menu-title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 44px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--chalk);
+  text-shadow: 0 0 1px rgba(244, 241, 232, 0.7), 0 0 6px rgba(244, 241, 232, 0.18);
+}
+
+/* Wobbly yellow chalk underline under the title */
+.menu-title::after {
+  content: '';
+  display: block;
+  height: 10px;
+  margin-top: 6px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='10' viewBox='0 0 240 10'%3E%3Cpath d='M3 6 C28 2 44 9 74 5 S124 2 150 6 S206 8 237 3' fill='none' stroke='%23F6D365' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") left center / 240px 10px no-repeat;
+}
+
+.menu-sub {
+  margin: 4px 0 0;
+  font-size: 19px;
+  color: var(--chalk-dim);
+}
+
+.menu-doodles {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: none;
+  padding-top: 2px;
+}
+
+.menu-doodles .doodle {
+  width: 44px;
+  height: 44px;
+}
+
+.menu-doodles .doodle:nth-child(odd) {
+  transform: rotate(-6deg);
+}
+
+.menu-doodles .doodle:nth-child(even) {
+  transform: rotate(5deg);
+}
+
+/* Doodles: fill-less chalk strokes drawn from <symbol>s via <use> */
+.doodle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  overflow: visible;
+}
+
+.ink-yellow { color: var(--yellow); }
+.ink-pink { color: var(--pink); }
+.ink-blue { color: var(--blue); }
+.ink-green { color: var(--green); }
+.ink-white { color: var(--chalk); }
+
+/* Filter row: chalk-boxed words + a chalk checkbox */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  flex: none;
+  margin: 14px 0 6px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  --c: var(--chalk);
+  padding: 2px 12px 3px;
+  border: 2.5px solid var(--c);
+  border-radius: var(--wobble-sm);
+  background: transparent;
+  color: var(--c);
+  font-family: var(--font-label);
+  font-size: 20px;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.chip:nth-child(odd) { transform: rotate(-1.5deg); }
+.chip:nth-child(even) { transform: rotate(1.2deg); }
+
+.chip:hover {
+  background: rgba(244, 241, 232, 0.1);
+}
+
+/* Selected: chalk scribbled in -- a diagonal-hatched fill */
+.chip[aria-pressed="true"] {
+  background: repeating-linear-gradient(115deg, rgba(244, 241, 232, 0.2) 0 2px, transparent 2px 6px);
+  box-shadow: 0 0 0 2px var(--slate), 0 0 0 4px var(--c);
+  transform: rotate(0deg);
+}
+
+.chip.c-tacos { --c: var(--yellow); }
+.chip.c-bbq { --c: var(--pink); }
+.chip.c-coffee { --c: var(--blue); }
+.chip.c-vegan { --c: var(--green); }
+.chip.c-sweet { --c: var(--chalk); }
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-label);
+  font-size: 20px;
+  color: var(--chalk);
+  cursor: pointer;
+}
+
+.toggle-box {
+  display: inline-block;
+  width: 26px;
+  height: 26px;
+  border: 2.5px solid var(--chalk);
+  border-radius: var(--wobble-sm);
+}
+
+.toggle-box svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.toggle-box path {
+  fill: none;
+  stroke: var(--yellow);
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 0.3s ease;
+}
+
+.toggle[aria-checked="true"] .toggle-box path {
+  stroke-dashoffset: 0;
+}
+
+.menu-status {
+  flex: none;
+  min-height: 24px;
+  margin: 0 0 4px;
+  font-size: 18px;
+  color: var(--chalk-dim);
+}
+
+.status-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-size: 18px;
+  color: var(--chalk-dim);
+}
+
+.status-note::before {
+  content: '*';
+  color: var(--yellow);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.status-note.loading::before {
+  display: inline-block;
+  animation: chalk-spin 1.4s linear infinite;
+}
+
+.status-note.success::before { color: var(--success); }
+.status-note.error { color: var(--error); }
+.status-note.error::before { content: '!'; color: var(--error); }
+
+@keyframes chalk-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* The list of menu entries */
+.truck-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(244, 241, 232, 0.4) transparent;
+}
+
+.truck {
+  position: relative;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 0 14px;
+  padding: 16px 12px 12px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.truck + .truck::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 10px;
+  background: var(--chalk-rule) center / 300px 10px repeat-x;
+  pointer-events: none;
+}
+
+.truck:hover {
+  background: rgba(244, 241, 232, 0.05);
+}
+
+.truck.active {
+  background: rgba(246, 211, 101, 0.08);
+}
+
+.truck-badge {
+  --c: var(--chalk);
+  position: relative;
+  width: 52px;
+  height: 52px;
+  color: var(--c);
+}
+
+.truck-badge .doodle {
+  width: 48px;
+  height: 48px;
+  margin-top: 4px;
+}
+
+.truck-num {
+  position: absolute;
+  top: -4px;
+  left: -6px;
+  min-width: 22px;
+  padding: 0 4px;
+  border: 2px solid var(--c);
+  border-radius: 50%;
+  background: var(--slate);
+  font-size: 16px;
+  line-height: 18px;
+  text-align: center;
+  color: var(--chalk);
+}
+
+.truck-name {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 25px;
+  line-height: 1.1;
+  color: var(--chalk);
+  text-shadow: 0 0 1px rgba(244, 241, 232, 0.6);
+}
+
+.truck-spot {
+  margin: 2px 0 6px;
+  font-size: 18px;
+  color: var(--c, var(--chalk-dim));
+}
+
+.dishes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dishes li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 19px;
+  line-height: 1.35;
+}
+
+.dishes .dish-name {
+  min-width: 0;
+}
+
+.dishes .leader {
+  flex: 1;
+  min-width: 14px;
+  border-bottom: 2px dotted rgba(244, 241, 232, 0.4);
+  transform: translateY(-4px);
+}
+
+.dishes .price {
+  flex: none;
+  color: var(--yellow);
+}
+
+.truck-hours {
+  margin: 6px 0 0;
+  font-size: 18px;
+  color: var(--yellow);
+}
+
+.truck-hours::before {
+  content: '~ ';
+  color: var(--chalk-dim);
+}
+
+/* Cuisine colour for each entry's badge / spot line */
+.truck.c-tacos { --c: var(--yellow); }
+.truck.c-bbq { --c: var(--pink); }
+.truck.c-coffee { --c: var(--blue); }
+.truck.c-vegan { --c: var(--green); }
+.truck.c-sweet { --c: var(--chalk); }
+
+/* Chalk-erased: closed entries (when "Open now" is on) fade and smear */
+.truck.erased > * {
+  opacity: 0.32;
+  filter: blur(0.4px) grayscale(1);
+}
+
+.truck.erased::after {
+  content: 'closed';
+  position: absolute;
+  right: 12px;
+  top: 14px;
+  font-size: 18px;
+  font-style: normal;
+  color: var(--chalk-dim);
+  transform: rotate(-4deg);
+  background: linear-gradient(100deg, transparent, rgba(244, 241, 232, 0.12) 30%, transparent 70%);
+  padding: 0 8px;
+}
+
+.truck.erased .truck-name {
+  text-decoration: line-through;
+  text-decoration-style: wavy;
+  text-decoration-thickness: 1.5px;
+}
+
+/* Drawn ring: a wobbly path, animated with stroke-dashoffset */
+.truck-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.truck-ring path,
+.pin-ring path {
+  fill: none;
+  stroke: var(--yellow);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: var(--len, 1);
+  stroke-dashoffset: var(--len, 1);
+}
+
+.truck-ring path.draw,
+.pin-ring path.draw {
+  animation: chalk-draw 0.75s ease-out forwards;
+}
+
+@keyframes chalk-draw {
+  from { stroke-dashoffset: var(--len, 1); }
+  to { stroke-dashoffset: 0; }
+}
+
+/* Right column: the map inside a chalk-drawn border */
+.stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 3px solid var(--chalk);
+  border-radius: var(--wobble);
+  box-shadow: 0 0 0 2px var(--slate), 0 0 0 4px rgba(244, 241, 232, 0.35), 0 8px 24px rgba(0, 0, 0, 0.4);
+  background: var(--slate);
+}
+
+/* Hand-drawn numbered marker (inner child of a mapboxgl.Marker element) */
+.chalk-pin {
+  --c: var(--chalk);
+  position: relative;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+  color: var(--chalk);
+}
+
+.chalk-pin.c-tacos { --c: var(--yellow); }
+.chalk-pin.c-bbq { --c: var(--pink); }
+.chalk-pin.c-coffee { --c: var(--blue); }
+.chalk-pin.c-vegan { --c: var(--green); }
+.chalk-pin.c-sweet { --c: var(--chalk); }
+
+.pin-body {
+  display: block;
+  width: 34px;
+  height: 34px;
+  overflow: visible;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+.pin-fill {
+  fill: var(--slate);
+  fill-opacity: 0.92;
+}
+
+.pin-line {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+
+.pin-body text {
+  fill: var(--chalk);
+  font-family: var(--font-body);
+  font-size: 17px;
+  text-anchor: middle;
+}
+
+.pin-ring {
+  position: absolute;
+  left: -19px;
+  top: -19px;
+  width: 72px;
+  height: 72px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.chalk-pin.erased {
+  opacity: 0.5;
+}
+
+.chalk-pin.erased .pin-line {
+  stroke: var(--chalk-dim);
+  stroke-dasharray: 4 5;
+}
+
+/* Chalk speech-bubble popup */
+.chalk-bubble {
+  z-index: 3;
+}
+
+.chalk-bubble .mapboxgl-popup-content {
+  min-width: 190px;
+  padding: 12px 40px 10px 18px; /* right: room for the close button */
+  border: 2.5px solid var(--chalk);
+  border-radius: 16px 20px 18px 22px / 20px 16px 22px 18px;
+  background: var(--slate);
+  color: var(--chalk);
+  font-family: var(--font-body);
+  font-size: 18px;
+  line-height: 1.3;
+  box-shadow: 0 0 0 2px var(--slate), 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.chalk-bubble .pop-name {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1.1;
+  color: var(--yellow);
+}
+
+.chalk-bubble .pop-spot,
+.chalk-bubble .pop-dish,
+.chalk-bubble .pop-hours {
+  margin: 3px 0 0;
+}
+
+.chalk-bubble .pop-spot { color: var(--chalk-dim); }
+.chalk-bubble .pop-hours { color: var(--green); }
+
+.chalk-bubble .mapboxgl-popup-close-button {
+  padding: 0 8px;
+  color: var(--chalk);
+  font-family: var(--font-body);
+  font-size: 22px;
+}
+
+.chalk-bubble .mapboxgl-popup-close-button:hover {
+  background: transparent;
+  color: var(--yellow);
+}
+
+.chalk-bubble.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip,
+.chalk-bubble.mapboxgl-popup-anchor-bottom-left .mapboxgl-popup-tip,
+.chalk-bubble.mapboxgl-popup-anchor-bottom-right .mapboxgl-popup-tip { border-top-color: var(--chalk); }
+.chalk-bubble.mapboxgl-popup-anchor-top .mapboxgl-popup-tip,
+.chalk-bubble.mapboxgl-popup-anchor-top-left .mapboxgl-popup-tip,
+.chalk-bubble.mapboxgl-popup-anchor-top-right .mapboxgl-popup-tip { border-bottom-color: var(--chalk); }
+.chalk-bubble.mapboxgl-popup-anchor-left .mapboxgl-popup-tip { border-right-color: var(--chalk); }
+.chalk-bubble.mapboxgl-popup-anchor-right .mapboxgl-popup-tip { border-left-color: var(--chalk); }
+
+/* Mapbox controls re-skinned as chalk-on-slate */
+.mapboxgl-ctrl-group {
+  border: 2px solid var(--chalk);
+  border-radius: var(--wobble-sm) !important;
+  background: var(--slate) !important;
+  box-shadow: none !important;
+}
+
+.mapboxgl-ctrl-group button + button {
+  border-top: 1.5px dashed rgba(244, 241, 232, 0.5) !important;
+}
+
+.mapboxgl-ctrl-group .mapboxgl-ctrl-icon {
+  filter: invert(1);
+}
+
+/* A raster-dem (terrain) source makes GL JS hide the Mapbox logo (the DEM
+   TileJSON has mapbox_logo:false). Force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (max-width: 1100px) {
+  .menu-title { font-size: 36px; }
+  .menu-doodles .doodle:nth-child(n + 3) { display: none; }
+}
+
+/* Phones: the page scrolls; map (~50dvh) first, the menu below it */
+@media (max-width: 760px) {
+  html, body {
+    height: auto;
+    overflow: auto;
+  }
+
+  .app {
+    height: auto;
+    min-height: 100dvh;
+    padding: 10px;
+  }
+
+  .board {
+    height: auto;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    padding: 14px 12px 18px;
+  }
+
+  .stage {
+    order: -1;
+    height: 50dvh;
+    min-height: 300px;
+  }
+
+  .menu-title { font-size: 34px; }
+  .menu-sub { font-size: 18px; }
+
+  .menu-doodles .doodle {
+    width: 38px;
+    height: 38px;
+  }
+
+  .truck-list {
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .truck {
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 0 10px;
+    padding: 16px 6px 12px;
+  }
+
+  .truck-badge,
+  .truck-badge .doodle {
+    width: 42px;
+    height: 42px;
+  }
+
+  .truck-name { font-size: 23px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .truck-ring path.draw,
+  .pin-ring path.draw {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  .status-note.loading::before {
+    animation: none;
+  }
+
+  .chip,
+  .truck,
+  .toggle-box path {
+    transition: none;
+  }
+}

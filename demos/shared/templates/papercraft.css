@@ -1,0 +1,679 @@
+/*
+  Papercraft -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a layered cut-paper pop-up storybook
+  diorama -- sky blue, mountain blue-greens, forest green, lake blue, cream
+  village paper, roof red and sun yellow -- where every surface is a sheet
+  of paper with fibre texture, deckled edges and stacked drop shadows),
+  deliberately distinct from every other pack in this folder: Academic
+  Paper, Aero Gadgets, Amber Terminal, Arena, Aurora Command, Blueprint,
+  Board Game, Bottom Sheet, Broadcast, Case Board, Celestial Tarot, Chat
+  Concierge, Chronicle, Clinic Finder, Comic Panel, Data Notebook, Deco
+  Voyage, Drop Culture, E-Ink, Editorial Paper, Estate Luxe, Event Invite,
+  Field Journal, Fleet Ops, Frontier Poster, Highway Sign, Isotype, Line
+  Diagram, Neon HUD, Pastel Bento, Postcards, Raw Web, Retro OS, Riso Zine,
+  Ski Piste, Slate Console, Split Flap, Sticker Book, Storefront, Story
+  Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt, Trailhead, Vapor
+  Sunset, Washi Seasons, Weather Console. (Editorial Paper and Washi
+  Seasons are flat printed paper; this one is physical, stacked, 3D-ish
+  craft paper with a parallax pop-up header.)
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/papercraft.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Grandstander for playful headings,
+  Mali for body text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@600;800&family=Mali:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  Signature touch: the pop-up diorama header -- six inline-SVG cut-paper
+  layers (sky, sun, far peaks, near peaks, forest + village, lake with a
+  boat) with soft drop shadows between them that shift with pointer-move
+  parallax (static under prefers-reduced-motion and on phones). Every
+  other surface uses .paper: a fibre-textured, deckle-edged sheet with a
+  hard 2px under-shadow plus a soft 6px one. Day / Dusk re-tints the
+  layers by swapping the colour variables on :root[data-mode="dusk"].
+
+  Layout: .app is a grid -- .diorama (about 38vh, 28vh on phones) over
+  .stage. .stage is the .map-frame (paper card holding the map) beside a
+  .side column of bookmark .tab cards plus the .caption card. On phones
+  the .tabs become a horizontal row under the map and the page scrolls.
+  The map sits inside the frame's padding, so the Mapbox logo and
+  attribution are never covered. If you add a raster-dem source (terrain),
+  GL JS hides the logo; the rule near the bottom of this file forces it
+  back.
+
+  Class/id contract (see papercraft-template.html in this same folder for
+  a full working example):
+
+  - .app                      page grid; 100dvh on desktop, scrolls on phone
+  - .diorama                  header scene; holds .layer svgs, then the
+                               .plaque. JS sets --px/--py (-1..1) on it.
+    .layer (+.l-sky .l-sun      one cut-paper svg layer; set style="--d:N"
+    .l-far .l-near .l-forest    for its parallax depth in px. SVG fills use
+    .l-lake)                    the .f-* classes below, so they re-tint.
+    .f-sky .f-far .f-near       fill classes: sky, far peaks, near peaks,
+    .f-forest .f-lake .f-cream  forest, lake, village cream, roof red, sun
+    .f-roof .f-sun .f-paper     yellow, paper white
+    .sun-disc                   the sun/moon circle (sinks at dusk)
+    .boat                       the lake boat (bobs; static if reduced)
+  - .plaque                   paper title plaque over the diorama
+    .plaque h1                  Grandstander title
+    .plaque .kicker             small label above/below the title
+  - .mode-toggle              Day / Dusk paper switch (button,
+                               role=switch, aria-checked); inner .opt
+                               labels and a sliding .knob
+  - .paper                    base paper sheet: texture, deckled edge,
+                               layered shadows (children are content)
+  - .stage                    grid under the diorama
+  - .map-frame                paper card around the map; holds .map-wrap
+    .map-wrap                   positioned, rounded map area holding #map
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .side                     column (row stack on phones) of tabs + caption
+    .tabs > .tab                bookmark card button; .tab-num, .tab-name,
+                                 .tab-sub inside; .is-active = pulled out
+  - .caption                  paper caption card; add .unfold to play the
+                               scaleY unfold (re-add it to replay);
+                               .caption-title, .caption-body, .caption-meta
+  - .flag                     inner child of a mapboxgl.Marker element: a
+                               paper flag on a toothpick (svg) with a
+                               shadow; .is-active enlarges it
+  - .btn, .btn-primary        paper buttons
+  - .status-note (+.loading/  small status line
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --sky: #BFE3F2;
+  --far: #8FB3C9;
+  --near: #6E9A7E;
+  --forest: #4E7A58;
+  --lake: #6FB1D6;
+  --cream: #FFF6E5;
+  --roof: #D9553F;
+  --sun: #FFD166;
+  --paper: #FFFDF8;
+  --cloud: #FFFFFF;
+  --sun-dy: 0px;
+
+  --page: #F3EBDA;
+  --ink: #3A3631;
+  --ink-muted: #6B6459;
+  --ink-faint: #9A917F;
+  --shade: rgba(60, 45, 20, 0.22);
+  --shade-soft: rgba(60, 45, 20, 0.2);
+  --accent: #D9553F;
+  --accent-ink: #FFFDF8;
+  --success: #3F7A54;
+  --error: #B8392B;
+
+  --font-heading: 'Grandstander', 'Trebuchet MS', 'Comic Sans MS', sans-serif;
+  --font-body: 'Mali', 'Trebuchet MS', 'Comic Sans MS', sans-serif;
+
+  /* Fibre texture: faint turbulence noise, tiled */
+  --fibre: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8 0.35' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45  0 0 0 0 0.35  0 0 0 0 0.2  0 0 0 0.5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.16'/%3E%3C/svg%3E");
+
+  /* Hand-torn edge: small px jitter so the sheet never clips its shadow
+     (the shadow lives on the .paper wrapper, the clip on ::before). */
+  --deckle: polygon(0 4px, 3% 1px, 7% 3px, 12% 0, 18% 2px, 25% 0, 33% 3px, 41% 1px, 50% 3px, 58% 0, 66% 2px, 74% 0, 83% 3px, 91% 1px, 97% 3px, 100% 0, calc(100% - 2px) 30%, 100% 55%, calc(100% - 2px) 80%, 100% 100%, 94% calc(100% - 2px), 86% 100%, 78% calc(100% - 3px), 69% 100%, 60% calc(100% - 2px), 51% 100%, 42% calc(100% - 3px), 33% 100%, 24% calc(100% - 2px), 14% 100%, 6% calc(100% - 3px), 0 100%, 2px 70%, 0 45%, 2px 20%);
+}
+
+/* Dusk: the same paper layers, re-tinted by variables */
+:root[data-mode="dusk"] {
+  --sky: #6A5F9E;
+  --far: #5E78A6;
+  --near: #4C7068;
+  --forest: #34564B;
+  --lake: #3F6FA0;
+  --cream: #F2DFC2;
+  --roof: #C2473A;
+  --sun: #F6E7C1;
+  --cloud: #B7A8D4;
+  --sun-dy: 78px;
+  --page: #E4DAC8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--page);
+  background-image: var(--fibre);
+  color: var(--ink);
+  font-family: var(--font-body);
+  transition: background-color 0.6s ease;
+}
+
+button, input, select {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---- Page grid ---- */
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 38vh minmax(0, 1fr);
+  height: 100dvh;
+}
+
+/* ---- Paper sheet ---- */
+.paper {
+  position: relative;
+  isolation: isolate;
+  color: var(--ink);
+  filter: drop-shadow(0 2px 0 var(--shade)) drop-shadow(0 6px 6px var(--shade-soft));
+}
+
+.paper::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--fibre), var(--paper);
+  clip-path: var(--deckle);
+}
+
+/* ---- Diorama header ---- */
+.diorama {
+  position: relative;
+  overflow: hidden;
+  background: var(--sky);
+  box-shadow: 0 3px 0 var(--shade), 0 8px 12px var(--shade-soft);
+  z-index: 2;
+  transition: background-color 0.6s ease;
+}
+
+.layer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -60px;
+  width: calc(100% + 120px);
+  height: 100%;
+  display: block;
+  transform: translate3d(calc(var(--px, 0) * var(--d, 0) * 1px), calc(var(--py, 0) * var(--d, 0) * 0.35px), 0);
+  transition: transform 0.3s ease-out;
+  pointer-events: none;
+}
+
+/* Soft shadows cast UP onto the sheet behind -- paper stacked in a box */
+.l-far, .l-near, .l-forest, .l-lake {
+  filter: drop-shadow(0 -3px 4px rgba(40, 40, 60, 0.28));
+}
+
+.f-sky { fill: var(--sky); transition: fill 0.6s ease; }
+.f-far { fill: var(--far); transition: fill 0.6s ease; }
+.f-near { fill: var(--near); transition: fill 0.6s ease; }
+.f-forest { fill: var(--forest); transition: fill 0.6s ease; }
+.f-lake { fill: var(--lake); transition: fill 0.6s ease; }
+.f-cream { fill: var(--cream); transition: fill 0.6s ease; }
+.f-roof { fill: var(--roof); transition: fill 0.6s ease; }
+.f-sun { fill: var(--sun); transition: fill 0.6s ease; }
+.f-paper { fill: var(--paper); }
+.f-cloud { fill: var(--cloud); opacity: 0.9; transition: fill 0.6s ease; }
+
+.sun-disc {
+  transform: translateY(var(--sun-dy));
+  transition: transform 0.9s ease;
+}
+
+.boat {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: paper-bob 3.6s ease-in-out infinite;
+}
+
+@keyframes paper-bob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(3px) rotate(2deg); }
+}
+
+/* ---- Title plaque + day/dusk switch ---- */
+.plaque {
+  position: absolute;
+  top: 14px;
+  left: 20px;
+  z-index: 3;
+  padding: 12px 22px 12px 20px;
+  max-width: calc(100% - 40px);
+}
+
+.plaque .kicker {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.plaque h1 {
+  margin: 2px 0 0;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 28px;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.mode-toggle {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 148px;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.mode-toggle .opt {
+  position: relative;
+  z-index: 1;
+  padding: 7px 0;
+  text-align: center;
+  transition: color 0.25s ease;
+}
+
+.mode-toggle .knob {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  background: var(--sun);
+  border-radius: 10px 12px 11px 13px;
+  box-shadow: 0 2px 0 var(--shade), 0 4px 6px var(--shade-soft);
+  transition: transform 0.3s cubic-bezier(0.3, 1.4, 0.5, 1), background-color 0.4s ease;
+}
+
+.mode-toggle[aria-checked="true"] .knob {
+  transform: translateX(100%);
+  background: #CFC6EC;
+}
+
+/* ---- Stage: map card + side column ---- */
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  padding: 16px 20px 20px;
+  min-height: 0;
+}
+
+.map-frame {
+  padding: 12px;
+  min-height: 0;
+  min-width: 0;
+}
+
+.map-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--sky);
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  /* room on the left so pulled-out tabs and shadows are not clipped */
+  padding: 6px 8px 14px 22px;
+  margin-left: -22px;
+}
+
+/* ---- Bookmark tabs ---- */
+.tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: none;
+}
+
+.tab {
+  --tab-c: var(--roof);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 14px 6px 10px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink);
+  transition: transform 0.25s cubic-bezier(0.3, 1.3, 0.5, 1), filter 0.25s ease;
+}
+
+.tab:nth-child(6n+1) { --tab-c: #D9553F; }
+.tab:nth-child(6n+2) { --tab-c: #E9A23B; }
+.tab:nth-child(6n+3) { --tab-c: #4E7A58; }
+.tab:nth-child(6n+4) { --tab-c: #4C93C0; }
+.tab:nth-child(6n+5) { --tab-c: #8E6BB5; }
+.tab:nth-child(6n+6) { --tab-c: #C9617F; }
+
+/* coloured bookmark ribbon on the sheet's left edge */
+.tab::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  background: var(--tab-c);
+  clip-path: polygon(0 4px, 100% 0, 100% 100%, 0 100%);
+}
+
+.tab:hover {
+  transform: translateX(-5px);
+}
+
+.tab.is-active {
+  transform: translateX(-14px);
+  filter: drop-shadow(0 3px 0 var(--shade)) drop-shadow(0 12px 10px var(--shade-soft));
+}
+
+.tab-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--tab-c);
+  color: var(--accent-ink);
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.tab-name {
+  display: block;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1.15;
+}
+
+.tab-sub {
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.2;
+  color: var(--ink-muted);
+}
+
+/* ---- Caption card: unfolds from a crease ---- */
+.caption {
+  flex: none;
+  padding: 14px 18px 20px;
+  transform-origin: 50% 0;
+}
+
+/* scalloped bottom edge: the mask lives on the face (::before) so the
+   .paper drop-shadow on the card still follows the scallops */
+.caption::before {
+  clip-path: none;
+  -webkit-mask: linear-gradient(#000, #000) top / 100% calc(100% - 7px) no-repeat, radial-gradient(circle at 50% 0, #000 6px, transparent 6.5px) bottom / 14px 7px repeat-x;
+  mask: linear-gradient(#000, #000) top / 100% calc(100% - 7px) no-repeat, radial-gradient(circle at 50% 0, #000 6px, transparent 6.5px) bottom / 14px 7px repeat-x;
+}
+
+.caption.unfold {
+  animation: paper-unfold 0.36s cubic-bezier(0.25, 1.2, 0.5, 1) both;
+}
+
+@keyframes paper-unfold {
+  0% { transform: scaleY(0.06); }
+  100% { transform: scaleY(1); }
+}
+
+.caption-title {
+  margin: 0 0 4px;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.caption-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.caption-meta {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* ---- Paper flag marker (inner child of the Marker element) ---- */
+.flag {
+  position: relative;
+  display: block;
+  width: 44px;
+  height: 66px;
+  cursor: pointer;
+  transform-origin: 50% 100%;
+  transition: transform 0.25s cubic-bezier(0.3, 1.4, 0.5, 1);
+  filter: drop-shadow(2px 3px 2px rgba(40, 30, 10, 0.4));
+}
+
+.flag svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.flag.is-active {
+  transform: scale(1.3);
+}
+
+.flag.is-active .cloth {
+  animation: paper-wave 1.6s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: 0 50%;
+}
+
+@keyframes paper-wave {
+  0%, 100% { transform: skewY(0deg); }
+  50% { transform: skewY(-5deg); }
+}
+
+/* ---- Buttons ---- */
+.btn {
+  display: inline-block;
+  padding: 9px 18px;
+  border: 0;
+  border-radius: 8px 12px 9px 13px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 2px 0 var(--shade), 0 6px 10px var(--shade-soft);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 0 var(--shade), 0 10px 12px var(--shade-soft);
+}
+
+.btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 var(--shade);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---- Status note ---- */
+.status-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.status-note.loading::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--far);
+  border-top-color: var(--accent);
+  animation: paper-spin 0.9s linear infinite;
+}
+
+@keyframes paper-spin {
+  to { transform: rotate(360deg); }
+}
+
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); }
+
+.hidden {
+  display: none !important;
+}
+
+/* GL JS hides the Mapbox logo when a raster-dem (terrain) source is
+   added; force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}
+
+/* ---- Phones: smaller diorama, tabs as a horizontal row ---- */
+@media (max-width: 860px) {
+  .app {
+    height: auto;
+    min-height: 100dvh;
+    grid-template-rows: 28vh auto;
+  }
+
+  .diorama {
+    min-height: 190px;
+  }
+
+  .plaque {
+    top: 10px;
+    left: 16px;
+    padding: 8px 14px 8px 14px;
+  }
+
+  .plaque h1 {
+    font-size: 20px;
+  }
+
+  .mode-toggle {
+    top: auto;
+    bottom: 10px;
+    right: 16px;
+    width: 128px;
+    font-size: 13px;
+  }
+
+  .stage {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px 16px 24px;
+    gap: 14px;
+  }
+
+  .map-frame {
+    padding: 8px;
+  }
+
+  .map-wrap {
+    height: 48dvh;
+    min-height: 300px;
+  }
+
+  .side {
+    overflow: visible;
+    padding: 0;
+    margin-left: 0;
+  }
+
+  .tabs {
+    flex-direction: row;
+    align-items: flex-start;
+    overflow-x: auto;
+    gap: 10px;
+    padding: 12px 4px 14px;
+    scroll-snap-type: x proximity;
+  }
+
+  .tab {
+    flex: none;
+    width: 168px;
+    scroll-snap-align: start;
+  }
+
+  .tab:hover {
+    transform: translateY(-3px);
+  }
+
+  .tab.is-active {
+    transform: translateY(-8px);
+  }
+
+  .tab::after {
+    width: auto;
+    right: 0;
+    bottom: auto;
+    height: 6px;
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 4px 100%);
+  }
+
+  .tab { padding-top: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layer,
+  .sun-disc,
+  .mode-toggle .knob,
+  .tab,
+  .flag {
+    transition: none;
+  }
+
+  .boat,
+  .flag.is-active .cloth,
+  .caption.unfold {
+    animation: none;
+  }
+}

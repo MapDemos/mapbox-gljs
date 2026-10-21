@@ -1,0 +1,457 @@
+<!--
+  Working EXAMPLE of the Pixel Quest style pack (pixel-quest.css, in this
+  same folder). Open this file directly to see the pattern working: a
+  16-bit fantasy overworld of Edinburgh (streets-v12 recoloured flat to a
+  limited pixel palette) with a party status window, a five-entry quest
+  log and an RPG dialog box. Pick a quest (in the log or on the map) and a
+  pixel-art hero walks there along a real walking route from the
+  Directions API (straight line if the request fails), the camera follows,
+  and on arrival an NPC line is typed out, XP and gold tick up, the quest
+  is ticked off and a "QUEST COMPLETE!" banner pops. Arrow keys nudge the
+  camera. Copy the markup below into your own demo and link
+  pixel-quest.css from its <head> -- see the class/id contract documented
+  at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (16-bit RPG overworld) at the user's request for
+  something distinct from every other pack in this folder. The places are
+  real; "The Castle Rock Chronicles", the hero Astrid and every NPC are
+  fictional placeholders -- swap in your own.
+
+  What's NOT included: saving progress, battles, search/geocoding, or a
+  hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pixel Quest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Handjet:wght@400;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="pixel-quest.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="map"></div>
+
+  <!-- Party status -->
+  <section class="win status-win" aria-label="Party status">
+    <div class="hero-row">
+      <canvas class="portrait px" id="portrait" width="12" height="14" aria-hidden="true"></canvas>
+      <div>
+        <div class="hero-name">ASTRID</div>
+        <div class="hero-class">Wayfarer</div>
+      </div>
+      <span class="hero-lv" id="st-lv">LV 1</span>
+    </div>
+    <div class="bar-row hp"><span class="bar-label">HP</span><div class="bar"><i id="hp-fill"></i></div><span class="bar-val" id="hp-val"></span></div>
+    <div class="bar-row mp" data-opt><span class="bar-label">MP</span><div class="bar"><i id="mp-fill" style="width:70%"></i></div><span class="bar-val">8/12</span></div>
+    <div class="bar-row xp" data-opt><span class="bar-label">XP</span><div class="bar"><i id="xp-fill"></i></div><span class="bar-val" id="xp-val"></span></div>
+    <div class="gold-row"><span class="gold-val" id="gold">0</span><span>G</span></div>
+  </section>
+
+  <button class="btn btn-small quest-toggle" id="quest-toggle" aria-expanded="false" aria-controls="quest-log">QUESTS 0/5</button>
+
+  <!-- Quest log -->
+  <aside class="win quest-log" id="quest-log" aria-label="Quest log">
+    <div class="ql-head"><h2 class="ql-title">QUEST LOG</h2><span class="ql-count" id="ql-count">0/5</span></div>
+    <ol class="quest-list" id="quest-list"></ol>
+    <div class="ql-foot">
+      <p class="ql-hint">Arrow keys: explore</p>
+      <button class="btn btn-small" id="new-game">NEW GAME</button>
+    </div>
+  </aside>
+
+  <div class="banner hidden" id="banner" role="status">
+    <div class="banner-title">QUEST COMPLETE!</div>
+    <div class="banner-sub" id="banner-sub"></div>
+  </div>
+
+  <!-- Dialog box -->
+  <section class="win dialog" id="dialog" role="status" aria-live="polite" aria-atomic="true">
+    <div class="dlg-name" id="dlg-name">NARRATOR</div>
+    <p class="dlg-text" id="dlg-text"></p>
+    <span class="dlg-next hidden" id="dlg-next" aria-hidden="true"></span>
+  </section>
+</div>
+
+<script>
+const START = [-3.1894, 55.9520]; // Waverley station, where the hero begins
+// Quest points: real public places in Edinburgh. Rewards and NPC lines are fictional.
+const QUESTS = [
+  { id: 'castle', title: 'Storm the Castle Rock', short: 'Castle Rock', coord: [-3.1999, 55.9487], npc: 'GATE CAPTAIN',
+    line: 'Halt, traveller! This rock is a sleeping volcano. The gate is yours, hero. Take the crown scroll.', xp: 40, gold: 120 },
+  { id: 'close', title: "Find the Writer's Close", short: "Writers' Close", coord: [-3.1927, 55.9503], npc: 'OLD SCRIBE',
+    line: 'Three great storytellers walked this close. Their words are the true treasure. Take this ink flask.', xp: 25, gold: 40 },
+  { id: 'seat', title: "Climb Arthur's Seat", short: "Arthur's Seat", coord: [-3.1618, 55.9441], npc: 'HILL HERMIT',
+    line: 'You climbed the old volcano! The whole kingdom lies below. Rest a while and take in the view.', xp: 40, gold: 60 },
+  { id: 'inn', title: 'Visit the Grassmarket inn', short: 'Grassmarket Inn', coord: [-3.1950, 55.9474], npc: 'INNKEEPER',
+    line: 'Welcome, friend! A hot stew and a soft bed. Your HP is fully restored. Rest well!', xp: 20, gold: 25, heal: true },
+  { id: 'yacht', title: 'Seek the Royal Yacht', short: 'Royal Yacht', coord: [-3.1770, 55.9818], npc: 'HARBOUR MASTER',
+    line: 'Ahoy! The royal yacht rests here at Leith, gleaming. Fair winds to you, hero!', xp: 40, gold: 200 },
+];
+const INTRO = 'Welcome, hero! Choose a quest from the log or tap a gold marker on the map. Arrow keys let you explore.';
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phoneMq = window.matchMedia('(max-width: 640px)');
+const $ = (id) => document.getElementById(id);
+
+/* ---- Pixel sprite: 12x14, drawn on a tiny canvas ---- */
+const PAL = { k: '#1B1F3B', h: '#D8434B', s: '#F4C9A0', b: '#3A5BA0', g: '#F2C14E' };
+const SPRITE_TOP = [
+  '....kkkk....', '...khhhhk...', '..khhhhhhk..', '..khhhhhhk..',
+  '..kskssksk..', '...kssssk...', '..kbbbbbbk..', '.skbbggbbks.',
+  '.skbbbbbbks.', '..kbbbbbbk..', '..kkggggkk..', '...kbbbbk...',
+];
+const SPRITE_LEGS = [
+  ['...kbk.kbk..', '...kkk.kkk..'],
+  ['....kbkbk...', '....kkkkk...'],
+];
+function drawSprite(cv, frame) {
+  const c = cv.getContext('2d');
+  c.clearRect(0, 0, 12, 14);
+  SPRITE_TOP.concat(SPRITE_LEGS[frame]).forEach((row, y) => {
+    for (let x = 0; x < 12; x++) {
+      if (PAL[row[x]]) { c.fillStyle = PAL[row[x]]; c.fillRect(x, y, 1, 1); }
+    }
+  });
+}
+drawSprite($('portrait'), 0);
+
+/* ---- Game state and HUD ---- */
+const XP_NEED = 100;
+let hp, hpMax, level, xp, gold, shownGold, done, busyIdx;
+let walkId = 0; // must start numeric: ++undefined is NaN, and NaN !== NaN would cancel every walk
+let heroPos = START.slice();
+
+function renderHud() {
+  $('st-lv').textContent = 'LV ' + level;
+  $('hp-fill').style.width = (hp / hpMax * 100) + '%';
+  $('hp-val').textContent = hp + '/' + hpMax;
+  $('xp-fill').style.width = (xp / XP_NEED * 100) + '%';
+  $('xp-val').textContent = xp + '/' + XP_NEED;
+  $('ql-count').textContent = done.size + '/' + QUESTS.length;
+  $('quest-toggle').textContent = 'QUESTS ' + done.size + '/' + QUESTS.length;
+  QUESTS.forEach((q, i) => {
+    const d = done.has(q.id), a = busyIdx === i;
+    q.btn.classList.toggle('done', d);
+    q.btn.classList.toggle('active', a);
+    q.bubble.classList.toggle('done', d);
+    q.bubble.textContent = d ? '' : String(i + 1);
+    q.qm.classList.toggle('active', a);
+  });
+}
+
+function tickGold(to) {
+  const from = shownGold, el = $('gold');
+  shownGold = to;
+  if (reduce) { el.textContent = to; return; }
+  let k = 0;
+  const iv = setInterval(() => {
+    k++;
+    el.textContent = Math.round(from + (to - from) * k / 12);
+    if (k >= 12) clearInterval(iv);
+  }, 45);
+}
+
+function reward(q) {
+  gold += q.gold;
+  xp += q.xp;
+  if (q.heal) hp = hpMax;
+  let leveled = false;
+  while (xp >= XP_NEED) { xp -= XP_NEED; level++; hpMax += 6; hp = hpMax; leveled = true; }
+  tickGold(gold);
+  renderHud();
+  if (leveled) {
+    const lv = $('st-lv');
+    lv.classList.remove('flash'); void lv.offsetWidth; lv.classList.add('flash');
+  }
+  return leveled;
+}
+
+/* ---- Dialog: typewriter (instant under reduced motion) ---- */
+let typer = null, fullText = '';
+function say(name, text) {
+  clearInterval(typer);
+  fullText = text;
+  $('dlg-name').textContent = name;
+  $('dlg-next').classList.add('hidden');
+  const el = $('dlg-text');
+  if (reduce) { el.textContent = text; $('dlg-next').classList.remove('hidden'); return; }
+  el.textContent = '';
+  let n = 0;
+  typer = setInterval(() => {
+    n++;
+    el.textContent = text.slice(0, n);
+    if (n >= text.length) finishTyping();
+  }, 26);
+}
+function finishTyping() {
+  clearInterval(typer);
+  $('dlg-text').textContent = fullText;
+  $('dlg-next').classList.remove('hidden');
+}
+$('dialog').addEventListener('click', finishTyping);
+
+/* ---- Banner ---- */
+let bannerTimer = null;
+function showBanner(sub) {
+  const b = $('banner');
+  $('banner-sub').textContent = sub;
+  b.classList.remove('hidden', 'show');
+  void b.offsetWidth;
+  b.classList.add('show');
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => b.classList.add('hidden'), 3000);
+}
+
+/* ---- Map ---- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/streets-v12',
+  projection: 'mercator',
+  center: [-3.185, 55.963],
+  zoom: 12.4,
+  attributionControl: true,
+});
+map.keyboard.disable(); // arrow keys are handled below ("explore")
+
+function frameAll(duration) {
+  const b = new mapboxgl.LngLatBounds(START, START);
+  QUESTS.forEach((q) => b.extend(q.coord));
+  map.fitBounds(b, {
+    padding: phoneMq.matches
+      ? { top: 130, bottom: 220, left: 40, right: 40 }
+      : { top: 70, bottom: 210, left: 60, right: 370 },
+    maxZoom: 14, duration,
+  });
+}
+frameAll(0);
+
+// Recolour streets-v12 flat to the 16-bit palette. Every call is guarded.
+const C = { grass: '#5BB04B', forest: '#2E6B3A', water: '#3A5BA0', road: '#E8C170', bld: '#8B8C99', navy: '#1B1F3B', parch: '#F4E4BC' };
+function paint(id, prop, val) { try { map.setPaintProperty(id, prop, val); } catch (e) { /* skip */ } }
+function recolour() {
+  map.getStyle().layers.forEach((l) => {
+    const id = l.id;
+    try {
+      if (l.type === 'background') paint(id, 'background-color', C.grass);
+      else if (l.type === 'fill') {
+        if (/water/.test(id)) paint(id, 'fill-color', C.water);
+        else if (/building/.test(id)) { paint(id, 'fill-color', C.bld); paint(id, 'fill-outline-color', C.navy); }
+        else if (/park|national|wood|pitch|golf|grass|^landuse/.test(id)) paint(id, 'fill-color', C.forest);
+        else paint(id, 'fill-color', C.grass);
+        paint(id, 'fill-opacity', /^landuse$/.test(id) ? 0.5 : 1);
+      } else if (l.type === 'fill-extrusion') {
+        paint(id, 'fill-extrusion-color', C.bld);
+      } else if (l.type === 'line') {
+        if (/water/.test(id)) paint(id, 'line-color', C.water);
+        else if (/admin|boundary/.test(id)) paint(id, 'line-color', C.navy);
+        else if (/rail/.test(id)) paint(id, 'line-color', C.bld);
+        else if (/case/.test(id)) paint(id, 'line-color', C.navy);
+        else if (/road|bridge|tunnel|ferry|path|steps|ped|street|motorway|trunk|primary|secondary|tertiary|service|link/.test(id)) paint(id, 'line-color', C.road);
+      } else if (l.type === 'symbol') {
+        if (/poi|airport|transit|rail-label|ferry|motorway-junction|road-number|road-exit/.test(id)) {
+          map.setLayoutProperty(id, 'visibility', 'none');
+        } else {
+          paint(id, 'text-color', C.parch);
+          paint(id, 'text-halo-color', C.navy);
+          paint(id, 'text-halo-width', 1.6);
+          paint(id, 'text-halo-blur', 0);
+        }
+      }
+    } catch (e) { /* layer shape differs; skip */ }
+  });
+}
+
+// Walking trail shown while the hero travels
+map.on('style.load', () => {
+  recolour();
+  map.addSource('trail', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  const join = { 'line-join': 'round', 'line-cap': 'butt' };
+  map.addLayer({ id: 'trail-casing', type: 'line', source: 'trail', layout: join, paint: { 'line-color': C.navy, 'line-width': 9 } });
+  map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', layout: join,
+    paint: { 'line-color': '#F2C14E', 'line-width': 5, 'line-dasharray': [1, 1.2] } });
+});
+function setTrail(coords) {
+  let src = null;
+  try { src = map.getSource('trail'); } catch (e) { /* style not ready */ }
+  if (!src) return;
+  src.setData(coords
+    ? { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } }
+    : { type: 'FeatureCollection', features: [] });
+}
+
+
+/* ---- Markers: hero + quest points (styled inner children only) ---- */
+QUESTS.forEach((q, i) => {
+  const li = document.createElement('li');
+  li.innerHTML = '<button class="quest"><span class="q-box"></span><span class="q-title"></span></button>';
+  li.querySelector('.q-title').textContent = q.title;
+  q.btn = li.firstChild;
+  q.btn.addEventListener('click', () => startQuest(i));
+  $('quest-list').appendChild(li);
+
+  const root = document.createElement('div');
+  root.innerHTML = '<div class="qm" role="button" tabindex="0"><span class="qm-name"></span><span class="qm-bubble"></span><i class="qm-stem"></i></div>';
+  q.qm = root.firstChild;
+  q.qm.setAttribute('aria-label', q.title);
+  q.qm.querySelector('.qm-name').textContent = q.short;
+  q.bubble = q.qm.querySelector('.qm-bubble');
+  q.qm.addEventListener('click', () => startQuest(i));
+  q.qm.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startQuest(i); } });
+  new mapboxgl.Marker({ element: root, anchor: 'bottom' }).setLngLat(q.coord).addTo(map);
+});
+
+const heroRoot = document.createElement('div');
+heroRoot.innerHTML = '<div class="hero"><canvas class="hero-cv px" width="12" height="14"></canvas><i class="hero-shadow"></i></div>';
+const heroEl = heroRoot.firstChild;
+const heroCv = heroRoot.querySelector('canvas');
+drawSprite(heroCv, 0);
+const heroMarker = new mapboxgl.Marker({ element: heroRoot, anchor: 'bottom' }).setLngLat(START).addTo(map);
+
+/* ---- Walking ---- */
+function hav(a, b) {
+  const R = 6371000, rad = Math.PI / 180;
+  const dLat = (b[1] - a[1]) * rad, dLng = (b[0] - a[0]) * rad;
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * rad) * Math.cos(b[1] * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+// Real walking route from the Directions API; straight line if it fails.
+async function fetchPath(a, b) {
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 4000);
+    const url = `https://api.mapbox.com/directions/v5/mapbox/walking/${a.join(',')};${b.join(',')}` +
+      `?geometries=geojson&overview=full&access_token=${mapboxgl.accessToken}`;
+    const r = await fetch(url, { signal: ctl.signal });
+    clearTimeout(t);
+    const j = await r.json();
+    const c = j.routes && j.routes[0] && j.routes[0].geometry.coordinates;
+    if (c && c.length > 1) return [a].concat(c, [b]);
+  } catch (e) { /* fall through */ }
+  return [a, b];
+}
+
+function setWalking(on) { heroEl.classList.toggle('walking', on); }
+
+async function startQuest(i) {
+  const q = QUESTS[i];
+  $('quest-log').classList.remove('open');
+  $('quest-toggle').setAttribute('aria-expanded', 'false');
+  if (done.has(q.id)) {
+    ++walkId; busyIdx = -1; setWalking(false); setTrail(null); renderHud();
+    say(q.npc, 'You already finished this quest. The realm thanks you, hero!');
+    if (reduce) map.jumpTo({ center: q.coord, zoom: 14.5 }); else map.flyTo({ center: q.coord, zoom: 14.5, duration: 1400 });
+    return;
+  }
+  const id = ++walkId;
+  busyIdx = i;
+  renderHud();
+  say('NARRATOR', 'Quest accepted: ' + q.title + '. Off you go!');
+  if (reduce) {
+    heroPos = q.coord.slice();
+    heroMarker.setLngLat(heroPos);
+    map.jumpTo({ center: heroPos, zoom: 14.5 });
+    arrive(i);
+    return;
+  }
+  const from = heroPos.slice();
+  const path = await fetchPath(from, q.coord);
+  if (id !== walkId) return;
+  setTrail(path);
+  const cum = [0];
+  for (let k = 1; k < path.length; k++) cum.push(cum[k - 1] + hav(path[k - 1], path[k]));
+  const total = cum[cum.length - 1];
+  const dur = 4000 + Math.min(2000, total / 2); // 4-6 s for any quest
+  const c0 = map.getCenter(), z0 = map.getZoom(), BLEND = 800;
+  let t0 = null, seg = 0;
+  setWalking(true);
+  const frame = (ts) => {
+    if (id !== walkId) return;
+    if (t0 === null) t0 = ts;
+    const k = Math.min(1, (ts - t0) / dur), d = k * total;
+    while (seg < path.length - 2 && cum[seg + 1] < d) seg++;
+    const a = path[seg], b = path[seg + 1];
+    const t = (d - cum[seg]) / ((cum[seg + 1] - cum[seg]) || 1);
+    heroPos = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    heroMarker.setLngLat(heroPos);
+    // Camera eases from where it is onto the hero, then locks on and follows.
+    const e = Math.min(1, (ts - t0) / BLEND), s = e * e * (3 - 2 * e);
+    map.jumpTo({
+      center: [c0.lng + (heroPos[0] - c0.lng) * s, c0.lat + (heroPos[1] - c0.lat) * s],
+      zoom: z0 + (14.3 - z0) * s,
+    });
+    if (Math.abs(b[0] - a[0]) > 1e-7) heroEl.classList.toggle('left', b[0] < a[0]);
+    drawSprite(heroCv, Math.floor(ts / 140) % 2);
+    if (k < 1) requestAnimationFrame(frame); else arrive(i);
+  };
+  requestAnimationFrame(frame);
+}
+
+function arrive(i) {
+  const q = QUESTS[i];
+  setWalking(false);
+  drawSprite(heroCv, 0);
+  setTrail(null);
+  busyIdx = -1;
+  done.add(q.id);
+  const leveled = reward(q);
+  const all = done.size === QUESTS.length;
+  showBanner(`+${q.xp} XP  +${q.gold} G` + (leveled ? '  LEVEL UP!' : ''));
+  say(q.npc, q.line + (leveled ? ' Level up!' : '') + (all ? ' The Chronicle is complete!' : ''));
+}
+
+/* ---- Controls ---- */
+$('quest-toggle').addEventListener('click', () => {
+  const open = $('quest-log').classList.toggle('open');
+  $('quest-toggle').setAttribute('aria-expanded', String(open));
+});
+
+const ARROWS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+window.addEventListener('keydown', (e) => {
+  const v = ARROWS[e.key];
+  if (!v || busyIdx >= 0 || e.metaKey || e.ctrlKey || e.altKey) return;
+  e.preventDefault();
+  map.panBy([v[0] * 120, v[1] * 120], { duration: reduce ? 0 : 200 });
+});
+['mousedown', 'touchstart', 'wheel'].forEach((ev) => map.on(ev, (e) => {
+  if (busyIdx >= 0 && e.originalEvent) { ++walkId; busyIdx = -1; setWalking(false); setTrail(null); renderHud(); }
+}));
+
+function newGame() {
+  ++walkId;
+  hp = 18; hpMax = 24; level = 1; xp = 0; gold = 0; shownGold = 0; busyIdx = -1;
+  done = new Set();
+  heroPos = START.slice();
+  heroMarker.setLngLat(START);
+  setWalking(false);
+  setTrail(null);
+  $('gold').textContent = '0';
+  renderHud();
+  say('NARRATOR', INTRO);
+  frameAll(reduce ? 0 : 1200);
+}
+$('new-game').addEventListener('click', newGame);
+
+map.on('error', (e) => {
+  if (busyIdx >= 0) return;
+  say('NARRATOR', 'The map spirits are restless: ' + ((e.error && e.error.message) || 'unknown error'));
+});
+newGame();
+</script>
+</body>
+</html>

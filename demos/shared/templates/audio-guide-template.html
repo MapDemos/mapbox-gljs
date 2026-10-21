@@ -1,0 +1,336 @@
+<!--
+  Working EXAMPLE of the Audio Guide style pack (audio-guide.css, in this same
+  folder). Open this file directly to see the pattern working: a handheld
+  museum-district audio guide ("Mall Walks") beside a Mapbox Standard map of
+  the National Mall, Washington DC. Key a stop number on the keypad (try
+  2-1-4) and press the brass play key -- the screen loads the stop, the map
+  flies to it and pulses a numbered brass pin, a waveform fills and the
+  transcript lights up sentence by sentence. Unknown numbers show "No stop
+  999". "All stops" lists every stop. On phones the device becomes a
+  bottom-docked panel with a collapsible keypad. Copy the markup below into
+  your own demo and link audio-guide.css from its <head> -- see the
+  class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief at the user's request for something distinct from
+  every other pack in this folder. The places are real public landmarks
+  (coordinates approximate); "Mall Walks", the stop numbers and all the
+  transcript text are fictional placeholders -- swap in your own.
+
+  What's NOT included: real audio (progress is a timer), search/geocoding,
+  routing, popups, or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Audio Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="audio-guide.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="map-pane">
+    <div id="map"></div>
+    <div class="map-badge"><span class="map-badge-mark"></span>Mall Walks &middot; Audio Guide</div>
+  </div>
+
+  <aside class="device-pane" aria-label="Audio guide">
+    <div class="device" id="device">
+      <div class="device-top"><span class="device-brand">Mall Walks</span></div>
+      <div class="screen">
+        <div class="screen-head">
+          <div>
+            <span class="stop-label">Stop</span>
+            <span class="stop-num" id="stop-num" aria-live="polite">214</span>
+          </div>
+          <div class="stop-info">
+            <h1 class="stop-title" id="stop-title">&nbsp;</h1>
+            <p class="stop-meta" id="stop-meta"></p>
+          </div>
+        </div>
+        <p class="stop-msg" id="stop-msg" aria-live="polite"></p>
+        <p class="transcript" id="transcript"></p>
+        <div class="player">
+          <svg class="wave" id="wave" viewBox="0 0 256 40" preserveAspectRatio="none" role="img" aria-label="Playback progress"></svg>
+          <div class="time"><span id="t-now">0:00</span><span id="t-total">0:00</span></div>
+        </div>
+        <div class="ctrls">
+          <button class="ctl-btn" id="back" aria-label="Back 15 seconds">&minus;15s</button>
+          <button class="ctl-play" id="play" aria-label="Play">&#9654;</button>
+          <button class="ctl-btn" id="fwd" aria-label="Forward 15 seconds">+15s</button>
+          <button class="ctl-btn ctl-keypad" id="kp-toggle" aria-expanded="false">Keypad</button>
+        </div>
+      </div>
+      <div class="keypad-wrap">
+        <div class="keypad" id="keypad"></div>
+      </div>
+    </div>
+
+    <div class="dock-bar">
+      <button class="toggle-btn" id="list-toggle" aria-expanded="false">All stops</button>
+    </div>
+    <ul class="stop-list hidden" id="stop-list"></ul>
+  </aside>
+</div>
+
+<script>
+// Fictional tour content on real public places (coordinates approximate).
+const STOPS = [
+  { n: 101, title: 'Lincoln Memorial', meta: 'West end of the Mall', c: [-77.0502, 38.8893], text: [
+    'Begin at the western end of the Mall, where the marble steps rise above the water.',
+    'Inside, a seated figure looks east along the whole length of the park.',
+    'Take a moment on the top step and let the long view settle.'] },
+  { n: 110, title: 'Reflecting Pool', meta: 'A long, still mirror', c: [-77.0447, 38.8898], text: [
+    'Walk the gravel path along the pool, shaded by elms on either side.',
+    'On calm days the water holds the monument at its far end, upside down.',
+    'The pool is shallow by design; its job is simply to reflect.'] },
+  { n: 120, title: 'National WWII Memorial', meta: 'Fountains and pillars', c: [-77.0405, 38.8894], text: [
+    'Fifty-six granite pillars curve around an open plaza and a broad fountain.',
+    'Each pillar carries a wreath and the name of a state or territory.',
+    'Sit by the water; the sound of the fountains carries across the plaza.'] },
+  { n: 130, title: 'Washington Monument', meta: 'The grassy centre', c: [-77.0353, 38.8895], text: [
+    'The obelisk anchors the middle of the Mall, simple and almost severe.',
+    'Look closely at the stone: a change in colour marks a pause in construction.',
+    'From the base, every other stop on this tour is visible on a clear day.'] },
+  { n: 140, title: 'Tidal Basin Path', meta: 'A quiet shoreline loop', c: [-77.0390, 38.8863], text: [
+    'Leave the Mall and follow the paved path along the northern shore of the basin.',
+    'In spring the cherry trees here bloom for about a week and draw the crowds.',
+    'Out of season, the walk is calm and the water is almost empty.'] },
+  { n: 150, title: 'Jefferson Memorial', meta: 'Across the basin', c: [-77.0366, 38.8814], text: [
+    'A shallow dome and a ring of columns face the water from the south shore.',
+    'Climb the steps and look back: the monument and the White House line up.',
+    'The interior is open to the air, so the weather is part of the visit.'] },
+  { n: 214, title: 'National Museum of American History', meta: 'Constitution Avenue', c: [-77.0300, 38.8913], text: [
+    'You are standing outside a museum of everyday objects and the stories behind them.',
+    'Inside, a large flag, a row of locomotives and a modest lunch counter share the floors.',
+    'Start on the first floor and let the collection lead you upward.'] },
+  { n: 218, title: 'National Museum of Natural History', meta: 'Rotunda and dinosaurs', c: [-77.0260, 38.8913], text: [
+    'A great stone rotunda opens onto halls of fossils, gems and living insects.',
+    'The elephant in the entrance hall has greeted visitors for decades.',
+    'Allow a full morning; the collection rewards slow looking.'] },
+  { n: 230, title: 'Smithsonian Castle', meta: 'Red sandstone landmark', c: [-77.0260, 38.8888], text: [
+    'The red sandstone building with its towers is the Institution’s oldest home on the Mall.',
+    'Today it works as a welcome centre, a good place to plan the rest of the day.',
+    'The garden behind it is a quiet pause between the larger museums.'] },
+  { n: 226, title: 'National Gallery of Art', meta: 'West Building', c: [-77.0199, 38.8913], text: [
+    'A domed neoclassical hall holds paintings and sculpture from the thirteenth century onward.',
+    'Move through the galleries in order and the centuries unfold room by room.',
+    'A fountain at the centre of the rotunda is a fine place to rest.'] },
+  { n: 222, title: 'National Air and Space Museum', meta: 'Independence Avenue', c: [-77.0199, 38.8882], text: [
+    'Rockets, capsules and early aircraft hang beneath tall glass ceilings.',
+    'Look for the smallest machines first; the details are easy to miss.',
+    'The building is a short walk from the Capitol, so the tour is nearly done.'] },
+  { n: 310, title: 'United States Capitol', meta: 'East end of the Mall', c: [-77.0090, 38.8899], text: [
+    'The tour ends at the eastern edge of the Mall, beneath the great cast-iron dome.',
+    'Turn around and the whole green avenue stretches back toward the river.',
+    'Thank you for walking with us.'] },
+].sort((a, b) => a.n - b.n);
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = () => window.matchMedia('(max-width: 760px)').matches;
+const $ = (id) => document.getElementById(id);
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [-77.029, 38.8885],
+  zoom: 14,
+  config: { basemap: { theme: 'faded', lightPreset: 'day', show3dObjects: true, showPointOfInterestLabels: false } },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+/* ---- Markers: small numbered dots plus one brass pulsing pin ---- */
+STOPS.forEach((s) => {
+  const el = document.createElement('div');
+  el.innerHTML = `<div class="stop-dot">${s.n}</div>`;
+  el.addEventListener('click', () => loadStop(s.n, { fly: true, play: true }));
+  new mapboxgl.Marker({ element: el }).setLngLat(s.c).addTo(map);
+});
+const pinEl = document.createElement('div');
+pinEl.innerHTML = '<div class="pin" id="pin-num"></div>';
+const pin = new mapboxgl.Marker({ element: pinEl });
+
+function fitAll(duration) {
+  const b = STOPS.reduce((acc, s) => acc.extend(s.c), new mapboxgl.LngLatBounds(STOPS[0].c, STOPS[0].c));
+  map.fitBounds(b, {
+    padding: phone() ? { top: 50, bottom: 56, left: 28, right: 28 } : { top: 70, bottom: 80, left: 60, right: 60 },
+    duration,
+  });
+}
+// Re-fit once the layout has settled (the phone panel can change the map height after load).
+map.on('load', () => { fitAll(0); map.once('idle', () => { map.resize(); fitAll(0); }); });
+new ResizeObserver(() => map.resize()).observe($('map'));
+
+/* ---- Player state ---- */
+const BARS = 56;
+let cur = null, buf = '', playing = false, elapsed = 0, dur = 30, timer = null, msgTimer = null, lastSent = -1;
+const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const find = (n) => STOPS.find((s) => s.n === n);
+
+function buildWave(seed) {
+  let html = '';
+  for (let i = 0; i < BARS; i++) {
+    const h = 5 + 30 * Math.abs(Math.sin(i * 0.55 + seed) * Math.cos(i * 0.21 + seed * 1.7));
+    html += `<rect class="bar" x="${(i * 256 / BARS + 0.6).toFixed(1)}" y="${((40 - h) / 2).toFixed(1)}" width="2.6" height="${h.toFixed(1)}" rx="1.3"/>`;
+  }
+  $('wave').innerHTML = html;
+}
+
+function render() {
+  const frac = Math.min(1, elapsed / dur);
+  $('wave').querySelectorAll('.bar').forEach((b, i) => b.classList.toggle('done', i < Math.floor(frac * BARS)));
+  $('t-now').textContent = fmt(elapsed);
+  $('t-total').textContent = fmt(dur);
+  $('play').innerHTML = playing ? '&#10074;&#10074;' : '&#9654;';
+  $('play').setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  const sents = $('transcript').children;
+  const idx = (playing || elapsed > 0) ? Math.min(sents.length - 1, Math.floor(frac * sents.length)) : -1;
+  [...sents].forEach((el, i) => { el.classList.toggle('on', i === idx); el.classList.toggle('past', i < idx); });
+  if (idx !== lastSent && idx >= 0) {
+    const tr = $('transcript');
+    tr.scrollTop += sents[idx].getBoundingClientRect().top - tr.getBoundingClientRect().top - 4;
+  }
+  lastSent = idx;
+}
+
+function setPlaying(on) {
+  playing = on;
+  clearInterval(timer);
+  if (on) {
+    if (elapsed >= dur) elapsed = 0;
+    timer = setInterval(() => {
+      elapsed += 0.25;
+      if (elapsed >= dur) { elapsed = dur; setPlaying(false); }
+      render();
+    }, 250);
+  }
+  render();
+}
+
+function seek(delta) {
+  elapsed = Math.max(0, Math.min(dur, elapsed + delta));
+  render();
+}
+
+function showNum() {
+  const el = $('stop-num');
+  el.classList.toggle('typing', buf.length > 0);
+  el.textContent = buf ? buf.padEnd(3, '–') : (cur ? cur.n : '–––');
+}
+
+function say(text, isError, ms) {
+  clearTimeout(msgTimer);
+  const el = $('stop-msg');
+  el.textContent = text;
+  el.classList.toggle('error', !!isError);
+  if (ms) msgTimer = setTimeout(() => { el.textContent = ''; el.classList.remove('error'); if (isError) { buf = ''; showNum(); } }, ms);
+}
+
+function loadStop(n, opts) {
+  const s = find(n);
+  if (!s) return;
+  cur = s;
+  buf = '';
+  say('', false);
+  showNum();
+  $('stop-title').textContent = s.title;
+  $('stop-meta').textContent = s.meta;
+  $('transcript').innerHTML = s.text.map((t) => `<span class="sent">${t}</span> `).join('');
+  $('transcript').scrollTop = 0;
+  dur = s.text.length * 11;
+  elapsed = 0;
+  lastSent = -1;
+  buildWave(n);
+  document.querySelectorAll('.stop-item').forEach((b) => b.classList.toggle('active', +b.dataset.n === n));
+  pinEl.querySelector('.pin').textContent = n; // marker isn't in the DOM until addTo()
+  pin.setLngLat(s.c).addTo(map);
+  setPlaying(!!opts.play);
+  if (opts.fly) {
+    const o = {
+      center: s.c, zoom: 16.2, pitch: 50,
+      padding: phone() ? { top: 50, bottom: 40, left: 30, right: 30 } : { top: 60, bottom: 80, left: 50, right: 50 },
+    };
+    if (reduce) map.jumpTo(o); else map.flyTo({ ...o, duration: 2400, essential: true });
+  }
+}
+
+/* ---- Keypad ---- */
+function press(k) {
+  if (k === 'del') {
+    buf = buf.slice(0, -1);
+    say('', false);
+  } else if (k === 'go') {
+    if (!buf) { if (cur) setPlaying(!playing); return; }
+    if (buf.length < 3) { say('Enter a three-digit stop number', false, 2200); return; }
+    const n = +buf;
+    if (find(n)) loadStop(n, { fly: true, play: true });
+    else { say(`No stop ${buf}`, true, 2200); }
+    return;
+  } else if (buf.length < 3) {
+    buf += k;
+    say('', false);
+  }
+  showNum();
+}
+
+['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'go'].forEach((k) => {
+  const b = document.createElement('button');
+  b.className = 'key' + (k === 'del' ? ' key-del' : k === 'go' ? ' key-go' : '');
+  b.innerHTML = k === 'del' ? '&#9003;' : k === 'go' ? '&#9654;' : k;
+  b.setAttribute('aria-label', k === 'del' ? 'Delete' : k === 'go' ? 'Play stop' : k);
+  b.addEventListener('click', () => press(k));
+  $('keypad').appendChild(b);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (/^[0-9]$/.test(e.key)) press(e.key);
+  else if (e.key === 'Backspace') press('del');
+  else if (e.key === 'Enter' && e.target === document.body) press('go');
+});
+
+$('play').addEventListener('click', () => { if (cur) setPlaying(!playing); });
+$('back').addEventListener('click', () => seek(-15));
+$('fwd').addEventListener('click', () => seek(15));
+$('wave').addEventListener('click', (e) => {
+  const r = $('wave').getBoundingClientRect();
+  elapsed = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * dur;
+  render();
+});
+$('kp-toggle').addEventListener('click', () => {
+  const open = $('device').classList.toggle('kp-open');
+  $('kp-toggle').setAttribute('aria-expanded', open);
+});
+
+/* ---- Stop list ---- */
+STOPS.forEach((s) => {
+  const li = document.createElement('li');
+  li.innerHTML = `<button class="stop-item" data-n="${s.n}"><span class="si-num">${s.n}</span><span class="si-title">${s.title}</span></button>`;
+  li.firstChild.addEventListener('click', () => loadStop(s.n, { fly: true, play: true }));
+  $('stop-list').appendChild(li);
+});
+$('list-toggle').addEventListener('click', () => {
+  const open = $('list-toggle').classList.toggle('open');
+  $('stop-list').classList.toggle('hidden', !open);
+  $('list-toggle').setAttribute('aria-expanded', open);
+  $('list-toggle').textContent = open ? 'Hide stops' : 'All stops';
+});
+
+// Start with stop 214 loaded (paused), without moving the overview camera.
+loadStop(214, { fly: false, play: false });
+</script>
+</body>
+</html>

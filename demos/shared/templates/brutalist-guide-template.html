@@ -1,0 +1,254 @@
+<!--
+  Working EXAMPLE of the Brutalist Guide style pack (brutalist-guide.css,
+  in this same folder). Open this file directly to see the pattern working
+  with eight public brutalist buildings in Boston and Cambridge on the
+  Mapbox Standard style (monochrome theme, 3D buildings on): a numbered
+  index slab, a central map slab, and a spec-sheet slab with a hand-drawn
+  SVG massing elevation. Click a row or a numbered marker to fly there
+  (pitch 60, slow orbit until you touch the map), or press "Tour" to visit
+  every building in order. Copy the markup below into your own demo and
+  link brutalist-guide.css from its <head> -- see the class/id contract
+  documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (board-marked concrete, monumental slabs, cantilevered
+  panels, one safety-yellow signal) at the user's request for something
+  distinct from every other pack in this folder. The buildings are real
+  public landmarks with approximate coordinates; the years, architects,
+  storey counts and notes are illustrative and the massing drawings are
+  simplified sketches, not surveys -- swap in your own.
+
+  What's NOT included: photos, search/geocoding, routing, popups, or a
+  hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Brutalist Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Sometype+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="brutalist-guide.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+  .slab-map { overflow: hidden; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="slab site-head">
+    <div>
+      <h1>Concrete Boston</h1>
+      <div class="site-sub">A field guide to eight brutalist monuments</div>
+    </div>
+    <button class="btn btn-primary" id="tour-btn" type="button">Tour</button>
+  </header>
+
+  <nav class="slab slab-index" aria-label="Buildings">
+    <div class="slab-label">Index / 08</div>
+    <ol class="bldg-list" id="bldg-list"></ol>
+  </nav>
+
+  <main class="slab slab-map">
+    <div id="map"></div>
+  </main>
+
+  <aside class="slab slab-spec" aria-live="polite">
+    <div class="slab-label">Spec sheet</div>
+    <div class="spec-body" id="spec-body">
+      <div class="spec-num" id="sp-num">&mdash;</div>
+      <h2 class="spec-name" id="sp-name">Select a building</h2>
+      <div class="spec-grid">
+        <div class="spec-cell"><span class="k">Year</span><span class="v" id="sp-year">&mdash;</span></div>
+        <div class="spec-cell"><span class="k">Storeys</span><span class="v" id="sp-storeys">&mdash;</span></div>
+        <div class="spec-cell" style="grid-column: 1 / -1; border-right: 0;"><span class="k">Architect</span><span class="v" id="sp-arch">&mdash;</span></div>
+      </div>
+      <div class="elevation"><svg id="sp-elev" viewBox="0 0 120 64" role="img" aria-label="Simplified massing elevation"></svg></div>
+      <p class="note" id="sp-note">Pick a row or a numbered block on the map.</p>
+      <div class="status-note hidden" id="status-note" style="margin-top:14px"></div>
+    </div>
+  </aside>
+</div>
+
+<script>
+// Illustrative data. coord = [lng, lat] (approximate). Massing: m = solid
+// rects [x, y, w, h], v = voids (slits / openings), in a 120x64 viewBox
+// whose ground line sits at y = 56.
+const B = [
+  { name: 'Boston City Hall', coord: [-71.0580, 42.3604], bearing: 135, year: 1968, arch: 'Kallmann, McKinnell & Knowles', storeys: 9,
+    note: 'An inverted ziggurat: upper floors overhang the brick plaza like a stack of cantilevered trays.',
+    m: [[8,48,104,8],[30,36,60,12],[20,24,80,12],[12,10,96,14]], v: [[34,40,6,6],[50,40,6,6],[64,40,6,6],[78,40,6,6],[26,28,6,6],[42,28,6,6],[58,28,6,6],[74,28,6,6],[18,14,8,6],[36,14,8,6],[54,14,8,6],[72,14,8,6],[90,14,8,6]] },
+  { name: 'Government Service Center', coord: [-71.0630, 42.3620], bearing: 270, year: 1971, arch: 'Paul Rudolph et al.', storeys: 23,
+    note: 'A tower and low wings of ribbed, hammered concrete, its corduroy surface raked to catch the light.',
+    m: [[8,38,44,18],[52,6,28,50],[80,24,32,32]], v: [[58,10,4,44],[66,10,4,44],[74,10,4,44],[14,42,6,6],[28,42,6,6],[86,28,6,6],[100,28,6,6]] },
+  { name: 'Harbor Towers', coord: [-71.0504, 42.3584], bearing: 300, year: 1971, arch: 'Cheng & Pei', storeys: 40,
+    note: 'Three slabs stepping toward the waterfront, with deep-set windows cut into pale cast concrete.',
+    m: [[12,14,26,42],[48,6,26,50],[84,22,26,34]], v: [[18,18,3,34],[26,18,3,34],[54,10,3,42],[62,10,3,42],[90,26,3,26],[98,26,3,26]] },
+  { name: 'Christian Science Plaza', coord: [-71.0865, 42.3442], bearing: 150, year: 1973, arch: 'I. M. Pei & Partners', storeys: 28,
+    note: 'A tall administration slab and long low colonnade frame a vast reflecting pool and plaza.',
+    m: [[14,6,24,50],[38,40,74,16]], v: [[18,10,3,42],[26,10,3,42],[32,10,3,42],[44,44,6,12],[58,44,6,12],[72,44,6,12],[86,44,6,12],[100,44,6,12]] },
+  { name: 'Boston University Law Tower', coord: [-71.1069, 42.3512], bearing: 180, year: 1964, arch: 'Sert, Jackson & Associates', storeys: 17,
+    note: 'A slender tower with slot windows rises from a broad podium of exposed board-formed concrete.',
+    m: [[16,44,88,12],[42,6,36,38]], v: [[47,10,3,30],[55,10,3,30],[63,10,3,30],[71,10,3,30],[24,48,6,4],[90,48,6,4]] },
+  { name: 'MIT Wiesner Building', coord: [-71.0879, 42.3609], bearing: 220, year: 1985, arch: 'I. M. Pei & Partners', storeys: 6,
+    note: 'Stacked white cubes and shifting volumes house the media laboratories behind a gridded facade.',
+    m: [[8,30,38,26],[46,18,38,38],[84,38,28,18]], v: [[14,36,8,8],[28,36,8,8],[52,24,8,8],[68,24,8,8],[52,40,8,8],[68,40,8,8],[90,44,8,6]] },
+  { name: 'Carpenter Center', coord: [-71.1146, 42.3738], bearing: 90, year: 1962, arch: 'Le Corbusier', storeys: 4,
+    note: 'Lifted on slender pilotis, with a ramp that pierces the building and invites the street inside.',
+    m: [[14,22,92,12],[24,38,76,10],[22,48,5,8],[58,48,5,8],[92,48,5,8]], v: [[22,26,10,4],[44,26,10,4],[66,26,10,4],[88,26,10,4],[32,42,10,3],[56,42,10,3],[78,42,10,3]] },
+  { name: 'Harvard Science Center', coord: [-71.1167, 42.3765], bearing: 0, year: 1972, arch: 'Sert, Jackson & Associates', storeys: 9,
+    note: 'A stepped, terraced mass of concrete and glass, its tiers cascading down toward the yard.',
+    m: [[8,40,104,16],[24,28,72,12],[38,16,44,12]], v: [[14,46,8,6],[30,46,8,6],[46,46,8,6],[62,46,8,6],[78,46,8,6],[94,46,8,6],[34,32,8,4],[56,32,8,4],[44,20,8,4],[62,20,8,4]] },
+];
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const pad2 = (n) => String(n).padStart(2, '0');
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [-71.08, 42.364],
+  zoom: 11.6,
+  pitch: 30,
+  bearing: -12,
+  config: { basemap: { theme: 'monochrome', lightPreset: 'day', show3dObjects: true, showPointOfInterestLabels: false } },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'top-right');
+
+let sel = -1;
+let orbiting = false;
+let touring = false;
+let tourTimer = null;
+const rows = [];
+const blocks = [];
+
+// Fit padding is symmetric-ish: the panels are separate slabs, so only keep points off the logo corners.
+const FIT_PAD = { top: 60, bottom: 76, left: 40, right: 40 };
+
+function frameAll() {
+  const bounds = new mapboxgl.LngLatBounds();
+  B.forEach((b) => bounds.extend(b.coord));
+  map.fitBounds(bounds, { padding: FIT_PAD, pitch: 30, bearing: -12, duration: reduce ? 0 : 1200 });
+}
+
+// --- Orbit: slow rotateTo loop while selected; any user gesture stops it ---
+function orbit() {
+  if (!orbiting || reduce) return;
+  map.rotateTo((map.getBearing() + 90) % 360, { duration: 22000, easing: (t) => t });
+}
+function stopOrbit() {
+  orbiting = false;
+}
+map.on('moveend', () => { if (orbiting) orbit(); });
+['mousedown', 'touchstart', 'wheel'].forEach((ev) =>
+  map.getCanvas().addEventListener(ev, () => { stopOrbit(); stopTour(); }, { passive: true }));
+
+// --- Spec sheet ---
+function drawElevation(b) {
+  const rect = (r, cls) => `<rect class="${cls}" x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}"/>`;
+  $('sp-elev').innerHTML =
+    b.m.map((r) => rect(r, 'e-mass')).join('') +
+    b.v.map((r) => rect(r, 'e-void')).join('') +
+    '<rect class="e-ground" x="0" y="56" width="120" height="3"/>';
+}
+
+function fillSpec(i) {
+  const b = B[i];
+  $('sp-num').textContent = pad2(i + 1);
+  $('sp-name').textContent = b.name;
+  $('sp-year').textContent = b.year;
+  $('sp-storeys').textContent = b.storeys;
+  $('sp-arch').textContent = b.arch;
+  $('sp-note').textContent = b.note;
+  drawElevation(b);
+  const body = $('spec-body');
+  body.classList.remove('slide-in');
+  void body.offsetWidth; // restart the slide animation
+  body.classList.add('slide-in');
+}
+
+function select(i, fromTour) {
+  if (!fromTour) stopTour();
+  sel = i;
+  rows.forEach((r, k) => { r.classList.toggle('active', k === i); r.setAttribute('aria-current', k === i ? 'true' : 'false'); });
+  blocks.forEach((el, k) => el.classList.toggle('active', k === i));
+  fillSpec(i);
+  rows[i].scrollIntoView({ block: 'nearest' });
+
+  stopOrbit();
+  const opts = { center: B[i].coord, zoom: 16, pitch: 55, bearing: B[i].bearing };
+  if (reduce) {
+    map.jumpTo(opts);
+    return;
+  }
+  map.once('moveend', () => { orbiting = true; orbit(); });
+  map.flyTo({ ...opts, duration: 2400, essential: true });
+}
+
+// --- Tour ---
+const tourBtn = $('tour-btn');
+function stopTour() {
+  if (!touring) return;
+  touring = false;
+  clearTimeout(tourTimer);
+  tourBtn.textContent = 'Tour';
+}
+function tourStep(i) {
+  if (!touring) return;
+  if (i >= B.length) {
+    stopTour();
+    stopOrbit();
+    frameAll();
+    return;
+  }
+  select(i, true);
+  tourTimer = setTimeout(() => tourStep(i + 1), reduce ? 3500 : 7500);
+}
+tourBtn.addEventListener('click', () => {
+  if (touring) { stopTour(); return; }
+  touring = true;
+  tourBtn.textContent = 'Stop';
+  tourStep(0);
+});
+
+// --- Index rows and markers ---
+const list = $('bldg-list');
+B.forEach((b, i) => {
+  const li = document.createElement('li');
+  const row = document.createElement('button');
+  row.type = 'button';
+  row.className = 'bldg-row';
+  row.innerHTML = `<span class="num">${pad2(i + 1)}</span><span class="name"></span><span class="meta"></span>`;
+  row.querySelector('.name').textContent = b.name;
+  row.querySelector('.meta').textContent = `${b.year} / ${b.arch}`;
+  row.addEventListener('click', () => select(i));
+  li.appendChild(row);
+  list.appendChild(li);
+  rows.push(row);
+
+  // Marker root stays untouched; all styling lives on the inner .blk
+  const root = document.createElement('div');
+  root.className = 'blk-marker';
+  const blk = document.createElement('div');
+  blk.className = 'blk';
+  blk.textContent = pad2(i + 1);
+  root.appendChild(blk);
+  root.addEventListener('click', (e) => { e.stopPropagation(); select(i); });
+  new mapboxgl.Marker({ element: root }).setLngLat(b.coord).addTo(map);
+  blocks.push(blk);
+});
+
+map.on('load', frameAll);
+</script>
+</body>
+</html>

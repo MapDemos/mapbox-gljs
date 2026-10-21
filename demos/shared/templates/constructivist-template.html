@@ -1,0 +1,307 @@
+<!--
+  Working EXAMPLE of the Constructivist style pack (constructivist.css, in
+  this same folder). Open this file directly to see the pattern working
+  with six illustrative cycle routes across Berlin for a fictional "Ride
+  the City" campaign: a red diagonal band with a giant stacked headline, a
+  black circle that shows the network figures (and the selected route's
+  length and time at 15 km/h), the map in a tilted-looking frame, and a
+  column of route tickets. Click a ticket or a route line to select it --
+  the map fits the route, the circle updates and a wedge label slides in.
+  The toggle switches between "Show all" (others dimmed) and "One at a
+  time". Copy the markup below into your own demo and link
+  constructivist.css from its <head> -- see the class/id contract
+  documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (1920s avant-garde poster language, used purely as a
+  graphic style) at the user's request for something distinct from every
+  other pack in this folder. The campaign, route names and numbers are
+  illustrative placeholders; the route geometry was fetched once from the
+  Mapbox Directions API (cycling profile) between real Berlin places and
+  simplified.
+
+  What's NOT included: live routing, search/geocoding, elevation data
+  (times are distance / 15 km/h), popups, or a hard-coded access token
+  (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ride the City</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;900&family=Golos+Text:wght@400;500;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="constructivist.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: the map fills the frame's remaining height. */
+  #map { width: 100%; }
+</style>
+</head>
+<body>
+<main class="poster">
+  <div class="band" aria-hidden="true"></div>
+  <div class="band-2" aria-hidden="true"></div>
+  <div class="wedge" aria-hidden="true"></div>
+
+  <section class="poster-left">
+    <div>
+      <span class="kicker">Berlin &middot; Cycle network</span>
+      <h1 class="headline"><span>Ride</span><span>the</span><span>City</span></h1>
+    </div>
+    <div class="disc" role="status" aria-live="polite">
+      <div class="disc-title" id="d-title">Network</div>
+      <div class="disc-big" id="d-big">42.4</div>
+      <div class="disc-unit">km of lanes</div>
+      <div class="disc-row">
+        <div class="disc-stat"><b id="d-a">6</b><span id="d-a-l">Routes</span></div>
+        <div class="disc-stat"><b id="d-b">100%</b><span>of network</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="map-frame">
+    <div class="arrow-row"><div class="arrow-label hidden" id="arrow"></div></div>
+    <div id="map"></div>
+  </section>
+
+  <section class="poster-right">
+    <div class="toggle" role="group" aria-label="Route display">
+      <button class="toggle-btn" id="t-all" aria-pressed="true">Show all</button>
+      <button class="toggle-btn" id="t-one" aria-pressed="false">One at a time</button>
+    </div>
+    <div class="ticket-list" id="tickets"></div>
+    <div class="status-note loading" id="status"><span id="status-text">Loading map&hellip;</span></div>
+  </section>
+</main>
+
+<script>
+// Simplified cycling geometry from the Directions API (lng, lat)
+const ROUTES = [
+  { name: 'Tiergarten–Mitte', km: 6.3, line: [[13.3331,52.5073],[13.3325,52.5064],[13.3321,52.5064],[13.3312,52.5069],[13.3318,52.5075],[13.3329,52.5089],[13.3327,52.5091],[13.3301,52.5099],[13.3299,52.5101],[13.3312,52.5121],[13.3312,52.5123],[13.3307,52.5126],[13.3304,52.5129],[13.3305,52.5131],[13.3313,52.5132],[13.3317,52.5131],[13.3358,52.5133],[13.3366,52.5134],[13.3483,52.5142],[13.3486,52.5143],[13.349,52.5142],[13.3497,52.5139],[13.3502,52.5139],[13.3508,52.514],[13.3514,52.5145],[13.3696,52.5156],[13.3701,52.5157],[13.372,52.5159],[13.3768,52.5162],[13.3774,52.5161],[13.3773,52.517],[13.377,52.5176],[13.3772,52.5178],[13.3801,52.5181],[13.3805,52.518],[13.3807,52.5166],[13.3808,52.5165],[13.3811,52.5164],[13.3974,52.5175],[13.3975,52.5171],[13.398,52.5171]] },
+  { name: 'Kreuzberg–Neukölln', km: 5.9, line: [[13.411,52.5038],[13.4107,52.5038],[13.4104,52.5037],[13.4104,52.5035],[13.4107,52.5034],[13.4113,52.5035],[13.4119,52.5033],[13.4147,52.5013],[13.4141,52.5005],[13.4142,52.5003],[13.4176,52.4993],[13.4178,52.4989],[13.4181,52.4987],[13.4184,52.4987],[13.4189,52.4989],[13.4199,52.499],[13.4268,52.4991],[13.4388,52.495],[13.4388,52.4949],[13.4337,52.4898],[13.4304,52.4864],[13.4296,52.4855],[13.4295,52.4854],[13.4291,52.4854],[13.4289,52.4853],[13.4288,52.4845],[13.4286,52.4845],[13.4253,52.486],[13.4247,52.4863],[13.4246,52.4865],[13.4255,52.4875],[13.4258,52.4876],[13.4335,52.4849],[13.4399,52.4817],[13.4399,52.4815],[13.4386,52.4814],[13.4385,52.4812]] },
+  { name: 'Prenzlauer Berg–Alex', km: 4.5, line: [[13.402,52.543],[13.4034,52.5405],[13.4025,52.5402],[13.4025,52.54],[13.4043,52.5405],[13.4083,52.5413],[13.4126,52.5409],[13.4141,52.5407],[13.4143,52.5405],[13.4159,52.5366],[13.417,52.5353],[13.4194,52.5342],[13.4196,52.5341],[13.418,52.5327],[13.418,52.5325],[13.4195,52.5319],[13.4195,52.5318],[13.4184,52.5301],[13.4156,52.5271],[13.4155,52.5268],[13.4158,52.5267],[13.4178,52.5258],[13.4178,52.5257],[13.419,52.5253],[13.418,52.5245],[13.4177,52.5245],[13.4151,52.5224],[13.4149,52.5222],[13.4152,52.522],[13.4144,52.5216],[13.4141,52.5218],[13.4131,52.5213],[13.4128,52.5215],[13.4134,52.5218]] },
+  { name: 'Tempelhofer Feld loop', km: 12.2, line: [[13.4062,52.4858],[13.4071,52.4861],[13.4067,52.4853],[13.4062,52.4828],[13.4063,52.4826],[13.4073,52.4824],[13.4073,52.4823],[13.418,52.48],[13.4196,52.4799],[13.4209,52.4801],[13.4212,52.48],[13.4213,52.4797],[13.4215,52.4796],[13.4251,52.4801],[13.4253,52.48],[13.4253,52.4798],[13.4256,52.4798],[13.428,52.4801],[13.4282,52.48],[13.4286,52.4786],[13.4285,52.4785],[13.4261,52.4782],[13.4259,52.4783],[13.4257,52.4791],[13.4254,52.4792],[13.4236,52.479],[13.4235,52.4789],[13.4244,52.4759],[13.4243,52.4758],[13.4192,52.4752],[13.4191,52.4751],[13.4198,52.4724],[13.42,52.4721],[13.4203,52.4718],[13.4205,52.4711],[13.4201,52.4708],[13.4175,52.4704],[13.4158,52.4692],[13.4131,52.4683],[13.4112,52.4671],[13.4094,52.4664],[13.4082,52.4661],[13.4066,52.4658],[13.405,52.4657],[13.4036,52.4658],[13.4008,52.4661],[13.397,52.4671],[13.3936,52.4685],[13.3918,52.4697],[13.3876,52.4709],[13.3868,52.4713],[13.3866,52.4718],[13.3866,52.4735],[13.3864,52.4741],[13.3865,52.4761],[13.3866,52.4762],[13.3861,52.4762],[13.386,52.4764],[13.3861,52.4814],[13.3862,52.4821],[13.3862,52.483],[13.3861,52.4831],[13.3864,52.4832],[13.3874,52.4833],[13.3877,52.4834],[13.3881,52.4837],[13.3883,52.4843],[13.3931,52.484],[13.3942,52.4839],[13.3945,52.4839],[13.3946,52.4839],[13.3985,52.4839],[13.4001,52.4837],[13.4003,52.4838],[13.4015,52.4851],[13.4044,52.4851],[13.4062,52.4858]] },
+  { name: 'Spree riverside', km: 8.0, line: [[13.4455,52.5017],[13.4449,52.5012],[13.445,52.5012],[13.4469,52.5027],[13.4451,52.5032],[13.4419,52.5044],[13.4393,52.5054],[13.4385,52.5059],[13.4348,52.5086],[13.4326,52.5096],[13.427,52.5118],[13.4262,52.5123],[13.4243,52.5135],[13.4179,52.5157],[13.4162,52.5159],[13.4128,52.5158],[13.4089,52.5163],[13.4092,52.5169],[13.409,52.5172],[13.4058,52.5194],[13.4032,52.5213],[13.4029,52.5214],[13.4008,52.5207],[13.4003,52.5213],[13.4001,52.5214],[13.3976,52.522],[13.3975,52.5224],[13.398,52.5232],[13.3949,52.5239],[13.3946,52.5233],[13.3923,52.5236],[13.3878,52.5234],[13.3877,52.5239],[13.3767,52.5221],[13.3764,52.5222],[13.3759,52.5226],[13.3748,52.5231],[13.3731,52.5235],[13.3718,52.5236],[13.3705,52.5234],[13.3695,52.5231],[13.3686,52.5226],[13.3682,52.5226],[13.3682,52.5231],[13.3681,52.5233],[13.3664,52.5233],[13.3662,52.5234],[13.3662,52.524],[13.367,52.5243],[13.3683,52.5245],[13.3684,52.5246]] },
+  { name: 'Charlottenburg–Westend', km: 5.5, line: [[13.273,52.5088],[13.2736,52.509],[13.2738,52.5094],[13.2741,52.5093],[13.281,52.5098],[13.282,52.5099],[13.2817,52.5126],[13.281,52.5168],[13.2806,52.5178],[13.2806,52.5183],[13.2827,52.5184],[13.2829,52.5185],[13.2845,52.5186],[13.2853,52.5187],[13.29,52.519],[13.2901,52.5189],[13.2979,52.5194],[13.2984,52.5194],[13.2992,52.5195],[13.3,52.5194],[13.3172,52.5139],[13.3199,52.5134],[13.3207,52.5132],[13.3208,52.513],[13.3205,52.5126],[13.3206,52.5124],[13.3214,52.5121],[13.322,52.512],[13.3223,52.5121]] },
+];
+
+const RED = '#D7261E', BLACK = '#111111', CREAM = '#F2E8D5';
+const TOTAL = ROUTES.reduce((s, r) => s + r.km, 0);
+const MAXKM = Math.max(...ROUTES.map((r) => r.km));
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const PAD = matchMedia('(max-width: 760px)').matches
+  ? { top: 40, left: 24, right: 24, bottom: 64 }
+  : { top: 56, left: 56, right: 56, bottom: 72 }; // bottom clears the logo
+
+let selected = null;   // route number 1..6, or null
+let oneAtATime = false;
+
+const $ = (id) => document.getElementById(id);
+const pad = (n) => String(n).padStart(2, '0');
+const fmtKm = (k) => k.toFixed(1);
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  center: [13.405, 52.505],
+  zoom: 10.5,
+  attributionControl: true,
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+// ---------- tickets ----------
+ROUTES.forEach((r, i) => {
+  const b = document.createElement('button');
+  b.className = 'ticket';
+  b.dataset.n = i + 1;
+  b.innerHTML =
+    `<span class="ticket-no">${pad(i + 1)}</span>` +
+    `<span class="ticket-body"><span class="ticket-name">${r.name}</span>` +
+    `<span class="ticket-meta"><span class="ticket-len">${fmtKm(r.km)} km</span>` +
+    `<span class="ticket-bar"><i style="width:${(r.km / MAXKM) * 100}%"></i></span></span></span>`;
+  b.addEventListener('click', () => select(selected === i + 1 && !oneAtATime ? null : i + 1));
+  $('tickets').appendChild(b);
+});
+
+// ---------- basemap recolour: cream / grey / black (all guarded) ----------
+function recolour() {
+  const set = (id, kind, prop, val) => {
+    try { if (map.getLayer(id)) map[kind](id, prop, val); } catch (e) { /* ignore */ }
+  };
+  (map.getStyle().layers || []).forEach((l) => {
+    const id = l.id;
+    if (l.type === 'background') set(id, 'setPaintProperty', 'background-color', CREAM);
+    else if (l.type === 'fill' || l.type === 'fill-extrusion') {
+      if (/water/.test(id)) set(id, 'setPaintProperty', 'fill-color', '#CFCAC0');
+      else if (/building/.test(id)) set(id, 'setPaintProperty', 'fill-color', '#E2D6BD');
+      else if (/park|green|wood|grass|landcover|national|pitch|hillshade/.test(id)) set(id, 'setPaintProperty', 'fill-color', '#E8DDC6');
+      else set(id, 'setPaintProperty', 'fill-color', CREAM);
+    } else if (l.type === 'line') {
+      if (/waterway|water/.test(id)) set(id, 'setPaintProperty', 'line-color', '#CFCAC0');
+      else if (/road|bridge|tunnel/.test(id)) {
+        const major = /motorway|trunk|primary/.test(id);
+        const casing = /case|casing/.test(id);
+        set(id, 'setPaintProperty', 'line-color', casing ? CREAM : major ? BLACK : '#FFFFFF');
+        if (casing) set(id, 'setPaintProperty', 'line-opacity', 0);
+      } else if (/admin|boundary/.test(id)) set(id, 'setPaintProperty', 'line-color', '#8C8C8C');
+    } else if (l.type === 'symbol') {
+      if (/poi|transit|airport|rail|ferry/.test(id)) set(id, 'setLayoutProperty', 'visibility', 'none');
+      else {
+        set(id, 'setPaintProperty', 'text-color', BLACK);
+        set(id, 'setPaintProperty', 'text-halo-color', CREAM);
+        set(id, 'setPaintProperty', 'text-halo-width', 1.2);
+      }
+    }
+  });
+}
+
+// ---------- route layers ----------
+function addRoutes() {
+  map.addSource('routes', {
+    type: 'geojson',
+    data: {
+      type: 'FeatureCollection',
+      features: ROUTES.map((r, i) => ({
+        type: 'Feature', properties: { n: i + 1 },
+        geometry: { type: 'LineString', coordinates: r.line },
+      })),
+    },
+  });
+  map.addSource('badges', {
+    type: 'geojson',
+    data: {
+      type: 'FeatureCollection',
+      features: ROUTES.map((r, i) => ({
+        type: 'Feature', properties: { n: i + 1, t: String(i + 1) },
+        geometry: { type: 'Point', coordinates: r.line[Math.floor(r.line.length / 2)] },
+      })),
+    },
+  });
+  const z = (a, b) => ['interpolate', ['linear'], ['zoom'], 10, a * 0.9, 11, a, 15, b];
+  map.addLayer({ id: 'routes-casing', type: 'line', source: 'routes',
+    layout: { 'line-cap': 'butt', 'line-join': 'round' },
+    paint: { 'line-color': CREAM, 'line-width': z(7, 15), 'line-opacity': 0.9 } });
+  map.addLayer({ id: 'routes-line', type: 'line', source: 'routes',
+    layout: { 'line-cap': 'butt', 'line-join': 'round' },
+    paint: { 'line-color': BLACK, 'line-width': z(4.5, 9) } });
+  map.addLayer({ id: 'routes-sel-casing', type: 'line', source: 'routes', filter: ['==', ['get', 'n'], 0],
+    layout: { 'line-cap': 'butt', 'line-join': 'round' },
+    paint: { 'line-color': BLACK, 'line-width': z(12, 20) } });
+  map.addLayer({ id: 'routes-sel', type: 'line', source: 'routes', filter: ['==', ['get', 'n'], 0],
+    layout: { 'line-cap': 'butt', 'line-join': 'round' },
+    paint: { 'line-color': RED, 'line-width': z(8, 14) } });
+  map.addLayer({ id: 'badges', type: 'circle', source: 'badges',
+    paint: { 'circle-radius': 12, 'circle-color': BLACK, 'circle-stroke-color': CREAM, 'circle-stroke-width': 3 } });
+  map.addLayer({ id: 'badges-text', type: 'symbol', source: 'badges',
+    layout: { 'text-field': ['get', 't'], 'text-size': 13, 'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'], 'text-allow-overlap': true },
+    paint: { 'text-color': CREAM } });
+
+  map.on('click', 'routes-line', (e) => select(e.features[0].properties.n));
+  map.on('click', 'badges', (e) => select(e.features[0].properties.n));
+  ['routes-line', 'badges'].forEach((id) => {
+    map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', id, () => { map.getCanvas().style.cursor = ''; });
+  });
+}
+
+// ---------- state -> map + poster ----------
+function paintRoutes() {
+  const sel = selected || 0;
+  const isSel = ['==', ['get', 'n'], sel];
+  // nothing selected: alternate red/black; selected: red, others black
+  map.setPaintProperty('routes-line', 'line-color',
+    selected ? ['case', isSel, RED, BLACK] : ['case', ['==', ['%', ['get', 'n'], 2], 1], RED, BLACK]);
+  map.setPaintProperty('routes-line', 'line-opacity',
+    !selected ? 1 : oneAtATime ? ['case', isSel, 1, 0] : ['case', isSel, 1, 0.4]);
+  map.setPaintProperty('routes-casing', 'line-opacity',
+    !selected ? 0.9 : oneAtATime ? ['case', isSel, 0.9, 0] : ['case', isSel, 0.9, 0.35]);
+  map.setFilter('routes-sel', ['==', ['get', 'n'], sel]);
+  map.setFilter('routes-sel-casing', ['==', ['get', 'n'], sel]);
+  map.setPaintProperty('badges', 'circle-color', ['case', isSel, RED, BLACK]);
+  map.setPaintProperty('badges', 'circle-opacity', !selected ? 1 : oneAtATime ? ['case', isSel, 1, 0] : 1);
+  map.setPaintProperty('badges', 'circle-stroke-opacity', !selected ? 1 : oneAtATime ? ['case', isSel, 1, 0] : 1);
+  map.setPaintProperty('badges-text', 'text-opacity', !selected ? 1 : oneAtATime ? ['case', isSel, 1, 0] : 1);
+}
+
+function fitAll(instant) {
+  const b = new mapboxgl.LngLatBounds();
+  ROUTES.forEach((r) => r.line.forEach((c) => b.extend(c)));
+  map.fitBounds(b, { padding: PAD, duration: REDUCED || instant ? 0 : 900 });
+}
+
+function fitRoute(n) {
+  const b = new mapboxgl.LngLatBounds();
+  ROUTES[n - 1].line.forEach((c) => b.extend(c));
+  map.fitBounds(b, { padding: PAD, duration: REDUCED ? 0 : 900, maxZoom: 15 });
+}
+
+function updateDisc() {
+  if (!selected) {
+    $('d-title').textContent = 'Network';
+    $('d-big').textContent = fmtKm(TOTAL);
+    $('d-a').textContent = ROUTES.length;
+    $('d-a-l').textContent = 'Routes';
+    $('d-b').textContent = '100%';
+    return;
+  }
+  const r = ROUTES[selected - 1];
+  $('d-title').textContent = 'Route ' + pad(selected);
+  $('d-big').textContent = fmtKm(r.km);
+  $('d-a').textContent = Math.round((r.km / 15) * 60);
+  $('d-a-l').textContent = 'min @ 15 km/h';
+  $('d-b').textContent = Math.round((r.km / TOTAL) * 100) + '%';
+}
+
+function updateArrow() {
+  const el = $('arrow');
+  if (!selected) { el.classList.add('hidden'); el.classList.remove('go'); return; }
+  el.innerHTML = `<em>${pad(selected)}</em>${ROUTES[selected - 1].name}`;
+  el.classList.remove('hidden', 'go');
+  void el.offsetWidth; // restart the slide-in animation
+  el.classList.add('go');
+}
+
+function select(n) {
+  selected = n;
+  document.querySelectorAll('.ticket').forEach((t) => t.classList.toggle('is-active', Number(t.dataset.n) === n));
+  paintRoutes();
+  updateDisc();
+  updateArrow();
+  if (n) fitRoute(n); else fitAll();
+  setStatus(n ? `Route ${pad(n)} selected: ${fmtKm(ROUTES[n - 1].km)} km.` : 'Click a ticket or a line to pick a route.');
+}
+
+function setMode(one) {
+  oneAtATime = one;
+  $('t-all').setAttribute('aria-pressed', String(!one));
+  $('t-one').setAttribute('aria-pressed', String(one));
+  if (one && !selected) select(1); else { paintRoutes(); }
+}
+$('t-all').addEventListener('click', () => setMode(false));
+$('t-one').addEventListener('click', () => setMode(true));
+
+function setStatus(text, cls = 'success') {
+  const s = $('status');
+  s.className = 'status-note ' + cls;
+  $('status-text').textContent = text;
+}
+
+map.on('error', (e) => {
+  if (!map.isStyleLoaded()) setStatus('Map failed to load. Check the access token.', 'error');
+});
+
+map.on('load', () => {
+  recolour();
+  addRoutes();
+  paintRoutes();
+  updateDisc();
+  fitAll(true);
+  setStatus('Click a ticket or a line to pick a route.');
+});
+</script>
+</body>
+</html>

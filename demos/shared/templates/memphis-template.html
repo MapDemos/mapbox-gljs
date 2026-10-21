@@ -1,0 +1,326 @@
+<!--
+  Working EXAMPLE of the Memphis style pack (memphis.css, in this same
+  folder). Open this file directly to see the pattern working: a fictional
+  design-week venue guide ("Salone Fuori Festival", Milan) on Mapbox
+  Standard (faded theme, day preset, cobalt-light water, mint greenspace,
+  white roads). Pick a day with the chunky pills to filter both the map
+  markers and the venue cards; click a card or marker to fly there and open
+  a patterned popup; toggle "Plan my route" to join the day's venues, in
+  time order, with a fat zigzag line. Markers are geometric shapes by venue
+  type (circle = talk, triangle = exhibition, square = party, squiggle =
+  workshop). Copy the markup below into your own demo and link memphis.css
+  from its <head> -- see the class/id contract documented at the top of that
+  CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (1980s Memphis maximalism) at the user's request for
+  something distinct from every other pack in this folder. The festival and
+  all venue names, times and descriptions are fictional placeholders; the
+  districts are real and the venue points are hand-approximated.
+
+  What's NOT included: real event data, search/geocoding, street routing
+  (the route is straight legs between stops), or a hard-coded access token
+  (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Salone Fuori Festival</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Darker+Grotesque:wght@500;600;700;800&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="memphis.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="title-block">
+    <span class="title-stamp">Free<br>entry</span>
+    <h1 class="title">Salone <em>Fuori</em> Festival</h1>
+    <p class="title-sub">Milano venue guide &middot; 7 districts &middot; 12 venues</p>
+  </header>
+
+  <div class="deco deco-top" aria-hidden="true">
+    <span class="shape shape-cyl" style="left:6%;top:14%"></span>
+    <span class="shape shape-tri" style="left:46%;top:2%;rotate:12deg"></span>
+    <span class="shape shape-ring" style="right:4%;top:36%"></span>
+    <span class="shape shape-squig" style="left:12%;bottom:6%;rotate:-6deg"></span>
+  </div>
+
+  <div class="day-bar">
+    <span class="day-label">Pick a day</span>
+    <div class="pills" id="pills" role="group" aria-label="Day of the week"></div>
+    <button class="btn" id="route-btn" aria-pressed="false">Plan my route</button>
+  </div>
+
+  <div class="map-wrap">
+    <div id="map"></div>
+  </div>
+
+  <aside class="aside">
+    <div class="panel">
+      <h2>Shape code</h2>
+      <ul class="legend" id="legend"></ul>
+    </div>
+    <div class="panel">
+      <h2 id="day-title">Friday</h2>
+      <p id="day-sum"></p>
+      <p class="route-readout hidden" id="route-readout"></p>
+      <p style="margin-top:10px"><span class="status-note loading" id="status-note">Loading map</span></p>
+    </div>
+    <div class="deco deco-aside" aria-hidden="true">
+      <span class="shape shape-cone" style="left:8%;top:6%;rotate:-8deg"></span>
+      <span class="shape shape-half" style="left:38%;top:34%"></span>
+      <span class="shape shape-tri" style="right:6%;bottom:4%;rotate:-14deg"></span>
+      <span class="shape shape-squig" style="left:2%;bottom:10%"></span>
+    </div>
+  </aside>
+
+  <section class="cards" id="cards" aria-label="Venues"></section>
+</main>
+
+<script>
+const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+const DAY_NAMES = { MON: 'Monday', TUE: 'Tuesday', WED: 'Wednesday', THU: 'Thursday', FRI: 'Friday', SAT: 'Saturday', SUN: 'Sunday' };
+const TYPES = {
+  talk: { label: 'Talk', color: '#2F5BFF' },
+  exhibit: { label: 'Exhibition', color: '#FFE45C' },
+  party: { label: 'Party', color: '#FF5A3C' },
+  workshop: { label: 'Workshop', color: '#FF8AC6' },
+};
+// Fictional venues on real districts: coord [lng, lat], opening time, days.
+const VENUES = [
+  { id: 1, name: 'Cortile dei Pesci', type: 'exhibit', area: 'Brera', coord: [9.1890, 45.4715], time: '10:00', days: ['MON', 'TUE', 'WED', 'THU', 'FRI'], text: 'Courtyard show of fish-shaped lamps in pastel resin.' },
+  { id: 2, name: 'Atelier Tre Cerchi', type: 'workshop', area: 'Brera', coord: [9.1822, 45.4765], time: '11:00', days: ['MON', 'WED', 'SAT'], text: 'Hands-on terrazzo casting. Bring an apron.' },
+  { id: 3, name: 'Officina Zigzag', type: 'exhibit', area: 'Tortona', coord: [9.1600, 45.4510], time: '12:00', days: ['TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'], text: 'Furniture with wobbly legs and loud laminates.' },
+  { id: 4, name: 'Hangar Coriandoli', type: 'party', area: 'Tortona', coord: [9.1700, 45.4495], time: '21:00', days: ['FRI', 'SAT'], text: 'Confetti cannons, synth DJs, a very long buffet.' },
+  { id: 5, name: 'Sala Terrazzo', type: 'talk', area: 'Tortona', coord: [9.1655, 45.4535], time: '15:00', days: ['MON', 'TUE', 'THU', 'SUN'], text: 'Panel: is more really more? Seats are speckled.' },
+  { id: 6, name: 'Fabbrica Isola', type: 'workshop', area: 'Isola', coord: [9.1880, 45.4875], time: '10:30', days: ['TUE', 'THU', 'SUN'], text: 'Build a lamp from cones, cylinders and tape.' },
+  { id: 7, name: 'Radio Cono', type: 'party', area: 'Isola', coord: [9.1855, 45.4925], time: '22:00', days: ['THU', 'FRI', 'SAT'], text: 'Late-night listening bar under a giant cone.' },
+  { id: 8, name: 'Teatro Piccolo Triangolo', type: 'talk', area: 'Porta Venezia', coord: [9.2080, 45.4760], time: '18:00', days: ['WED', 'FRI', 'SUN'], text: 'Evening talks on colour, pattern and bad taste.' },
+  { id: 9, name: 'Giardino Pastello', type: 'exhibit', area: 'Porta Venezia', coord: [9.2000, 45.4722], time: '14:00', days: ['SAT', 'SUN', 'MON'], text: 'Outdoor sculptures in sorbet colours, free to roam.' },
+  { id: 10, name: 'Binario Nove', type: 'party', area: 'Centrale', coord: [9.2040, 45.4855], time: '23:00', days: ['SAT', 'SUN'], text: 'Platform-side closing party with live squiggle VJs.' },
+  { id: 11, name: 'Studio NoLo Colori', type: 'workshop', area: 'NoLo', coord: [9.2175, 45.4870], time: '16:00', days: ['MON', 'TUE', 'WED', 'FRI'], text: 'Screen-print your own zigzag tote bag.' },
+  { id: 12, name: 'Sala Ventura Talks', type: 'talk', area: 'Ventura / Lambrate', coord: [9.2370, 45.4845], time: '13:00', days: ['WED', 'THU', 'FRI', 'SAT', 'SUN'], text: 'Lunchtime lightning talks from young studios.' },
+];
+
+const $ = (id) => document.getElementById(id);
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const FRAME = { top: 80, bottom: 80, left: 60, right: 60 };   // keeps points off logo/attribution
+
+function shapeSVG(type) {
+  const c = TYPES[type].color, s = 'stroke="#111" stroke-width="4" stroke-linejoin="round"';
+  const inner = {
+    talk: `<circle cx="16" cy="16" r="12" fill="${c}" ${s}/>`,
+    exhibit: `<polygon points="16,3 29.5,28 2.5,28" fill="${c}" ${s}/>`,
+    party: `<rect x="5" y="5" width="22" height="22" fill="${c}" ${s}/>`,
+    workshop: `<path d="M3 21Q9 5 16 16T29 11" fill="none" stroke="#111" stroke-width="9.5" stroke-linecap="round"/><path d="M3 21Q9 5 16 16T29 11" fill="none" stroke="${c}" stroke-width="4.5" stroke-linecap="round"/>`,
+  }[type];
+  return `<svg viewBox="0 0 32 32" aria-hidden="true">${inner}</svg>`;
+}
+
+/* ---- Map ---- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [9.195, 45.473],
+  zoom: 11.6,
+  config: {
+    basemap: {
+      theme: 'faded',
+      lightPreset: 'day',
+      showPointOfInterestLabels: false,
+      showTransitLabels: false,
+      colorWater: '#8FB0FF',
+      colorGreenspace: '#6EE7C8',
+      colorRoads: '#FFFFFF',
+      colorMotorways: '#FFFFFF',
+      colorTrunks: '#FFFFFF',
+    },
+  },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+let day = 'FRI';
+let selected = null;
+let routeOn = false;
+let styleReady = false;
+const popup = new mapboxgl.Popup({ className: 'memphis-popup', maxWidth: '250px', offset: 24, closeButton: true });
+popup.on('close', () => { selected = null; paintSelection(); });
+
+const markers = VENUES.map((v) => {
+  const el = document.createElement('div');
+  el.innerHTML = `<div class="mk" role="button" aria-label="${v.name}">${shapeSVG(v.type)}<span class="mk-n"></span></div>`;
+  el.addEventListener('click', (e) => { e.stopPropagation(); select(v.id); });
+  return new mapboxgl.Marker({ element: el }).setLngLat(v.coord);
+});
+
+// Zigzag line-pattern tile: black outline + tomato stroke, drawn at 2x.
+function zigzagImage() {
+  const c = document.createElement('canvas');
+  c.width = 80; c.height = 48;
+  const g = c.getContext('2d');
+  g.lineJoin = 'round'; g.lineCap = 'butt';
+  const pts = [[0, 12], [20, 36], [40, 12], [60, 36], [80, 12]];
+  [['#111', 14], ['#FF5A3C', 6]].forEach(([col, w]) => {
+    g.strokeStyle = col; g.lineWidth = w; g.beginPath();
+    pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+    g.stroke();
+  });
+  return g.getImageData(0, 0, 80, 48);
+}
+
+map.on('style.load', () => {
+  map.addImage('zigzag', zigzagImage(), { pixelRatio: 2 });
+  map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: 'route-zigzag', type: 'line', source: 'route', slot: 'top',
+    layout: { 'line-join': 'round' },
+    paint: { 'line-pattern': 'zigzag', 'line-width': 24, 'line-emissive-strength': 1 },
+  });
+  styleReady = true;
+  updateRoute();
+});
+
+map.on('load', () => {
+  const n = $('status-note');
+  n.className = 'status-note success';
+  n.textContent = 'Map ready';
+});
+
+map.on('error', (e) => {
+  const n = $('status-note');
+  if (n.classList.contains('success')) return;
+  n.className = 'status-note error';
+  n.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+/* ---- Day filtering ---- */
+const dayVenues = () => VENUES.filter((v) => v.days.includes(day)).sort((a, b) => a.time.localeCompare(b.time));
+
+function hav(a, b) {
+  const R = 6371, r = Math.PI / 180;
+  const dLat = (b[1] - a[1]) * r, dLng = (b[0] - a[0]) * r;
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * r) * Math.cos(b[1] * r) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+function fitDay(list) {
+  if (!list.length) return;
+  const b = list.reduce((bb, v) => bb.extend(v.coord), new mapboxgl.LngLatBounds(list[0].coord, list[0].coord));
+  map.fitBounds(b, { padding: FRAME, maxZoom: 14, duration: reduce ? 0 : 900 });
+}
+
+function renderDay(fit) {
+  const list = dayVenues();
+  popup.remove();
+  selected = null;
+  document.querySelectorAll('.pill').forEach((p) => p.setAttribute('aria-pressed', String(p.dataset.day === day)));
+  $('day-title').textContent = DAY_NAMES[day];
+  $('day-sum').textContent = `${list.length} venues open, ${list[0].time} to late.`;
+
+  markers.forEach((m, i) => {
+    if (list.includes(VENUES[i])) m.addTo(map); else m.remove();
+  });
+
+  $('cards').innerHTML = list.map((v) => {
+    const idx = VENUES.indexOf(v);
+    return `<div class="card" role="button" tabindex="0" data-id="${v.id}">
+      <div class="card-head pat-${(idx % 5) + 1}">${shapeSVG(v.type)}<span class="card-type">${TYPES[v.type].label}</span></div>
+      <div class="card-body">
+        <h3 class="card-name">${v.name}</h3>
+        <p class="card-meta">${v.area} &middot; ${v.time}</p>
+        <p class="card-text">${v.text}</p>
+        <div class="card-days">${DAYS.map((d) => `<span class="day-chip${d === day ? ' on' : ''}">${d}</span>`).join('')}</div>
+      </div></div>`;
+  }).join('');
+
+  updateRoute();
+  if (fit) fitDay(list);
+}
+
+function updateRoute() {
+  const list = dayVenues();
+  markers.forEach((m, i) => {
+    const mk = m.getElement().querySelector('.mk');
+    const n = list.indexOf(VENUES[i]) + 1;
+    mk.classList.toggle('routed', routeOn && n > 0);
+    mk.querySelector('.mk-n').textContent = n || '';
+  });
+  const ro = $('route-readout');
+  ro.classList.toggle('hidden', !routeOn);
+  if (routeOn) {
+    let km = 0;
+    for (let i = 1; i < list.length; i++) km += hav(list[i - 1].coord, list[i].coord);
+    ro.textContent = `${list.length} stops, ${km.toFixed(1)} km as the crow flies`;
+  }
+  if (!styleReady) return;
+  const feats = routeOn && list.length > 1
+    ? [{ type: 'Feature', geometry: { type: 'LineString', coordinates: list.map((v) => v.coord) } }] : [];
+  map.getSource('route').setData({ type: 'FeatureCollection', features: feats });
+}
+
+/* ---- Selection: popup + fly ---- */
+function paintSelection() {
+  markers.forEach((m, i) => m.getElement().querySelector('.mk').classList.toggle('on', VENUES[i].id === selected));
+  document.querySelectorAll('.card').forEach((c) => c.classList.toggle('on', Number(c.dataset.id) === selected));
+}
+
+function select(id) {
+  const v = VENUES.find((x) => x.id === id);
+  selected = id;
+  paintSelection();
+  popup.remove();
+  popup.setLngLat(v.coord).setHTML(
+    `<div class="pop-head pat-${(VENUES.indexOf(v) % 5) + 1}"></div><div class="pop-body">
+      <h3 class="pop-name">${v.name}</h3>
+      <p class="pop-meta">${TYPES[v.type].label} &middot; ${v.area} &middot; ${v.time}</p>
+      <p class="pop-text">${v.text}</p>
+      <div class="pop-days">${DAYS.map((d) => `<span class="day-chip${v.days.includes(d) ? ' on' : ''}">${d}</span>`).join('')}</div>
+    </div>`).addTo(map);
+  const wrap = document.querySelector('.map-wrap').getBoundingClientRect();
+  if (wrap.top < 0 || wrap.bottom > window.innerHeight) {
+    $('map').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+  }
+  const opts = { center: v.coord, zoom: Math.max(map.getZoom(), 14.3), offset: [0, 90] };
+  if (reduce) map.jumpTo(opts); else map.flyTo({ ...opts, duration: 1600 });
+}
+
+/* ---- Wiring ---- */
+$('pills').innerHTML = DAYS.map((d) =>
+  `<button class="pill" data-day="${d}" aria-pressed="false">${d}<small>${VENUES.filter((v) => v.days.includes(d)).length}</small></button>`).join('');
+$('pills').addEventListener('click', (e) => {
+  const b = e.target.closest('.pill');
+  if (b) { day = b.dataset.day; renderDay(true); }
+});
+$('cards').addEventListener('click', (e) => {
+  const c = e.target.closest('.card');
+  if (c) select(Number(c.dataset.id));
+});
+$('cards').addEventListener('keydown', (e) => {
+  const c = e.target.closest('.card');
+  if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); select(Number(c.dataset.id)); }
+});
+$('route-btn').addEventListener('click', () => {
+  routeOn = !routeOn;
+  $('route-btn').setAttribute('aria-pressed', String(routeOn));
+  updateRoute();
+});
+$('legend').innerHTML = Object.keys(TYPES).map((t) =>
+  `<li class="legend-item">${shapeSVG(t)}${TYPES[t].label}</li>`).join('');
+
+renderDay(false);
+fitDay(dayVenues());
+</script>
+</body>
+</html>
