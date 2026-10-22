@@ -1,0 +1,507 @@
+/*
+  Treasure Hunt -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a family pirate scavenger hunt -- torn
+  parchment, X-marks-the-spot, a dotted trail, a compass rose, red wax
+  seals and cartoon props, playful but legible for kids), deliberately
+  distinct from every other pack in this folder: Academic Paper, Aero
+  Gadgets, Amber Terminal, Arena, Atomic Motel, Audio Guide, Aurora
+  Command, Blueprint, Board Game, Bottom Sheet, Broadcast, Brutalist
+  Guide, Case Board, Celestial Tarot, Chalkboard, Chat Concierge,
+  Chronicle, Clinic Finder, Comic Panel, Constructivist, Data Notebook,
+  Deco Voyage, Drop Culture, E-Ink, Editorial Paper, Estate Luxe, Event
+  Invite, Field Journal, Fleet Ops, Frontier Poster, Highway Sign,
+  Isotype, Line Diagram, Memphis, Moving Map, Neon HUD, Nordic Cabin,
+  Papercraft, Pastel Bento, Pixel Quest, Postcards, Raw Web, Retro OS, Riso
+  Zine, Ski Piste, Slate Console, Soft UI, Split Flap, Stained Glass,
+  Sticker Book, Storefront, Story Scroll, Swiss Grid, Tarmac Glass,
+  Thermal Receipt, Trailhead, Trip Kanban, Vapor Sunset, Vintage Chart,
+  Washi Seasons, Weather Console, Whiteboard and Zellige; and also distinct
+  from the 19 sibling packs being built in parallel right now: Ukiyo-e
+  Coast, Herbarium, Film Noir, Dive Log, Illuminated, Stage Profile, Tiki
+  Lagoon, Rally Dash, Grand Hotel, Orienteering, Museum Label, Regatta,
+  Code Editor, Watercolor, Annual Report, Truck Art, Papel Picado, Vinyl
+  Crate and Art Nouveau.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/treasure-hunt.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Pirata One for headings, Andika
+  for body copy):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Andika:wght@400;700&display=swap" rel="stylesheet" />
+
+  Signature touch: the map sits in a torn-parchment frame (the ragged
+  edge is a clip-path on the FRAME only -- the map rectangle inside stays
+  straight, so the Mapbox logo and attribution are never cut) beside a
+  rolled clue scroll whose locked clues are shut with red wax seals.
+
+  Class/id contract (see treasure-hunt-template.html in this folder for a
+  full working example):
+
+  - .app                      page shell: 2-col grid (map ~65% / scroll
+                               ~35%) on desktop, stacked on phones
+  - .map-frame                torn-parchment frame (clip-path) with a
+                               drop-shadow wrapper
+    .map-wrap                   straight-edged box holding #map (the demo
+                                 positions #map to fill it)
+    .compass-rose               decorative SVG, top-left of .map-wrap
+    .burst-layer                pointer-events:none layer for coin bursts
+  - .hunt-marker              (root of a mapboxgl.Marker -- never styled
+                               with position/transform) containing
+    .hm-inner                   the styled child; +.is-x (red X) or
+                                 +.is-coin (gold coin); .hm-label caption
+  - .scroll                   the clue scroll panel
+    .scroll-roll (.top/.bottom)  rolled paper ends
+    .scroll-body               flex column: .hunt-head, .meter,
+                                .actions, .clue-list
+    .hunt-head h1 / .eyebrow    title + "Clue 3 of 6" line
+    .meter                      treasure-chest progress: svg.chest,
+                                 .coins > .coin(.filled)
+    .actions                    .btn .btn-primary (We found it!),
+                                 .btn .btn-secondary (Reset)
+    .clue-list > .clue-card     +.is-solved / .is-current / .is-locked;
+                                 .clue-num, .clue-title, .clue-text,
+                                 .seal (wax seal, +.breaking)
+  - .status-note              playful status line (+.success/.loading/.error)
+  - svg.sprite                zero-size inline sprite holding <symbol>s
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --parchment: #F1DDB0;
+  --parchment-light: #F8EBCB;
+  --parchment-deep: #E3C98E;
+  --burnt: #8B5A2B;
+  --sea: #1D7A8C;
+  --sea-deep: #14596A;
+  --sea-light: #8CCBD5;
+  --gold: #F4B942;
+  --gold-deep: #C8861A;
+  --red: #C0392B;
+  --red-deep: #922B21;
+  --ink: #3B2614;
+  --ink-soft: #6B4A2E;
+  --jungle: #4E8B3A;
+
+  --font-heading: 'Pirata One', 'Georgia', serif;
+  --font-body: 'Andika', 'Trebuchet MS', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; height: 100%; }
+
+body {
+  font-family: var(--font-body);
+  color: var(--ink);
+  background-color: var(--sea-deep);
+  /* Gentle wave pattern: the sea the parchment lies on. */
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='40'%3E%3Cpath d='M0 20 Q10 10 20 20 T40 20 T60 20 T80 20' fill='none' stroke='%231D7A8C' stroke-width='3' opacity='.55'/%3E%3C/svg%3E");
+}
+
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.hidden { display: none !important; }
+
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* ---------- Page shell ---------- */
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 65fr) minmax(0, 35fr);
+  gap: 18px;
+  height: 100dvh;
+  padding: 16px;
+}
+
+/* ---------- Torn-parchment map frame ---------- */
+.map-frame {
+  min-width: 0;
+  min-height: 0;
+  /* The shadow lives on this wrapper; the ragged clip lives on .map-paper. */
+  filter: drop-shadow(0 8px 10px rgba(10, 40, 50, 0.55));
+}
+
+.map-paper {
+  position: relative;
+  height: 100%;
+  padding: 18px;
+  background:
+    radial-gradient(ellipse at 20% 10%, rgba(255, 255, 255, 0.35), transparent 55%),
+    radial-gradient(ellipse at 90% 95%, rgba(139, 90, 43, 0.35), transparent 50%),
+    var(--parchment);
+  /* Irregular torn edge: jitter stays within 10px, padding is 18px, so the
+     straight map rectangle inside is never touched. */
+  clip-path: polygon(0% 3px, 4% 4px, 8% 7px, 12% 0px, 16% 2px, 20% 5px, 24% 2px, 28% 3px, 32% 8px, 36% 0px, 40% 5px, 44% 6px, 48% 0px, 52% 2px, 56% 7px, 60% 7px, 64% 2px, 68% 6px, 72% 2px, 76% 5px, 80% 7px, 84% 0px, 88% 8px, 92% 2px, 96% 6px, 100% 8px, calc(100% - 0px) 6%, calc(100% - 8px) 12%, calc(100% - 8px) 18%, calc(100% - 7px) 24%, calc(100% - 0px) 30%, calc(100% - 6px) 36%, calc(100% - 0px) 42%, calc(100% - 5px) 48%, calc(100% - 4px) 54%, calc(100% - 9px) 60%, calc(100% - 7px) 66%, calc(100% - 4px) 72%, calc(100% - 5px) 78%, calc(100% - 2px) 84%, calc(100% - 8px) 90%, calc(100% - 9px) 96%, 100% calc(100% - 5px), 96% calc(100% - 4px), 92% calc(100% - 2px), 88% calc(100% - 8px), 84% calc(100% - 8px), 80% calc(100% - 6px), 76% calc(100% - 3px), 72% calc(100% - 2px), 68% calc(100% - 5px), 64% calc(100% - 2px), 60% calc(100% - 8px), 56% calc(100% - 0px), 52% calc(100% - 8px), 48% calc(100% - 6px), 44% calc(100% - 1px), 40% calc(100% - 5px), 36% calc(100% - 7px), 32% calc(100% - 3px), 28% calc(100% - 1px), 24% calc(100% - 8px), 20% calc(100% - 1px), 16% calc(100% - 3px), 12% calc(100% - 9px), 8% calc(100% - 6px), 4% calc(100% - 4px), 0% calc(100% - 6px), 2px 96%, 8px 90%, 9px 84%, 5px 78%, 1px 72%, 3px 66%, 1px 60%, 9px 54%, 8px 48%, 2px 42%, 2px 36%, 5px 30%, 7px 24%, 4px 18%, 3px 12%, 4px 6%);
+}
+
+.map-wrap {
+  position: relative;
+  height: 100%;
+  border: 3px solid var(--burnt);
+  border-radius: 2px;
+  background: var(--sea-light);
+  box-shadow: inset 0 0 0 2px var(--parchment-light);
+}
+
+.compass-rose {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 84px;
+  height: 84px;
+  z-index: 2;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 2px rgba(59, 38, 20, 0.45));
+}
+
+.burst-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.burst-coin {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #FFE59A, var(--gold) 55%, var(--gold-deep));
+  border: 2px solid var(--ink);
+}
+
+/* ---------- Map markers (styled child only; root is left alone) ---------- */
+.hunt-marker { width: 38px; height: 38px; cursor: pointer; }
+
+.hm-inner {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 3px solid var(--ink);
+  background: var(--parchment-light);
+  box-shadow: 0 3px 6px rgba(59, 38, 20, 0.5);
+  animation: hm-pop 0.5s cubic-bezier(.2, 1.6, .4, 1) both;
+}
+
+.hm-inner.is-x::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  border: 3px dashed var(--red);
+  animation: hm-pulse 1.6s ease-in-out infinite;
+}
+
+.hm-inner svg { width: 24px; height: 24px; display: block; }
+
+.hm-inner.is-coin {
+  background: radial-gradient(circle at 35% 30%, #FFE59A, var(--gold) 55%, var(--gold-deep));
+  font-family: var(--font-heading);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.hm-label {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 6px);
+  translate: -50% 0;
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--parchment-light);
+  border: 2px solid var(--burnt);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.hm-label.above { top: auto; bottom: calc(100% + 6px); }
+
+@keyframes hm-pop { from { scale: 0; } to { scale: 1; } }
+@keyframes hm-pulse {
+  0%, 100% { scale: 1; opacity: 1; }
+  50% { scale: 1.18; opacity: 0.55; }
+}
+
+/* ---------- Clue scroll ---------- */
+.scroll {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  filter: drop-shadow(0 8px 10px rgba(10, 40, 50, 0.55));
+}
+
+.scroll-roll {
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
+  height: 30px;
+  margin: 0 -6px;
+  border-radius: 15px;
+  background:
+    linear-gradient(180deg, #A9743A 0%, var(--parchment-deep) 18%, var(--parchment-light) 45%, var(--parchment) 65%, #B9884A 100%);
+  border: 2px solid var(--burnt);
+}
+
+/* Spiral end-caps of the roll. */
+.scroll-roll::before,
+.scroll-roll::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--burnt);
+  background: radial-gradient(circle, var(--burnt) 0 3px, var(--parchment-deep) 4px 8px, var(--parchment-light) 9px 11px, var(--parchment-deep) 12px);
+}
+.scroll-roll::before { left: -4px; }
+.scroll-roll::after { right: -4px; }
+
+.scroll-roll.top { margin-bottom: -6px; }
+.scroll-roll.bottom { margin-top: -6px; }
+
+.scroll-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 18px 16px;
+  background:
+    linear-gradient(90deg, rgba(139, 90, 43, 0.35), transparent 7%, transparent 93%, rgba(139, 90, 43, 0.35)),
+    radial-gradient(ellipse at 80% 0%, rgba(255, 255, 255, 0.35), transparent 55%),
+    var(--parchment);
+  margin: 0 4px;
+}
+
+.hunt-head { display: flex; align-items: center; gap: 10px; }
+.hunt-head .spyglass { flex: 0 0 auto; width: 56px; height: 56px; }
+
+.eyebrow {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--red-deep);
+}
+
+.hunt-head h1 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.05;
+  color: var(--ink);
+}
+
+/* ---------- Treasure chest progress meter ---------- */
+.meter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 2px dashed var(--burnt);
+  border-radius: 14px;
+  background: rgba(248, 235, 203, 0.7);
+}
+
+.meter .chest { flex: 0 0 auto; width: 64px; height: 52px; }
+.meter .chest .lid { transform-origin: 8px 24px; transition: transform 0.6s ease; }
+.meter.is-open .chest .lid { transform: rotate(-28deg); }
+.meter .chest .glow { opacity: 0; transition: opacity 0.6s; }
+.meter.is-open .chest .glow { opacity: 1; }
+
+.meter-text { min-width: 0; }
+.meter-title { margin: 0 0 4px; font-family: var(--font-heading); font-size: 19px; line-height: 1; }
+
+.coins { display: flex; gap: 5px; flex-wrap: wrap; }
+
+.coin {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--burnt);
+  background: var(--parchment-deep);
+  box-shadow: inset 0 2px 3px rgba(59, 38, 20, 0.35);
+  transition: background 0.4s, scale 0.4s;
+}
+
+.coin.filled {
+  border-color: var(--ink);
+  background: radial-gradient(circle at 35% 30%, #FFE59A, var(--gold) 55%, var(--gold-deep));
+  box-shadow: none;
+  scale: 1.1;
+}
+
+/* ---------- Buttons ---------- */
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.btn {
+  min-height: 46px;
+  padding: 8px 18px;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--parchment-light);
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--ink);
+  transition: transform 0.1s, box-shadow 0.1s, filter 0.15s;
+}
+
+.btn:hover:not(:disabled) { filter: brightness(1.06); }
+.btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.btn-primary {
+  flex: 1 1 auto;
+  background: var(--gold);
+  font-size: 18px;
+}
+
+.btn-secondary { background: var(--parchment-light); }
+
+/* ---------- Clue cards ---------- */
+.clue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 2px 2px 6px;
+  list-style: none;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.clue-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 4px 10px;
+  padding: 10px 12px;
+  border: 2px solid var(--burnt);
+  border-radius: 12px;
+  background: var(--parchment-light);
+  overflow: hidden;
+}
+
+.clue-num {
+  grid-row: span 2;
+  align-self: start;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 3px solid var(--ink);
+  background: var(--sea-light);
+  font-family: var(--font-heading);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.clue-title { margin: 0; font-family: var(--font-heading); font-size: 21px; line-height: 1.1; font-weight: 400; }
+.clue-text { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
+.clue-text b { color: var(--ink); }
+
+.clue-card.is-current {
+  background: #FFF4D0;
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(244, 185, 66, 0.7);
+}
+.clue-card.is-current .clue-num { background: var(--red); color: #fff; }
+
+.clue-card.is-solved .clue-num {
+  background: radial-gradient(circle at 35% 30%, #FFE59A, var(--gold) 55%, var(--gold-deep));
+}
+.clue-card.is-solved { cursor: pointer; }
+.clue-card.is-solved .clue-title::after { content: " \2713"; color: var(--jungle); }
+
+/* Locked: text hidden behind a red wax seal. */
+.clue-card.is-locked { background: var(--parchment-deep); border-style: dashed; }
+.clue-card.is-locked .clue-text,
+.clue-card.is-locked .clue-title { visibility: hidden; }
+.clue-card.is-locked .clue-num { background: var(--parchment); color: var(--ink-soft); }
+
+.seal {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  width: 52px;
+  height: 52px;
+  margin-top: -26px;
+  display: none;
+  filter: drop-shadow(0 2px 2px rgba(59, 38, 20, 0.5));
+}
+.clue-card.is-locked .seal,
+.clue-card.breaking .seal { display: block; }
+.clue-card .seal-hint {
+  display: none;
+  position: absolute;
+  left: 62px;
+  right: 76px;
+  top: 50%;
+  translate: 0 -50%;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.clue-card.is-locked .seal-hint { display: block; }
+
+.clue-card.breaking .seal { animation: seal-break 0.7s ease-in forwards; }
+@keyframes seal-break {
+  0% { scale: 1; rotate: 0deg; opacity: 1; }
+  40% { scale: 1.25; rotate: -12deg; opacity: 1; }
+  100% { scale: 0.2; rotate: 40deg; opacity: 0; translate: 30px 40px; }
+}
+
+.status-note {
+  margin: 0;
+  min-height: 1.4em;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.status-note.success { color: var(--jungle); }
+.status-note.error { color: var(--red-deep); }
+.status-note.loading::after { content: " ..."; }
+
+/* ---------- Phone: map on top (55dvh), scroll below, page scrolls ---------- */
+@media (max-width: 800px) {
+  html, body { height: auto; }
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    gap: 14px;
+    padding: 16px;
+  }
+  .map-frame { height: 60dvh; min-height: 340px; flex: 0 0 auto; }
+  .scroll { flex: 0 0 auto; }
+  .clue-list { overflow: visible; }
+  .compass-rose { width: 60px; height: 60px; top: 6px; left: 6px; }
+  .hunt-head h1 { font-size: 26px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hm-inner, .hm-inner.is-x::before, .clue-card.breaking .seal { animation: none; }
+  .clue-card.breaking .seal { opacity: 0; }
+  .meter .chest .lid, .coin { transition: none; }
+}

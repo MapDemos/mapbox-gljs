@@ -1,0 +1,395 @@
+<!--
+  Working EXAMPLE of the Stage Profile style pack (stage-profile.css, in
+  this same folder). Open this file directly to see the pattern working
+  with a live-coverage mountain stage: Le Bourg-d'Oisans to Alpe d'Huez on
+  Mapbox Standard with terrain, a big SVG elevation profile (gradient
+  bands, HC badge, flamme rouge), race-number bib markers, a km-to-go
+  slab and a GC table with live time gaps. Scrub the profile (or press
+  Play) to move the group up the climb. Copy the markup into your own
+  demo and link stage-profile.css from its <head> -- see the class/id
+  contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo. All
+  riders, teams and the race name are fictional. The road geometry is a
+  simplified Mapbox Directions (driving) route embedded below; the
+  elevation profile is sampled from the map's terrain at runtime, with an
+  embedded approximate profile as fallback.
+
+  What's NOT included: real race data or timing feeds, live GPS, the demo
+  token (demo-kit.js sets mapboxgl.accessToken -- never hardcode one), or
+  any external library (the chart is hand-written SVG).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stage Profile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Teko:wght@500;600;700&family=Titillium+Web:wght@400;600;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="stage-profile.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="stage">
+    <div id="map"></div>
+    <div class="race-head">
+      <span class="live-tag">LIVE</span>
+      <h1 class="race-name" style="margin:4px 0 0">Tour des Cimes</h1>
+      <span class="stage-name">Stage 17 &middot; Bourg-d'Oisans &rarr; Alpe d'Huez</span>
+    </div>
+    <div class="togo" aria-live="off">
+      <span class="togo-num" id="togo-num">14.8</span><span class="togo-unit">KM</span>
+      <span class="togo-label" id="togo-label">to go</span>
+    </div>
+    <div class="stat-strip">
+      <div class="stat stat-grade g3" id="stat-grade"><span class="stat-k">Gradient</span><span class="stat-v" id="v-grade">0%</span></div>
+      <div class="stat"><span class="stat-k">Altitude</span><span class="stat-v" id="v-alt">0 m</span></div>
+      <div class="stat"><span class="stat-k">Speed</span><span class="stat-v" id="v-speed">0 km/h</span></div>
+    </div>
+  </section>
+
+  <div class="bottom">
+    <section class="profile-panel">
+      <div class="panel-head">
+        <h2 class="panel-title">Stage profile</h2>
+        <div class="grade-legend" aria-hidden="true">
+          <span class="lg g1">&lt;3%</span><span class="lg g2">3&ndash;6</span><span class="lg g3">6&ndash;9</span><span class="lg g4">9&ndash;12</span><span class="lg g5">12%+</span>
+        </div>
+        <div class="controls">
+          <button class="btn btn-icon" id="btn-back" aria-label="Back 1 kilometre">&minus;1 km</button>
+          <button class="btn btn-primary" id="btn-play">Play</button>
+          <button class="btn btn-icon" id="btn-fwd" aria-label="Forward 1 kilometre">+1 km</button>
+        </div>
+      </div>
+      <div class="profile-body" id="pbody">
+        <svg id="profile" role="slider" tabindex="0" aria-label="Stage elevation profile. Use arrow keys to move the rider group." aria-valuemin="0" aria-valuemax="15" aria-valuenow="0"></svg>
+        <div class="profile-readout"><span><b>KM</b><i id="r-km" style="font-style:normal">0.0</i></span><span><b>ALT</b><i id="r-alt" style="font-style:normal">0</i></span><span><b>GRADE</b><i id="r-grade" style="font-style:normal">0%</i></span></div>
+        <div class="profile-status" id="pstatus">Estimated profile</div>
+      </div>
+    </section>
+
+    <aside class="standings">
+      <div class="standings-head">
+        <h2 class="panel-title">GC standings</h2>
+        <span class="kom-chip">HC &middot; 20 PTS</span>
+      </div>
+      <table class="gc"><tbody id="gc"></tbody></table>
+      <div class="status-note success" style="margin-top:8px"><span>Gaps update live with the group. Riders and teams are fictional.</span></div>
+    </aside>
+  </div>
+</div>
+
+<script>
+/* ---------- embedded data ---------- */
+// Simplified Directions (driving) route, Le Bourg-d'Oisans -> Alpe d'Huez (D211, the 21 hairpins)
+const ROUTE = [[6.03159,45.0553],[6.03181,45.05476],[6.0324,45.0549],[6.03276,45.05511],[6.03607,45.05803],[6.03739,45.05889],[6.03805,45.05918],[6.03784,45.05952],[6.03741,45.06147],[6.03699,45.06231],[6.03702,45.06272],[6.03724,45.06299],[6.03999,45.06497],[6.04012,45.06517],[6.03959,45.06665],[6.03941,45.06781],[6.03925,45.06817],[6.0393,45.06872],[6.03919,45.06915],[6.0387,45.07025],[6.03902,45.07182],[6.03919,45.07187],[6.03929,45.07179],[6.03913,45.07099],[6.03934,45.07047],[6.04023,45.06964],[6.04084,45.06923],[6.04113,45.06808],[6.04206,45.06644],[6.0422,45.0664],[6.04226,45.06649],[6.04174,45.06761],[6.04198,45.06802],[6.04209,45.06792],[6.04192,45.06765],[6.04196,45.06745],[6.04264,45.06679],[6.04309,45.06598],[6.04325,45.06594],[6.04333,45.06607],[6.0431,45.06679],[6.04282,45.06717],[6.04282,45.06759],[6.04262,45.0681],[6.04268,45.06887],[6.04289,45.06885],[6.0428,45.0684],[6.04291,45.06815],[6.04364,45.06726],[6.04392,45.06719],[6.04454,45.06779],[6.04486,45.06876],[6.04544,45.06926],[6.04587,45.07001],[6.04694,45.07067],[6.04816,45.07192],[6.04793,45.07196],[6.04734,45.07141],[6.04667,45.07107],[6.04498,45.07109],[6.04434,45.07088],[6.04427,45.07103],[6.04489,45.07131],[6.04608,45.07152],[6.04653,45.0717],[6.04695,45.07205],[6.04761,45.07285],[6.0478,45.07346],[6.04851,45.07368],[6.04884,45.07364],[6.0492,45.07339],[6.04981,45.07322],[6.05108,45.07244],[6.05127,45.07251],[6.05076,45.07288],[6.05011,45.07368],[6.04969,45.07396],[6.04955,45.07455],[6.04937,45.07476],[6.04859,45.07502],[6.04773,45.07476],[6.04762,45.07479],[6.04763,45.0749],[6.04871,45.07523],[6.04982,45.07517],[6.05001,45.07505],[6.05029,45.07446],[6.05084,45.07418],[6.05167,45.07357],[6.05198,45.07323],[6.05218,45.07325],[6.05096,45.07451],[6.05064,45.07538],[6.0502,45.07589],[6.04888,45.07637],[6.04801,45.07629],[6.04728,45.07657],[6.04743,45.07667],[6.04803,45.07649],[6.04866,45.0767],[6.04935,45.07672],[6.05081,45.07644],[6.05155,45.07598],[6.0521,45.07519],[6.05223,45.07482],[6.05239,45.07476],[6.05251,45.07489],[6.05222,45.07523],[6.05163,45.07682],[6.04948,45.07805],[6.0479,45.0778],[6.04781,45.07793],[6.04868,45.07817],[6.04926,45.07843],[6.05004,45.0784],[6.05236,45.07766],[6.05317,45.07708],[6.05338,45.07707],[6.05352,45.07717],[6.05365,45.07767],[6.05408,45.07818],[6.05466,45.07917],[6.05463,45.07974],[6.05484,45.08054],[6.05501,45.08073],[6.05544,45.08079],[6.05588,45.0802],[6.0568,45.08006],[6.05856,45.08074],[6.05909,45.08108],[6.06013,45.08153],[6.06232,45.08221],[6.06221,45.08235],[6.06174,45.08213],[6.06142,45.08209],[6.05823,45.08223],[6.05791,45.0823],[6.0577,45.08245],[6.05747,45.08358],[6.05756,45.08369],[6.0583,45.08316],[6.05901,45.08301],[6.06007,45.08307],[6.06193,45.08346],[6.06252,45.08349],[6.06264,45.08357],[6.06251,45.08366],[6.06146,45.08361],[6.06049,45.08403],[6.06024,45.08435],[6.05982,45.08554],[6.05875,45.08662],[6.05914,45.0867],[6.05963,45.08624],[6.06181,45.08507],[6.06483,45.0846],[6.06571,45.08425],[6.06588,45.08433],[6.06579,45.08451],[6.06513,45.08468],[6.06395,45.08521],[6.06337,45.08537],[6.06268,45.08584],[6.06185,45.08734],[6.06189,45.08748],[6.06221,45.08744],[6.06243,45.08681],[6.06315,45.08623],[6.06399,45.0859],[6.06473,45.08588],[6.06658,45.08541],[6.06733,45.08472],[6.06802,45.08458],[6.06851,45.08483],[6.069,45.08528],[6.06975,45.08576],[6.07082,45.08594],[6.07144,45.08576],[6.07161,45.0858],[6.07188,45.08633],[6.07264,45.08675],[6.07363,45.08801],[6.07489,45.08878],[6.07497,45.08896],[6.07485,45.08925],[6.07407,45.08963],[6.07405,45.08982],[6.0743,45.09017],[6.07427,45.09034],[6.07324,45.09132],[6.0722,45.09108],[6.06899,45.09095],[6.0691,45.09151],[6.069,45.09151]];
+// Hairpin label positions, numbered 21 (bottom) down to 4
+const HAIRPINS = [[6.042195,45.066401],[6.043252,45.065945],[6.042888,45.068852],[6.043919,45.067191],[6.044345,45.070877],[6.051267,45.072508],[6.047617,45.07479],[6.052177,45.073254],[6.047279,45.076574],[6.052388,45.074764],[6.047814,45.077929],[6.05544,45.080794],[6.062317,45.082213],[6.05756,45.083686],[6.062636,45.08357],[6.058746,45.086623],[6.065876,45.084334],[6.061894,45.087477]];
+// Fallback elevation knots [metres along route, metres above sea level]
+const KNOTS = [[0,715],[2000,730],[2300,745],[3300,845],[7000,1190],[10000,1440],[11700,1555],[14784,1850]];
+const RIDERS = [
+  { bib: 1,  name: 'Mateo Valcourt',  team: 'Vallis Cycling', gap: 0,   cls: 'is-yellow' },
+  { bib: 14, name: 'Jonas Brevik',    team: 'Nordvik Racing', gap: 75,  cls: 'is-polka' },
+  { bib: 21, name: 'Luca Ferrandi',   team: 'Corvo Pro',      gap: 98,  cls: 'is-green' },
+  { bib: 31, name: 'Inigo Sorrel',    team: 'Tarn Velo',      gap: 122, cls: '' },
+  { bib: 44, name: 'Tobias Rindal',   team: 'Nordvik Racing', gap: 155, cls: '' },
+  { bib: 52, name: 'Samuel Okoro',    team: 'Team Brevant',   gap: 190, cls: '' },
+  { bib: 63, name: 'Pavel Hradil',    team: 'Aster Bikes',    gap: 238, cls: '' },
+  { bib: 77, name: 'Etienne Marchal', team: 'Corvo Pro',      gap: 300, cls: '' },
+];
+const GRADE_COLORS = ['#19A04B', '#8FC7F0', '#FFD400', '#F28C1B', '#E2231A'];
+
+/* ---------- geometry helpers ---------- */
+const RM = matchMedia('(prefers-reduced-motion: reduce)');
+function dist(a, b) {
+  const k = Math.cos(((a[1] + b[1]) / 2) * Math.PI / 180);
+  return Math.hypot((b[0] - a[0]) * 111320 * k, (b[1] - a[1]) * 110540);
+}
+const CUM = [0];
+for (let i = 1; i < ROUTE.length; i++) CUM.push(CUM[i - 1] + dist(ROUTE[i - 1], ROUTE[i]));
+const TOTAL = CUM[CUM.length - 1];
+const N = Math.round(TOTAL / 100), STEP = TOTAL / N;
+function pointAt(d) {
+  d = Math.max(0, Math.min(TOTAL, d));
+  let i = 1;
+  while (i < CUM.length - 1 && CUM[i] < d) i++;
+  const t = (d - CUM[i - 1]) / (CUM[i] - CUM[i - 1] || 1), a = ROUTE[i - 1], b = ROUTE[i];
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+}
+let ELEV = [];
+for (let i = 0; i <= N; i++) {
+  const d = i * STEP; let k = 1;
+  while (k < KNOTS.length - 1 && KNOTS[k][0] < d) k++;
+  const [d0, e0] = KNOTS[k - 1], [d1, e1] = KNOTS[k];
+  ELEV.push(e0 + (e1 - e0) * Math.max(0, Math.min(1, (d - d0) / (d1 - d0))));
+}
+function elevAt(d) {
+  const f = Math.max(0, Math.min(N, d / STEP)), i = Math.min(N - 1, Math.floor(f));
+  return ELEV[i] + (ELEV[i + 1] - ELEV[i]) * (f - i);
+}
+function gradeAt(d) {
+  const a = Math.max(0, d - 150), b = Math.min(TOTAL, d + 150);
+  return ((elevAt(b) - elevAt(a)) / (b - a)) * 100;
+}
+const BLOCK = 500;   // wide 500 m blocks, like a real race profile
+function blockClass(d) {
+  const a = Math.min(Math.floor(d / BLOCK) * BLOCK, TOTAL - 1), b = Math.min(TOTAL, a + BLOCK);
+  return gradeClass(((elevAt(b) - elevAt(a)) / (b - a)) * 100);
+}
+const gradeClass = (g) => (g < 3 ? 0 : g < 6 ? 1 : g < 9 ? 2 : g < 12 ? 3 : 4);
+
+/* ---------- map ---------- */
+const BEARING = 35;   // look from the valley (Bourg-d'Oisans, SW) up toward Alpe d'Huez (NE): nothing occluded
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [6.05, 45.073], zoom: 12, pitch: 55, bearing: BEARING,
+  config: { basemap: { lightPreset: 'day', showPointOfInterestLabels: false, showPlaceLabels: false } },
+});
+map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
+
+function markerEl(cls, inner) {
+  const root = document.createElement('div');         // root left untouched (Mapbox positions it)
+  const el = document.createElement('div');
+  el.className = cls; el.innerHTML = inner;
+  root.appendChild(el);
+  return { root, el };
+}
+const gm = markerEl('group-marker', '<span class="bib bib-yellow">1</span>');
+const cm = markerEl('group-marker chase', '<span class="bib bib-sm bib-polka">14</span>');
+const groupMarker = new mapboxgl.Marker({ element: gm.root, anchor: 'bottom' });
+const chaseMarker = new mapboxgl.Marker({ element: cm.root, anchor: 'bottom' });
+
+function routeGradient() {
+  const M = Math.ceil(TOTAL / BLOCK), stops = [];
+  for (let k = 0; k < M; k++) {
+    const a = (k * BLOCK) / TOTAL, b = Math.min(1, ((k + 1) * BLOCK) / TOTAL), c = GRADE_COLORS[blockClass(k * BLOCK + 1)];
+    stops.push(k === 0 ? 0 : a + 1e-5, c, k === M - 1 ? 1 : b - 1e-5, c);
+  }
+  return ['interpolate', ['linear'], ['line-progress'], ...stops];
+}
+
+map.on('style.load', () => {
+  map.addSource('mapbox-dem', { type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14 });
+  map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.4 });
+  map.addSource('route', { type: 'geojson', lineMetrics: true, data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE } } });
+  map.addLayer({ id: 'route-casing', type: 'line', source: 'route', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#1E1F22', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 6, 15, 14], 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'route-line', type: 'line', source: 'route', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-gradient': routeGradient(), 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 15, 8], 'line-emissive-strength': 1 } });
+  map.addSource('hairpins', { type: 'geojson', data: { type: 'FeatureCollection',
+    features: HAIRPINS.map((c, i) => ({ type: 'Feature', properties: { n: String(21 - i), keep: (i % 3 === 0) ? 1 : 0 }, geometry: { type: 'Point', coordinates: c } })) } });
+  map.addLayer({ id: 'hairpin-labels', type: 'symbol', source: 'hairpins', slot: 'top',
+    filter: ['==', ['get', 'keep'], 1],
+    layout: { 'text-field': ['get', 'n'], 'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'], 'text-size': 15,
+      'text-variable-anchor': ['top', 'bottom', 'left', 'right'], 'text-radial-offset': 0.9, 'text-padding': 8 },
+    paint: { 'text-color': '#FFFFFF', 'text-halo-color': '#E2231A', 'text-halo-width': 3, 'text-emissive-strength': 1 } });
+});
+
+/* ---------- state + UI ---------- */
+const $ = (id) => document.getElementById(id);
+let pos = TOTAL * 0.32, playing = false, raf = 0, lastT = 0, follow = null, drawn = false;
+const fmtGap = (s) => (s < 1 ? '—' : `+${Math.floor(s / 60)}'${String(Math.round(s % 60)).padStart(2, '0')}`);
+$('gc').innerHTML = RIDERS.map((r, i) => `<tr class="${r.cls}"><td class="pos">${i + 1}</td>
+  <td class="rider"><span class="bib bib-sm ${r.cls === 'is-yellow' ? 'bib-yellow' : r.cls === 'is-polka' ? 'bib-polka' : r.cls === 'is-green' ? 'bib-green' : ''}">${r.bib}</span>
+  ${r.name}<small>${r.team}</small></td><td class="gap" data-i="${i}">${fmtGap(r.gap)}</td></tr>`).join('');
+const gapCells = [...document.querySelectorAll('#gc .gap')];
+
+function gapSec(r, p) { return r.gap * (0.3 + 0.7 * p); }
+
+function setPos(d, opts = {}) {
+  pos = Math.max(0, Math.min(TOTAL, d));
+  const p = pos / TOTAL, g = gradeAt(pos), e = elevAt(pos), togo = (TOTAL - pos) / 1000;
+  const here = pointAt(pos), behind = pointAt(pos - gapSec(RIDERS[1], p) * 6);
+  groupMarker.setLngLat(here); chaseMarker.setLngLat(behind);
+  if (!groupMarker._map) { groupMarker.addTo(map); chaseMarker.addTo(map); }
+  $('togo-num').textContent = togo.toFixed(1);
+  $('togo-label').textContent = togo <= 0.05 ? 'FINISH' : togo <= 1 ? 'flamme rouge' : 'to go';
+  $('v-grade').textContent = g.toFixed(1) + '%';
+  $('stat-grade').className = 'stat stat-grade g' + (gradeClass(g) + 1);
+  $('v-alt').textContent = Math.round(e).toLocaleString('en-US') + ' m';
+  $('v-speed').textContent = Math.max(9, 27 - 1.6 * Math.max(0, g)).toFixed(0) + ' km/h';
+  $('r-km').textContent = (pos / 1000).toFixed(1);
+  $('r-alt').textContent = Math.round(e) + ' m';
+  $('r-grade').textContent = g.toFixed(1) + '%';
+  gapCells.forEach((c, i) => { c.textContent = fmtGap(gapSec(RIDERS[i], p)); });
+  svg.setAttribute('aria-valuenow', (pos / 1000).toFixed(1));
+  moveCursor();
+  if (opts.follow === 'soft') softFollow(here);
+}
+function softFollow(c) {
+  const s = map.project(c), cv = map.getCanvas(), w = cv.clientWidth, h = cv.clientHeight;
+  if (s.x < 60 || s.x > w - 60 || s.y < 120 || s.y > h - 90) {
+    if (RM.matches) map.jumpTo({ center: c }); else map.easeTo({ center: c, duration: 500 });
+  }
+}
+
+/* ---------- profile (hand-written SVG, redrawn to fit the box) ---------- */
+const svg = $('profile'), pbody = $('pbody'), NS = 'http:' + '//www.w3.org/2000/svg';
+let G = null, curG = null, curLine, curDot, chaseDot;
+function el(tag, attrs, parent, text) {
+  const n = document.createElementNS(NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (text != null) n.textContent = text;
+  (parent || svg).appendChild(n); return n;
+}
+function drawProfile() {
+  const W = pbody.clientWidth, H = pbody.clientHeight;
+  if (W < 80 || H < 80) return;
+  svg.innerHTML = ''; svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const m = { l: 46, r: 30, t: 44, b: 26 }, PW = W - m.l - m.r, PH = H - m.t - m.b;
+  const mn = Math.min(...ELEV), mx = Math.max(...ELEV);
+  const y0 = Math.floor((mn - 40) / 100) * 100, y1 = Math.ceil((mx + 160) / 100) * 100;
+  const xOf = (d) => m.l + (d / TOTAL) * PW, yOf = (e) => m.t + (1 - (e - y0) / (y1 - y0)) * PH;
+  G = { m, PW, PH, xOf, yOf };
+  const base = m.t + PH;
+  // elevation grid + labels
+  const gs = PH < 170 ? 400 : 200;
+  for (let e = Math.ceil(y0 / gs) * gs; e < y1; e += gs) {
+    el('line', { class: 'pf-grid', x1: m.l, x2: m.l + PW, y1: yOf(e), y2: yOf(e) });
+    el('text', { class: 'pf-tick', x: m.l - 6, y: yOf(e) + 4, 'text-anchor': 'end' }, null, e);
+  }
+  // gradient bands: one path per colour class
+  const paths = [[], [], [], [], []];
+  for (let i = 0; i < N; i++) {
+    const c = blockClass((i + 0.5) * STEP), xa = xOf(i * STEP), xb = xOf((i + 1) * STEP);
+    paths[c].push(`M${xa},${base}L${xa},${yOf(ELEV[i])}L${xb},${yOf(ELEV[i + 1])}L${xb},${base}Z`);
+  }
+  paths.forEach((p, c) => p.length && el('path', { class: 'pf-band', d: p.join(''), fill: GRADE_COLORS[c], stroke: GRADE_COLORS[c], 'stroke-width': 0.7 }));
+  el('polyline', { class: 'pf-silhouette', points: ELEV.map((e, i) => `${xOf(i * STEP).toFixed(1)},${yOf(e).toFixed(1)}`).join(' ') });
+  // km ticks
+  const kmStep = PW < 520 ? 2 : 1;
+  el('line', { class: 'pf-axis', x1: m.l, x2: m.l + PW, y1: base, y2: base });
+  for (let k = 0; k * 1000 <= TOTAL; k += kmStep) {
+    el('line', { class: 'pf-axis', x1: xOf(k * 1000), x2: xOf(k * 1000), y1: base, y2: base + 5 });
+    el('text', { class: 'pf-tick', x: xOf(k * 1000), y: base + 18, 'text-anchor': 'middle' }, null, k);
+  }
+  if (PW > 520) el('text', { class: 'pf-tick', x: m.l + PW + 2, y: base + 18, 'text-anchor': 'end' }, null, 'km');
+  // flamme rouge at 1 km to go
+  const xf = xOf(TOTAL - 1000), yf = yOf(elevAt(TOTAL - 1000));
+  el('line', { class: 'pf-axis', style: 'stroke:#E2231A;stroke-width:2.5', x1: xf, x2: xf, y1: yf, y2: yf - 26 });
+  el('path', { class: 'pf-flamme', d: `M${xf},${yf - 26}l12,6l-12,6z` });
+  if (PW > 600) el('text', { class: 'pf-label', x: xf - 6, y: yf - 20, 'text-anchor': 'end' }, null, 'FLAMME ROUGE · 1 KM');
+  // HC badge at the summit
+  const xs = xOf(TOTAL), ys = yOf(ELEV[N]);
+  el('rect', { class: 'pf-badge', x: xs - 17, y: ys - 58, width: 34, height: 24, rx: 4 });
+  el('text', { class: 'pf-badge-text', x: xs, y: ys - 40 }, null, 'HC');
+  if (PW > 600) {
+    el('text', { class: 'pf-label', x: xs - 24, y: ys - 40, 'text-anchor': 'end' }, null, 'ALPE D’HUEZ');
+    el('text', { class: 'pf-label', x: m.l + 6, y: yOf(ELEV[0]) - 10 }, null, 'LE BOURG-D’OISANS');
+  }
+  // cursor group (updated without redraw)
+  curG = el('g', {});
+  curLine = el('line', { class: 'pf-cursor', y1: m.t - 6, y2: base }, curG);
+  chaseDot = el('circle', { r: 5, fill: '#E2231A', stroke: '#fff', 'stroke-width': 2 }, curG);
+  curDot = el('circle', { r: 8, fill: '#FFD400', stroke: '#1E1F22', 'stroke-width': 3 }, curG);
+  drawn = true; moveCursor();
+}
+function moveCursor() {
+  if (!G || !drawn) return;
+  const cd = pos - gapSec(RIDERS[1], pos / TOTAL) * 6, x = G.xOf(pos);
+  curLine.setAttribute('x1', x); curLine.setAttribute('x2', x);
+  curDot.setAttribute('cx', x); curDot.setAttribute('cy', G.yOf(elevAt(pos)));
+  const xc = G.xOf(Math.max(0, cd));
+  chaseDot.setAttribute('cx', xc); chaseDot.setAttribute('cy', G.yOf(elevAt(Math.max(0, cd))));
+}
+
+/* scrubbing: hover with a mouse, drag with touch/pen; arrow keys for keyboard */
+let dragging = false;
+function scrub(e) {
+  if (!G) return;
+  const r = svg.getBoundingClientRect();
+  stop(); setPos(((e.clientX - r.left - G.m.l) / G.PW) * TOTAL, { follow: 'soft' });
+}
+svg.addEventListener('pointerdown', (e) => { dragging = true; svg.setPointerCapture(e.pointerId); scrub(e); });
+svg.addEventListener('pointermove', (e) => { if (dragging || e.pointerType === 'mouse') scrub(e); });
+svg.addEventListener('pointerup', () => { dragging = false; });
+svg.addEventListener('pointercancel', () => { dragging = false; });
+svg.addEventListener('keydown', (e) => {
+  const k = { ArrowRight: 100, ArrowLeft: -100, PageUp: 1000, PageDown: -1000 }[e.key];
+  if (k) { e.preventDefault(); stop(); setPos(pos + k, { follow: 'soft' }); }
+});
+new ResizeObserver(drawProfile).observe(pbody);
+
+/* ---------- play / step ---------- */
+function stop() { playing = false; cancelAnimationFrame(raf); $('btn-play').textContent = 'Play'; }
+function tick(t) {
+  if (!playing) return;
+  const dt = Math.min(0.05, (t - lastT) / 1000); lastT = t;
+  setPos(pos + 320 * dt);
+  const c = pointAt(pos), cur = map.getCenter();
+  map.setCenter([cur.lng + (c[0] - cur.lng) * 0.08, cur.lat + (c[1] - cur.lat) * 0.08]);
+  if (pos >= TOTAL) return stop();
+  raf = requestAnimationFrame(tick);
+}
+$('btn-play').addEventListener('click', () => {
+  if (playing) return stop();
+  if (pos >= TOTAL - 1) setPos(0);
+  playing = true; $('btn-play').textContent = 'Pause'; lastT = performance.now();
+  if (map.getZoom() < 13) map.easeTo({ zoom: 13.4, duration: 1200 });
+  raf = requestAnimationFrame(tick);
+});
+$('btn-back').addEventListener('click', () => { stop(); setPos(pos - 1000, { follow: 'soft' }); });
+$('btn-fwd').addEventListener('click', () => { stop(); setPos(pos + 1000, { follow: 'soft' }); });
+function syncMotion() { $('btn-play').classList.toggle('hidden', RM.matches); if (RM.matches) stop(); }
+RM.addEventListener('change', syncMotion); syncMotion();
+
+/* phone: the stat strip lives above the chart instead of covering the map */
+const strip = document.querySelector('.stat-strip'), stage = document.querySelector('.stage');
+const PH = matchMedia('(max-width: 760px)');
+function placeStrip() { if (PH.matches) pbody.parentNode.insertBefore(strip, pbody); else stage.appendChild(strip); }
+PH.addEventListener('change', placeStrip); placeStrip();
+
+/* ---------- landmarks, framing, terrain-sampled profile ---------- */
+function addLandmarks() {
+  const s = markerEl('place-tag', 'Le Bourg-d’Oisans');
+  new mapboxgl.Marker({ element: s.root, anchor: 'top-right' }).setLngLat(ROUTE[0]).addTo(map);
+  const f = markerEl('pin-flag finish', '<span class="pin-text">Finish · 1,850 m</span>');
+  new mapboxgl.Marker({ element: f.root, anchor: 'bottom-left' }).setLngLat(ROUTE[ROUTE.length - 1]).addTo(map);
+  const fl = markerEl('pin-flag flamme', '<span class="pin-text">1 km</span>');
+  new mapboxgl.Marker({ element: fl.root, anchor: 'bottom-right' }).setLngLat(pointAt(TOTAL - 1000)).addTo(map);
+}
+function frame() {
+  const b = ROUTE.reduce((bb, c) => bb.extend(c), new mapboxgl.LngLatBounds(ROUTE[0], ROUTE[0]));
+  const phone = innerWidth <= 760;
+  const pad = phone ? { top: 90, bottom: 75, left: 24, right: 24 } : { top: 110, bottom: 80, left: 50, right: 80 };
+  const cam = map.cameraForBounds(b, { padding: pad, bearing: BEARING, pitch: 55 });
+  map.jumpTo({ center: cam.center, zoom: cam.zoom, bearing: BEARING, pitch: 55 });
+  const cv = map.getCanvas(), w = cv.clientWidth, h = cv.clientHeight;
+  const fits = () => ROUTE.every((c) => { const q = map.project(c); return q.x >= pad.left && q.x <= w - pad.right && q.y >= pad.top && q.y <= h - pad.bottom; });
+  // zoom in until the route just fills the padded box (project ignores terrain height, so back off after)
+  let z = map.getZoom();
+  for (let i = 0; i < 30; i++) { map.jumpTo({ zoom: z + 0.1 }); if (!fits()) break; z += 0.1; }
+  map.jumpTo({ zoom: z - (phone ? 0.25 : 0.4) });
+}
+let tries = 0;
+function sampleTerrain() {
+  if (tries++ > 6 || !map.getTerrain()) return;
+  const out = [];
+  for (let i = 0; i <= N; i++) {
+    const c = pointAt(i * STEP);
+    const e = map.queryTerrainElevation(c, { exaggerated: false });
+    if (e == null || !isFinite(e)) return;
+    out.push(e);
+  }
+  if (out[0] < 500 || out[0] > 1000 || out[N] < 1650 || out[N] > 2050) return;
+  ELEV = out.map((_, i) => { let s = 0, n = 0; for (let k = -2; k <= 2; k++) { const v = out[i + k]; if (v != null) { s += v; n++; } } return s / n; });
+  tries = 99; $('pstatus').textContent = 'Measured from terrain';
+  drawProfile(); setPos(pos);
+  if (map.getLayer('route-line')) map.setPaintProperty('route-line', 'line-gradient', routeGradient());
+}
+map.on('load', () => { addLandmarks(); frame(); drawProfile(); setPos(pos); map.on('idle', sampleTerrain); });
+</script>
+</body>
+</html>

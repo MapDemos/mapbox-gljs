@@ -1,0 +1,471 @@
+<!--
+  Working EXAMPLE of the Truck Art style pack (truck-art.css, in this same
+  folder). Open this file directly to see the pattern working: the page is
+  the hand-painted back of a truck -- an arched title panel under a swaying
+  fringe of chains and bells, the map inside an ornate floral border with
+  mirror-work dots, two mud-flap columns of painted stop tiles, and a
+  rear lettering panel. A Rajasthan road trip (Jaipur, Amber Fort, Ajmer,
+  Pushkar, Jodhpur, Udaipur) runs along a real driving route on Mapbox
+  Standard at dusk. "Start Journey" drives a little truck along it (reduced
+  motion: Prev/Next stop buttons); click a tile or numbered roundel to fly
+  there and see the tile flash with a mirror sparkle. Copy the markup and
+  link truck-art.css from your own demo's <head> -- see the class/id
+  contract at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- a
+  respectful, celebratory nod to South Asian truck-art folk painting. The
+  places are real and the route was fetched once from the Mapbox Directions
+  API (driving) and simplified; "Marwar Star Roadways" and the slogans are
+  fictional placeholders -- swap in your own.
+
+  What's NOT included: live routing, search, popups, or a hard-coded access
+  token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Truck Art</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Rozha+One&family=Hind:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="truck-art.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<div class="truck">
+  <div class="truck-fringe" id="fringe" aria-hidden="true"></div>
+
+  <header class="arch">
+    <h1>Royal Rajasthan Road Trip</h1>
+    <p class="arch-sub">Jaipur to Udaipur &middot; Marwar Star Roadways</p>
+  </header>
+
+  <main class="stage">
+    <div class="flap" id="flap-l" aria-label="Stops 1 to 3"><h2 class="flap-title">Stops</h2></div>
+
+    <section class="map-frame">
+      <svg class="frame-svg" aria-hidden="true" focusable="false">
+        <defs>
+          <g id="fl-a">
+            <g fill="#E6197F"><ellipse cx="12" cy="5.5" rx="3.6" ry="5"/><ellipse cx="12" cy="18.5" rx="3.6" ry="5"/><ellipse cx="5.5" cy="12" rx="5" ry="3.6"/><ellipse cx="18.5" cy="12" rx="5" ry="3.6"/></g>
+            <circle cx="12" cy="12" r="4" fill="#FFD60A"/><circle cx="12" cy="12" r="1.7" fill="#E5E7EB"/>
+          </g>
+          <g id="fl-b">
+            <g fill="#0FA968"><ellipse cx="12" cy="5.5" rx="3.6" ry="5"/><ellipse cx="12" cy="18.5" rx="3.6" ry="5"/><ellipse cx="5.5" cy="12" rx="5" ry="3.6"/><ellipse cx="18.5" cy="12" rx="5" ry="3.6"/></g>
+            <circle cx="12" cy="12" r="4" fill="#FF9F1C"/><circle cx="12" cy="12" r="1.7" fill="#E5E7EB"/>
+          </g>
+          <pattern id="fl-h" width="48" height="24" patternUnits="userSpaceOnUse">
+            <rect width="48" height="24" fill="#260630"/>
+            <use href="#fl-a"/><use href="#fl-b" x="24"/>
+            <circle cx="24" cy="2.5" r="1.4" fill="#E5E7EB"/><circle cx="24" cy="21.5" r="1.4" fill="#E5E7EB"/>
+            <circle cx="0" cy="12" r="1.4" fill="#E5E7EB"/>
+          </pattern>
+          <pattern id="fl-v" width="48" height="24" patternUnits="userSpaceOnUse" patternTransform="rotate(90)">
+            <rect width="48" height="24" fill="#260630"/>
+            <use href="#fl-a"/><use href="#fl-b" x="24"/>
+            <circle cx="24" cy="2.5" r="1.4" fill="#E5E7EB"/><circle cx="24" cy="21.5" r="1.4" fill="#E5E7EB"/>
+          </pattern>
+          <g id="fl-corner">
+            <circle r="17" fill="#FFD60A"/><circle r="14" fill="#E11D48"/><circle r="10.5" fill="#E5E7EB"/>
+            <circle r="7.5" fill="#1D4ED8"/><circle r="3.5" fill="#FF9F1C"/>
+          </g>
+        </defs>
+        <svg x="0" y="0" overflow="visible"><rect width="100%" height="24" fill="url(#fl-h)"/></svg>
+        <svg x="0" y="100%" overflow="visible"><rect y="-24" width="100%" height="24" fill="url(#fl-h)"/></svg>
+        <svg x="0" y="0" overflow="visible"><rect width="24" height="100%" fill="url(#fl-v)"/></svg>
+        <svg x="100%" y="0" overflow="visible"><rect x="-24" width="24" height="100%" fill="url(#fl-v)"/></svg>
+        <svg x="0" y="0" overflow="visible"><use href="#fl-corner" x="12" y="12"/></svg>
+        <svg x="100%" y="0" overflow="visible"><use href="#fl-corner" x="-12" y="12"/></svg>
+        <svg x="0" y="100%" overflow="visible"><use href="#fl-corner" x="12" y="-12"/></svg>
+        <svg x="100%" y="100%" overflow="visible"><use href="#fl-corner" x="-12" y="-12"/></svg>
+      </svg>
+
+      <div class="map-wrap"><div id="map"></div></div>
+
+      <div class="controls">
+        <button class="btn btn-primary" id="go-btn" disabled>Start Journey</button>
+        <button class="btn btn-secondary hidden" id="prev-btn" disabled>&larr; Prev stop</button>
+        <button class="btn btn-primary hidden" id="next-btn" disabled>Next stop &rarr;</button>
+        <button class="btn btn-secondary" id="all-btn" disabled>Whole route</button>
+        <p class="status-note loading" id="status" role="status" aria-live="polite">Loading the road&hellip;</p>
+      </div>
+    </section>
+
+    <div class="flap" id="flap-r" aria-label="Stops 4 to 6"><h2 class="flap-title">Onward</h2></div>
+  </main>
+
+  <footer class="rear-panel" aria-label="Rear panel">
+    <span>Horn Please</span><span>&middot;</span><span>Drive Slow</span><span>&middot;</span><span>Safe Journey</span>
+  </footer>
+</div>
+
+<script>
+// Driving route Jaipur -> Amber -> Ajmer -> Pushkar -> Jodhpur -> Udaipur
+// [lng, lat]: Mapbox Directions (driving), fetched once and simplified.
+const ROUTE = [
+  [75.827,26.9238],
+  [75.8477,26.9677],
+  [75.8386,26.9744],
+  [75.8539,26.9877],
+  [75.8517,26.971],
+  [75.827,26.9228],
+  [75.8085,26.9265],
+  [75.7664,26.8987],
+  [75.6473,26.853],
+  [75.558,26.8249],
+  [75.4591,26.8043],
+  [75.3749,26.7741],
+  [75.3238,26.7489],
+  [75.213,26.6681],
+  [75.1344,26.6509],
+  [75.0645,26.6183],
+  [75.0321,26.6105],
+  [74.9844,26.6072],
+  [74.8994,26.589],
+  [74.88,26.5895],
+  [74.871,26.5986],
+  [74.8537,26.6004],
+  [74.8053,26.5695],
+  [74.7985,26.5588],
+  [74.7053,26.5137],
+  [74.7142,26.4759],
+  [74.7042,26.4495],
+  [74.6407,26.4494],
+  [74.6309,26.4687],
+  [74.6166,26.4666],
+  [74.5956,26.5024],
+  [74.5648,26.4877],
+  [74.5512,26.4895],
+  [74.5646,26.4877],
+  [74.6009,26.5],
+  [74.6166,26.4666],
+  [74.6308,26.4688],
+  [74.6364,26.4585],
+  [74.6398,26.4413],
+  [74.6337,26.416],
+  [74.5916,26.3633],
+  [74.583,26.344],
+  [74.5531,26.3222],
+  [74.5203,26.2849],
+  [74.4969,26.2767],
+  [74.4937,26.2603],
+  [74.4377,26.194],
+  [74.3632,26.1535],
+  [74.3422,26.1213],
+  [74.3396,26.0868],
+  [74.323,26.0748],
+  [74.3068,26.0731],
+  [74.3008,26.0615],
+  [74.2679,26.0884],
+  [74.2392,26.0986],
+  [74.2109,26.0731],
+  [74.1138,26.0711],
+  [74.1131,26.083],
+  [74.0984,26.0887],
+  [74.0844,26.1092],
+  [74.0252,26.1428],
+  [73.9982,26.1638],
+  [73.9934,26.1773],
+  [73.9539,26.1959],
+  [73.9158,26.2034],
+  [73.7899,26.2047],
+  [73.7504,26.2197],
+  [73.7258,26.2084],
+  [73.6477,26.2167],
+  [73.499,26.2651],
+  [73.416,26.2821],
+  [73.3778,26.2753],
+  [73.3502,26.2798],
+  [73.3016,26.2654],
+  [73.2731,26.2663],
+  [73.1989,26.2955],
+  [73.1468,26.3382],
+  [73.0556,26.2945],
+  [73.0208,26.2982],
+  [73.0241,26.2882],
+  [73.0154,26.2725],
+  [73.0146,26.238],
+  [73.0403,26.229],
+  [73.0492,26.1484],
+  [73.0794,26.0317],
+  [73.1399,25.9632],
+  [73.1448,25.9484],
+  [73.1756,25.9284],
+  [73.191,25.8999],
+  [73.2225,25.872],
+  [73.2345,25.8197],
+  [73.2457,25.8139],
+  [73.2667,25.7757],
+  [73.304,25.7409],
+  [73.3246,25.7345],
+  [73.3242,25.7257],
+  [73.3362,25.7084],
+  [73.3697,25.6782],
+  [73.3838,25.635],
+  [73.3818,25.605],
+  [73.3897,25.5805],
+  [73.4248,25.5604],
+  [73.4447,25.5279],
+  [73.4561,25.5234],
+  [73.4337,25.4941],
+  [73.469,25.4728],
+  [73.4703,25.4516],
+  [73.4601,25.4303],
+  [73.4532,25.3726],
+  [73.4721,25.3672],
+  [73.4819,25.3522],
+  [73.5656,25.2908],
+  [73.5693,25.2797],
+  [73.6615,25.2334],
+  [73.6946,25.238],
+  [73.7269,25.268],
+  [73.748,25.2786],
+  [73.7841,25.2815],
+  [73.7792,25.2673],
+  [73.7919,25.227],
+  [73.8416,25.1727],
+  [73.8685,25.083],
+  [73.8582,25.0541],
+  [73.8602,25.0283],
+  [73.8261,24.949],
+  [73.8236,24.9384],
+  [73.8313,24.9244],
+  [73.7723,24.8649],
+  [73.7599,24.8118],
+  [73.7628,24.7592],
+  [73.7314,24.7221],
+  [73.7386,24.677],
+  [73.7211,24.6576],
+  [73.6999,24.607],
+  [73.6894,24.6084],
+  [73.6921,24.5957],
+  [73.6837,24.5772]
+];
+const STOPS = [
+  { name: 'Jaipur',   sub: 'Hawa Mahal',          coord: [75.8267, 26.9239], off: [-14, 10] },
+  { name: 'Amber',    sub: 'Amber Fort',          coord: [75.8513, 26.9855], off: [16, -12] },
+  { name: 'Ajmer',    sub: 'Ana Sagar Lake',      coord: [74.6399, 26.4499], off: [14, 12] },
+  { name: 'Pushkar',  sub: 'Sacred lake town',    coord: [74.5513, 26.4897], off: [-14, -12] },
+  { name: 'Jodhpur',  sub: 'Mehrangarh Fort',     coord: [73.0188, 26.2979], off: [0, 0] },
+  { name: 'Udaipur',  sub: 'City Palace',         coord: [73.6835, 24.5764], off: [0, 0] },
+];
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const statusEl = $('status');
+const setStatus = (cls, txt) => { statusEl.className = 'status-note ' + cls; statusEl.textContent = txt; };
+
+/* ---- Fringe of chains and bells ---- */
+function buildFringe() {
+  const f = $('fringe');
+  const n = Math.max(12, Math.floor(window.innerWidth / 26));
+  f.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const c = document.createElement('span');
+    c.className = 'chain';
+    c.style.setProperty('--d', ((i * 0.37) % 3.2).toFixed(2) + 's');
+    c.innerHTML = '<i class="links"></i><b class="bell"></b>';
+    f.appendChild(c);
+  }
+}
+buildFringe();
+window.addEventListener('resize', buildFringe);
+
+/* ---- Route geometry: cumulative distance, stop positions along the line ---- */
+const cum = [0];
+for (let i = 1; i < ROUTE.length; i++) {
+  const k = Math.cos(ROUTE[i][1] * Math.PI / 180);
+  cum.push(cum[i - 1] + Math.hypot((ROUTE[i][0] - ROUTE[i - 1][0]) * k, ROUTE[i][1] - ROUTE[i - 1][1]));
+}
+const TOTAL = cum[cum.length - 1];
+// First route vertex (after the previous stop) within ~2 km of each stop.
+let from = 0;
+STOPS.forEach((s, n) => {
+  let best = -1, bd = Infinity;
+  for (let i = from; i < ROUTE.length; i++) {
+    const d = Math.hypot(ROUTE[i][0] - s.coord[0], ROUTE[i][1] - s.coord[1]);
+    if (d < 0.02) { best = i; break; }
+    if (d < bd) { bd = d; best = i; }
+  }
+  s.idx = best; s.dist = cum[best]; from = best;
+});
+
+function pointAt(d) {
+  d = Math.max(0, Math.min(TOTAL, d));
+  let i = 1;
+  while (i < cum.length - 1 && cum[i] < d) i++;
+  const t = (d - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1);
+  return {
+    lng: ROUTE[i - 1][0] + (ROUTE[i][0] - ROUTE[i - 1][0]) * t,
+    lat: ROUTE[i - 1][1] + (ROUTE[i][1] - ROUTE[i - 1][1]) * t,
+    dx: ROUTE[i][0] - ROUTE[i - 1][0],
+  };
+}
+
+/* ---- Map ---- */
+const phone = window.matchMedia('(max-width: 899px)').matches;
+// Phone: extra top/right clearance for the zoom buttons and Amber's offset roundel.
+const FIT_PAD = phone ? { top: 64, bottom: 64, left: 36, right: 64 } : { top: 40, bottom: 64, left: 40, right: 60 };
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  bounds: ROUTE.reduce((b, c) => b.extend(c), new mapboxgl.LngLatBounds(ROUTE[0], ROUTE[0])),
+  fitBoundsOptions: { padding: FIT_PAD },
+  config: { basemap: { lightPreset: 'dusk', showPointOfInterestLabels: false } },
+  attributionControl: true,
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+const tiles = [], roundels = [];
+let current = 0;          // stop the truck is at / last selected
+let ico = null, truckMarker = null;
+
+/* ---- Tiles (mud flaps) and roundels (markers) ---- */
+STOPS.forEach((s, i) => {
+  const t = document.createElement('button');
+  t.className = 'tile';
+  t.dataset.c = i % 6;
+  t.innerHTML = `<span class="tile-num">${i + 1}</span><span class="tile-name">${s.name}</span><span class="tile-sub">${s.sub}</span>`;
+  t.addEventListener('click', () => select(i, true));
+  $(i < 3 ? 'flap-l' : 'flap-r').appendChild(t);
+  tiles.push(t);
+
+  const root = document.createElement('div');            // never style the Marker root
+  root.innerHTML = `<div class="roundel" data-c="${i % 6}" role="button" aria-label="${s.name}">${i + 1}</div>`;
+  root.addEventListener('click', () => select(i, true));
+  new mapboxgl.Marker({ element: root, offset: s.off }).setLngLat(s.coord).addTo(map);
+  roundels.push(root.firstChild);
+});
+
+function flash(i) {
+  tiles.forEach((t, k) => t.classList.toggle('is-active', k === i));
+  roundels.forEach((r, k) => r.classList.toggle('is-active', k === i));
+  const t = tiles[i];
+  t.classList.remove('sparkle');
+  void t.offsetWidth;                                     // restart the animation
+  if (!reduce) t.classList.add('sparkle');
+  setStatus('success', `Stop ${i + 1} of ${STOPS.length}: ${STOPS[i].name} \u00b7 ${STOPS[i].sub}`);
+}
+
+function select(i, fly) {
+  cancelRun();
+  current = i;
+  placeTruck(STOPS[i].dist);
+  flash(i);
+  if (fly) {
+    const o = { center: STOPS[i].coord, zoom: 10.5, padding: FIT_PAD };
+    if (reduce) map.jumpTo(o); else map.flyTo({ ...o, duration: 2200, essential: true });
+  }
+  updateStep();
+}
+
+/* ---- Truck icon ---- */
+function placeTruck(d) {
+  if (!truckMarker) return;
+  const p = pointAt(d);
+  truckMarker.setOffset(moving ? [0, 0] : [0, 30]);   // parked: sit below the roundel, never on it
+  truckMarker.setLngLat([p.lng, p.lat]);
+  if (Math.abs(p.dx) > 1e-6) ico.style.transform = p.dx < 0 ? 'scaleX(-1)' : 'none';
+}
+
+let runId = 0, running = false, moving = false;
+function cancelRun() {
+  runId++;
+  if (running) { running = false; $('go-btn').textContent = 'Start Journey'; }
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+function glide(from, to, id) {
+  const ms = Math.max(1200, ((to - from) / TOTAL) * 22000);
+  return new Promise((resolve) => {
+    const t0 = performance.now();
+    moving = true;
+    (function frame(now) {
+      if (id !== runId) { moving = false; return resolve(false); }
+      const t = Math.min(1, (now - t0) / ms);
+      const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;   // ease in-out
+      placeTruck(from + (to - from) * e);
+      if (t < 1) requestAnimationFrame(frame); else { moving = false; placeTruck(to); resolve(true); }
+    })(t0);
+  });
+}
+
+async function startJourney() {
+  cancelRun();
+  const id = runId;
+  running = true;
+  $('go-btn').textContent = 'Stop';
+  if (current >= STOPS.length - 1) { current = 0; placeTruck(0); flash(0); await sleep(900); }
+  for (let k = current + 1; k < STOPS.length; k++) {
+    setStatus('loading', `Driving to ${STOPS[k].name}\u2026`);
+    if (!(await glide(STOPS[current].dist, STOPS[k].dist, id))) return;
+    current = k;
+    flash(k);
+    if (id !== runId) return;
+    await sleep(1200);
+    if (id !== runId) return;
+  }
+  running = false;
+  $('go-btn').textContent = 'Start Journey';
+  setStatus('success', 'Safe journey! You have arrived in Udaipur.');
+}
+
+$('go-btn').addEventListener('click', () => { if (running) { cancelRun(); setStatus('success', 'Parked.'); } else startJourney(); });
+$('prev-btn').addEventListener('click', () => select(Math.max(0, current - 1), true));
+$('next-btn').addEventListener('click', () => select(Math.min(STOPS.length - 1, current + 1), true));
+$('all-btn').addEventListener('click', () => {
+  const b = ROUTE.reduce((x, c) => x.extend(c), new mapboxgl.LngLatBounds(ROUTE[0], ROUTE[0]));
+  map.fitBounds(b, { padding: FIT_PAD, duration: reduce ? 0 : 1800 });
+});
+function updateStep() {
+  $('prev-btn').disabled = current <= 0;
+  $('next-btn').disabled = current >= STOPS.length - 1;
+}
+
+// Reduced motion: no animated drive, use step buttons instead.
+if (reduce) {
+  $('go-btn').classList.add('hidden');
+  $('prev-btn').classList.remove('hidden');
+  $('next-btn').classList.remove('hidden');
+}
+
+/* ---- Route layers and truck once the style is ready ---- */
+map.on('style.load', () => {
+  map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE } } });
+  const join = { 'line-join': 'round', 'line-cap': 'round' };
+  map.addLayer({ id: 'route-casing', type: 'line', source: 'route', slot: 'middle', layout: join,
+    paint: { 'line-color': '#E6197F', 'line-width': 10, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'route-line', type: 'line', source: 'route', slot: 'middle', layout: join,
+    paint: { 'line-color': '#FF9F1C', 'line-width': 5, 'line-emissive-strength': 1 } });
+  // Mirror-work dots down the middle of the road
+  map.addLayer({ id: 'route-dots', type: 'line', source: 'route', slot: 'middle',
+    layout: { 'line-cap': 'round' },
+    paint: { 'line-color': '#E5E7EB', 'line-width': 2, 'line-dasharray': [0.1, 2.4], 'line-emissive-strength': 1 } });
+
+  const el = document.createElement('div');
+  el.innerHTML = `<div class="truck-ico"><svg viewBox="0 0 46 30" aria-hidden="true">
+    <rect x="1" y="3" width="28" height="19" rx="2" fill="#FF9F1C" stroke="#3B0A45" stroke-width="1.6"/>
+    <rect x="1" y="9" width="28" height="4" fill="#E6197F"/><circle cx="9" cy="6.2" r="1.3" fill="#E5E7EB"/><circle cx="15" cy="6.2" r="1.3" fill="#E5E7EB"/><circle cx="21" cy="6.2" r="1.3" fill="#E5E7EB"/>
+    <path d="M29 9h9l6 6v7H29z" fill="#1D4ED8" stroke="#3B0A45" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M32 11h5l3 4h-8z" fill="#E5E7EB"/>
+    <circle cx="11" cy="23" r="5" fill="#3B0A45"/><circle cx="11" cy="23" r="2" fill="#E5E7EB"/>
+    <circle cx="36" cy="23" r="5" fill="#3B0A45"/><circle cx="36" cy="23" r="2" fill="#E5E7EB"/></svg></div>`;
+  ico = el.firstChild;
+  truckMarker = new mapboxgl.Marker({ element: el }).setLngLat(STOPS[0].coord).addTo(map);
+  placeTruck(0);
+  flash(0);
+  $('go-btn').disabled = false;
+  $('all-btn').disabled = false;
+  updateStep();
+  setStatus('success', 'Stop 1 of ' + STOPS.length + ': ' + STOPS[0].name + ' \u00b7 ' + STOPS[0].sub);
+});
+
+map.on('error', (e) => setStatus('error', 'Map error: ' + ((e.error && e.error.message) || 'unknown')));
+</script>
+</body>
+</html>

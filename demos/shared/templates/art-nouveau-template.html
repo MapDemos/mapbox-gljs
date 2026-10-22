@@ -1,0 +1,297 @@
+<!--
+  Working EXAMPLE of the Art Nouveau style pack (art-nouveau.css, in this
+  same folder). Open this file directly to see the pattern working with a
+  seven-stop Belle Epoque walk through Prague: the map sits in a round-topped
+  arch window wrapped in inline-SVG whiplash ironwork, a mosaic halo
+  roundel carries the title, and a column of tendril-bordered cartouches
+  lists the stops. Click a cartouche (or a lily-bud marker) to fly there;
+  the ironwork tendrils briefly grow and the cartouche takes a gold-leaf
+  border. Copy the markup below into your own demo and link art-nouveau.css
+  from its <head> -- see the class/id contract at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (muted sage / ochre / plum with gold, organic curves)
+  at the user's request for something distinct from every other pack in
+  this folder. The places are real; the walking route is a simplified
+  Mapbox Directions (walking) result embedded as coordinates, and the stop
+  blurbs are short illustrative notes -- swap in your own.
+
+  What's NOT included: live routing, search/geocoding, popups, 3D terrain,
+  or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Prague Art Nouveau Walk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Federo&family=Alegreya:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="art-nouveau.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: the map fills the arch window; the page is a poster grid. */
+  #map { position: absolute; inset: 0; }
+
+  .page {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 330px;
+    gap: 28px;
+    height: 100dvh;
+    min-height: 720px;
+    grid-template-rows: minmax(0, 1fr);
+    padding: 20px 28px 16px;
+  }
+
+  .walk { align-self: stretch; padding-top: 28px; }
+
+  @media (max-width: 900px) {
+    .page {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: none;
+      height: auto;
+      min-height: 0;
+      padding: 16px 16px 28px;
+      gap: 22px;
+    }
+    .walk { padding-top: 0; }
+  }
+</style>
+</head>
+<body>
+<main class="page">
+  <section class="poster">
+    <div class="halo">
+      <div class="halo-core">
+        <h1>Prague</h1>
+        <div class="halo-sub">Art Nouveau<br />Walk</div>
+      </div>
+    </div>
+
+    <div class="arch" id="arch">
+      <div class="arch-map"><div id="map"></div></div>
+
+      <svg class="iron iron-crown" viewBox="0 0 620 314" preserveAspectRatio="none" aria-hidden="true" data-mirror="620">
+        <path class="line plum tendril" d="M16 314 A294 294 0 0 1 604 314" />
+        <path class="petal mid" d="M310 34 C300 22 301 8 310 0 C319 8 320 22 310 34Z" />
+        <path class="petal" d="M310 34 C296 30 284 20 282 8 C296 10 306 20 310 34Z" />
+        <path class="petal" d="M310 34 C324 30 336 20 338 8 C324 10 314 20 310 34Z" />
+        <g class="half">
+          <path class="line tendril" d="M16 314 C10 250 20 200 52 160 C84 120 120 112 150 84 C176 62 170 34 148 36 C130 38 128 58 144 62" />
+          <path class="line fine tendril" d="M52 200 C20 190 6 160 22 138 C34 124 52 134 44 148" />
+          <path class="line fine tendril" d="M92 120 C60 108 44 80 62 56 C74 42 90 50 84 62" />
+          <path class="line tendril" d="M290 24 C240 16 210 30 180 12 C170 6 160 14 168 20" />
+          <path class="leaf" d="M144 62 C132 74 116 70 112 60 C126 56 138 58 144 62Z" />
+          <path class="leaf" d="M62 56 C48 60 38 50 40 40 C52 40 60 46 62 56Z" />
+        </g>
+      </svg>
+
+      <svg class="iron iron-side" viewBox="0 0 34 400" preserveAspectRatio="none" aria-hidden="true">
+        <path class="line plum tendril" d="M30 0 C6 40 34 80 14 120 C-2 150 28 190 14 230 C6 260 26 290 18 330 C14 355 24 380 30 400" />
+        <path class="line fine tendril" d="M18 330 C4 324 2 308 12 304 C18 302 20 310 14 312" />
+        <path class="leaf" d="M14 120 C2 112 2 98 8 92 C16 100 18 110 14 120Z" />
+        <path class="leaf" d="M24 175 C32 166 34 154 30 148 C24 156 22 166 24 175Z" />
+        <path class="leaf" d="M14 230 C2 224 2 210 8 204 C16 212 18 222 14 230Z" />
+        <path class="leaf" d="M22 300 C30 294 32 282 28 276 C22 282 20 292 22 300Z" />
+      </svg>
+    </div>
+
+    <svg class="arch-base" viewBox="0 0 620 40" preserveAspectRatio="xMidYMid slice" aria-hidden="true" data-mirror="620">
+      <path class="petal mid" d="M310 4 C298 14 298 28 310 38 C322 28 322 14 310 4Z" />
+      <path class="petal" d="M310 38 C296 34 284 24 282 12 C296 14 306 26 310 38Z" />
+      <path class="petal" d="M310 38 C324 34 336 24 338 12 C324 14 314 26 310 38Z" />
+      <g class="half">
+        <path class="line tendril" d="M284 22 C250 6 210 38 160 22 C120 10 80 14 40 26 C26 30 14 22 22 14 C28 8 38 14 32 20" />
+        <path class="line fine tendril" d="M200 28 C170 38 140 34 112 30" />
+        <path class="leaf" d="M160 22 C150 32 136 32 130 26 C142 20 154 20 160 22Z" />
+      </g>
+    </svg>
+  </section>
+
+  <aside class="walk" aria-label="Stops on the walk">
+    <div class="plate">
+      <h2>The Walk</h2>
+      <p class="plate-meta">Seven stops &middot; 3.7 km &middot; about 45 min</p>
+    </div>
+    <ol class="cartouche-list" id="stops"></ol>
+    <button class="leaf-btn" id="overview" type="button">Show the whole walk</button>
+    <div class="hidden" id="live" aria-live="polite"></div>
+  </aside>
+</main>
+
+<script>
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const C = { cream: '#F4ECD8', sage: '#9CAF88', plum: '#6D3B5C', teal: '#2F5D50', gold: '#B8933A', rose: '#D8A7A0', ink: '#2E2421' };
+
+// Simplified Mapbox Directions (walking) geometry, station -> Cech Bridge
+const ROUTE = [[14.43529,50.08318],[14.43491,50.0833],[14.43476,50.08346],[14.43453,50.08356],[14.43444,50.08369],[14.43425,50.08375],[14.43407,50.0838],[14.43417,50.08404],[14.43391,50.08413],[14.43346,50.08427],[14.43328,50.08433],[14.43311,50.08412],[14.433,50.08399],[14.4328,50.08374],[14.43228,50.08312],[14.43213,50.08296],[14.43197,50.08281],[14.43173,50.08273],[14.43074,50.08199],[14.43059,50.08188],[14.43029,50.08168],[14.42992,50.08143],[14.42973,50.08131],[14.42882,50.08084],[14.42853,50.08096],[14.4282,50.08119],[14.42802,50.08132],[14.42766,50.0816],[14.42734,50.08182],[14.42715,50.08171],[14.42697,50.0816],[14.42678,50.08149],[14.42619,50.08191],[14.42611,50.08205],[14.42583,50.08189],[14.42542,50.08159],[14.42525,50.08162],[14.42524,50.08173],[14.42553,50.082],[14.42578,50.08225],[14.42594,50.08249],[14.42545,50.08286],[14.42492,50.08326],[14.42449,50.08365],[14.4247,50.08364],[14.42446,50.08363],[14.42498,50.08329],[14.42545,50.08287],[14.42585,50.08253],[14.42608,50.08264],[14.42631,50.08279],[14.42649,50.08284],[14.42712,50.08321],[14.42787,50.0837],[14.42804,50.08382],[14.42854,50.08417],[14.42883,50.08438],[14.4292,50.08464],[14.42937,50.08475],[14.42978,50.08515],[14.4296,50.08529],[14.42942,50.08558],[14.42931,50.08577],[14.42928,50.08592],[14.42893,50.08712],[14.42863,50.08708],[14.42863,50.08724],[14.42861,50.08736],[14.42836,50.08738],[14.42832,50.08749],[14.42811,50.08729],[14.42785,50.08722],[14.42766,50.08726],[14.42745,50.08729],[14.42724,50.08728],[14.42664,50.08724],[14.42625,50.08722],[14.42595,50.08721],[14.42574,50.08719],[14.42555,50.08717],[14.42536,50.08716],[14.42456,50.08716],[14.42436,50.08716],[14.42392,50.08715],[14.42374,50.08715],[14.42356,50.08717],[14.42335,50.08719],[14.42306,50.08723],[14.42286,50.08726],[14.42256,50.0873],[14.42218,50.08728],[14.42176,50.08725],[14.42164,50.08749],[14.42159,50.08761],[14.42136,50.08807],[14.42101,50.0879],[14.42074,50.08779],[14.42055,50.08787],[14.42031,50.08785],[14.41974,50.08865],[14.41931,50.0893],[14.41924,50.08942],[14.41888,50.08998],[14.41873,50.09025],[14.41849,50.09059],[14.41841,50.09073],[14.41801,50.09136],[14.41782,50.09142],[14.41782,50.09157],[14.4177,50.09182],[14.41759,50.09199],[14.41744,50.09213]];
+
+const STOPS = [
+  { n: 'I', name: 'Main Station Hall', note: 'The historic hall, its glass dome and tiled facade, crowned the 1900s rail age.', c: [14.43529, 50.08318] },
+  { n: 'II', name: 'Wenceslas Square', note: 'A grand boulevard lined with ornamental hotel fronts and gilded lettering.', c: [14.42848, 50.08099] },
+  { n: 'III', name: 'Lucerna Passage', note: 'A glass-roofed arcade tucked inside the block, all curving rails and lamps.', c: [14.42516, 50.08157] },
+  { n: 'IV', name: 'Mucha Museum', note: 'Decorative posters and panels from the Czech master of the style.', c: [14.4247, 50.08364] },
+  { n: 'V', name: 'Municipal House', note: 'Opened in 1912: mosaics, stained glass and a lavishly ornamented concert hall.', c: [14.42832, 50.08749] },
+  { n: 'VI', name: 'Old Town Square', note: 'The medieval heart of the city, a calm pause between the set pieces.', c: [14.42161, 50.08756] },
+  { n: 'VII', name: 'Cech Bridge', note: 'A graceful steel arch over the Vltava, where the walk meets the river.', c: [14.41744, 50.09213] },
+];
+
+// ---------- ironwork: build mirrored halves ----------
+document.querySelectorAll('svg[data-mirror]').forEach((svg) => {
+  const half = svg.querySelector('.half');
+  const mirror = half.cloneNode(true);
+  mirror.setAttribute('transform', 'translate(' + svg.dataset.mirror + ' 0) scale(-1 1)');
+  svg.appendChild(mirror);
+});
+const side = document.querySelector('.iron-side');
+const sideR = side.cloneNode(true);
+sideR.classList.add('right');
+side.after(sideR);
+
+const arch = document.getElementById('arch');
+function growIron() {
+  if (reduce) return;
+  arch.classList.remove('grow');
+  void arch.offsetWidth; // restart the animation
+  arch.classList.add('grow');
+  setTimeout(() => arch.classList.remove('grow'), 900);
+}
+
+// ---------- map ----------
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  center: [14.4285, 50.0855],
+  zoom: 13.6,
+});
+
+// padding keeps points clear of the arch's curved top corners and the logo
+function pad(scale) {
+  const w = map.getContainer().clientWidth;
+  const k = scale || 1;
+  const phone = window.matchMedia('(max-width: 900px)').matches;
+  return {
+    top: Math.round(w * (phone ? 0.16 : 0.24) * k) + 16,
+    bottom: 70,
+    left: phone ? 40 : 56,
+    right: phone ? 40 : 56,
+  };
+}
+
+function recolour() {
+  const set = (id, kind, prop, val) => {
+    try { if (map.getLayer(id)) (kind === 'l' ? map.setLayoutProperty : map.setPaintProperty).call(map, id, prop, val); } catch (e) {}
+  };
+  map.getStyle().layers.forEach(({ id, type }) => {
+    if (type === 'background') set(id, 'p', 'background-color', C.cream);
+    else if (type === 'fill') {
+      if (/water/.test(id)) set(id, 'p', 'fill-color', '#8FB3A4');
+      else if (/park|wood|grass|scrub|agriculture|pitch|golf|landuse|national/.test(id) && !/building/.test(id)) set(id, 'p', 'fill-color', '#B7C7A0');
+      else if (/building/.test(id)) set(id, 'p', 'fill-color', '#E6D9B8');
+      else set(id, 'p', 'fill-color', '#F1E7CF');
+    } else if (type === 'line') {
+      if (/water/.test(id)) set(id, 'p', 'line-color', '#8FB3A4');
+      else if (/admin/.test(id)) set(id, 'p', 'line-color', C.rose);
+      else if (/case|casing/.test(id)) set(id, 'p', 'line-color', '#EADFC2');
+      else if (/road|bridge|tunnel|street|path|pedestrian|motorway|trunk|primary|secondary|tertiary|link|ferry/.test(id)) set(id, 'p', 'line-color', C.plum);
+    } else if (type === 'symbol') {
+      if (/poi|transit|airport|rail/.test(id)) set(id, 'l', 'visibility', 'none');
+      else {
+        set(id, 'p', 'text-color', /water/.test(id) ? C.teal : '#4A2A40');
+        set(id, 'p', 'text-halo-color', 'rgba(244,236,216,0.95)');
+      }
+    }
+  });
+}
+
+function lilyEl(stop, i) {
+  const root = document.createElement('div'); // Marker root: never styled
+  const btn = document.createElement('button');
+  btn.className = 'lily';
+  btn.type = 'button';
+  btn.setAttribute('aria-label', stop.name);
+  btn.innerHTML =
+    '<svg viewBox="0 0 30 40"><path class="stem" d="M15 40 V29"/>' +
+    '<path class="lily-leaf" d="M15 37 C9 36 6 32 6 29 C11 30 14 33 15 37Z"/>' +
+    '<path class="petal-s" d="M15 30 C7 27 2 18 3 9 C10 12 14 20 15 30Z"/>' +
+    '<path class="petal-s" d="M15 30 C23 27 28 18 27 9 C20 12 16 20 15 30Z"/>' +
+    '<path class="petal-c" d="M15 2 C8 10 8 22 15 31 C22 22 22 10 15 2Z"/>' +
+    '<text x="15" y="21">' + (i + 1) + '</text></svg>';
+  btn.addEventListener('click', () => select(i));
+  root.appendChild(btn);
+  return { root, btn };
+}
+
+const markers = [];
+const items = [];
+let current = -1;
+
+function select(i) {
+  current = i;
+  const s = STOPS[i];
+  items.forEach((b, k) => { b.classList.toggle('active', k === i); b.setAttribute('aria-pressed', k === i); });
+  markers.forEach((m, k) => m.btn.classList.toggle('on', k === i));
+  document.getElementById('live').textContent = s.name;
+  growIron();
+  if (window.matchMedia('(max-width: 900px)').matches) arch.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+  const opts = { center: s.c, zoom: 16, padding: pad(0.5) };
+  if (reduce) map.jumpTo(opts); else map.flyTo({ ...opts, duration: 1600, essential: false });
+}
+
+function overview() {
+  current = -1;
+  items.forEach((b) => { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); });
+  markers.forEach((m) => m.btn.classList.remove('on'));
+  const b = ROUTE.reduce((bb, c) => bb.extend(c), new mapboxgl.LngLatBounds(ROUTE[0], ROUTE[0]));
+  map.fitBounds(b, { padding: pad(1), maxZoom: 16, duration: reduce ? 0 : 1200 });
+}
+
+// ---------- cartouches ----------
+const list = document.getElementById('stops');
+STOPS.forEach((s, i) => {
+  const li = document.createElement('li');
+  const b = document.createElement('button');
+  b.className = 'cartouche';
+  b.type = 'button';
+  b.setAttribute('aria-pressed', 'false');
+  b.innerHTML = '<span class="num"></span><span class="name"></span><span class="note"></span>';
+  b.querySelector('.num').textContent = s.n;
+  b.querySelector('.name').textContent = s.name;
+  b.querySelector('.note').textContent = s.note;
+  b.addEventListener('click', () => select(i));
+  li.appendChild(b);
+  list.appendChild(li);
+  items.push(b);
+});
+document.getElementById('overview').addEventListener('click', () => { overview(); growIron(); });
+
+map.on('load', () => {
+  recolour();
+
+  map.addSource('walk', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE } } });
+  const firstSymbol = (map.getStyle().layers.find((l) => l.type === 'symbol') || {}).id;
+  map.addLayer({
+    id: 'walk-under', type: 'line', source: 'walk',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': C.cream, 'line-width': 7, 'line-opacity': 0.9 },
+  }, firstSymbol);
+  map.addLayer({
+    id: 'walk-dots', type: 'line', source: 'walk',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': C.gold, 'line-width': 4, 'line-dasharray': [0.01, 1.8] },
+  }, firstSymbol);
+
+  STOPS.forEach((s, i) => {
+    const m = lilyEl(s, i);
+    new mapboxgl.Marker({ element: m.root, anchor: 'bottom' }).setLngLat(s.c).addTo(map);
+    markers.push(m);
+  });
+
+  overview();
+});
+</script>
+</body>
+</html>

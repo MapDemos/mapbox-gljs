@@ -1,0 +1,458 @@
+/*
+  Rally Dash -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: the cockpit of a 1960s Italian GT car --
+  walnut veneer dashboard, chrome-bezel analog gauges with red needles,
+  toggle switches with amber lamps and a co-driver's paper route-book roll
+  with tulip diagrams -- deliberately distinct from every other style pack
+  in this folder: Academic Paper, Aero Gadgets, Amber Terminal, Arena, Atomic
+  Motel, Audio Guide, Aurora Command, Blueprint, Board Game, Bottom Sheet,
+  Broadcast, Brutalist Guide, Case Board, Celestial Tarot, Chalkboard,
+  Chronicle, Clinic Finder, Comic Panel, Constructivist, Data Notebook, Deco
+  Voyage, Drop Culture, E-Ink, Editorial Paper, Estate Luxe, Event Invite,
+  Field Journal, Fleet Ops, Frontier Poster, Highway Sign, Isotype, Line
+  Diagram, Memphis, Moving Map, Neon HUD, Nordic Cabin, Papercraft, Pastel
+  Bento, Pixel Quest, Postcards, Raw Web, Retro OS, Riso Zine, Ski Piste,
+  Slate Console, Soft UI, Split Flap, Stained Glass, Sticker Book, Storefront,
+  Story Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt, Trailhead, Trip
+  Kanban, Vapor Sunset, Vintage Chart, Washi Seasons, Weather Console,
+  Whiteboard and Zellige; and also distinct from the 19 sibling packs being
+  built in parallel right now: Ukiyo-e Coast, Herbarium, Film Noir, Dive
+  Log, Illuminated, Stage Profile, Treasure Hunt, Tiki Lagoon, Grand Hotel,
+  Orienteering, Museum Label, Regatta, Code Editor, Watercolor, Annual
+  Report, Truck Art, Papel Picado, Vinyl Crate and Art Nouveau).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/rally-dash.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Michroma for headings and gauge
+  numerals, Rajdhani for body text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+
+  Signature touch: the COCKPIT layout -- the map is the windscreen (gently
+  curved top corners only, so the Mapbox logo and attribution stay clear at
+  the bottom) and everything else sits on a walnut-grain dashboard built
+  from layered gradients plus a stretched feTurbulence data-URI, with
+  glossy chrome bezels, a leather brow with cream stitching, and a paper
+  route-book roll at the right.
+
+  Class/id contract (see rally-dash-template.html in this same folder for a
+  full working example):
+
+  - #map                      the windscreen's map container (every demo
+                               defines its own positioning)
+  - .cockpit                  page root: windscreen on top, dashboard below
+    .windscreen               wrapper around #map, curved top corners only
+      .plate                    small chrome nameplate on the windscreen
+      .plate-title / .plate-sub  Michroma title + Rajdhani sub-line
+    .dashboard                walnut veneer panel
+      .dash-brow                 leather brow with cream stitching
+      .dash-main                 left column: gauges + controls
+      .gauges                    row of gauges
+        .gauge                     one gauge cell (svg built by script)
+          .gauge-svg               the svg element
+          .gauge-label             Michroma caption under the dial
+      .controls                  row: start button, prev/next, switches
+      .switch                    <button role="switch" aria-checked>
+        .switch-slot / .switch-lever   recessed slot + chrome lever
+        .switch-lamp                   amber lamp (lit when on)
+        .switch-text                   caption
+  - .btn, .btn-primary,       chrome keys; .btn-primary is the big Start
+    .btn-secondary              button (with .btn-lamp inside), .btn-secondary
+                                 is a small Prev/Next key
+  - .routebook                paper route-book roll
+    .rb-head                   header strip (title + totals)
+    .rb-list                   scroll area (<ol>)
+    .rb-item (+.active/.done)  one tulip row: .tulip (svg), .rb-km,
+                                .rb-name, .rb-note
+  - .status-note              small stencil status line (+.loading/.error)
+  - .car-marker               inner element of the car Marker
+  - .stop-marker              inner element of numbered tulip Markers
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --walnut: #5A3A22;
+  --walnut-dark: #2E1B0E;
+  --walnut-light: #8A5A36;
+  --leather: #1B1714;
+  --leather-2: #2A231E;
+  --chrome-hi: #D6D9DC;
+  --chrome-lo: #8C9196;
+  --chrome: linear-gradient(145deg, #F2F4F5 0%, #D6D9DC 28%, #8C9196 58%, #C9CDD1 80%, #7E8388 100%);
+  --face: #F4EEDC;
+  --ink: #1B1714;
+  --needle: #D2281E;
+  --amber: #F5A623;
+  --green: #0E4D3A;
+  --paper: #F4EBD0;
+  --paper-edge: #D8C9A0;
+  --cream: #F4EEDC;
+  --error: #D2281E;
+
+  --font-head: 'Michroma', 'Eurostile', 'Arial Black', sans-serif;
+  --font-body: 'Rajdhani', 'Arial Narrow', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; height: 100%; }
+
+body {
+  background: var(--leather);
+  color: var(--cream);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 16px;
+  overflow: hidden; /* desktop: one screen; phone rule below re-enables scroll */
+}
+
+button { font-family: inherit; color: inherit; }
+
+.hidden { display: none !important; }
+
+/* ---- Cockpit shell: windscreen 60% / dashboard 40% ---- */
+.cockpit {
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 60% minmax(0, 1fr);
+  background: var(--leather);
+}
+
+.windscreen {
+  position: relative;
+  min-height: 0;
+  border-radius: 56px 56px 0 0 / 34px 34px 0 0;
+  overflow: hidden;
+  background: #9db4c8;
+}
+/* leather A-pillar frame: top + sides only, bottom stays open so the logo
+   and attribution are never covered */
+.windscreen::after {
+  content: '';
+  position: absolute; inset: 0;
+  border: 8px solid var(--leather);
+  border-bottom: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2px rgba(214, 217, 220, 0.35);
+  pointer-events: none;
+}
+
+.plate {
+  position: absolute; z-index: 2;
+  top: 20px; left: 28px;
+  padding: 8px 16px 9px;
+  border-radius: 6px;
+  background: var(--chrome);
+  color: var(--ink);
+  box-shadow: 0 2px 0 rgba(255, 255, 255, 0.6) inset, 0 -2px 0 rgba(0, 0, 0, 0.25) inset, 0 4px 10px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  max-width: calc(100% - 56px);
+}
+.plate-title {
+  display: block;
+  font-family: var(--font-head);
+  font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase;
+}
+.plate-sub {
+  display: block; margin-top: 2px;
+  font-weight: 700; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #4a4e52;
+}
+
+/* ---- Dashboard: walnut veneer ---- */
+.dashboard {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+  gap: 18px;
+  padding: 26px 20px 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 220, 170, 0.16) 0%, rgba(255, 220, 170, 0) 26%, rgba(0, 0, 0, 0.3) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='260'%3E%3Cfilter id='g' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.004 0.16' numOctaves='3' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 0.1  0 0 0 0 0.05  0 0 0 0 0.02  1.9 0 0 0 -0.7'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E"),
+    repeating-linear-gradient(176deg, rgba(0, 0, 0, 0) 0 9px, rgba(40, 20, 8, 0.18) 9px 11px, rgba(0, 0, 0, 0) 11px 23px, rgba(255, 200, 140, 0.07) 23px 25px),
+    var(--walnut);
+  box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.5);
+}
+
+.dash-brow {
+  position: absolute; z-index: 1;
+  left: 0; right: 0; top: 0; height: 14px;
+  background: linear-gradient(180deg, #2c2520, var(--leather));
+  border-bottom: 2px solid #0c0a08;
+  pointer-events: none;
+}
+.dash-brow::after {
+  content: '';
+  position: absolute; left: 14px; right: 14px; bottom: 3px;
+  border-bottom: 2px dashed rgba(244, 238, 220, 0.55);
+}
+
+.dash-main {
+  display: flex; flex-direction: column; justify-content: space-between;
+  gap: 10px;
+  min-width: 0; min-height: 0;
+}
+
+.gauges {
+  display: flex; justify-content: center; align-items: center;
+  gap: clamp(8px, 2.2vw, 36px);
+  min-height: 0; flex: 1 1 auto;
+}
+.gauge {
+  display: flex; flex-direction: column; align-items: center;
+  min-width: 0;
+}
+.gauge-svg {
+  display: block;
+  width: clamp(100px, 19dvh, 200px);
+  height: auto; aspect-ratio: 1;
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.55));
+}
+.gauge:nth-child(2) .gauge-svg { width: clamp(110px, 22dvh, 230px); } /* tach is the centrepiece */
+.gauge-label {
+  margin-top: -2px;
+  font-family: var(--font-head);
+  font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--cream); opacity: 0.85;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* ---- Controls row ---- */
+.controls {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: 10px 16px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(27, 23, 20, 0.88), rgba(27, 23, 20, 0.7));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.keys { display: flex; align-items: center; gap: 8px; }
+
+.btn {
+  cursor: pointer;
+  border: 0;
+  background: var(--chrome);
+  color: var(--ink);
+  font-family: var(--font-head);
+  text-transform: uppercase; letter-spacing: 0.12em;
+  border-radius: 8px;
+  box-shadow: 0 2px 0 rgba(255, 255, 255, 0.75) inset, 0 -3px 0 rgba(0, 0, 0, 0.3) inset, 0 3px 0 #4f5358, 0 6px 10px rgba(0, 0, 0, 0.5);
+  transition: transform 0.08s, box-shadow 0.08s, filter 0.15s;
+}
+.btn:hover { filter: brightness(1.06); }
+.btn:active, .btn.pressed {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 rgba(255, 255, 255, 0.5) inset, 0 -3px 0 rgba(0, 0, 0, 0.3) inset, 0 0 0 #4f5358, 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+.btn:focus-visible, .switch:focus-visible, .rb-item:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+.btn:disabled { opacity: 0.5; cursor: default; }
+
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 12px;
+  min-width: 150px; min-height: 56px;
+  padding: 0 22px;
+  font-size: 15px;
+  border-radius: 28px;
+}
+.btn-lamp {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ff8a80, var(--needle) 55%, #6e0f0a);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45), 0 0 8px rgba(210, 40, 30, 0.7);
+}
+.btn-primary.running .btn-lamp {
+  background: radial-gradient(circle at 35% 30%, #c8ffd8, #2fbf6a 55%, #0e4d3a);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45), 0 0 10px rgba(47, 191, 106, 0.8);
+}
+.btn-secondary {
+  min-width: 56px; min-height: 40px; padding: 0 12px;
+  font-size: 11px;
+}
+
+/* ---- Toggle switches ---- */
+.switch {
+  cursor: pointer;
+  display: grid; justify-items: center; gap: 3px;
+  min-width: 64px;
+  padding: 2px 4px;
+  background: none; border: 0;
+}
+.switch-lamp {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #4a3410;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5) inset, 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.switch[aria-checked="true"] .switch-lamp {
+  background: radial-gradient(circle at 35% 30%, #ffe2a0, var(--amber) 60%, #a86a0a);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5), 0 0 9px 2px rgba(245, 166, 35, 0.75);
+}
+.switch-slot {
+  position: relative;
+  width: 30px; height: 38px;
+  border-radius: 15px;
+  background: linear-gradient(90deg, #0a0807, #2a231e 50%, #0a0807);
+  box-shadow: 0 0 0 3px #A5AAAE, 0 0 0 4px #4a4e52, 0 3px 6px rgba(0, 0, 0, 0.6);
+}
+.switch-lever {
+  position: absolute; left: 50%; top: 50%;
+  width: 8px; height: 26px;
+  margin: -26px 0 0 -4px;
+  transform-origin: 50% 100%;
+  transform: rotate(-24deg);
+  border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(90deg, #7E8388, #F2F4F5 45%, #8C9196);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.6);
+  transition: transform 0.14s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.switch-lever::before {
+  content: '';
+  position: absolute; left: -2px; top: -5px; width: 12px; height: 12px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #C9CDD1 45%, #6f7478);
+}
+.switch[aria-checked="true"] .switch-lever { transform: rotate(24deg); }
+.switch-text {
+  font-family: var(--font-head);
+  font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--cream); text-align: center; line-height: 1.3;
+}
+
+/* ---- Route book: a paper roll ---- */
+.routebook {
+  position: relative;
+  display: flex; flex-direction: column;
+  min-width: 0; min-height: 0;
+  margin-top: 4px;
+  border-radius: 6px;
+  color: var(--ink);
+  background:
+    repeating-linear-gradient(0deg, rgba(120, 90, 40, 0.05) 0 1px, rgba(0, 0, 0, 0) 1px 4px),
+    var(--paper);
+  box-shadow: 0 0 0 2px #8a6c3a inset, 0 8px 16px rgba(0, 0, 0, 0.55);
+}
+/* roll cylinders at top and bottom */
+.routebook::before, .routebook::after {
+  content: '';
+  position: absolute; left: -6px; right: -6px; height: 14px; z-index: 2;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #F2F4F5, #A7ABAF 40%, #5d6165 100%);
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+.routebook::before { top: -7px; }
+.routebook::after { bottom: -7px; }
+
+.rb-head {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  padding: 16px 14px 6px;
+  border-bottom: 2px solid var(--green);
+}
+.rb-title {
+  margin: 0;
+  font-family: var(--font-head); font-weight: 400;
+  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--green);
+}
+.rb-total { font-weight: 700; font-size: 14px; color: #6b5a34; white-space: nowrap; }
+
+.rb-list {
+  list-style: none; margin: 0; padding: 0 0 12px;
+  overflow-y: auto; flex: 1 1 auto; min-height: 0;
+  position: relative;
+}
+.rb-item {
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 46px 64px minmax(0, 1fr);
+  align-items: center; gap: 8px;
+  padding: 6px 12px 6px 10px;
+  border-bottom: 1px dashed rgba(107, 90, 52, 0.45);
+  border-left: 5px solid transparent;
+}
+.rb-item.done { opacity: 0.55; }
+.rb-item.active {
+  background: linear-gradient(90deg, rgba(245, 166, 35, 0.35), rgba(245, 166, 35, 0.08));
+  border-left-color: var(--needle);
+}
+.tulip { width: 46px; height: 52px; display: block; }
+.tulip .t-road { stroke: #3b3226; }
+.tulip .t-dot { fill: var(--green); }
+.tulip .t-turn { stroke: var(--needle); }
+.tulip .t-head { fill: var(--needle); }
+.rb-km {
+  font-family: var(--font-head); font-size: 13px; line-height: 1.1;
+}
+.rb-km small { display: block; margin-top: 2px; font-family: var(--font-body); font-weight: 700; font-size: 11px; color: #6b5a34; letter-spacing: 0.06em; }
+.rb-name { display: block; font-weight: 700; font-size: 16px; line-height: 1.15; }
+.rb-note { display: block; font-size: 13.5px; line-height: 1.2; color: #5e5030; }
+
+/* ---- Status note ---- */
+.status-note {
+  position: absolute; z-index: 2; left: 50%; bottom: 40px; transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 4px;
+  background: rgba(27, 23, 20, 0.9);
+  color: var(--cream);
+  font-family: var(--font-head); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+  pointer-events: none;
+}
+.status-note.loading::before { content: '\25CF '; color: var(--amber); }
+.status-note.error { color: #ffb4ad; }
+.status-note.error::before { content: '\25B2 '; color: var(--error); }
+
+/* ---- Map markers (inner elements only) ---- */
+.car-marker {
+  width: 26px; height: 40px; display: block;
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.6));
+}
+.stop-marker {
+  display: grid; place-items: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  cursor: pointer;
+  background: radial-gradient(circle at 35% 30%, #ffe2a0, var(--amber) 60%, #a86a0a);
+  border: 2px solid #F2F4F5;
+  box-shadow: 0 0 0 1.5px var(--leather), 0 0 8px rgba(245, 166, 35, 0.8);
+  font-family: var(--font-head); font-size: 9px; color: var(--ink);
+}
+.stop-marker.active { background: radial-gradient(circle at 35% 30%, #ff9c92, var(--needle) 60%, #6e0f0a); color: #fff; width: 26px; height: 26px; }
+
+/* Mapbox controls: keep logo/attribution visible when terrain is on */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) { display: block !important; }
+
+/* ---- Short desktop windows: tighter dashboard ---- */
+@media (max-height: 760px) and (min-width: 821px) {
+  .dashboard { padding-top: 22px; gap: 14px; }
+  .btn-primary { min-height: 48px; }
+  .switch-slot { height: 32px; }
+}
+
+/* ---- Narrow desktop / tablet ---- */
+@media (max-width: 1000px) and (min-width: 821px) {
+  .dashboard { grid-template-columns: minmax(0, 1fr) 280px; }
+  .gauges { gap: 6px; }
+}
+
+/* ---- Phone: windscreen 50dvh, two gauges, switches, route book; page scrolls ---- */
+@media (max-width: 820px) {
+  body { overflow-y: auto; }
+  .cockpit { height: auto; min-height: 100dvh; grid-template-rows: 50dvh auto; }
+  .windscreen { border-radius: 36px 36px 0 0 / 22px 22px 0 0; }
+  .plate { top: 14px; left: 18px; padding: 6px 12px 7px; }
+  .plate-title { font-size: 11px; }
+  .plate-sub { font-size: 12px; }
+  .dashboard { grid-template-columns: minmax(0, 1fr); padding: 26px 16px 28px; }
+  .gauges { gap: 14px; }
+  .gauge-svg, .gauge:nth-child(2) .gauge-svg { width: min(40vw, 170px); }
+  .gauge.tach { display: none; }
+  .controls { gap: 10px 12px; }
+  .btn-primary { flex: 1 1 100%; justify-content: center; }
+  .routebook { margin-top: 10px; }
+  .rb-list { overflow: visible; max-height: none; }
+  .routebook, .rb-list { flex: none; }
+  .rb-list { max-height: 360px; overflow-y: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch-lever, .btn, .switch-lamp { transition: none; }
+}

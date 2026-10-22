@@ -1,0 +1,380 @@
+<!--
+  Working EXAMPLE of the Regatta style pack (regatta.css, in this same
+  folder). Open this file directly to see the pattern working: a yacht-race
+  committee boat on the Mapbox Standard style (day preset, POI labels off)
+  in the Solent off Cowes, Isle of Wight. A strip of international signal
+  flags spells the regatta name; the "Race Committee" panel on the right has
+  a start-sequence countdown (class flag, P flag, I flag), a wind dial and a
+  live fleet leaderboard. Press "Start sequence": a ~10 s accelerated
+  5-minute countdown flips the flags, then six yachts sail the course (beat,
+  run, reach) and the standings reorder live. Click a buoy or a chip to fly
+  to a mark. With prefers-reduced-motion the page shows a static mid-race
+  snapshot instead. Copy the markup below into your own demo and link
+  regatta.css from its <head> -- see the class/id contract documented at the
+  top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief at the user's request for something distinct from
+  every other pack in this folder. The place is real, but the regatta, the
+  club, the yachts, sail numbers and the course marks are fictional
+  placeholders (the marks sit in open water, not on any real race area) --
+  swap in your own.
+
+  What's NOT included: real AIS/tracking data, GPS or wind feeds, tide
+  modelling, a real tactics engine (yacht speeds are a simple scripted
+  model), routing, search, or a hard-coded access token (demo-kit.js sets
+  that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Regatta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Signika:wght@400;500;600&family=Squada+One&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="regatta.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="hoist">
+    <div class="halyard"></div>
+    <div class="flag-row" id="flag-row" role="img" aria-label="Signal flags spelling SOLENT CUP"></div>
+    <div class="hoist-title">
+      <h1>Solent Cup Regatta</h1>
+      <p class="hoist-sub">Fictional event &middot; Cowes Roads</p>
+    </div>
+  </header>
+
+  <div class="body">
+    <div class="stage"><div id="map"></div></div>
+
+    <aside class="committee" aria-label="Race Committee">
+      <div class="cm-head">
+        <h2 class="cm-title">Race Committee</h2>
+        <div class="rivets"><i></i><i></i><i></i></div>
+      </div>
+
+      <section class="cm-sec">
+        <h3 class="cm-h">Start sequence</h3>
+        <div class="countdown">
+          <div class="cd-flags" id="cd-flags"></div>
+          <div class="cd-timer" id="cd-timer" role="timer" aria-live="off">5:00</div>
+          <p class="cd-caption" id="cd-caption">Standing by on the committee boat</p>
+        </div>
+        <button class="btn btn-primary" id="start-btn">Start sequence</button>
+      </section>
+
+      <section class="cm-sec">
+        <h3 class="cm-h">Wind</h3>
+        <div class="wind">
+          <svg class="dial" id="dial" viewBox="0 0 120 120" role="img" aria-label="Wind dial"></svg>
+          <div class="wind-read">
+            <div class="wind-kn"><span id="w-kn">14</span><small>kn</small></div>
+            <p id="w-dir">From N 005&deg;</p>
+            <p>Gusting 18 &middot; Beaufort 4</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="cm-sec">
+        <h3 class="cm-h">Fleet standings</h3>
+        <ol class="standings" id="standings"></ol>
+        <p class="status-note" id="status" aria-live="polite"></p>
+      </section>
+
+      <section class="cm-sec">
+        <h3 class="cm-h">Course marks</h3>
+        <div class="chip-row" id="chips"></div>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<script>
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = window.matchMedia('(max-width: 760px)').matches;
+const $ = (id) => document.getElementById(id);
+const NAVY = '#0B2545', K = '#111827';
+// Phones get a tighter box (Cowes just a strip at the bottom) so the course is larger.
+const BOUNDS = phone ? [[-1.3085, 50.7690], [-1.2840, 50.8002]] : [[-1.3085, 50.7650], [-1.2840, 50.8012]];
+const PAD = phone ? { top: 30, bottom: 64, left: 24, right: 24 } : { top: 50, bottom: 80, left: 60, right: 60 };
+
+/* ---- International signal flags (simple geometric, 48x32) ---- */
+const FLAGS = {
+  S: '<rect width="48" height="32" fill="#fff"/><rect x="14" y="8" width="20" height="16" fill="#1B65A6"/>',
+  O: '<polygon points="0,0 48,0 0,32" fill="#F7C548"/><polygon points="48,0 48,32 0,32" fill="#D7263D"/>',
+  L: '<rect width="24" height="16" fill="#F7C548"/><rect x="24" width="24" height="16" fill="' + K + '"/><rect y="16" width="24" height="16" fill="' + K + '"/><rect x="24" y="16" width="24" height="16" fill="#F7C548"/>',
+  E: '<rect width="48" height="16" fill="#1B65A6"/><rect y="16" width="48" height="16" fill="#D7263D"/>',
+  N: (() => { let s = '<rect width="48" height="32" fill="#fff"/>'; for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) if ((r + c) % 2 === 0) s += `<rect x="${c * 12}" y="${r * 8}" width="12" height="8" fill="#1B65A6"/>`; return s; })(),
+  T: '<rect width="16" height="32" fill="#D7263D"/><rect x="16" width="16" height="32" fill="#fff"/><rect x="32" width="16" height="32" fill="#1B65A6"/>',
+  C: '<rect width="48" height="32" fill="#1B65A6"/><rect y="6.4" width="48" height="6.4" fill="#fff"/><rect y="12.8" width="48" height="6.4" fill="#D7263D"/><rect y="19.2" width="48" height="6.4" fill="#fff"/>',
+  U: '<rect width="24" height="16" fill="#D7263D"/><rect x="24" width="24" height="16" fill="#fff"/><rect y="16" width="24" height="16" fill="#fff"/><rect x="24" y="16" width="24" height="16" fill="#D7263D"/>',
+  P: '<rect width="48" height="32" fill="#1B65A6"/><rect x="12" y="8" width="24" height="16" fill="#fff"/>',
+  I: '<rect width="48" height="32" fill="#111827"/><circle cx="24" cy="16" r="9" fill="#F7C548"/>',
+};
+const flagSVG = (l, name) =>
+  `<svg class="flag" viewBox="0 0 48 32" role="img" aria-label="${name || l} flag"><title>${name || l}</title>${FLAGS[l]}<rect width="48" height="32" fill="none" stroke="rgba(11,37,69,.45)"/></svg>`;
+
+const row = $('flag-row');
+'SOLENT CUP'.split('').forEach((ch) => {
+  const w = document.createElement('div');
+  if (ch === ' ') { w.className = 'flag-gap'; } else { w.className = 'flag-wrap'; w.innerHTML = flagSVG(ch); }
+  row.appendChild(w);
+});
+
+/* ---- Start-sequence flag slots ---- */
+const SLOTS = [['E', 'Class'], ['P', 'Prep'], ['I', '1 min']];
+$('cd-flags').innerHTML = SLOTS.map(([l, t]) =>
+  `<div class="cd-slot">${flagSVG(l)}<span class="cd-slot-label">${t}</span></div>`).join('');
+const slotEls = [...document.querySelectorAll('.cd-slot')];
+const setSlots = (a) => slotEls.forEach((el, i) => el.classList.toggle('up', !!a[i]));
+
+/* ---- Wind dial ---- */
+(function dial() {
+  let s = '<circle class="dial-ring" cx="60" cy="60" r="54"/>';
+  for (let a = 0; a < 360; a += 15) {
+    const r = a % 90 === 0 ? 44 : 47, rad = (a - 90) * Math.PI / 180;
+    s += `<line class="dial-tick${a % 90 === 0 ? ' major' : ''}" x1="${60 + r * Math.cos(rad)}" y1="${60 + r * Math.sin(rad)}" x2="${60 + 51 * Math.cos(rad)}" y2="${60 + 51 * Math.sin(rad)}"/>`;
+  }
+  [['N', 0], ['E', 90], ['S', 180], ['W', 270]].forEach(([t, a]) => {
+    const rad = (a - 90) * Math.PI / 180;
+    s += `<text class="dial-n${t === 'N' ? ' north' : ''}" x="${60 + 37 * Math.cos(rad)}" y="${60 + 37 * Math.sin(rad)}">${t}</text>`;
+  });
+  s += '<g id="w-arrow"><polygon class="dial-arrow" points="56.5,31 63.5,31 63.5,72 71,72 60,90 49,72 56.5,72"/></g><circle class="dial-hub" cx="60" cy="60" r="4"/>';
+  $('dial').innerHTML = s;
+})();
+const PTS16 = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+function setWind(from, kn) {
+  // The arrow points the way the wind blows (downwind): rotate "from" degrees.
+  $('w-arrow').setAttribute('transform', `rotate(${from.toFixed(1)} 60 60)`);
+  const f = (from + 360) % 360;
+  $('w-kn').textContent = kn;
+  $('w-dir').innerHTML = `From ${PTS16[Math.round(f / 22.5) % 16]} ${String(Math.round(f)).padStart(3, '0')}&deg;`;
+}
+setWind(5, 14);
+
+/* ---- Course geometry (fictional marks in open water, Cowes Roads) ---- */
+const M = {
+  cb:  [-1.2985, 50.7815], pin: [-1.3070, 50.7815],      // start line
+  ww:  [-1.3000, 50.7990],                               // windward mark
+  gA:  [-1.3070, 50.7870], gB: [-1.2986, 50.7870],        // leeward gate
+  fA:  [-1.2860, 50.7925], fB: [-1.2860, 50.7885],        // finish line
+};
+const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+const S = mid(M.cb, M.pin), G = mid(M.gA, M.gB), F = mid(M.fA, M.fB);
+const PATH = [S, M.ww, G, F];                            // beat, run, reach
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  bounds: BOUNDS,
+  fitBoundsOptions: { padding: PAD },
+  config: { basemap: { lightPreset: 'day', showPointOfInterestLabels: false } },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+map.on('style.load', () => {
+  const line = (coords) => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords } });
+  map.addSource('course', { type: 'geojson', data: { type: 'FeatureCollection', features: [
+    { ...line(PATH), properties: { k: 'legs' } },
+    { ...line([M.pin, M.cb]), properties: { k: 'start' } },
+    { ...line([M.fA, M.fB]), properties: { k: 'finish' } },
+    { ...line([M.gA, M.gB]), properties: { k: 'gate' } },
+  ] } });
+  const em = { 'line-emissive-strength': 1 };
+  const L = (id, k, paint, extra) => map.addLayer({ id, type: 'line', source: 'course', slot: 'top',
+    filter: ['==', ['get', 'k'], k], layout: { 'line-join': 'round' }, paint: { ...em, ...paint }, ...extra });
+  L('legs-halo', 'legs', { 'line-color': '#FAFAFA', 'line-width': 6, 'line-opacity': .65 });
+  L('legs', 'legs', { 'line-color': NAVY, 'line-width': 3, 'line-dasharray': [2, 1.6] });
+  L('gate-line', 'gate', { 'line-color': NAVY, 'line-width': 2, 'line-dasharray': [1, 2] });
+  L('start-line', 'start', { 'line-color': '#D7263D', 'line-width': 4 });
+  L('finish-halo', 'finish', { 'line-color': '#FAFAFA', 'line-width': 6 });
+  L('finish-line', 'finish', { 'line-color': NAVY, 'line-width': 4, 'line-dasharray': [1, 1] });
+});
+
+/* ---- Mark markers (inner child styled; click flies to the mark) ---- */
+const fly = (c, zoom = 15.6) => {
+  const o = { center: c, zoom };
+  if (reduce) map.jumpTo(o); else map.flyTo({ ...o, duration: 2000 });
+};
+const BOAT = '<svg viewBox="0 0 22 18"><path d="M1 11h20l-4 6H5z" fill="#FAFAFA" stroke="#0B2545" stroke-width="1.5" stroke-linejoin="round"/><path d="M11 10V1" stroke="#0B2545" stroke-width="1.5"/><path d="M11 1.5h8l-2.5 2.5L19 6.5h-8z" fill="#D7263D" stroke="#0B2545" stroke-width="1"/></svg>';
+[
+  ['cb', 'Committee', 'boat'], ['pin', 'Pin', 'orange'], ['ww', 'Windward', ''],
+  ['gA', 'Gate', 'orange'], ['gB', '', 'orange'], ['fA', 'Finish', 'finish'], ['fB', '', 'finish'],
+].forEach(([k, label, type]) => {
+  const el = document.createElement('div');
+  el.innerHTML = `<div class="mark" title="${label || 'Mark'}"><div class="buoy ${type}">${type === 'boat' ? BOAT : ''}</div>${label ? `<span class="mark-label${k === 'fA' ? ' side' : ''}">${label}</span>` : ''}</div>`;
+  el.addEventListener('click', () => fly(M[k]));
+  new mapboxgl.Marker({ element: el, anchor: 'center' }).setLngLat(M[k]).addTo(map);
+});
+[['Start line', S], ['Windward', M.ww], ['Gate', G], ['Finish', F]].forEach(([t, c]) => {
+  const b = document.createElement('button');
+  b.className = 'chip'; b.textContent = t;
+  b.addEventListener('click', () => fly(c, t === 'Windward' ? 15.2 : 15.6));
+  $('chips').appendChild(b);
+});
+const full = document.createElement('button');
+full.className = 'chip'; full.textContent = 'Whole course';
+full.addEventListener('click', () => {
+  map.fitBounds(BOUNDS, { padding: PAD, duration: reduce ? 0 : 1600 });
+});
+$('chips').appendChild(full);
+
+/* ---- Path maths in local metres (x east, y north) ---- */
+const KX = 111320 * Math.cos(50.79 * Math.PI / 180), KY = 110574, O = S;
+const xy = (c) => [(c[0] - O[0]) * KX, (c[1] - O[1]) * KY];
+const ll = (p) => [O[0] + p[0] / KX, O[1] + p[1] / KY];
+const legs = []; let total = 0;
+for (let i = 0; i < PATH.length - 1; i++) {
+  const a = xy(PATH[i]), b = xy(PATH[i + 1]);
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  legs.push({ a, t: [(b[0] - a[0]) / len, (b[1] - a[1]) / len], len, cum: total });
+  total += len;
+}
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const ramp = (x) => 0.4 + 0.6 * clamp(x * 8, 0, 1);
+
+// Position at distance d along the course, spread = sideways slot of the yacht.
+function posAt(d, y) {
+  let i = 0;
+  while (i < legs.length - 1 && d >= legs[i].cum + legs[i].len) i++;
+  const lg = legs[i], local = d - lg.cum, fr = clamp(local / lg.len, 0, 1);
+  const inn = i === 0 ? 1 : ramp(fr), out = i === legs.length - 1 ? 1 : ramp(1 - fr);
+  let lat = y.spread * 78 * inn * out;
+  // Upwind leg: tack back and forth across the course axis.
+  if (i === 0 && d > 0) lat += 70 * Math.sin(local / (85 + y.k * 6) + y.ph) * clamp(Math.sin(Math.PI * fr) * 4, 0, 1);
+  const n = [lg.t[1], -lg.t[0]];
+  return [lg.a[0] + lg.t[0] * local + n[0] * lat, lg.a[1] + lg.t[1] * local + n[1] * lat];
+}
+
+/* ---- Fleet (fictional yachts) ---- */
+const FLEET = [
+  { name: 'Petrel',     sail: 'GBR 412',  col: '#D7263D' },
+  { name: 'Kittiwake',  sail: 'GBR 1907', col: '#F7C548' },
+  { name: 'Sea Hare',   sail: 'IRL 88',   col: '#1B65A6' },
+  { name: 'Mistral',    sail: 'FRA 315',  col: '#FAFAFA' },
+  { name: 'Gannet',     sail: 'USA 64',   col: '#E8743B' },
+  { name: 'Tulip',      sail: 'NED 506',  col: '#B08D57' },
+];
+const ROW_H = 30, RACE_T = 60, BASE = total / RACE_T;
+FLEET.forEach((y, i) => {
+  y.k = i; y.spread = i - 2.5; y.f = 1 - i * 0.004;
+  y.w = 0.4 + ((i * 37) % 6) * 0.09; y.a = 0.22 / y.w; y.ph = i * 1.7;
+  y.d = -100 - (i % 3) * 14; y.fin = null; y.heading = 0;
+  const el = document.createElement('div');
+  el.innerHTML = `<div class="yacht" title="${y.name} ${y.sail}"><svg viewBox="0 0 24 24"><path d="M12 1 20 21 12 23 4 21Z" fill="#FAFAFA" stroke="${NAVY}" stroke-width="1.3" stroke-linejoin="round"/><path d="M12 4 19 19H5Z" fill="${y.col}" stroke="${NAVY}" stroke-width="1.2" stroke-linejoin="round"/></svg></div>`;
+  y.inner = el.firstChild;
+  y.marker = new mapboxgl.Marker({ element: el, anchor: 'center' }).setLngLat(ll(posAt(y.d, y))).addTo(map);
+  const li = document.createElement('li');
+  li.className = 'st-row';
+  li.innerHTML = `<span class="st-rank"></span><span class="st-sail"><svg class="st-swatch" viewBox="0 0 24 24"><path d="M12 3 21 21H3Z" fill="${y.col}" stroke="${NAVY}" stroke-width="1.6" stroke-linejoin="round"/></svg></span><span class="st-name">${y.name}<small>${y.sail}</small></span><span class="st-gap">--</span>`;
+  y.row = li; y.rankEl = li.children[0]; y.gapEl = li.children[3];
+  $('standings').appendChild(li);
+});
+$('standings').style.height = FLEET.length * ROW_H + 'px';
+document.querySelectorAll('.st-row').forEach((r) => { r.style.height = ROW_H + 'px'; });
+
+// Place markers and re-sort the leaderboard from each yacht's d / fin.
+function layout(live) {
+  FLEET.forEach((y) => {
+    const p1 = posAt(y.d, y), p2 = posAt(y.d + 8, y);
+    y.marker.setLngLat(ll(p1));
+    y.inner.style.transform = `rotate(${(Math.atan2(p2[0] - p1[0], p2[1] - p1[1]) * 180 / Math.PI).toFixed(1)}deg)`;
+  });
+  const order = FLEET.slice().sort((a, b) =>
+    (a.fin != null && b.fin != null) ? a.fin - b.fin : a.fin != null ? -1 : b.fin != null ? 1 : (b.d - a.d) || (a.k - b.k));
+  const lead = order[0];
+  order.forEach((y, r) => {
+    y.row.style.transform = `translateY(${r * ROW_H}px)`;
+    y.row.classList.toggle('lead', r === 0 && live);
+    y.rankEl.textContent = r + 1;
+    if (!live) y.gapEl.textContent = '--';
+    else if (y.fin != null) y.gapEl.textContent = r === 0 ? 'WIN' : 'FIN';
+    else if (r === 0) {
+      let li = 0; while (li < legs.length - 1 && y.d >= legs[li].cum + legs[li].len) li++;
+      y.gapEl.textContent = 'LEG ' + (li + 1);
+    } else y.gapEl.textContent = '+' + Math.max(1, Math.round((Math.min(lead.d, total) - y.d) / BASE)) + 's';
+  });
+  return order;
+}
+
+// Yacht distance at race time t (seconds): steady pace plus a gentle surge.
+function raceAt(t) {
+  FLEET.forEach((y) => {
+    const raw = BASE * y.f * (t + y.a * (Math.sin(y.w * t + y.ph) - Math.sin(y.ph)));
+    if (y.fin == null && raw >= total) y.fin = t;
+    y.raw = raw;
+    y.d = Math.min(raw, total + 50) - 100 * (1 - Math.min(1, t / 5));
+  });
+}
+
+/* ---- Sequence state machine ---- */
+const CD = 10;                       // seconds of real time for the 5:00 countdown
+const btn = $('start-btn'), timer = $('cd-timer'), cap = $('cd-caption'), status = $('status');
+let phase = 'idle', t0 = 0;
+
+function setCountdown(e) {
+  const rem = 300 * (1 - e / CD), s = Math.max(0, Math.ceil(rem));
+  timer.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  if (rem > 240) { setSlots([1, 0, 0]); cap.textContent = 'Class flag up: warning signal'; }
+  else if (rem > 60) { setSlots([1, 1, 0]); cap.textContent = 'Prep flag P up: four minutes'; }
+  else { setSlots([1, 0, 1]); cap.textContent = 'P down, I flag up: one minute'; }
+}
+function setGo() {
+  timer.textContent = 'GO'; timer.classList.add('go');
+  setSlots([0, 0, 0]); cap.textContent = 'All flags down: the fleet is racing';
+}
+function startSequence() {
+  FLEET.forEach((y, i) => { y.d = -100 - (i % 3) * 14; y.fin = null; });
+  layout(false);
+  timer.classList.remove('go');
+  btn.disabled = true; btn.textContent = 'Sequence running';
+  status.textContent = 'Five-minute sequence, accelerated.';
+  phase = 'count'; t0 = performance.now();
+  map.fitBounds(BOUNDS, { padding: PAD, duration: 1000 });
+}
+btn.addEventListener('click', startSequence);
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  setWind(5 + 7 * Math.sin(now / 2300), Math.round(14 + 2 * Math.sin(now / 1700)));
+  if (phase === 'count') {
+    const e = (now - t0) / 1000;
+    if (e >= CD) { setGo(); phase = 'race'; t0 = now; status.textContent = 'Racing: beat, run, reach to the finish.'; }
+    else setCountdown(e);
+  } else if (phase === 'race') {
+    raceAt((now - t0) / 1000);
+    const order = layout(true);
+    if (FLEET.every((y) => y.fin != null)) {
+      phase = 'done'; btn.disabled = false; btn.textContent = 'Restart';
+      status.textContent = `Finished. Line honours: ${order[0].name} (${order[0].sail}).`;
+      cap.textContent = 'Race complete';
+    }
+  }
+}
+
+if (reduce) {
+  // No animation: a static mid-race snapshot and a still timer.
+  btn.classList.add('hidden');
+  raceAt(34);
+  layout(true);
+  setGo();
+  cap.textContent = 'Snapshot at mid-race';
+  status.textContent = 'Reduced motion: showing a mid-race snapshot.';
+} else {
+  layout(false);
+  requestAnimationFrame(frame);
+}
+
+map.on('error', (e) => { status.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown'); });
+</script>
+</body>
+</html>

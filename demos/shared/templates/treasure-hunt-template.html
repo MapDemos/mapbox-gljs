@@ -1,0 +1,451 @@
+<!--
+  Working EXAMPLE of the Treasure Hunt style pack (treasure-hunt.css, in
+  this same folder). Open this file directly to see the pattern working
+  with a six-clue pirate scavenger hunt through Old San Juan, Puerto Rico
+  (El Morro, Plaza de Armas, Puerta de San Juan, Paseo de la Princesa,
+  Castillo San Cristobal, the Cathedral). The map is Mapbox Outdoors
+  recoloured to parchment; a red dashed trail is revealed only up to the
+  current clue. Press "We found it!" to turn the X into a gold coin, break
+  the next clue's wax seal, extend the trail and fly there; the chest
+  meter fills with coins. Reset starts over.
+
+  This is a brand-new style, not extracted from an existing demo. The
+  places are real; the walking trail is a Mapbox Directions (walking)
+  route in hunt order, simplified and embedded. "Captain Coral", the
+  riddles and the hunt framing are fictional placeholders -- swap in your
+  own.
+
+  What's NOT included: live routing, user accounts, saving progress,
+  GPS check-ins, or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Treasure Hunt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Andika:wght@400;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="treasure-hunt.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: #map fills the straight-edged .map-wrap. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="x-mark" viewBox="0 0 24 24">
+    <path d="M5 5L19 19M19 5L5 19" stroke="#3B2614" stroke-width="7.5" stroke-linecap="round"/>
+    <path d="M5 5L19 19M19 5L5 19" stroke="#C0392B" stroke-width="4.5" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="seal" viewBox="0 0 52 52">
+    <path d="M26 2l5 4 6-1 3 5 6 2-1 6 4 5-4 5 1 6-6 2-3 5-6-1-5 4-5-4-6 1-3-5-6-2 1-6-4-5 4-5-1-6 6-2 3-5 6 1z" fill="#C0392B" stroke="#922B21" stroke-width="2"/>
+    <circle cx="26" cy="26" r="14" fill="none" stroke="#922B21" stroke-width="2"/>
+    <path d="M26 15l3.2 7.4 8 .7-6.1 5.3 1.8 7.9-6.9-4.2-6.9 4.2 1.8-7.9-6.1-5.3 8-.7z" fill="#E8695C" stroke="#922B21" stroke-width="1.2" stroke-linejoin="round"/>
+  </symbol>
+</svg>
+
+<div class="app">
+  <div class="map-frame">
+    <div class="map-paper">
+      <div class="map-wrap">
+        <div id="map"></div>
+        <!-- Decorative compass rose: top-left, away from the map controls. -->
+        <svg class="compass-rose" viewBox="0 0 100 100" aria-hidden="true">
+          <circle cx="50" cy="50" r="44" fill="#F8EBCB" fill-opacity=".85" stroke="#8B5A2B" stroke-width="3"/>
+          <circle cx="50" cy="50" r="36" fill="none" stroke="#8B5A2B" stroke-width="1.5" stroke-dasharray="2 3"/>
+          <path d="M50 14L58 42 86 50 58 58 50 86 42 58 14 50 42 42z" fill="#3B2614"/>
+          <path d="M50 14L58 42 42 42z" fill="#C0392B"/>
+          <path d="M50 30L54 46 70 50 54 54 50 70 46 54 30 50 46 46z" fill="#F4B942" stroke="#3B2614" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="50" cy="50" r="4" fill="#C0392B" stroke="#3B2614" stroke-width="1.5"/>
+          <text x="50" y="12" text-anchor="middle" font-family="Pirata One, serif" font-size="14" fill="#3B2614">N</text>
+        </svg>
+        <div class="burst-layer" id="burst"></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="scroll" aria-label="Clue scroll">
+    <div class="scroll-roll top"></div>
+    <div class="scroll-body">
+      <div class="hunt-head">
+        <!-- Cartoon spyglass -->
+        <svg class="spyglass" viewBox="0 0 64 64" aria-hidden="true">
+          <g transform="rotate(-35 32 32)" stroke="#3B2614" stroke-width="3" stroke-linejoin="round">
+            <rect x="4" y="25" width="14" height="14" rx="2" fill="#F4B942"/>
+            <rect x="16" y="22" width="18" height="20" rx="2" fill="#C0392B"/>
+            <rect x="32" y="19" width="14" height="26" rx="2" fill="#F4B942"/>
+            <rect x="44" y="15" width="14" height="34" rx="3" fill="#8B5A2B"/>
+            <ellipse cx="58" cy="32" rx="3" ry="14" fill="#8CCBD5"/>
+          </g>
+        </svg>
+        <div>
+          <p class="eyebrow" id="eyebrow">Clue 1 of 6</p>
+          <h1>Captain Coral's Treasure Hunt</h1>
+        </div>
+      </div>
+
+      <div class="meter" id="meter">
+        <!-- Cartoon chest; the lid opens when the hunt is won -->
+        <svg class="chest" viewBox="0 0 64 52" aria-hidden="true">
+          <ellipse class="glow" cx="32" cy="16" rx="22" ry="12" fill="#F4B942"/>
+          <g stroke="#3B2614" stroke-width="2.5" stroke-linejoin="round">
+            <rect x="6" y="24" width="52" height="24" rx="3" fill="#8B5A2B"/>
+            <rect x="18" y="24" width="7" height="24" fill="#F4B942"/>
+            <rect x="39" y="24" width="7" height="24" fill="#F4B942"/>
+            <g class="lid">
+              <path d="M6 24V18Q6 6 32 6T58 18V24z" fill="#A9743A"/>
+              <rect x="18" y="8" width="7" height="16" fill="#F4B942"/>
+              <rect x="39" y="8" width="7" height="16" fill="#F4B942"/>
+            </g>
+            <rect x="27" y="22" width="10" height="11" rx="2" fill="#F4B942"/>
+          </g>
+          <circle cx="32" cy="27" r="1.8" fill="#3B2614"/>
+        </svg>
+        <div class="meter-text">
+          <p class="meter-title" id="meter-title">0 of 6 coins</p>
+          <div class="coins" id="coins" aria-hidden="true"></div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="found-btn" type="button">We found it!</button>
+        <button class="btn btn-secondary" id="reset-btn" type="button">Reset</button>
+      </div>
+      <p class="status-note" id="status-note" role="status"></p>
+
+      <ol class="clue-list" id="clue-list"></ol>
+    </div>
+    <div class="scroll-roll bottom"></div>
+  </section>
+</div>
+
+<script>
+// Trail geometry: Mapbox Directions (walking) through the six stops in hunt
+// order, simplified. LEGS[i] runs from stop i to stop i+1.
+const LEGS = [
+  [[-66.12428,18.47069],[-66.12432,18.47057],[-66.12421,18.47055],[-66.12381,18.471],[-66.12359,18.47092],[-66.12351,18.47094],[-66.12349,18.471],[-66.1236,18.47111],[-66.12386,18.47111],[-66.12414,18.47087],[-66.12117,18.46831],[-66.12115,18.46819],[-66.12103,18.46819],[-66.12026,18.46724],[-66.11862,18.46754],[-66.11856,18.4675],[-66.1183,18.46647],[-66.11744,18.46663],[-66.11729,18.46598],[-66.11684,18.46608]],
+  [[-66.11684,18.46608],[-66.11729,18.46598],[-66.11733,18.46613],[-66.11817,18.46596],[-66.11808,18.46561],[-66.1195,18.46516],[-66.11951,18.46492]],
+  [[-66.11951,18.46492],[-66.1195,18.46516],[-66.11922,18.46525],[-66.11913,18.46493],[-66.11602,18.46559]],
+  [[-66.11602,18.46559],[-66.11309,18.4663],[-66.11162,18.46656],[-66.11159,18.46661],[-66.11032,18.46637],[-66.10946,18.4667],[-66.10855,18.46689],[-66.10835,18.46701],[-66.1083,18.46761],[-66.10824,18.46779],[-66.10796,18.46787],[-66.10767,18.46779],[-66.1076,18.46799],[-66.10766,18.46814],[-66.10751,18.46822],[-66.10756,18.46831],[-66.10761,18.4683],[-66.10796,18.46818]],
+  [[-66.10796,18.46818],[-66.10761,18.4683],[-66.10756,18.46831],[-66.10751,18.46822],[-66.10766,18.46814],[-66.1076,18.46799],[-66.10767,18.46779],[-66.10796,18.46787],[-66.10824,18.46779],[-66.1083,18.46761],[-66.10835,18.46701],[-66.10855,18.46689],[-66.10946,18.4667],[-66.1103,18.46637],[-66.11105,18.46648],[-66.11159,18.46661],[-66.1131,18.46634],[-66.11713,18.46535],[-66.11733,18.46613],[-66.11817,18.46596],[-66.11828,18.4664]]
+];
+
+// Stops [lng, lat] sit on the snapped walking route; label side avoids overlaps.
+const CLUES = [
+  { short: 'El Morro', coord: [-66.12428, 18.47069], side: 'below',
+    title: 'Castillo San Felipe del Morro',
+    text: 'Ahoy, matey! Our quest starts where the sea wind blows hardest: a giant stone fort on the tip of the island with a great green lawn. Sailors kept watch here for hundreds of years. <b>Find the X by the harbour mouth!</b>',
+    fact: 'Built by the Spanish, starting in 1539, to guard the harbour.' },
+  { short: 'Plaza de Armas', coord: [-66.11684, 18.46608], side: 'above',
+    title: 'Plaza de Armas',
+    text: 'Follow the dotted trail into town! Look for a leafy square with a fountain and statues of the four seasons. Pigeons are the lookouts here. <b>Find the X in the middle of town!</b>',
+    fact: 'The main square of the old city, with statues for the four seasons.' },
+  { short: 'Puerta de San Juan', coord: [-66.11951, 18.46492], side: 'below',
+    title: 'Puerta de San Juan',
+    text: 'Squeeze past the town wall and look for a big red gate. Long ago, visitors arriving by ship were welcomed through it. <b>Find the X under the red gate!</b>',
+    fact: 'The painted gate was the old city wall\'s main door from the bay.' },
+  { short: 'Paseo de la Princesa', coord: [-66.11602, 18.46559], side: 'below',
+    title: 'Paseo de la Princesa',
+    text: 'Stroll along the sea wall on a shady promenade lined with trees and lamps. Good pirates always walk slowly to spot the treasure. <b>Find the X on the promenade!</b>',
+    fact: 'A tree-lined walk beside the old city wall, perfect for strolling.' },
+  { short: 'San Cristóbal', coord: [-66.10796, 18.46818], side: 'below',
+    title: 'Castillo San Cristóbal',
+    text: 'Now to the BIGGEST fortress! Its walls, tunnels and hidden corners guarded the town from land attacks. Climb up and look all around. <b>Find the X at the great fort!</b>',
+    fact: 'One of the largest Spanish forts ever built in the Americas.' },
+  { short: 'The Cathedral', coord: [-66.11828, 18.4664], side: 'above',
+    title: 'Catedral de San Juan Bautista',
+    text: 'Last clue, brave crew! Head back to a grand old church on a narrow street, where a famous explorer rests. The treasure is hidden at its door. <b>Find the final X!</b>',
+    fact: 'A very old cathedral, home to the tomb of explorer Juan Ponce de León.' },
+];
+const TOTAL = CLUES.length;
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/outdoors-v12',
+  center: [-66.1175, 18.4685],
+  zoom: 14,
+  attributionControl: true,
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+/* ---- State ---- */
+let solved = 0;            // clues solved so far
+let busy = false;          // trail animation running
+let trail = [];            // coordinates currently revealed
+const markers = [];        // per-clue mapboxgl.Marker (X or coin)
+let timers = [];
+
+/* ---- Parchment recolour: guarded, pattern-driven ---- */
+function recolor() {
+  const set = (id, prop, val) => { try { if (map.getLayer(id)) map.setPaintProperty(id, prop, val); } catch (e) { /* ignore */ } };
+  const lay = (id, prop, val) => { try { if (map.getLayer(id)) map.setLayoutProperty(id, prop, val); } catch (e) { /* ignore */ } };
+  for (const l of map.getStyle().layers) {
+    const id = l.id;
+    if (l.type === 'background') set(id, 'background-color', '#F1DDB0');
+    else if (l.type === 'fill') {
+      if (/water/.test(id)) set(id, 'fill-color', '#8CCBD5');
+      else if (/building/.test(id)) set(id, 'fill-color', '#DDBE86');
+      else if (id === 'landuse') set(id, 'fill-color', ['match', ['get', 'class'], ['park', 'pitch', 'golf_course', 'cemetery', 'grass'], '#A9BF7E', '#E9D29E']);
+      else if (/park|wood|forest|grass|scrub|landcover|agriculture|national/.test(id)) set(id, 'fill-color', '#B2C583');
+    } else if (l.type === 'fill-extrusion') set(id, 'fill-extrusion-color', '#D9B97C');
+    else if (l.type === 'hillshade') {
+      set(id, 'hillshade-shadow-color', '#8B5A2B');
+      set(id, 'hillshade-highlight-color', '#FFF3D0');
+      set(id, 'hillshade-exaggeration', 0.25);
+    } else if (l.type === 'line') {
+      if (/contour/.test(id)) set(id, 'line-color', '#8B5A2B');
+      else if (/waterway/.test(id)) set(id, 'line-color', '#6FB8C6');
+      else if (/admin/.test(id)) set(id, 'line-color', '#8B5A2B');
+      else if (/(road|bridge|tunnel|path|steps|trail|ferry)/.test(id)) {
+        if (/case|casing/.test(id)) { set(id, 'line-color', '#EAD5A3'); set(id, 'line-opacity', 0.5); }
+        else {
+          set(id, 'line-color', '#6B4A2E'); set(id, 'line-opacity', 0.4);
+          // Thin, light streets so the red trail stands out.
+          set(id, 'line-width', ['interpolate', ['exponential', 1.5], ['zoom'], 10, 0.3, 14, 0.8, 16, 1.6, 18, 3]);
+        }
+      }
+    } else if (l.type === 'symbol') {
+      if (/poi|shield|exit|transit|airport|rail|ferry/.test(id)) lay(id, 'visibility', 'none');
+      else {
+        set(id, 'text-color', /water/.test(id) ? '#14596A' : '#3B2614');
+        set(id, 'text-halo-color', '#F8EBCB');
+      }
+    }
+  }
+}
+
+/* ---- Trail ---- */
+function firstSymbolId() {
+  const s = map.getStyle().layers.find((l) => l.type === 'symbol');
+  return s ? s.id : undefined;
+}
+
+function setTrail(coords) {
+  trail = coords;
+  const src = map.getSource('trail');
+  if (src) src.setData({
+    type: 'Feature', properties: {},
+    geometry: { type: 'LineString', coordinates: coords.length > 1 ? coords : [] },
+  });
+}
+
+function legPartial(leg, f) {
+  // Return the first f (0..1) of a leg by length, with an interpolated tip.
+  const k = Math.cos(18.47 * Math.PI / 180);
+  const seg = [];
+  let total = 0;
+  for (let i = 1; i < leg.length; i++) {
+    const l = Math.hypot((leg[i][0] - leg[i - 1][0]) * k, leg[i][1] - leg[i - 1][1]);
+    seg.push(l); total += l;
+  }
+  let want = total * f;
+  const out = [leg[0]];
+  for (let i = 0; i < seg.length; i++) {
+    if (want >= seg[i]) { out.push(leg[i + 1]); want -= seg[i]; }
+    else {
+      const t = want / (seg[i] || 1);
+      out.push([leg[i][0] + (leg[i + 1][0] - leg[i][0]) * t, leg[i][1] + (leg[i + 1][1] - leg[i][1]) * t]);
+      break;
+    }
+  }
+  return out;
+}
+
+function fullTrail(n) { return LEGS.slice(0, n).flat(); }
+
+function animateLeg(n, done) {
+  const base = fullTrail(n);
+  const leg = LEGS[n];
+  if (reduce) { setTrail(base.concat(leg)); done(); return; }
+  const dur = 1900, t0 = performance.now();
+  (function frame(now) {
+    const f = Math.min(1, (now - t0) / dur);
+    const eased = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
+    setTrail(base.concat(legPartial(leg, eased)));
+    if (f < 1) requestAnimationFrame(frame); else done();
+  })(t0);
+}
+
+/* ---- Camera ---- */
+const PAD = { top: 80, bottom: 90, left: 70, right: 70 };
+function fitCoords(coords, opts) {
+  const b = new mapboxgl.LngLatBounds(coords[0], coords[0]);
+  coords.forEach((c) => b.extend(c));
+  map.fitBounds(b, Object.assign({ padding: PAD, maxZoom: 16.3, duration: reduce ? 0 : 2000 }, opts));
+}
+function fitAll(animate) {
+  map.resize();
+  fitCoords(CLUES.map((c) => c.coord), { padding: { top: 60, bottom: 76, left: 60, right: 60 }, maxZoom: 17, duration: animate && !reduce ? 1500 : 0 });
+}
+
+/* ---- Markers ---- */
+function makeMarker(i, kind) {
+  const c = CLUES[i];
+  const el = document.createElement('div');
+  el.className = 'hunt-marker';
+  const inner = document.createElement('div');
+  const label = document.createElement('span');
+  label.className = 'hm-label' + (c.side === 'above' ? ' above' : '');
+  if (kind === 'x') {
+    inner.className = 'hm-inner is-x';
+    inner.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#x-mark"/></svg>';
+    label.textContent = 'Clue ' + (i + 1);
+    el.setAttribute('aria-label', 'X marks the spot for clue ' + (i + 1));
+  } else {
+    inner.className = 'hm-inner is-coin';
+    inner.textContent = String(i + 1);
+    label.textContent = c.short;
+    el.setAttribute('aria-label', c.title + ', found');
+  }
+  inner.appendChild(label);
+  el.appendChild(inner);
+  el.addEventListener('click', () => {
+    map.flyTo({ center: c.coord, zoom: 16.5, duration: reduce ? 0 : 1200 });
+  });
+  if (markers[i]) markers[i].remove();
+  markers[i] = new mapboxgl.Marker({ element: el }).setLngLat(c.coord).addTo(map);
+  return el;
+}
+
+/* ---- Coin burst (no-op for reduced motion) ---- */
+function burst(coord, count) {
+  if (reduce) return;
+  const layer = $('burst');
+  const p = map.project(coord);
+  for (let i = 0; i < count; i++) {
+    const d = document.createElement('i');
+    d.className = 'burst-coin';
+    d.style.left = p.x + 'px';
+    d.style.top = p.y + 'px';
+    layer.appendChild(d);
+    const a = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+    const r = 50 + Math.random() * 50;
+    const anim = d.animate([
+      { transform: 'translate(0,0) scale(1)', opacity: 1 },
+      { transform: `translate(${Math.cos(a) * r}px, ${Math.sin(a) * r - 24}px) scale(1)`, opacity: 1, offset: 0.6 },
+      { transform: `translate(${Math.cos(a) * r * 1.1}px, ${Math.sin(a) * r + 30}px) scale(.4)`, opacity: 0 },
+    ], { duration: 900, easing: 'ease-out' });
+    anim.onfinish = () => d.remove();
+  }
+}
+
+/* ---- Scroll UI ---- */
+function buildList() {
+  const list = $('clue-list');
+  list.innerHTML = '';
+  CLUES.forEach((c, i) => {
+    const li = document.createElement('li');
+    li.className = 'clue-card';
+    li.innerHTML =
+      `<span class="clue-num">${i + 1}</span>` +
+      `<h2 class="clue-title"></h2><p class="clue-text"></p>` +
+      `<svg class="seal" viewBox="0 0 52 52" aria-hidden="true"><use href="#seal"/></svg>` +
+      `<span class="seal-hint">Sealed! Solve clue ${i} to open.</span>`;
+    li.addEventListener('click', () => { if (li.classList.contains('is-solved')) map.flyTo({ center: c.coord, zoom: 16.5, duration: reduce ? 0 : 1200 }); });
+    list.appendChild(li);
+  });
+  const coins = $('coins');
+  coins.innerHTML = '';
+  for (let i = 0; i < TOTAL; i++) coins.insertAdjacentHTML('beforeend', '<span class="coin"></span>');
+}
+
+function render() {
+  const cards = $('clue-list').children;
+  CLUES.forEach((c, i) => {
+    const el = cards[i];
+    const state = i < solved ? 'is-solved' : i === solved ? 'is-current' : 'is-locked';
+    el.classList.remove('is-solved', 'is-current', 'is-locked');
+    el.classList.add(state);
+    el.querySelector('.clue-title').textContent = state === 'is-locked' ? 'Sealed clue' : c.title;
+    el.querySelector('.clue-text').innerHTML = state === 'is-solved' ? c.fact : state === 'is-current' ? c.text : '';
+  });
+  [...$('coins').children].forEach((el, i) => el.classList.toggle('filled', i < solved));
+  const done = solved >= TOTAL;
+  $('meter').classList.toggle('is-open', done);
+  $('meter-title').textContent = done ? 'Treasure won!' : `${solved} of ${TOTAL} coins`;
+  $('eyebrow').textContent = done ? 'All 6 clues solved!' : `Clue ${solved + 1} of ${TOTAL}`;
+  $('found-btn').disabled = busy || done;
+  $('found-btn').textContent = done ? 'Hunt complete' : 'We found it!';
+  const cur = cards[Math.min(solved, TOTAL - 1)];
+  // Only scroll inside the clue list (desktop); never move the phone page away from the map.
+  const list = $('clue-list');
+  if (cur && list.scrollHeight > list.clientHeight) list.scrollTo({ top: cur.offsetTop - list.offsetTop - 4, behavior: reduce ? 'auto' : 'smooth' });
+}
+
+function status(msg, cls) {
+  const s = $('status-note');
+  s.className = 'status-note ' + (cls || '');
+  s.textContent = msg;
+}
+
+/* ---- Game flow ---- */
+function found() {
+  if (busy || solved >= TOTAL) return;
+  const i = solved;
+  makeMarker(i, 'coin');
+  burst(CLUES[i].coord, 16);
+  solved++;
+  if (solved >= TOTAL) {
+    render();
+    burst(CLUES[i].coord, 28);
+    status('Yo ho ho! You found all the treasure!', 'success');
+    fitAll(true);
+    return;
+  }
+  busy = true;
+  render();
+  const card = $('clue-list').children[solved];
+  card.classList.add('breaking');
+  timers.push(setTimeout(() => card.classList.remove('breaking'), 750));
+  status('Seal broken! Follow the dotted trail...', 'loading');
+  fitCoords(LEGS[i], {});
+  animateLeg(i, () => {
+    makeMarker(solved, 'x');
+    busy = false;
+    status('X marks the spot for clue ' + (solved + 1) + '!', 'success');
+    render();
+  });
+}
+
+let firstRun = true;
+function reset() {
+  timers.forEach(clearTimeout); timers = [];
+  markers.forEach((m) => m && m.remove());
+  markers.length = 0;
+  solved = 0; busy = false;
+  setTrail([]);
+  $('clue-list').querySelectorAll('.breaking').forEach((e) => e.classList.remove('breaking'));
+  makeMarker(0, 'x');
+  render();
+  status('Ahoy! Find the first X to begin.', '');
+  fitAll(!firstRun);
+  firstRun = false;
+}
+
+buildList();
+$('found-btn').addEventListener('click', found);
+$('reset-btn').addEventListener('click', reset);
+
+map.on('error', (e) => { if (e && e.error && /401|403/.test(String(e.error.status))) status('The map needs a valid access token.', 'error'); });
+
+map.on('load', () => {
+  recolor();
+  const before = firstSymbolId();
+  map.addSource('trail', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } } });
+  map.addLayer({ id: 'trail-casing', type: 'line', source: 'trail',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#F8EBCB', 'line-width': 8.5, 'line-opacity': 0.95 } }, before);
+  map.addLayer({ id: 'trail', type: 'line', source: 'trail',
+    layout: { 'line-cap': 'butt', 'line-join': 'round' },
+    paint: { 'line-color': '#A52A1E', 'line-width': 4.5, 'line-dasharray': [1.6, 1.4] } }, before);
+  reset();
+});
+</script>
+</body>
+</html>

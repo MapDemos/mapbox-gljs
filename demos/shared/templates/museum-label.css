@@ -1,0 +1,418 @@
+/*
+  Museum Label -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a contemporary art museum "white cube" --
+  a calm off-white wall, the map hung like a framed artwork with a wide
+  passe-partout and a soft gallery shadow, wall-text placards in tombstone
+  format, small numbered wall dots like a room guide, and a single bold
+  signal orange), deliberately distinct from every other style pack in this
+  folder: Academic Paper, Aero Gadgets, Amber Terminal, Arena, Atomic Motel,
+  Audio Guide, Aurora Command, Blueprint, Board Game, Bottom Sheet,
+  Broadcast, Brutalist Guide, Case Board, Celestial Tarot, Chalkboard,
+  Chronicle, Clinic Finder, Comic Panel, Constructivist, Data Notebook, Deco
+  Voyage, Drop Culture, E-Ink, Editorial Paper, Estate Luxe, Event Invite,
+  Field Journal, Fleet Ops, Frontier Poster, Highway Sign, Isotype, Line
+  Diagram, Memphis, Moving Map, Neon HUD, Nordic Cabin, Papercraft, Pastel
+  Bento, Pixel Quest, Postcards, Raw Web, Retro OS, Riso Zine, Ski Piste,
+  Slate Console, Soft UI, Split Flap, Stained Glass, Sticker Book,
+  Storefront, Story Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt,
+  Trailhead, Trip Kanban, Vapor Sunset, Vintage Chart, Washi Seasons,
+  Weather Console, Whiteboard and Zellige; and also distinct from the 19
+  sibling packs being built in parallel at the same time (Ukiyo-e Coast,
+  Herbarium, Film Noir, Dive Log, Illuminated, Stage Profile, Treasure Hunt,
+  Tiki Lagoon, Rally Dash, Grand Hotel, Orienteering, Regatta, Code Editor,
+  Watercolor, Annual Report, Truck Art, Papel Picado, Vinyl Crate, Art
+  Nouveau).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/museum-label.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Red Hat Display for headings and
+  numerals, Libre Caslon Text for body / label copy):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@500;700;900&family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+
+  Signature touch: the map is hung on the wall -- a thin black frame, a
+  wide white passe-partout (mat) with a hairline bevel, a soft shadow
+  beneath it, and a faint spot-light gradient painted on the WALL only
+  (never over the map). Signal orange appears exactly twice: the active
+  numbered dot and the short rule on the wall label.
+
+  Layout archetype: GALLERY WALL. Desktop: header, then the framed map
+  left-of-centre with a tombstone placard to its right, and a horizontal
+  room guide (numbered labels) beneath the frame. Phone (<= 720px): frame
+  full width with a thinner mat, placard below, room guide as a vertical
+  list; the page scrolls.
+
+  Class/id contract (see museum-label-template.html in this same folder for
+  a full working example):
+
+  - .wall                     the page: wall colour, spot-light, CSS grid
+                               (header / frame / placard / rooms)
+  - .exhibit                  exhibition header (top of the wall)
+    .exhibit-title              big quiet title
+    .exhibit-meta               small caption line (dates, venue)
+  - .frame                    black frame + white passe-partout + shadow
+    .map-well                   inner window that holds the map; the demo
+                                 owns #map inside it (position:absolute;
+                                 inset:0)
+  - .placard                  tombstone wall label column
+    .placard-body               the part that cross-fades (+ .fading)
+    .plac-no                    small room number line ("Room 01 / 08")
+    .plac-title                 bold stop name
+    .plac-place                 italic neighbourhood
+    .plac-spec                  caption lines (year, materials, dimension)
+    .plac-rule                  the one signal-orange rule
+    .plac-text                  two-sentence curatorial text
+  - .rooms                    room guide list (ol): horizontal on desktop,
+                               vertical on phone
+    .room                       a button: .room-dot (numbered) + .room-name
+    .room.active                active room: its dot turns signal orange
+    .rooms-hint                 tiny caption (keyboard hint)
+  - .wall-dot                 map marker inner child (a numbered black dot);
+                               .wall-dot.active = signal orange (style the
+                               inner child, never the Marker root)
+  - .status-note              quiet one-line status (+ .loading / .error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --wall: #FAFAF7;
+  --wall-grey: #E7E6E1;
+  --mat: #FFFFFF;
+  --ink: #111111;
+  --caption: #6B6B6B;
+  --hairline: rgba(17, 17, 17, 0.14);
+  --signal: #FF4F1F;
+  --signal-ink: #FFFFFF;
+  --error: #B3261E;
+
+  --font-head: 'Red Hat Display', 'Helvetica Neue', Arial, sans-serif;
+  --font-body: 'Libre Caslon Text', Georgia, 'Times New Roman', serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--wall);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+button { font-family: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/* ---- The wall: spot-light lives here, on the wall only ---- */
+.wall {
+  min-height: 100dvh;
+  height: 100dvh;
+  min-height: max(100dvh, 640px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 300px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  column-gap: clamp(32px, 5vw, 80px);
+  row-gap: 22px;
+  padding: 28px clamp(24px, 5vw, 72px) 26px;
+  background:
+    radial-gradient(ellipse 62% 72% at 36% 46%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 70%),
+    linear-gradient(180deg, var(--wall) 0%, #F3F2EE 100%);
+}
+
+/* ---- Exhibition header ---- */
+.exhibit {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.exhibit-title {
+  margin: 0;
+  font-family: var(--font-head);
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.exhibit-meta {
+  font-style: italic;
+  font-size: 12px;
+  color: var(--caption);
+  text-align: right;
+}
+
+/* ---- Frame + passe-partout ---- */
+.frame {
+  grid-column: 1;
+  grid-row: 2;
+  min-height: 0;
+  display: flex;
+  padding: clamp(24px, 3.4vw, 48px);
+  background: var(--mat);
+  border: 2px solid var(--ink);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.18),
+    0 22px 30px -14px rgba(0, 0, 0, 0.30),
+    0 46px 70px -34px rgba(0, 0, 0, 0.28);
+}
+
+.map-well {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  /* mat bevel: a hairline, then a faint inset line where the board is cut */
+  outline: 1px solid var(--hairline);
+  outline-offset: 0;
+  box-shadow: 0 0 0 5px var(--mat), 0 0 0 6px var(--hairline);
+  background: var(--wall-grey);
+}
+
+/* ---- Tombstone wall label ---- */
+.placard {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: center;
+  min-width: 0;
+}
+
+.placard-body {
+  transition: opacity 0.32s ease;
+}
+
+.placard-body.fading { opacity: 0; }
+
+.plac-no {
+  margin: 0 0 18px;
+  font-family: var(--font-head);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--caption);
+}
+
+.plac-title {
+  margin: 0;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 1.12;
+  letter-spacing: -0.005em;
+  overflow-wrap: anywhere;
+}
+
+.plac-place {
+  margin: 6px 0 0;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--caption);
+}
+
+.plac-spec {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.plac-spec li { margin: 0; }
+
+.plac-rule {
+  width: 36px;
+  height: 3px;
+  margin: 22px 0;
+  background: var(--signal);
+  border: 0;
+}
+
+.plac-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.75;
+  color: #2A2A2A;
+  max-width: 34ch;
+}
+
+/* ---- Room guide ---- */
+.rooms {
+  grid-column: 1;
+  grid-row: 3;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.room {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 10px 0 0;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--hairline);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.room:hover { border-top-color: var(--ink); }
+
+.room-dot,
+.wall-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #FFFFFF;
+  font-family: var(--font-head);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.room-dot {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+  transition: background 0.25s ease;
+}
+
+.room-name {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--caption);
+  overflow-wrap: anywhere;
+  transition: color 0.2s ease;
+}
+
+.room.active .room-dot { background: var(--signal); color: var(--signal-ink); }
+.room.active .room-name,
+.room:hover .room-name { color: var(--ink); }
+
+.rooms-hint {
+  grid-column: 2;
+  grid-row: 3;
+  align-self: end;
+  margin: 0;
+  font-style: italic;
+  font-size: 11.5px;
+  color: var(--caption);
+}
+
+/* ---- Map marker inner child (never style the Marker root) ---- */
+.wall-dot {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
+  font-size: 10px;
+  cursor: pointer;
+  transition: background 0.25s ease, transform 0.25s ease;
+}
+
+.wall-dot:hover { transform: scale(1.12); }
+
+.wall-dot.active {
+  background: var(--signal);
+  transform: scale(1.3);
+}
+
+/* ---- Status ---- */
+.status-note {
+  margin: 0;
+  font-style: italic;
+  font-size: 12px;
+  color: var(--caption);
+}
+
+.status-note.error { color: var(--error); }
+
+.status-note.loading::after {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--caption);
+  animation: museum-blink 1.1s ease-in-out infinite;
+}
+
+@keyframes museum-blink {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .placard-body,
+  .room,
+  .room-dot,
+  .wall-dot { transition: none; }
+  .status-note.loading::after { animation: none; }
+}
+
+/* ---- Phone: frame full width, placard below, rooms as a vertical list ---- */
+@media (max-width: 720px) {
+  .wall {
+    display: block;
+    height: auto;
+    min-height: 100dvh;
+    padding: 20px 16px 28px;
+  }
+
+  .exhibit {
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 18px;
+  }
+
+  .exhibit-meta { text-align: left; }
+
+  .frame {
+    height: min(62dvh, 520px);
+    padding: 14px;
+  }
+
+  .placard { margin: 32px 0 0; }
+
+  .plac-title { font-size: 24px; }
+
+  .plac-text { max-width: none; }
+
+  .rooms {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 34px;
+  }
+
+  .room {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 0;
+  }
+
+  .room-name { font-size: 14px; }
+
+  .rooms-hint { display: none; }
+}

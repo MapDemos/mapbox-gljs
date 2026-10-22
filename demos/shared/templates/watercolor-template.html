@@ -1,0 +1,294 @@
+<!--
+  Working EXAMPLE of the Watercolor style pack (watercolor.css, in this
+  same folder). Open this file directly to see the pattern working with a
+  seven-stop sketchbook of the Amalfi Coast, then copy the markup into your
+  own demo and link watercolor.css from its <head> -- see the class/id
+  contract at the top of that CSS file. Copy the hidden <svg> filter block
+  verbatim: the swatches, brush strokes and map frame all use it.
+
+  What's NOT included: a real itinerary, photos, search or routing UI. The
+  stop copy is illustrative and the coast-road line is a simplified,
+  embedded SS163 driving route (fetched once from the Directions API).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Amalfi Sketchbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Quattrocento+Sans:wght@400;700&family=Sacramento&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="watercolor.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: the map fills the vignette holder. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+
+<!-- Shared watercolour filters (copy verbatim) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="wc-blob-a" x="-8%" y="-25%" width="116%" height="150%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.03 0.05" numOctaves="3" seed="3" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="18" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feMorphology in="d" operator="erode" radius="3" result="e"/>
+      <feComposite in="d" in2="e" operator="out" result="ring"/>
+      <feGaussianBlur in="ring" stdDeviation="1.2" result="rb"/>
+      <feColorMatrix in="rb" type="matrix" values="0 0 0 0 0.14  0 0 0 0 0.2  0 0 0 0 0.32  0 0 0 0.55 0" result="edge"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="8" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 -2.2 1.35" result="gr"/>
+      <feComposite in="gr" in2="d" operator="in" result="grain"/>
+      <feMerge><feMergeNode in="d"/><feMergeNode in="edge"/><feMergeNode in="grain"/></feMerge>
+    </filter>
+    <filter id="wc-blob-b" x="-8%" y="-25%" width="116%" height="150%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04 0.03" numOctaves="3" seed="11" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="20" xChannelSelector="G" yChannelSelector="R" result="d"/>
+      <feMorphology in="d" operator="erode" radius="3" result="e"/>
+      <feComposite in="d" in2="e" operator="out" result="ring"/>
+      <feGaussianBlur in="ring" stdDeviation="1.2" result="rb"/>
+      <feColorMatrix in="rb" type="matrix" values="0 0 0 0 0.14  0 0 0 0 0.2  0 0 0 0 0.32  0 0 0 0.55 0" result="edge"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="21" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 -2.2 1.35" result="gr"/>
+      <feComposite in="gr" in2="d" operator="in" result="grain"/>
+      <feMerge><feMergeNode in="d"/><feMergeNode in="edge"/><feMergeNode in="grain"/></feMerge>
+    </filter>
+    <filter id="wc-blob-c" x="-8%" y="-25%" width="116%" height="150%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.025 0.045" numOctaves="3" seed="27" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="16" xChannelSelector="R" yChannelSelector="B" result="d"/>
+      <feMorphology in="d" operator="erode" radius="3" result="e"/>
+      <feComposite in="d" in2="e" operator="out" result="ring"/>
+      <feGaussianBlur in="ring" stdDeviation="1.2" result="rb"/>
+      <feColorMatrix in="rb" type="matrix" values="0 0 0 0 0.14  0 0 0 0 0.2  0 0 0 0 0.32  0 0 0 0.55 0" result="edge"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.95" numOctaves="2" seed="5" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 -2.2 1.35" result="gr"/>
+      <feComposite in="gr" in2="d" operator="in" result="grain"/>
+      <feMerge><feMergeNode in="d"/><feMergeNode in="edge"/><feMergeNode in="grain"/></feMerge>
+    </filter>
+    <!-- rough edge for the map frame and brush strokes -->
+    <filter id="wc-rough" x="-4%" y="-40%" width="108%" height="180%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="4" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="34" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+</svg>
+
+<main class="page">
+  <section class="vignette" aria-label="Map of the Amalfi Coast">
+    <div id="map"></div>
+    <div class="vignette-frame"></div>
+    <aside class="caption-card" id="caption" aria-live="polite">
+      <div class="caption-name" id="cap-name">Amalfi Coast</div>
+      <svg class="brush" id="cap-brush" viewBox="0 0 300 14" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M4 8 C 50 2, 100 13, 160 7 S 250 5, 296 8"/></svg>
+      <p class="caption-note" id="cap-note">Seven stops along the SS163, painted in a hurry. Pick a colour to visit.</p>
+    </aside>
+  </section>
+
+  <div class="side">
+    <header class="page-head">
+      <h1 class="title">Amalfi Coast</h1>
+      <p class="subtitle">A sketchbook along the SS163</p>
+    </header>
+    <p class="status-note loading" id="status" role="status">Mixing the paints&hellip;</p>
+    <nav class="swatches" id="swatches" aria-label="Stops"></nav>
+
+    <svg class="paintbox" viewBox="0 0 200 110" aria-hidden="true" focusable="false">
+      <rect x="6" y="30" width="170" height="70" rx="8" fill="#E9E3D6" stroke="#8E8A84" stroke-width="2"/>
+      <rect x="12" y="36" width="158" height="58" rx="5" fill="#F7F3EA" stroke="#8E8A84" stroke-width="1" stroke-dasharray="3 3"/>
+      <ellipse cx="34" cy="58" rx="15" ry="12" fill="#D9774B"/><ellipse cx="68" cy="58" rx="15" ry="12" fill="#F2CF5B"/>
+      <ellipse cx="102" cy="58" rx="15" ry="12" fill="#4A7BC8"/><ellipse cx="136" cy="58" rx="15" ry="12" fill="#7FB7E0"/>
+      <ellipse cx="34" cy="82" rx="15" ry="10" fill="#7FA650"/><ellipse cx="68" cy="82" rx="15" ry="10" fill="#4C5866"/>
+      <ellipse cx="102" cy="82" rx="15" ry="10" fill="#8E8A84"/><ellipse cx="136" cy="82" rx="15" ry="10" fill="#EDE6D6" stroke="#8E8A84"/>
+      <path d="M14 30 L8 8 L52 14 L48 30 Z" fill="#DDD6C6" stroke="#8E8A84" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M150 20 L196 4" stroke="#8B5E3C" stroke-width="5" stroke-linecap="round"/>
+      <path d="M150 20 L132 28" stroke="#4A7BC8" stroke-width="6" stroke-linecap="round"/>
+    </svg>
+  </div>
+</main>
+
+<script>
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = window.matchMedia('(max-width: 820px)');
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const COL = {
+  paper: css('--paper'), ultra: css('--ultramarine'), cerulean: css('--cerulean'), terra: css('--terracotta'),
+  lemon: css('--lemon'), sap: css('--sap'), payne: css('--payne'), pencil: css('--pencil'),
+};
+
+// Illustrative copy; coordinates are approximate public locations.
+const STOPS = [
+  { name: 'Positano', meta: 'Vertical village', c: COL.terra, p: [14.4890, 40.6282], z: 14.2,
+    note: 'Pink and peach houses stacked like a pile of paint chips, tumbling toward the pebble beach.' },
+  { name: 'Praiano', meta: 'Quiet fishing hamlet', c: COL.lemon, p: [14.5265, 40.6115], z: 14.4,
+    note: 'Less fuss than its neighbours. Lemon light at sunset and a tiny bay for swimming.' },
+  { name: 'Furore', meta: 'The painted fjord', c: COL.ultra, p: [14.5569, 40.6122], z: 14.6,
+    note: 'A narrow gorge cut to the sea, crossed by a high bridge. Deep blue shadow, whitewashed fishing huts below.' },
+  { name: 'Bomerano', meta: 'Path of the Gods', c: COL.sap, p: [14.5636, 40.6296], z: 14.4,
+    note: 'The trailhead above the coast: terraces, goats and a long, high walk toward Nocelle.' },
+  { name: 'Amalfi', meta: 'Cathedral and paper', c: COL.cerulean, p: [14.6029, 40.6345], z: 14.6,
+    note: 'A striped cathedral at the top of a staircase, and a harbour that once ruled the sea.' },
+  { name: 'Atrani', meta: 'Smallest village', c: COL.pencil, p: [14.6117, 40.6417], z: 15,
+    note: 'One piazza, one beach, a tangle of arches. Drawn quickly in pencil.' },
+  { name: 'Ravello', meta: 'Villa Rufolo gardens', c: COL.payne, p: [14.6113, 40.6493], z: 15,
+    note: 'Up in the clouds: terraced gardens hanging over a very long drop to the water.' },
+];
+
+// SS163 coast road, simplified from a Directions API driving route (Positano to Atrani)
+const ROAD = [[14.4853,40.6281],[14.485,40.6288],[14.4852,40.6294],[14.4851,40.6297],[14.4848,40.6299],[14.4842,40.6299],[14.485,40.6309],[14.4853,40.6308],[14.4857,40.6302],[14.4865,40.63],[14.4866,40.6296],[14.4873,40.6293],[14.4881,40.6286],[14.4908,40.6277],[14.4916,40.6276],[14.492,40.6282],[14.4923,40.6283],[14.4933,40.6277],[14.4939,40.6277],[14.4946,40.6283],[14.4948,40.6282],[14.4949,40.6276],[14.4961,40.6275],[14.4966,40.6281],[14.4971,40.6282],[14.497,40.6272],[14.4971,40.6267],[14.4974,40.6264],[14.4981,40.6261],[14.4988,40.6261],[14.4992,40.6256],[14.5011,40.6246],[14.502,40.6239],[14.5025,40.6243],[14.5036,40.6247],[14.504,40.6235],[14.5074,40.6239],[14.508,40.6242],[14.5084,40.6256],[14.5088,40.6256],[14.5091,40.6251],[14.5096,40.6254],[14.5097,40.6247],[14.5093,40.6243],[14.5093,40.624],[14.5096,40.6237],[14.5102,40.6237],[14.5105,40.6235],[14.5099,40.6227],[14.5099,40.6224],[14.5103,40.6217],[14.5123,40.6202],[14.513,40.6201],[14.5142,40.6192],[14.5151,40.6195],[14.5156,40.6184],[14.5165,40.6187],[14.5168,40.6179],[14.5185,40.6183],[14.5191,40.6179],[14.5193,40.6184],[14.5198,40.6187],[14.5205,40.6178],[14.5203,40.6165],[14.5207,40.6161],[14.523,40.6165],[14.5233,40.6155],[14.5222,40.6147],[14.5224,40.6134],[14.5228,40.6125],[14.5236,40.6116],[14.5254,40.6109],[14.5274,40.6093],[14.5287,40.6088],[14.5314,40.611],[14.532,40.6113],[14.5336,40.6116],[14.5327,40.611],[14.5318,40.6107],[14.5306,40.609],[14.5295,40.608],[14.5325,40.6102],[14.5339,40.6106],[14.5347,40.6112],[14.5374,40.6118],[14.5379,40.6125],[14.5379,40.6131],[14.5385,40.6147],[14.5389,40.615],[14.5395,40.6147],[14.5397,40.6137],[14.5401,40.6136],[14.5408,40.6139],[14.5419,40.614],[14.5429,40.6149],[14.5438,40.6143],[14.5443,40.6142],[14.545,40.6148],[14.546,40.6143],[14.5475,40.6146],[14.5499,40.6141],[14.5503,40.6144],[14.5515,40.6141],[14.5529,40.6142],[14.5531,40.6138],[14.5543,40.614],[14.5552,40.6137],[14.5574,40.6148],[14.5598,40.6155],[14.5605,40.6154],[14.5616,40.6148],[14.5624,40.6155],[14.5636,40.6159],[14.5642,40.6159],[14.5647,40.6162],[14.5666,40.6148],[14.5672,40.6156],[14.568,40.6153],[14.5683,40.6159],[14.57,40.6162],[14.573,40.6152],[14.5731,40.6143],[14.574,40.614],[14.5755,40.6148],[14.5754,40.6162],[14.5748,40.6171],[14.5747,40.6177],[14.5752,40.6182],[14.576,40.6183],[14.5759,40.6186],[14.5762,40.6193],[14.5771,40.6196],[14.5794,40.621],[14.5791,40.6215],[14.5804,40.6225],[14.5817,40.6229],[14.5826,40.6238],[14.5827,40.6243],[14.5834,40.6245],[14.5837,40.6248],[14.584,40.6255],[14.5835,40.6263],[14.5836,40.627],[14.584,40.627],[14.5847,40.6259],[14.5854,40.6255],[14.5863,40.6255],[14.5869,40.6261],[14.5877,40.6265],[14.5893,40.6268],[14.591,40.6277],[14.5917,40.6283],[14.5927,40.6297],[14.5942,40.6301],[14.595,40.6311],[14.5957,40.6315],[14.5958,40.6323],[14.5975,40.6328],[14.598,40.6333],[14.6044,40.634],[14.605,40.6335],[14.6069,40.6331],[14.6072,40.6343],[14.608,40.6347],[14.6085,40.6356],[14.6095,40.6359],[14.6098,40.6357],[14.6102,40.6358],[14.6102,40.6367],[14.6108,40.6374],[14.611,40.6375],[14.6118,40.6372],[14.6126,40.6378],[14.6127,40.6381],[14.6119,40.6374],[14.6115,40.6376],[14.6116,40.6377],[14.6119,40.6374],[14.6124,40.6379],[14.6124,40.6397],[14.6142,40.6406],[14.6147,40.6412],[14.6145,40.6413],[14.6145,40.641],[14.6142,40.6407],[14.6132,40.6407],[14.612,40.6402]];
+
+const blobs = [
+  'M18 52 C 14 22, 70 10, 140 14 S 270 8, 284 38 C 296 66, 250 92, 170 90 S 22 90, 18 52Z',
+  'M10 40 C 22 12, 90 8, 150 18 S 280 14, 290 50 C 292 80, 220 94, 150 88 S 0 76, 10 40Z',
+  'M24 60 C 8 30, 60 6, 130 12 S 262 16, 288 46 C 300 72, 240 96, 160 92 S 40 94, 24 60Z',
+];
+const BRUSH_D = 'M4 8 C 50 2, 100 13, 160 7 S 250 5, 296 8';
+
+const statusEl = document.getElementById('status');
+const swatchEl = document.getElementById('swatches');
+const capCard = document.getElementById('caption');
+const capName = document.getElementById('cap-name');
+const capNote = document.getElementById('cap-note');
+const capBrush = document.getElementById('cap-brush');
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  center: [14.55, 40.628],
+  zoom: 11.5,
+  attributionControl: true,
+});
+
+function framePadding() {
+  return phone.matches
+    ? { top: current >= 0 ? 120 : 40, bottom: 72, left: 40, right: 40 }
+    : { top: 150, bottom: 80, left: 70, right: 70 };
+}
+
+// Replay a brush-stroke underline (instant under reduced motion via CSS)
+function paintBrush(svg) {
+  svg.classList.remove('painted');
+  void svg.getBoundingClientRect();
+  svg.classList.add('painted');
+}
+
+// Build swatches and markers
+const markers = [];
+STOPS.forEach((s, i) => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'swatch';
+  b.style.setProperty('--c', s.c);
+  b.setAttribute('aria-pressed', 'false');
+  b.innerHTML =
+    '<svg class="swatch-blob" viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">' +
+    '<path d="' + blobs[i % 3] + '" filter="url(#wc-blob-' + 'abc'[i % 3] + ')"/></svg>' +
+    '<span class="swatch-text"><span class="swatch-name">' + s.name + '</span><span class="swatch-meta">' + s.meta + '</span></span>' +
+    '<svg class="brush" viewBox="0 0 300 14" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="' + BRUSH_D + '"/></svg>';
+  b.addEventListener('click', () => select(i, true));
+  swatchEl.appendChild(b);
+  s.btn = b;
+
+  const el = document.createElement('div');
+  el.className = 'stop-marker';
+  el.innerHTML = '<span class="stop-pin" style="--c:' + s.c + '"><i class="stop-dot"></i><span class="stop-name' +
+    (s.name === 'Amalfi' || s.name === 'Positano' ? ' left' : '') + '">' + s.name + '</span></span>';
+  el.addEventListener('click', () => select(i, true));
+  s.pin = el.querySelector('.stop-pin');
+  markers.push(new mapboxgl.Marker({ element: el }).setLngLat(s.p));
+});
+
+let current = -1;
+function select(i, fly) {
+  current = i;
+  capCard.classList.add('has-stop');
+  const s = STOPS[i];
+  STOPS.forEach((o, k) => {
+    o.btn.classList.toggle('is-active', k === i);
+    o.btn.setAttribute('aria-pressed', k === i ? 'true' : 'false');
+    o.pin.classList.toggle('is-active', k === i);
+    if (k !== i) o.btn.querySelector('.brush').classList.remove('painted');
+  });
+  capCard.style.setProperty('--stop', s.c);
+  capName.textContent = s.name;
+  capNote.textContent = s.note;
+  paintBrush(capBrush);
+  paintBrush(s.btn.querySelector('.brush'));
+  if (fly) {
+    const opts = { center: s.p, zoom: s.z, padding: framePadding() };
+    if (reduce) map.jumpTo(opts);
+    else map.flyTo({ ...opts, duration: 1700, essential: true });
+    if (phone.matches) {
+      document.querySelector('.vignette').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    }
+  }
+}
+
+// Recolour light-v11 into watercolour tones; every call is guarded.
+function tintBasemap() {
+  const set = (fn, id, prop, val) => { try { map[fn](id, prop, val); } catch (e) { /* layer lacks this property */ } };
+  const parkExpr = ['match', ['get', 'class'], ['park', 'wood', 'grass', 'scrub', 'pitch', 'glacier'], 'rgba(127,166,80,0.32)', 'rgba(237,230,214,0.55)'];
+  map.getStyle().layers.forEach((l) => {
+    const id = l.id;
+    if (l.type === 'background') set('setPaintProperty', id, 'background-color', COL.paper);
+    else if (l.type === 'fill') {
+      if (/water/.test(id)) { set('setPaintProperty', id, 'fill-color', COL.cerulean); set('setPaintProperty', id, 'fill-opacity', 0.85); }
+      else if (/building/.test(id)) { set('setPaintProperty', id, 'fill-color', '#EADFCB'); set('setPaintProperty', id, 'fill-opacity', 0.8); }
+      else if (/^landuse$/.test(id)) { set('setPaintProperty', id, 'fill-color', parkExpr); set('setPaintProperty', id, 'fill-opacity', 1); }
+      else if (/park|landcover|wood|grass|scrub|pitch|national/.test(id)) { set('setPaintProperty', id, 'fill-color', 'rgba(127,166,80,0.3)'); set('setPaintProperty', id, 'fill-opacity', 1); }
+      else if (/hillshade/.test(id)) set('setLayoutProperty', id, 'visibility', 'none');
+    } else if (l.type === 'line') {
+      if (/waterway/.test(id)) set('setPaintProperty', id, 'line-color', COL.cerulean);
+      else if (/admin/.test(id)) { set('setPaintProperty', id, 'line-color', COL.pencil); set('setPaintProperty', id, 'line-opacity', 0.4); }
+      else if (/case|bridge-.*-case/.test(id)) set('setPaintProperty', id, 'line-opacity', 0);
+      else if (/road|bridge|tunnel|path|pedestrian|steps|ferry/.test(id)) {
+        set('setPaintProperty', id, 'line-color', COL.pencil);
+        set('setPaintProperty', id, 'line-opacity', 0.75);
+        set('setPaintProperty', id, 'line-width', ['interpolate', ['linear'], ['zoom'], 8, 0.3, 13, 0.8, 16, 2]);
+      }
+    } else if (l.type === 'symbol') {
+      // my handwritten labels replace the basemap's town names and POIs
+      if (/poi|transit|airport|ferry|housenum|natural-point|settlement|place|water-point/.test(id)) set('setLayoutProperty', id, 'visibility', 'none');
+      else { set('setPaintProperty', id, 'text-color', COL.payne); set('setPaintProperty', id, 'text-halo-color', COL.paper); }
+    }
+  });
+}
+
+function addRoad() {
+  const firstSymbol = (map.getStyle().layers.find((l) => l.type === 'symbol') || {}).id;
+  map.addSource('road', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ROAD } } });
+  // wide translucent wash, pencil underdrawing, then the painted line
+  map.addLayer({ id: 'road-wash', type: 'line', source: 'road',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': COL.terra, 'line-opacity': 0.22, 'line-blur': 4,
+      'line-width': ['interpolate', ['linear'], ['zoom'], 9, 8, 13, 18, 16, 34] } }, firstSymbol);
+  map.addLayer({ id: 'road-pencil', type: 'line', source: 'road',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': COL.pencil, 'line-width': 1, 'line-offset': 2.5, 'line-dasharray': [3, 2], 'line-opacity': 0.8 } }, firstSymbol);
+  map.addLayer({ id: 'road-paint', type: 'line', source: 'road',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': COL.terra, 'line-opacity': 0.9,
+      'line-width': ['interpolate', ['linear'], ['zoom'], 9, 1.6, 13, 3, 16, 6] } }, firstSymbol);
+}
+
+map.on('error', (e) => {
+  statusEl.className = 'status-note error';
+  statusEl.textContent = 'The map could not load: ' + ((e.error && e.error.message) || 'unknown error');
+});
+
+map.on('load', () => {
+  tintBasemap();
+  addRoad();
+  markers.forEach((m) => m.addTo(map));
+  const b = new mapboxgl.LngLatBounds();
+  STOPS.forEach((s) => b.extend(s.p));
+  map.fitBounds(b, { padding: framePadding(), duration: 0 });
+  statusEl.className = 'status-note';
+  statusEl.textContent = 'Tap a swatch to visit a stop.';
+});
+</script>
+</body>
+</html>

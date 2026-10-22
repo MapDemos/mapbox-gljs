@@ -1,0 +1,341 @@
+<!--
+  Working EXAMPLE of the Dive Log style pack (dive-log.css, in this same
+  folder). Open this file directly to see the pattern working with six
+  dive sites off Dahab on the Red Sea coast, on Mapbox Standard Satellite.
+  A vertical DEPTH RAIL (0-40 m, surface-to-abyss gradient, rising
+  bubbles) on the left pins each site at its max depth; clicking a site on
+  the rail (or its dive flag on the map) flies there, sends a sonar ring
+  out of the flag, and counts the round dive-computer dial and readouts up
+  to that site's figures. A white "slate" card carries the log text. On
+  phones the rail becomes a horizontal depth bar, the computer a compact
+  strip and the slate a panel below the map. Copy the markup below into
+  your own demo and link dive-log.css from its <head> -- see the
+  class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (scuba dive computer + logbook) at the user's
+  request for something distinct from every other pack in this folder. The
+  site names are real dive sites near Dahab and their positions sit just
+  offshore on the reef edge, but the depths, times, temperatures,
+  visibility figures and log text are illustrative placeholders, not dive
+  plans -- swap in your own.
+
+  What's NOT included: real dive-site data, bathymetry, tide/weather
+  feeds, search, routing, or a hard-coded access token (demo-kit.js sets
+  that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dive Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;700&family=Nunito+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="dive-log.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="depth-rail" aria-label="Dive sites by depth">
+    <div class="rail-head">Depth<small>metres</small></div>
+    <div class="rail-track" id="rail-track">
+      <canvas class="rail-bubbles" id="bubbles" aria-hidden="true"></canvas>
+      <div class="rail-needle hidden" id="needle"></div>
+    </div>
+  </nav>
+
+  <div class="stage">
+    <div id="map"></div>
+
+    <section class="computer" aria-label="Dive computer">
+      <svg class="dial" id="dial" viewBox="0 0 200 200" role="img" aria-label="Depth gauge">
+        <circle class="dial-bezel-outer" cx="100" cy="100" r="95" />
+        <circle class="dial-bezel" cx="100" cy="100" r="88" />
+        <path class="dial-arc-bg" d="M44.85 155.15 A78 78 0 1 1 155.15 155.15" />
+        <path class="dial-arc" id="dial-arc" d="M44.85 155.15 A78 78 0 1 1 155.15 155.15" />
+        <g id="dial-ticks"></g>
+        <circle class="dial-head" id="dial-head" cx="44.85" cy="155.15" r="5.5" />
+        <text class="dial-num" id="dial-num" x="100" y="112">--</text>
+        <text class="dial-unit" x="100" y="127">MAX DEPTH m</text>
+      </svg>
+      <div class="readouts">
+        <div class="readout"><span class="ro-label">Bottom time</span><span class="ro-value" id="ro-time">--</span></div>
+        <div class="readout"><span class="ro-label">Water</span><span class="ro-value" id="ro-temp">--</span></div>
+        <div class="readout"><span class="ro-label">Visibility</span><span class="ro-value" id="ro-vis">--</span></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="dl-title">
+    <h1>Dahab Dive Log</h1>
+    <p>Red Sea &middot; Sinai coast</p>
+  </div>
+
+  <aside class="slate" aria-live="polite">
+    <span class="slate-no" id="sl-no">Logbook</span>
+    <h2 class="slate-name" id="sl-name">Pick a dive site</h2>
+    <p class="slate-area" id="sl-area">Dahab, Egypt</p>
+    <p class="slate-text" id="sl-text">Six shore dives sit along the reef edge, each pinned on the depth rail at its maximum depth. Choose one to fly there and read the dive computer.</p>
+    <div class="slate-tags" id="sl-tags"></div>
+    <div class="slate-actions">
+      <button class="btn btn-secondary" id="btn-prev">&larr; Shallower</button>
+      <button class="btn btn-primary" id="btn-next">Deeper &rarr;</button>
+      <button class="btn btn-secondary" id="btn-all">All sites</button>
+    </div>
+    <p class="slate-foot">Illustrative log, not a dive plan.</p>
+    <div class="status-note loading" id="status-note" style="margin-top:8px">Loading map&hellip;</div>
+  </aside>
+</div>
+
+<script>
+// Sites ordered shallow to deep. Coordinates are [lng, lat], placed just
+// offshore (~50-150 m) on the reef edge. Figures and text are illustrative.
+const MAX_DEPTH = 40;
+const SITES = [
+  { name: 'Three Pools', area: 'North reef', depth: 8, time: 55, temp: 25, vis: 25,
+    coord: [34.5158, 28.5300], entry: 'Shore entry', level: 'Easy',
+    text: 'Sheltered coral basins just past the reef edge. A gentle first dive of the day: anthias shimmer over the heads and glassfish hang in the shade.' },
+  { name: 'Eel Garden', area: 'South bay', depth: 14, time: 50, temp: 25, vis: 20,
+    coord: [34.5110, 28.4745], flip: true, entry: 'Shore entry', level: 'Easy',
+    text: 'A sandy slope where garden eels sway like grass. Move slowly, keep your distance and they stay out; hover and wait for the rest of the cast.' },
+  { name: 'Lighthouse Reef', area: 'Dahab bay', depth: 18, time: 48, temp: 25, vis: 25,
+    coord: [34.5194, 28.4985], entry: 'Shore entry', level: 'Easy',
+    text: 'A busy reef wall below the harbour mouth. Look for pufferfish under the table corals and plan a slow return along the shallow shelf.' },
+  { name: 'Golden Blocks', area: 'Dahab bay', depth: 22, time: 45, temp: 24, vis: 25,
+    coord: [34.5160, 28.4840], entry: 'Shore entry', level: 'Moderate',
+    text: 'Square-cut coral blocks glow amber in the afternoon light. A good second dive, with a sandy bottom and plenty of small life in every crevice.' },
+  { name: 'The Canyon', area: 'North coast', depth: 30, time: 40, temp: 24, vis: 30,
+    coord: [34.5452, 28.5850], entry: 'Shore entry', level: 'Advanced',
+    text: 'A narrow crack drops through the reef into blue. Light falls in shafts between the walls; keep a close eye on gauges and on your buddy.' },
+  { name: 'Blue Hole', area: 'North coast', depth: 38, time: 35, temp: 24, vis: 40,
+    coord: [34.5374, 28.5722], entry: 'Shore entry', level: 'Advanced',
+    text: 'A deep sinkhole ringed by a shallow reef shelf. The edge of the hole falls away into dark blue; stay within your limits and plan the way back first.' },
+];
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phoneMQ = window.matchMedia('(max-width: 700px)');
+const $ = (id) => document.getElementById(id);
+const pad2 = (n) => String(n).padStart(2, '0');
+
+/* ------------------------------------------------------------- rail */
+const track = $('rail-track');
+const needle = $('needle');
+for (let m = 0; m <= MAX_DEPTH; m += 2) {
+  const t = document.createElement('div');
+  t.className = 'rail-tick' + (m % 10 === 0 ? ' major' : '');
+  t.style.setProperty('--p', m / MAX_DEPTH);
+  if (m % 10 === 0) t.innerHTML = `<span class="rail-tick-label">${m} m</span>`;
+  track.appendChild(t);
+}
+const railBtns = SITES.map((s, i) => {
+  const b = document.createElement('button');
+  b.className = 'rail-site';
+  b.style.setProperty('--p', s.depth / MAX_DEPTH);
+  b.setAttribute('aria-label', `${s.name}, ${s.depth} metres`);
+  b.innerHTML = `<span class="rs-dot">${i + 1}</span><span class="rs-name">${s.name}</span>`;
+  b.addEventListener('click', () => select(i));
+  track.appendChild(b);
+  return b;
+});
+
+/* Rising bubbles (off when reduced motion is requested) */
+const cv = $('bubbles');
+const ctx = cv.getContext('2d');
+let bubbles = [];
+function sizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const w = track.clientWidth, h = track.clientHeight;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const n = Math.max(8, Math.min(28, Math.round((w * h) / 9000)));
+    bubbles = Array.from({ length: n }, () => ({
+      x: Math.random() * w, y: Math.random() * h, r: 1.5 + Math.random() * 2.8,
+      v: 16 + Math.random() * 34, ph: Math.random() * 6.28, amp: 2 + Math.random() * 4,
+    }));
+  }
+  return [w, h];
+}
+let lastT = 0;
+function bubbleFrame(now) {
+  const [w, h] = sizeCanvas();
+  const dt = Math.min(0.05, (now - lastT) / 1000 || 0.016);
+  lastT = now;
+  ctx.clearRect(0, 0, w, h);
+  bubbles.forEach((b) => {
+    b.y -= b.v * dt;
+    if (b.y < -8) { b.y = h + 8; b.x = Math.random() * w; }
+    const x = b.x + Math.sin(now / 700 + b.ph) * b.amp;
+    ctx.beginPath();
+    ctx.arc(x, b.y, b.r, 0, 6.283);
+    ctx.fillStyle = 'rgba(244,247,248,0.16)';
+    ctx.fill();
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = 'rgba(244,247,248,0.75)';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x - b.r * 0.35, b.y - b.r * 0.35, Math.max(0.6, b.r * 0.25), 0, 6.283);
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fill();
+  });
+  requestAnimationFrame(bubbleFrame);
+}
+if (!reduce) requestAnimationFrame(bubbleFrame);
+
+/* -------------------------------------------------------- dive dial */
+const ARC_LEN = 78 * (270 * Math.PI / 180);
+const arcEl = $('dial-arc');
+arcEl.style.strokeDasharray = ARC_LEN;
+arcEl.style.strokeDashoffset = ARC_LEN;
+(function buildTicks() {
+  let s = '';
+  for (let m = 0; m <= MAX_DEPTH; m += 1) {
+    const a = (135 + 270 * (m / MAX_DEPTH)) * Math.PI / 180;
+    const major = m % 10 === 0;
+    const r1 = major ? 62 : 67, r2 = 72;
+    s += `<line class="dial-tick${major ? ' major' : ''}" x1="${(100 + r1 * Math.cos(a)).toFixed(2)}" y1="${(100 + r1 * Math.sin(a)).toFixed(2)}" x2="${(100 + r2 * Math.cos(a)).toFixed(2)}" y2="${(100 + r2 * Math.sin(a)).toFixed(2)}"/>`;
+    if (major) {
+      s += `<text class="dial-scale" x="${(100 + 52 * Math.cos(a)).toFixed(2)}" y="${(100 + 52 * Math.sin(a)).toFixed(2)}">${m}</text>`;
+    }
+  }
+  $('dial-ticks').innerHTML = s;
+})();
+
+const cur = { depth: 0, time: 0, temp: 0, vis: 0 };
+let shown = false;   // false until the first selection (dashes before that)
+let raf = 0;
+function render() {
+  const f = Math.min(1, cur.depth / MAX_DEPTH);
+  $('dial-num').textContent = Math.round(cur.depth);
+  arcEl.style.strokeDashoffset = ARC_LEN * (1 - f);
+  const a = (135 + 270 * f) * Math.PI / 180;
+  $('dial-head').setAttribute('cx', (100 + 78 * Math.cos(a)).toFixed(2));
+  $('dial-head').setAttribute('cy', (100 + 78 * Math.sin(a)).toFixed(2));
+  $('ro-time').innerHTML = `${Math.round(cur.time)}<small>min</small>`;
+  $('ro-temp').innerHTML = `${Math.round(cur.temp)}<small>&deg;C</small>`;
+  $('ro-vis').innerHTML = `${Math.round(cur.vis)}<small>m</small>`;
+}
+function countTo(target) {
+  cancelAnimationFrame(raf);
+  const keys = ['depth', 'time', 'temp', 'vis'];
+  if (reduce) { keys.forEach((k) => { cur[k] = target[k]; }); render(); return; }
+  const from = { ...cur };
+  const t0 = performance.now(), D = 1200;
+  (function step(now) {
+    const k = Math.min(1, (now - t0) / D), e = 1 - Math.pow(1 - k, 3);
+    keys.forEach((key) => { cur[key] = from[key] + (target[key] - from[key]) * e; });
+    render();
+    if (k < 1) raf = requestAnimationFrame(step);
+  })(t0);
+}
+
+/* -------------------------------------------------------------- map */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard-satellite',
+  config: { basemap: { lightPreset: 'day', showPointOfInterestLabels: false, showTransitLabels: false, showRoadLabels: false } },
+  center: [34.527, 28.53],
+  zoom: 11,
+  attributionControl: true,
+});
+if (!phoneMQ.matches) map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+function pad() {
+  return phoneMQ.matches
+    ? { top: 116, bottom: 70, left: 24, right: 24 }
+    : { top: 70, bottom: 90, left: 350, right: 360 };
+}
+
+function fitAll(instant) {
+  const b = SITES.reduce((bb, s) => bb.extend(s.coord), new mapboxgl.LngLatBounds(SITES[0].coord, SITES[0].coord));
+  const opts = { padding: pad(), maxZoom: 14 };
+  if (reduce || instant) map.fitBounds(b, { ...opts, duration: 0 }); else map.fitBounds(b, { ...opts, duration: 1600 });
+}
+
+const flagEls = SITES.map((s, i) => {
+  const root = document.createElement('div');
+  root.innerHTML =
+    `<div class="dive-flag${s.flip ? ' flip' : ''}" role="button" tabindex="0" aria-label="${s.name}, ${s.depth} metres">` +
+    `<span class="sonar"><i></i><i></i><i></i></span>` +
+    `<span class="flag-pole"></span><span class="flag-cloth"></span><span class="flag-base"></span>` +
+    `<span class="flag-label">${s.name}</span></div>`;
+  const flag = root.firstChild;
+  flag.addEventListener('click', () => select(i));
+  flag.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(i); } });
+  new mapboxgl.Marker({ element: root, anchor: 'bottom' }).setLngLat(s.coord).addTo(map);
+  return flag;
+});
+
+function ping(flag) {
+  flag.classList.remove('ping');
+  void flag.offsetWidth;            // restart the CSS animations
+  flag.classList.add('ping');
+}
+
+let selected = -1;
+function select(i) {
+  const s = SITES[i];
+  selected = i;
+  railBtns.forEach((b, k) => b.classList.toggle('is-active', k === i));
+  flagEls.forEach((f, k) => f.classList.toggle('is-active', k === i));
+  needle.classList.remove('hidden');
+  needle.style.setProperty('--p', s.depth / MAX_DEPTH);
+
+  $('sl-no').textContent = `Dive ${pad2(i + 1)} · ${s.depth} m`;
+  $('sl-name').textContent = s.name;
+  $('sl-area').textContent = `${s.area} · Dahab, Egypt`;
+  $('sl-text').textContent = s.text;
+  $('sl-tags').innerHTML = '';
+  [s.entry, s.level, `Max ${s.depth} m`].forEach((t) => {
+    const el = document.createElement('span');
+    el.className = 'tag';
+    el.textContent = t;
+    $('sl-tags').appendChild(el);
+  });
+  document.querySelector('.slate').scrollTop = 0;
+  shown = true;
+  countTo({ depth: s.depth, time: s.time, temp: s.temp, vis: s.vis });
+
+  ping(flagEls[i]);
+  const cam = { center: s.coord, zoom: 15.4, pitch: 30, bearing: 0, padding: pad() };
+  if (reduce) { map.jumpTo(cam); return; }
+  map.once('moveend', () => { if (selected === i) ping(flagEls[i]); });  // sweep again on arrival
+  map.flyTo({ ...cam, duration: 2400 });
+}
+
+$('btn-prev').addEventListener('click', () => select(selected <= 0 ? SITES.length - 1 : selected - 1));
+$('btn-next').addEventListener('click', () => select((selected + 1) % SITES.length));
+$('btn-all').addEventListener('click', () => {
+  selected = -1;
+  railBtns.forEach((b) => b.classList.remove('is-active'));
+  flagEls.forEach((f) => f.classList.remove('is-active', 'ping'));
+  needle.classList.add('hidden');
+  fitAll();
+});
+
+const statusEl = $('status-note');
+map.on('style.load', () => {
+  fitAll(true);
+});
+map.once('idle', () => {
+  statusEl.className = 'status-note success';
+  statusEl.textContent = `${SITES.length} dive sites on the reef edge`;
+});
+map.on('error', (e) => {
+  statusEl.className = 'status-note error';
+  statusEl.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+</script>
+</body>
+</html>

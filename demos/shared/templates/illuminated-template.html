@@ -1,0 +1,246 @@
+<!--
+  Working EXAMPLE of the Illuminated style pack (illuminated.css, in this
+  same folder). Open this file directly to see the pattern working with
+  the last seven stages of the Camino Frances (Sarria to Santiago de
+  Compostela), then copy the markup into your own demo and link
+  illuminated.css from its <head> -- see the class/id contract documented
+  at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo: an open
+  codex spread (text on the verso, bordered map on the recto) with gold
+  initials, a ribbon bookmark and a gold manicule marking the chosen stage.
+  The route is a real Mapbox Directions walking route, simplified and
+  embedded. Stage copy is illustrative.
+
+  What's NOT included: turn-by-turn directions, offline use, accommodation
+  data, or any live API calls (the route is embedded).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Road to Compostela</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=UnifrakturMaguntia&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="illuminated.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: position the map inside the bordered shell. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+
+<!-- shared SVG defs: gold gradient + vine-scroll border tiles -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="goldGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#C9A341"/><stop offset="1" stop-color="#F1D98A"/>
+    </linearGradient>
+    <g id="vineTile">
+      <path d="M0 17 C14 3 28 3 42 17 S70 31 84 17" fill="none" stroke="#8C6D1F" stroke-width="3"/>
+      <path d="M0 17 C14 3 28 3 42 17 S70 31 84 17" fill="none" stroke="#2F6B47" stroke-width="1.8"/>
+      <path d="M21 8 q-7 -6 -12 0 q6 5 12 0z M63 26 q7 6 12 0 q-6 -5 -12 0z" fill="#2F6B47" stroke="#8C6D1F" stroke-width=".6"/>
+      <path d="M21 8 q3 -8 9 -7 M63 26 q-3 8 -9 7" fill="none" stroke="#2F6B47" stroke-width="1"/>
+      <circle cx="42" cy="17" r="4" fill="url(#goldGrad)" stroke="#8C6D1F" stroke-width=".8"/>
+      <circle cx="0" cy="17" r="2.4" fill="#A4271F"/><circle cx="84" cy="17" r="2.4" fill="#A4271F"/>
+      <circle cx="31" cy="4.5" r="2.4" fill="#23408E"/><circle cx="53" cy="29.5" r="2.4" fill="#23408E"/>
+    </g>
+    <pattern id="vineH" width="84" height="34" patternUnits="userSpaceOnUse"><use href="#vineTile"/></pattern>
+    <pattern id="vineV" width="84" height="34" patternUnits="userSpaceOnUse" patternTransform="rotate(90)"><use href="#vineTile"/></pattern>
+    <g id="roundelArt">
+      <circle cx="20" cy="20" r="18.5" fill="#23408E" stroke="url(#goldGrad)" stroke-width="3"/>
+      <circle cx="20" cy="20" r="14" fill="none" stroke="#C9A341" stroke-width=".8"/>
+      <g fill="url(#goldGrad)" stroke="#8C6D1F" stroke-width=".5">
+        <circle cx="20" cy="13" r="5"/><circle cx="27" cy="20" r="5"/><circle cx="20" cy="27" r="5"/><circle cx="13" cy="20" r="5"/>
+      </g>
+      <circle cx="20" cy="20" r="3.4" fill="#A4271F" stroke="#F1D98A" stroke-width=".8"/>
+    </g>
+  </defs>
+</svg>
+
+<main class="codex">
+
+  <!-- VERSO: the stages -->
+  <section class="page page-verso" aria-label="Pilgrimage stages">
+    <header class="folio-head">
+      <p class="rubric-line">Incipit liber de itinere</p>
+      <h1 class="codex-title">The Road to Compostela</h1>
+      <div class="ornament-rule"></div>
+    </header>
+    <p class="lead"><span class="gold-initial" aria-hidden="true"><span>T</span></span><span class="sr-only" style="position:absolute;left:-9999px">T</span>he last hundred kilometres of the Camino Franc&eacute;s lead from the green hills of Galicia to the tomb of Saint James. Seven stages are set down here in order; touch any one, and the map shall carry thee thither.</p>
+
+    <h2 class="rubric" style="font-size:19px;text-align:center;margin-top:4px">Here follow the Stages</h2>
+    <ol class="stage-list" id="stage-list">
+      <li class="ribbon" id="ribbon" aria-hidden="true" style="list-style:none"></li>
+    </ol>
+    <p class="status-note success" id="status-note" role="status" aria-live="polite">Choose a stage to begin.</p>
+    <p style="text-align:center;margin:8px 0 0"><button class="btn btn-secondary" id="btn-all" type="button">View the whole road</button></p>
+    <p class="colophon">Explicit &mdash; here endeth the reading.</p>
+  </section>
+
+  <!-- RECTO: the map in its vine-scroll border -->
+  <section class="page page-recto" aria-label="Map">
+    <div class="map-frame">
+      <div class="vine vine-t"><svg aria-hidden="true"><rect width="100%" height="100%" fill="url(#vineH)"/></svg></div>
+      <div class="vine vine-b"><svg aria-hidden="true"><rect width="100%" height="100%" fill="url(#vineH)"/></svg></div>
+      <div class="vine vine-l"><svg aria-hidden="true"><rect width="100%" height="100%" fill="url(#vineV)"/></svg></div>
+      <div class="vine vine-r"><svg aria-hidden="true"><rect width="100%" height="100%" fill="url(#vineV)"/></svg></div>
+      <svg class="roundel rd-tl" viewBox="0 0 40 40" aria-hidden="true"><use href="#roundelArt"/></svg>
+      <svg class="roundel rd-tr" viewBox="0 0 40 40" aria-hidden="true"><use href="#roundelArt"/></svg>
+      <svg class="roundel rd-bl" viewBox="0 0 40 40" aria-hidden="true"><use href="#roundelArt"/></svg>
+      <svg class="roundel rd-br" viewBox="0 0 40 40" aria-hidden="true"><use href="#roundelArt"/></svg>
+      <div id="map-shell"><div id="map"></div></div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+// Seven stages, on real public places along the Camino Frances.
+const STAGES = [
+  { n: 'I',   name: 'Sarria',       leg: 'The beginning',  c: [-7.4146, 42.7766], text: 'The old stair of the Rua Maior climbs to the monastery of La Magdalena. Here the faithful take their first stamp, for the last hundred miles begin.' },
+  { n: 'II',  name: 'Portomarín', leg: 'c. 22 km',     c: [-7.6162, 42.8074], text: 'The ancient town lies drowned beneath the waters; its Romanesque church of San Nicolás was borne up the hill stone by stone.' },
+  { n: 'III', name: 'Palas de Rei', leg: 'c. 25 km',      c: [-7.8693, 42.8733], text: 'Lanes of oak and eucalyptus wind among small stone chapels, and a king’s palace is remembered in the very name of the town.' },
+  { n: 'IV',  name: 'Melide',       leg: 'c. 15 km',      c: [-8.0138, 42.9153], text: 'Here the way of Oviedo joins the French road. Pilgrims dine upon boiled octopus at long wooden tables, as is the custom.' },
+  { n: 'V',   name: 'Arzúa',  leg: 'c. 14 km',       c: [-8.1618, 42.9298], text: 'A town of cheese and cattle, with a hospitable chapel of the Magdalene where the weary may rest their feet.' },
+  { n: 'VI',  name: 'O Pedrouzo',   leg: 'c. 19 km',      c: [-8.3646, 42.9066], text: 'The last night upon the road. Through the eucalyptus woods the towers of Santiago are but one morning’s walk away.' },
+  { n: 'VII', name: 'Santiago de Compostela', leg: 'c. 19 km, the journey’s end', c: [-8.5448, 42.8806], text: 'Beneath the towers of the Cathedral, on the Praza do Obradoiro, the pilgrim lays a hand upon the pillar and gives thanks.' }
+];
+
+// Real Mapbox Directions walking route (Sarria to Santiago), simplified.
+const ROUTE = [[-7.4146,42.7766],[-7.4172,42.7764],[-7.4191,42.7752],[-7.4202,42.7753],[-7.4209,42.7763],[-7.4224,42.7767],[-7.4239,42.7784],[-7.4252,42.778],[-7.4288,42.7745],[-7.432,42.7743],[-7.431,42.7753],[-7.4347,42.7746],[-7.4407,42.7764],[-7.4415,42.7773],[-7.441,42.779],[-7.4416,42.78],[-7.4459,42.7821],[-7.4495,42.7825],[-7.4511,42.7818],[-7.4554,42.7816],[-7.458,42.7824],[-7.46,42.784],[-7.4671,42.7829],[-7.468,42.7826],[-7.468,42.782],[-7.4727,42.7803],[-7.4753,42.7816],[-7.4796,42.7805],[-7.4819,42.7811],[-7.4833,42.7804],[-7.4842,42.7812],[-7.4885,42.7811],[-7.4944,42.7802],[-7.4956,42.781],[-7.4961,42.7796],[-7.4992,42.779],[-7.5004,42.7779],[-7.5059,42.7772],[-7.5085,42.7788],[-7.5099,42.7783],[-7.5145,42.779],[-7.5193,42.7804],[-7.5208,42.7815],[-7.5213,42.7837],[-7.5219,42.784],[-7.5347,42.7835],[-7.5392,42.7843],[-7.5446,42.7862],[-7.5484,42.7841],[-7.5525,42.7842],[-7.5557,42.7828],[-7.5609,42.786],[-7.5671,42.7885],[-7.5694,42.7889],[-7.5725,42.7909],[-7.5826,42.7912],[-7.5834,42.7915],[-7.5847,42.7932],[-7.5868,42.794],[-7.5962,42.7954],[-7.6029,42.7957],[-7.6047,42.7951],[-7.6091,42.796],[-7.6081,42.7977],[-7.6087,42.7991],[-7.6106,42.7997],[-7.6132,42.8022],[-7.6151,42.8022],[-7.6167,42.8047],[-7.6159,42.8056],[-7.6165,42.8055],[-7.617,42.8065],[-7.6159,42.8074],[-7.6162,42.8076],[-7.6174,42.8068],[-7.6199,42.8077],[-7.6273,42.8079],[-7.6304,42.8104],[-7.6383,42.8073],[-7.6463,42.8116],[-7.6577,42.812],[-7.6628,42.8128],[-7.6789,42.821],[-7.6861,42.8223],[-7.6904,42.8246],[-7.6971,42.827],[-7.6987,42.8269],[-7.7021,42.8296],[-7.7096,42.8319],[-7.7136,42.8337],[-7.7135,42.8341],[-7.7157,42.8353],[-7.722,42.8355],[-7.7293,42.8379],[-7.7343,42.8424],[-7.7354,42.8419],[-7.7455,42.8434],[-7.7557,42.8458],[-7.7605,42.8497],[-7.7699,42.8525],[-7.7727,42.8527],[-7.7775,42.8554],[-7.7795,42.8584],[-7.7826,42.8614],[-7.7825,42.8623],[-7.785,42.8627],[-7.7873,42.8654],[-7.7936,42.8662],[-7.8058,42.8738],[-7.8091,42.8737],[-7.8119,42.8723],[-7.814,42.8722],[-7.8181,42.8742],[-7.8247,42.8729],[-7.8301,42.8754],[-7.8349,42.876],[-7.8373,42.8757],[-7.8397,42.8745],[-7.8485,42.8743],[-7.851,42.8749],[-7.8659,42.8728],[-7.8675,42.8728],[-7.8683,42.8735],[-7.8684,42.873],[-7.8702,42.8732],[-7.8722,42.8741],[-7.8819,42.8727],[-7.8831,42.8717],[-7.8849,42.8713],[-7.8902,42.8718],[-7.8895,42.8702],[-7.895,42.8709],[-7.8977,42.8717],[-7.9017,42.8745],[-7.9041,42.8744],[-7.9079,42.8755],[-7.9151,42.879],[-7.9192,42.88],[-7.9286,42.8787],[-7.9346,42.8808],[-7.9371,42.8805],[-7.9387,42.8812],[-7.9429,42.8802],[-7.9468,42.8817],[-7.9532,42.8817],[-7.9584,42.8847],[-7.9642,42.8867],[-7.9663,42.8882],[-7.9671,42.8896],[-7.969,42.8901],[-7.9734,42.8939],[-7.9745,42.8942],[-7.9762,42.8936],[-7.9807,42.8976],[-7.9909,42.9028],[-7.9912,42.9045],[-7.9958,42.9078],[-7.9988,42.9082],[-7.9988,42.9088],[-7.9999,42.9093],[-8.0024,42.9091],[-8.0048,42.9106],[-8.0131,42.9135],[-8.0138,42.9154],[-8.0204,42.9145],[-8.0245,42.9111],[-8.0274,42.912],[-8.037,42.9126],[-8.0391,42.9135],[-8.0426,42.9163],[-8.0465,42.916],[-8.0516,42.9176],[-8.054,42.9162],[-8.0573,42.9154],[-8.0601,42.9155],[-8.0643,42.917],[-8.0736,42.9155],[-8.078,42.9163],[-8.0793,42.9179],[-8.0811,42.9183],[-8.0843,42.918],[-8.0891,42.9185],[-8.0889,42.9192],[-8.0924,42.9205],[-8.0953,42.9242],[-8.0973,42.9248],[-8.1018,42.9247],[-8.1037,42.9253],[-8.1045,42.9267],[-8.1097,42.9281],[-8.1132,42.9271],[-8.1203,42.928],[-8.122,42.9263],[-8.1269,42.9239],[-8.128,42.9245],[-8.1281,42.9255],[-8.1307,42.924],[-8.1333,42.9239],[-8.1363,42.9225],[-8.1383,42.9234],[-8.1448,42.9223],[-8.1459,42.9236],[-8.1496,42.9239],[-8.1549,42.9281],[-8.1574,42.9288],[-8.1621,42.9287],[-8.1615,42.9297],[-8.1621,42.9287],[-8.1644,42.9292],[-8.1649,42.9305],[-8.168,42.9321],[-8.169,42.9334],[-8.1716,42.9329],[-8.1725,42.9356],[-8.1773,42.9353],[-8.1801,42.9365],[-8.1847,42.9363],[-8.1844,42.9335],[-8.1913,42.9304],[-8.197,42.9301],[-8.1982,42.9318],[-8.207,42.9319],[-8.2077,42.9303],[-8.2108,42.9298],[-8.2117,42.9304],[-8.2133,42.9289],[-8.2158,42.928],[-8.2239,42.9316],[-8.2355,42.9328],[-8.236,42.9336],[-8.2399,42.9333],[-8.241,42.9324],[-8.2458,42.9323],[-8.252,42.9337],[-8.26,42.9333],[-8.2598,42.9327],[-8.2706,42.9307],[-8.2722,42.9296],[-8.2772,42.9304],[-8.2799,42.9301],[-8.2804,42.9292],[-8.2834,42.9298],[-8.2867,42.9289],[-8.2968,42.9298],[-8.3065,42.9282],[-8.3121,42.9281],[-8.3218,42.9263],[-8.3301,42.927],[-8.3416,42.9219],[-8.3459,42.9229],[-8.3489,42.9216],[-8.3486,42.9208],[-8.3504,42.9204],[-8.3511,42.9171],[-8.3504,42.9145],[-8.3543,42.9128],[-8.3576,42.9123],[-8.3637,42.9091],[-8.3632,42.9086],[-8.364,42.9072],[-8.3637,42.9065],[-8.3646,42.9064],[-8.3637,42.9065],[-8.364,42.9071],[-8.3655,42.9083],[-8.3719,42.9058],[-8.3741,42.9057],[-8.3766,42.904],[-8.3816,42.9037],[-8.3825,42.9019],[-8.3909,42.9044],[-8.3934,42.906],[-8.3978,42.9055],[-8.3996,42.9064],[-8.4036,42.9057],[-8.4102,42.9062],[-8.4112,42.9074],[-8.4148,42.9084],[-8.4141,42.9136],[-8.4214,42.9135],[-8.4214,42.9142],[-8.4238,42.9141],[-8.4281,42.913],[-8.4303,42.9118],[-8.4354,42.9128],[-8.4396,42.9147],[-8.4472,42.911],[-8.4482,42.9099],[-8.4567,42.9069],[-8.4623,42.9063],[-8.4693,42.8984],[-8.4726,42.8967],[-8.4785,42.895],[-8.4791,42.8939],[-8.4875,42.8924],[-8.4879,42.8915],[-8.4999,42.8879],[-8.5044,42.8873],[-8.5046,42.8868],[-8.5171,42.8862],[-8.5253,42.8872],[-8.5318,42.8851],[-8.533,42.8853],[-8.535,42.8818],[-8.538,42.8812],[-8.5408,42.8818],[-8.5445,42.8809]];
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const listEl = document.getElementById('stage-list');
+const ribbonEl = document.getElementById('ribbon');
+const statusEl = document.getElementById('status-note');
+let current = -1;
+let mapReady = false;
+const markers = [];
+const items = [];
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  bounds: [[-8.62, 42.74], [-7.36, 42.96]],
+  fitBoundsOptions: { padding: 40 }
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+// Padding that keeps points off the logo / attribution corners.
+function pad() {
+  const w = document.getElementById('map').clientWidth;
+  const side = w < 500 ? 36 : 64;
+  return { top: 60, bottom: 76, left: side, right: side };
+}
+function fitAll() {
+  const b = new mapboxgl.LngLatBounds();
+  ROUTE.forEach((p) => b.extend(p));
+  map.fitBounds(b, { padding: pad(), duration: reduceMotion ? 0 : 1400, essential: false });
+}
+
+// ---- recolour light-v11 toward vellum (every call guarded) ----
+function setP(id, prop, val) { try { if (map.getLayer(id)) map.setPaintProperty(id, prop, val); } catch (e) {} }
+function setL(id, prop, val) { try { if (map.getLayer(id)) map.setLayoutProperty(id, prop, val); } catch (e) {} }
+function recolour() {
+  map.getStyle().layers.forEach((l) => {
+    const id = l.id;
+    if (/(^|-)rail|railway|transit/.test(id) && l.type !== 'symbol') setL(id, 'visibility', 'none');
+    else if (l.type === 'background') setP(id, 'background-color', '#F3E7C9');
+    else if (l.type === 'fill') {
+      let c = '#F0E2BF';
+      if (/water/.test(id)) c = '#BCC8E0';
+      else if (/park|national|wood|scrub|grass|pitch|golf|cemetery|agri|hospital|school/.test(id)) c = '#B9C497';
+      else if (/building/.test(id)) c = '#E2D0A4';
+      setP(id, 'fill-color', c);
+    } else if (l.type === 'line') {
+      if (/water/.test(id)) setP(id, 'line-color', '#8FA3CF');
+      else if (/admin|boundary/.test(id)) setP(id, 'line-color', '#A4271F');
+      else if (/case|bridge-case|tunnel-case/.test(id)) setP(id, 'line-color', '#E7D6AC');
+      else if (/road|bridge|tunnel|path|street|motorway|trunk|primary|secondary|tertiary|service|link|pedestrian/.test(id)) { setP(id, 'line-color', '#5A4636'); setP(id, 'line-opacity', 0.75); }
+    } else if (l.type === 'symbol') {
+      if (/poi|transit|airport|rail|ferry|motorway-junction|road-number|shield|settlement/.test(id)) setL(id, 'visibility', 'none');
+      else { setP(id, 'text-color', '#2B1D14'); setP(id, 'text-halo-color', '#F3E7C9'); }
+    }
+  });
+}
+
+// ---- pilgrim badge marker: scallop shell (inline SVG) ----
+const SHELL = '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 36 L5 23 C0 14 8 4 20 3.5 C32 4 40 14 35 23 Z" fill="url(#goldGrad)" stroke="#2B1D14" stroke-width="1.6" stroke-linejoin="round"/><path d="M20 36 L5 23 M20 36 L9 12 M20 36 L14 6 M20 36 L20 3.5 M20 36 L26 6 M20 36 L31 12 M20 36 L35 23" stroke="#8C6D1F" stroke-width="1.2" fill="none"/><rect x="15" y="33" width="10" height="4" rx="1.5" fill="#A4271F" stroke="#2B1D14" stroke-width="1"/></svg>';
+
+// ---- build the entries, markers ----
+STAGES.forEach((s, i) => {
+  const li = document.createElement('li');
+  li.className = 'stage';
+  li.innerHTML = '<button class="stage-btn" type="button" aria-pressed="false"><span class="initial" aria-hidden="true"><span></span></span><span><span class="stage-title"></span><span class="stage-meta"></span><span class="stage-text"></span></span></button><span class="manicule" aria-hidden="true">☞</span>';
+  li.querySelector('.initial > span').textContent = s.name.charAt(0);
+  li.querySelector('.stage-title').textContent = s.name;
+  li.querySelector('.stage-meta').textContent = 'Stage ' + s.n + ' · ' + s.leg;
+  li.querySelector('.stage-text').textContent = s.text;
+  li.querySelector('.stage-btn').addEventListener('click', () => select(i, true));
+  listEl.appendChild(li);
+  items.push(li);
+
+  const badge = document.createElement('button');
+  badge.className = 'pilgrim-badge';
+  badge.type = 'button';
+  badge.setAttribute('aria-label', 'Stage ' + s.n + ': ' + s.name);
+  badge.innerHTML = SHELL + '<span class="num"></span><span class="plaque"></span>';
+  badge.querySelector('.num').textContent = i + 1;
+  badge.querySelector('.plaque').textContent = s.name;
+  badge.addEventListener('click', () => select(i, true));
+  const root = document.createElement('div');   // marker root: no position/transform
+  root.appendChild(badge);
+  markers.push({ badge, marker: new mapboxgl.Marker({ element: root }).setLngLat(s.c) });
+});
+
+function moveRibbon() {
+  const li = items[current];
+  if (!li) return;
+  ribbonEl.style.top = li.offsetTop + 'px';
+  ribbonEl.style.left = (li.offsetLeft - 22) + 'px';
+  ribbonEl.style.height = Math.max(40, li.offsetHeight - 10) + 'px';
+}
+
+function select(i, fly) {
+  current = i;
+  const s = STAGES[i];
+  items.forEach((li, k) => {
+    li.classList.toggle('is-active', k === i);
+    li.querySelector('.stage-btn').setAttribute('aria-pressed', k === i);
+    markers[k].badge.classList.toggle('is-active', k === i);
+  });
+  moveRibbon();
+  statusEl.textContent = 'Stage ' + s.n + ' — ' + s.name + ' (' + s.leg + ').';
+  if (fly && mapReady) {
+    const o = { center: s.c, zoom: 12.2, padding: pad(), essential: false };
+    if (reduceMotion) map.jumpTo(o); else map.flyTo({ ...o, duration: 1800 });
+  }
+}
+
+map.on('load', () => {
+  recolour();
+  const firstSymbol = (map.getStyle().layers.find((l) => l.type === 'symbol') || {}).id;
+  map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE } } });
+  map.addLayer({ id: 'route-halo', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#F3E7C9', 'line-width': 6.5, 'line-opacity': 0.85 } }, firstSymbol);
+  map.addLayer({ id: 'route-dots', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#A4271F', 'line-width': 3.5, 'line-dasharray': [0.1, 2] } }, firstSymbol);
+  markers.forEach((m) => m.marker.addTo(map));
+  mapReady = true;
+  fitAll();
+});
+map.on('error', (e) => { statusEl.className = 'status-note error'; statusEl.textContent = 'The map could not be loaded.'; });
+
+document.getElementById('btn-all').addEventListener('click', () => { fitAll(); });
+window.addEventListener('resize', moveRibbon);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(moveRibbon);
+select(0, false);
+</script>
+</body>
+</html>

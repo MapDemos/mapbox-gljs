@@ -1,0 +1,537 @@
+/*
+  Regatta -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a yacht-race committee boat -- a strip of
+  international maritime signal flags hoisted on a halyard, a rope-bordered
+  "Race Committee" panel with a start-sequence countdown, a wind dial and a
+  fleet leaderboard, navy and sail-white with brass fittings), deliberately
+  distinct from every other pack in this folder:
+  Academic Paper, Aero Gadgets, Amber Terminal, Arena, Atomic Motel, Audio
+  Guide, Aurora Command, Blueprint, Board Game, Bottom Sheet, Broadcast,
+  Brutalist Guide, Case Board, Celestial Tarot, Chalkboard, Chronicle, Clinic
+  Finder, Comic Panel, Constructivist, Data Notebook, Deco Voyage, Drop
+  Culture, E-Ink, Editorial Paper, Estate Luxe, Event Invite, Field Journal,
+  Fleet Ops, Frontier Poster, Highway Sign, Isotype, Line Diagram, Memphis,
+  Moving Map, Neon HUD, Nordic Cabin, Papercraft, Pastel Bento, Pixel Quest,
+  Postcards, Raw Web, Retro OS, Riso Zine, Ski Piste, Slate Console, Soft UI,
+  Split Flap, Stained Glass, Sticker Book, Storefront, Story Scroll, Swiss
+  Grid, Tarmac Glass, Thermal Receipt, Trailhead, Trip Kanban, Vapor Sunset,
+  Vintage Chart (navy/parchment/brass -- this one is crisp white sailcloth
+  with primary-colour flags and rope), Washi Seasons, Weather Console,
+  Whiteboard and Zellige; and also distinct from the 19 sibling packs built
+  alongside it (Ukiyo-e Coast, Herbarium, Film Noir, Dive Log, Illuminated,
+  Stage Profile, Treasure Hunt, Tiki Lagoon, Rally Dash, Grand Hotel,
+  Orienteering, Museum Label, Code Editor, Watercolor, Annual Report, Truck
+  Art, Papel Picado, Vinyl Crate and Art Nouveau).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/regatta.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Squada One for headings and numerals;
+  Signika for body text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Signika:wght@400;500;600&family=Squada+One&display=swap" rel="stylesheet" />
+
+  Signature touch: a "flag hoist" -- inline-SVG international signal flags
+  hung from a twisted-rope halyard along the top, plus a rope-twist border
+  (a repeating diagonal gradient used as border-image) around the committee
+  panel, brass rivets, and a big navy start-timer.
+
+  Layout: .app is a grid -- .hoist (strip) on top, then .body holding .stage
+  (the map) and .committee (the right panel). On phones .body stacks: the map
+  at 55dvh, the panel below, and the page scrolls. The map never sits under
+  the panel, so the Mapbox logo and attribution are never covered.
+
+  Class/id contract (see regatta-template.html in this same folder):
+
+  - .app                      page grid; .body = stage + panel
+  - .hoist                    top flag strip; .halyard the rope line,
+                               .flag-row (flex, scrolls inside itself on
+                               phones) of .flag-wrap > .flag (an inline
+                               <svg>), .flag-gap between words, .hoist-title
+                               the regatta name, .hoist-sub small line
+  - .stage / #map             positioned map area / container (the demo
+                               positions #map itself)
+  - .committee                right panel, rope border; .cm-head > .cm-title
+    .cm-sec                    section; .cm-h its small brass heading
+    .countdown                 .cd-flags > .cd-slot (.up when raised, holds a
+                                .flag + .cd-slot-label), .cd-timer (add
+                                .go at GO), .cd-caption
+    .wind                      .dial (svg: .dial-ring, .dial-tick,
+                                .dial-n, .dial-arrow), .wind-read
+                                (.wind-kn + small lines)
+    .standings > .st-row       absolutely stacked rows moved with transform;
+                                .st-rank, .st-sail (.st-swatch), .st-name
+                                (+ <small> sail no.), .st-gap
+  - .btn, .btn-primary, .chip   button / small pill (.chip-row)
+  - .mark                    inner child of a mapboxgl.Marker: .buoy (the
+                               cylinder), .buoy.boat, .mark-label
+  - .yacht                   inner child of a yacht marker (rotated svg)
+  - .status-note             one-line live status
+  - .hidden                  utility: display: none !important
+*/
+
+:root {
+  --navy: #0B2545;
+  --sail: #FAFAFA;
+  --red: #D7263D;
+  --yellow: #F7C548;
+  --blue: #1B65A6;
+  --brass: #B08D57;
+  --brass-hi: #E2C48A;
+  --sea: #13315C;
+  --rope: #CBB993;
+  --rope-dark: #8F7A52;
+  --ink: #0B2545;
+  --ink-soft: #4A5F7D;
+  --line: #D7DEE8;
+  --font-display: 'Squada One', 'Arial Narrow', Impact, sans-serif;
+  --font-body: 'Signika', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--navy);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.hidden { display: none !important; }
+
+/* ---------- App grid ---------- */
+.app {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  height: 100dvh;
+}
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  min-height: 0;
+}
+.stage {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  border-top: 3px solid var(--brass);
+}
+
+/* ---------- Flag hoist ---------- */
+.hoist {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 18px 8px;
+  background: var(--navy);
+  min-width: 0;
+}
+.halyard {
+  position: absolute;
+  left: 0; right: 0; top: 8px;
+  height: 5px;
+  background: repeating-linear-gradient(-45deg, var(--rope) 0 3px, var(--rope-dark) 3px 6px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .35);
+}
+.flag-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 4px 0;
+}
+.flag-wrap {
+  position: relative;
+  flex: none;
+  padding-top: 7px;
+}
+/* brass toggle that clips the flag to the halyard */
+.flag-wrap::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%;
+  width: 6px; height: 9px;
+  margin-left: -3px;
+  background: linear-gradient(90deg, var(--brass), var(--brass-hi), var(--brass));
+  border-radius: 2px;
+}
+.flag {
+  display: block;
+  width: 48px;
+  height: 32px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, .4);
+  transform-origin: 50% 0;
+}
+.flag-gap { flex: none; width: 18px; }
+.hoist-title {
+  margin: 0 0 0 auto;
+  padding-top: 6px;
+  text-align: right;
+  flex: none;
+}
+.hoist-title h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--sail);
+}
+.hoist-sub {
+  margin: 3px 0 0;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--brass-hi);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .flag { animation: flutter 3.4s ease-in-out infinite; }
+  .flag-wrap:nth-child(2n) .flag { animation-delay: -1.1s; }
+  .flag-wrap:nth-child(3n) .flag { animation-delay: -2.2s; }
+  @keyframes flutter {
+    0%, 100% { transform: skewX(0) rotate(0); }
+    50% { transform: skewX(-3deg) rotate(.8deg); }
+  }
+}
+
+/* ---------- Committee panel ---------- */
+.committee {
+  position: relative;
+  margin: 10px 10px 10px 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--sail);
+  border: 8px solid transparent;
+  border-image: repeating-linear-gradient(-45deg, var(--rope) 0 5px, var(--rope-dark) 5px 10px) 8;
+  padding: 10px 14px 14px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+}
+.cm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--navy);
+}
+.cm-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 26px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--navy);
+}
+.rivets { display: flex; gap: 6px; }
+.rivets i {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--brass-hi), var(--brass) 60%, #6E5530);
+}
+.cm-sec { padding: 6px 0 0; }
+.cm-sec + .cm-sec { border-top: 1px dashed var(--line); margin-top: 6px; }
+.cm-h {
+  margin: 0 0 5px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+/* start countdown */
+.countdown { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.cd-flags { display: flex; justify-content: space-between; gap: 8px; }
+.cd-slot {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 56px;
+  padding-top: 3px;
+  border-top: 3px solid var(--rope);
+  position: relative;
+  overflow: hidden;
+}
+.cd-slot .flag {
+  width: 42px; height: 28px;
+  margin-top: 2px;
+  transform: translateY(46px);
+  opacity: 0;
+  transition: transform .5s cubic-bezier(.3, 1.4, .5, 1), opacity .25s;
+  animation: none;
+}
+.cd-slot.up .flag { transform: translateY(0); opacity: 1; }
+.cd-slot-label {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.cd-timer {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  padding: 4px 8px 6px;
+  background: var(--navy);
+  color: var(--sail);
+  font-family: var(--font-display);
+  font-size: 52px;
+  line-height: 1;
+  letter-spacing: .04em;
+  border: 3px solid var(--brass);
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  box-shadow: inset 0 0 0 2px var(--sea);
+}
+.cd-timer.go {
+  background: var(--red);
+  color: var(--sail);
+  letter-spacing: .12em;
+}
+.cd-caption {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+/* wind dial */
+.wind { display: flex; align-items: center; gap: 14px; }
+.dial { flex: none; width: 88px; height: 88px; }
+.dial-ring { fill: var(--sea); stroke: var(--brass); stroke-width: 4; }
+.dial-tick { stroke: var(--sail); stroke-width: 1.5; opacity: .7; }
+.dial-tick.major { stroke-width: 2.5; opacity: 1; }
+.dial-n { fill: var(--sail); font-family: var(--font-display); font-size: 13px; text-anchor: middle; dominant-baseline: central; }
+.dial-n.north { fill: var(--yellow); }
+.dial-arrow { fill: var(--yellow); stroke: var(--navy); stroke-width: 1.2; stroke-linejoin: round; }
+.dial-hub { fill: var(--brass); stroke: var(--navy); stroke-width: 1.5; }
+.wind-read { min-width: 0; }
+.wind-kn {
+  font-family: var(--font-display);
+  font-size: 46px;
+  line-height: .95;
+  color: var(--navy);
+}
+.wind-kn small { font-size: 18px; letter-spacing: .08em; color: var(--blue); margin-left: 3px; }
+.wind-read p { margin: 3px 0 0; font-size: 13px; color: var(--ink-soft); }
+
+/* standings */
+.standings {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.st-row {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 30px;
+  display: grid;
+  grid-template-columns: 28px 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px;
+  background: var(--sail);
+  border-bottom: 1px solid var(--line);
+  transition: transform .5s cubic-bezier(.3, .9, .3, 1);
+}
+.st-row.lead { background: #FFF6DC; }
+.st-rank {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1;
+  color: var(--navy);
+  text-align: center;
+}
+.st-sail { display: flex; align-items: center; justify-content: center; }
+.st-swatch { width: 18px; height: 18px; display: block; }
+.st-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--navy);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.st-name small {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .08em;
+  color: var(--ink-soft);
+}
+.st-gap {
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: .04em;
+  color: var(--blue);
+  text-align: right;
+  min-width: 46px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .st-row, .cd-slot .flag { transition: none; }
+}
+
+/* buttons and chips */
+.btn {
+  appearance: none;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 19px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 9px 16px 8px;
+  border: 2px solid var(--navy);
+  border-radius: 4px;
+  background: var(--sail);
+  color: var(--navy);
+}
+.btn:hover { background: #EEF2F8; }
+.btn:focus-visible, .chip:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+.btn-primary {
+  width: 100%;
+  margin-top: 12px;
+  background: var(--red);
+  border-color: var(--navy);
+  color: var(--sail);
+  box-shadow: 0 3px 0 var(--navy);
+}
+.btn-primary:hover { background: #C21F34; }
+.btn-primary:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--navy); }
+.btn:disabled { opacity: .6; cursor: default; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  appearance: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border: 1.5px solid var(--navy);
+  border-radius: 999px;
+  background: var(--sail);
+  color: var(--navy);
+}
+.chip:hover { background: var(--yellow); }
+.status-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  min-height: 1.35em;
+}
+
+/* ---------- Map markers (inner children only) ---------- */
+.mark {
+  position: relative;
+  width: 22px;
+  height: 26px;
+  cursor: pointer;
+}
+.buoy {
+  position: absolute;
+  left: 2px; top: 5px;
+  width: 18px; height: 18px;
+  border-radius: 3px 3px 9px 9px / 3px 3px 5px 5px;
+  background: linear-gradient(90deg, #D98A0B 0%, var(--yellow) 38%, #FFE9A8 55%, #E0A21C 100%);
+  border: 2px solid var(--navy);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, .4);
+}
+.buoy::before {   /* top cap */
+  content: '';
+  position: absolute;
+  left: -2px; right: -2px; top: -7px;
+  height: 9px;
+  border-radius: 50%;
+  background: #FFE08A;
+  border: 2px solid var(--navy);
+}
+.buoy::after {    /* red band */
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 6px;
+  height: 4px;
+  background: var(--red);
+}
+.buoy.orange { background: linear-gradient(90deg, #C9480F, #F2711C 40%, #FFA566 56%, #D9560F); }
+.buoy.finish::after {
+  height: 6px;
+  background: repeating-linear-gradient(90deg, var(--navy) 0 4px, var(--sail) 4px 8px);
+}
+.buoy.boat {
+  left: 0; top: 4px;
+  width: 22px; height: 18px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.buoy.boat::before, .buoy.boat::after { display: none; }
+.buoy.boat svg { display: block; width: 22px; height: 18px; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .4)); }
+.mark-label {
+  position: absolute;
+  left: 50%; bottom: 31px;
+  transform: translateX(-50%);
+  padding: 1px 6px 0;
+  background: var(--navy);
+  color: var(--sail);
+  border-radius: 3px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.mark-label.side {
+  left: 28px; bottom: auto; top: 3px;
+  transform: none;
+}
+.yacht {
+  width: 26px;
+  height: 26px;
+  pointer-events: auto;
+  cursor: default;
+}
+.yacht svg { display: block; width: 26px; height: 26px; filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, .55)); }
+
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) { display: block !important; }
+
+/* ---------- Phones ---------- */
+@media (max-width: 760px) {
+  .app { height: auto; min-height: 100dvh; display: block; }
+  .body { display: block; }
+  .hoist { padding: 12px 12px 6px; gap: 10px; overflow: hidden; }
+  .flag-row { overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; padding-bottom: 2px; }
+  .flag-row::-webkit-scrollbar { display: none; }
+  .flag { width: 34px; height: 23px; }
+  .flag-gap { width: 10px; }
+  .hoist-title { display: none; }
+  .mark { width: 20px; height: 24px; }
+  .buoy { width: 16px; height: 16px; left: 2px; top: 5px; }
+  .mark-label { font-size: 10px; bottom: 29px; padding: 0 4px; }
+  .mark-label.side { left: 24px; top: 4px; bottom: auto; }
+  .stage { height: 55dvh; }
+  .committee { margin: 10px 16px 16px; overflow: visible; }
+  .cd-timer { font-size: 56px; }
+}

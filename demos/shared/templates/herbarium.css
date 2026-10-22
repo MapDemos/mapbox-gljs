@@ -1,0 +1,375 @@
+/*
+  Herbarium -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: pressed botanical specimen sheets --
+  cream rag paper, archival specimen labels, translucent tape hinges,
+  pencil annotations, accession numbers, a cm ruler and a colour-checker
+  strip), deliberately distinct from every other pack in this folder:
+  Academic Paper, Aero Gadgets, Amber Terminal, Arena, Atomic Motel, Audio
+  Guide, Aurora Command, Blueprint, Board Game, Bottom Sheet, Broadcast,
+  Brutalist Guide, Case Board, Celestial Tarot, Chalkboard, Chronicle,
+  Clinic Finder, Comic Panel, Constructivist, Data Notebook, Deco Voyage,
+  Drop Culture, E-Ink, Editorial Paper, Estate Luxe, Event Invite, Field
+  Journal, Fleet Ops, Frontier Poster, Highway Sign, Isotype, Line Diagram,
+  Memphis, Moving Map, Neon HUD, Nordic Cabin, Papercraft, Pastel Bento,
+  Pixel Quest, Postcards, Raw Web, Retro OS, Riso Zine, Ski Piste, Slate
+  Console, Soft UI, Split Flap, Stained Glass, Sticker Book, Storefront,
+  Story Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt, Trailhead, Trip
+  Kanban, Vapor Sunset, Vintage Chart, Washi Seasons, Weather Console,
+  Whiteboard and Zellige; and also distinct from the 19 sibling packs
+  being built in parallel right now (Ukiyo-e Coast, Film Noir, Dive Log,
+  Illuminated, Stage Profile, Treasure Hunt, Tiki Lagoon, Rally Dash, Grand
+  Hotel, Orienteering, Museum Label, Regatta, Code Editor, Watercolor,
+  Annual Report, Truck Art, Papel Picado, Vinyl Crate, Art Nouveau).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/herbarium.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Gilda Display for headings, EB
+  Garamond for body text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Gilda+Display&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+
+  Signature touch: a pencil-annotation ring that draws itself around the
+  selected marker (stroke-dashoffset animation; instant under
+  prefers-reduced-motion), on a sheet with translucent tape hinges.
+
+  Class/id contract (see herbarium-template.html in this same folder):
+
+  - #map                       map container (demo-owned: position:absolute;
+                                inset:0 inside .sheet-map)
+  - .app                       page grid: sheet (~60%) + .shelf (~40%) on
+                                desktop; stacked, page scrolls, on phones
+  - .specimen-sheet            the paper sheet; contains
+    .tape (.tl .tr .bl .br)      translucent tape corners
+    .checker > i                 colour-checker strip (one <i> per swatch,
+                                  background set inline)
+    .ruler                       cm ruler down the left edge (ticks are CSS;
+                                  numbers are <b> children added by script)
+    .sheet-body                  grid holding .sheet-map and .label-card
+    .sheet-map                   framed map area (position:relative)
+    .label-card                  archival label, lower-left of the map on
+                                  desktop (lifted clear of the logo),
+                                  below the map on phones
+      .label-head, table.label   th/td rows: Collector, Locality, Date,
+                                  Accession No.; td.fill is pencil-hand
+  - .shelf                     right column (scrolls on desktop)
+    .shelf-head h1, .lede        title + intro
+    .toggle                      pill switch button (aria-pressed)
+    .card-grid                   2-column grid
+      .plant-card (button)         .illus (svg), .latin, .place, .acc;
+                                    .active marks the selected card
+  - .pin / .pin.active         round pressed-flower marker (inner child of
+                                a mapboxgl.Marker; never style the root)
+    .ring-root > .ring           pencil ring marker; .ring.draw animates
+  - .status-note (+ .error)    italic pencil status line
+  - .hidden                    utility: display: none !important
+*/
+
+:root {
+  --paper: #F4EFE3;
+  --paper-edge: #E3D9C2;
+  --ink: #2E2A24;
+  --green: #5E7D4A;
+  --rose: #B5656B;
+  --rule: #8C7B5B;
+  --tape: rgba(232, 215, 168, 0.6);
+  --pencil: #7D776C;
+  --shadow: rgba(46, 42, 36, 0.22);
+
+  --font-display: 'Gilda Display', 'Times New Roman', serif;
+  --font-body: 'EB Garamond', Garamond, Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.35;
+  background-color: #DDD2B8;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+}
+
+button { font-family: inherit; color: inherit; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 400; margin: 0; }
+
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 22px;
+  height: 100dvh;
+  padding: 22px;
+}
+
+/* ---- The specimen sheet ---- */
+.specimen-sheet {
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  grid-template-rows: 20px minmax(0, 1fr);
+  column-gap: 8px;
+  row-gap: 8px;
+  padding: 34px 30px 28px 18px;
+  min-height: 0;
+  background-color: var(--paper);
+  border: 1px solid var(--paper-edge);
+  box-shadow: 0 1px 0 #fff inset, 0 10px 26px var(--shadow), 0 2px 4px rgba(46, 42, 36, 0.15);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+.tape {
+  position: absolute;
+  width: 78px;
+  height: 24px;
+  background: var(--tape);
+  box-shadow: 0 1px 2px rgba(46, 42, 36, 0.18);
+  clip-path: polygon(0 8%, 4% 0, 8% 10%, 12% 0, 88% 0, 92% 10%, 96% 0, 100% 8%, 100% 92%, 96% 100%, 92% 90%, 88% 100%, 12% 100%, 8% 90%, 4% 100%, 0 92%);
+  pointer-events: none;
+  z-index: 4;
+}
+.tape.tl { top: 2px; left: -18px; transform: rotate(-38deg); }
+.tape.tr { top: 2px; right: -18px; transform: rotate(38deg); }
+.tape.bl { bottom: 2px; left: -18px; transform: rotate(38deg); }
+.tape.br { bottom: 2px; right: -18px; transform: rotate(-38deg); }
+
+.checker {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  gap: 2px;
+}
+.checker i {
+  flex: 1;
+  border: 1px solid rgba(46, 42, 36, 0.25);
+  min-width: 0;
+}
+
+.ruler {
+  grid-column: 1;
+  grid-row: 2;
+  position: relative;
+  overflow: hidden;
+  border-right: 1px solid var(--pencil);
+}
+.ruler b {
+  position: absolute;
+  left: 1px;
+  font: 400 11px/1 var(--font-body);
+  color: var(--pencil);
+  transform: translateY(2px);
+}
+.ruler {
+  /* 1 cm = 37.8px: long tick per cm, short tick per mm */
+  background-image:
+    repeating-linear-gradient(to bottom, var(--ink) 0 1px, transparent 1px 37.8px),
+    repeating-linear-gradient(to bottom, var(--pencil) 0 1px, transparent 1px 3.78px);
+  background-size: 14px 100%, 7px 100%;
+  background-position: right top, right top;
+  background-repeat: repeat-y, repeat-y;
+}
+
+.sheet-body {
+  grid-column: 2;
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
+}
+.sheet-map {
+  grid-area: 1 / 1;
+  position: relative;
+  min-height: 0;
+  border: 1px solid var(--rule);
+  outline: 5px solid var(--paper);
+  box-shadow: 0 0 0 6px var(--paper-edge);
+}
+
+/* ---- Archival label ---- */
+.label-card {
+  grid-area: 1 / 1;
+  align-self: end;
+  justify-self: start;
+  z-index: 3;
+  width: 262px;
+  margin: 0 0 46px 14px; /* lower-left, lifted clear of the Mapbox logo */
+  padding: 9px 12px 10px;
+  background: #FBF8EF;
+  border: 1px solid var(--rule);
+  box-shadow: 0 0 0 3px #FBF8EF, 0 0 0 4px var(--rule), 0 4px 10px var(--shadow);
+}
+.label-head {
+  font: 400 12px/1.2 var(--font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--green);
+  padding-bottom: 5px;
+  margin-bottom: 4px;
+  border-bottom: 1px double var(--rule);
+}
+.label-title {
+  font: italic 500 17px/1.2 var(--font-body);
+  text-align: center;
+  margin-bottom: 4px;
+}
+table.label { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+table.label th {
+  width: 34%;
+  text-align: left;
+  font-weight: 400;
+  font-variant: small-caps;
+  letter-spacing: 0.05em;
+  color: var(--rule);
+  vertical-align: baseline;
+  padding: 2px 6px 2px 0;
+  border-bottom: 1px solid rgba(140, 123, 91, 0.45);
+}
+table.label td {
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(140, 123, 91, 0.45);
+  vertical-align: baseline;
+}
+table.label td.fill { font-style: italic; color: var(--pencil); }
+table.label tr:last-child th, table.label tr:last-child td { border-bottom: 0; }
+
+/* ---- Shelf of cards ---- */
+.shelf {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 6px 24px 2px;
+}
+.shelf-head h1 {
+  font-size: 34px;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+}
+.shelf-head .rule { border: 0; border-top: 1px double var(--rule); margin: 10px 0; }
+.lede { margin: 0 0 12px; color: #4A453C; font-size: 17.5px; }
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 6px 14px 6px 8px;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  font-size: 16px;
+  cursor: pointer;
+}
+.toggle .dash {
+  width: 28px;
+  height: 0;
+  border-top: 2px dashed var(--pencil);
+  opacity: 0.45;
+}
+.toggle[aria-pressed="true"] { background: rgba(94, 125, 74, 0.12); border-color: var(--green); }
+.toggle[aria-pressed="true"] .dash { opacity: 1; }
+.toggle:focus-visible, .plant-card:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+.plant-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 7px 8px;
+  background: #FBF8EF;
+  border: 1px solid var(--paper-edge);
+  box-shadow: 0 2px 5px rgba(46, 42, 36, 0.16);
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.plant-card::before { /* small tape flag */
+  content: "";
+  position: absolute;
+  top: -7px; left: 50%;
+  width: 44px; height: 14px;
+  margin-left: -22px;
+  background: var(--tape);
+  transform: rotate(-3deg);
+  pointer-events: none;
+}
+.plant-card:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(46, 42, 36, 0.2); }
+.plant-card.active { border-color: var(--rose); box-shadow: 0 0 0 1px var(--rose), 0 6px 12px rgba(46, 42, 36, 0.2); }
+.plant-card .illus {
+  display: block;
+  width: 100%;
+  height: 110px;
+  background: rgba(227, 217, 194, 0.35);
+  border: 1px solid rgba(140, 123, 91, 0.35);
+}
+.plant-card .latin { display: block; margin-top: 7px; font: italic 500 15.5px/1.15 var(--font-body); overflow-wrap: anywhere; }
+.plant-card .place { display: block; font-size: 14px; color: #4A453C; line-height: 1.2; margin-top: 2px; }
+.plant-card .acc { display: block; margin-top: 4px; font: 400 12.5px/1 var(--font-display); letter-spacing: 0.08em; color: var(--rule); }
+
+@media (min-width: 1200px) {
+  .card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .plant-card .place { font-size: 13px; }
+}
+
+/* ---- Map pins ---- */
+.pin {
+  display: block;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: #FBF8EF;
+  border: 2px solid var(--green);
+  box-shadow: 0 1px 3px rgba(46, 42, 36, 0.4);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+.pin svg { display: block; width: 100%; height: 100%; }
+.pin.flower { border-color: var(--rose); }
+.pin:hover, .pin.active { transform: scale(1.2); }
+.ring-root { pointer-events: none; }
+.ring { display: block; width: 72px; height: 72px; overflow: visible; }
+.ring path {
+  fill: none;
+  stroke: var(--pencil);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+.ring.draw path { stroke-dashoffset: 0; transition: stroke-dashoffset 0.9s ease-out; }
+
+.status-note { font-style: italic; color: var(--pencil); font-size: 15px; margin: 6px 0 0; }
+.status-note.error { color: var(--rose); }
+
+.hidden { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ring.draw path, .pin, .plant-card { transition: none; }
+}
+
+/* ---- Phones: sheet on top, cards in 2 columns below, page scrolls ---- */
+@media (max-width: 860px) {
+  .app {
+    display: block;
+    height: auto;
+    padding: 16px;
+  }
+  .specimen-sheet { padding: 30px 22px 22px 12px; margin-bottom: 20px; }
+  .tape.tl, .tape.bl { left: -8px; }
+  .tape.tr, .tape.br { right: -8px; }
+  .sheet-body { grid-template-rows: 420px auto; }
+  .sheet-map { grid-area: 1 / 1; }
+  .label-card {
+    grid-area: 2 / 1;
+    justify-self: stretch;
+    width: auto;
+    margin: 16px 0 0;
+  }
+  .shelf { overflow: visible; padding: 0; }
+  .shelf-head h1 { font-size: 28px; }
+  .card-grid { gap: 12px; }
+  .plant-card .illus { height: 100px; }
+}

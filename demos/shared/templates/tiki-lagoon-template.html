@@ -1,0 +1,274 @@
+<!--
+  Working EXAMPLE of the Tiki Lagoon style pack (tiki-lagoon.css, in this
+  same folder). Open this file directly to see the pattern working: a
+  mid-century tiki-bar MENU BOARD for a fictional Bora Bora resort bar. The
+  map (Mapbox Standard Satellite, dusk) is framed by bamboo poles, a carved
+  totem column divides it from a cocktail-menu card, and every lagoon
+  activity is a menu line with an icon, dotted leader and a duration in
+  place of a price. Click a line (or a hibiscus marker) to fly there; the
+  line glows like a torch and a paper cocktail-umbrella tag opens on the
+  map. The carved switch flips the light between Dusk and Night. Copy the
+  markup below into your own demo and link tiki-lagoon.css from its <head>
+  -- see the class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (carved dark wood, bamboo, tapa cloth, hibiscus,
+  torch glow, lagoon turquoise) at the user's request for something distinct
+  from every other pack in this folder. Bora Bora is real but the spot
+  coordinates are hand-approximated, and "Hale Moana", the activities and
+  their durations are fictional placeholders -- swap in your own.
+
+  What's NOT included: booking, search/geocoding, routing, or a hard-coded
+  access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tiki Lagoon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Shrikhand&family=Chivo:wght@400;500;700;900&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="tiki-lagoon.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. Inset by the pole width
+     so the bamboo frame (and the logo/attribution inside the map) stay clear. */
+  #map {
+    position: absolute;
+    inset: var(--pole);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="stage" aria-label="Map of Bora Bora">
+    <div id="map"></div>
+    <div class="bamboo-frame" aria-hidden="true">
+      <div class="pole top"></div><div class="pole bottom"></div>
+      <div class="pole left"></div><div class="pole right"></div>
+    </div>
+    <button class="torch-switch" id="light-switch" role="switch" aria-checked="false" aria-label="Night mode">
+      <span class="ts-label">Dusk</span><span class="ts-label">Night</span><span class="ts-knob"></span>
+    </button>
+  </section>
+
+  <!-- Carved totem column: a face tile repeated down the column (decorative) -->
+  <div class="totem" aria-hidden="true">
+    <svg preserveAspectRatio="none">
+      <defs>
+        <pattern id="totem-tile" width="56" height="168" patternUnits="userSpaceOnUse">
+          <rect width="56" height="168" fill="none" />
+          <!-- headdress -->
+          <path d="M6 14 L14 2 L22 12 L28 0 L34 12 L42 2 L50 14 Z" fill="#D9B56C" stroke="#3A2416" stroke-width="2" />
+          <!-- face block -->
+          <rect x="6" y="14" width="44" height="100" rx="6" fill="#8A5A33" stroke="#3A2416" stroke-width="3" />
+          <!-- brows -->
+          <path d="M10 32 L26 26 M46 32 L30 26" stroke="#3A2416" stroke-width="5" stroke-linecap="round" />
+          <!-- eyes -->
+          <circle cx="19" cy="40" r="7" fill="#F2E3C6" stroke="#3A2416" stroke-width="2" />
+          <circle cx="37" cy="40" r="7" fill="#F2E3C6" stroke="#3A2416" stroke-width="2" />
+          <circle cx="19" cy="41" r="3" fill="#E03E52" />
+          <circle cx="37" cy="41" r="3" fill="#E03E52" />
+          <!-- nose -->
+          <path d="M28 46 L21 68 L35 68 Z" fill="#6B4226" stroke="#3A2416" stroke-width="2.5" stroke-linejoin="round" />
+          <!-- mouth with teeth -->
+          <rect x="11" y="78" width="34" height="24" rx="4" fill="#3A2416" />
+          <path d="M15 78 v9 M21 78 v9 M27 78 v9 M33 78 v9 M39 78 v9 M18 102 v-8 M24 102 v-8 M30 102 v-8 M36 102 v-8" stroke="#F2E3C6" stroke-width="3" />
+          <!-- tapa chevrons between faces -->
+          <path d="M6 124 L28 136 L50 124 M6 134 L28 146 L50 134 M6 144 L28 156 L50 144" fill="none" stroke="#18C2C2" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#totem-tile)" />
+    </svg>
+  </div>
+
+  <aside class="menu-card" aria-label="Lagoon activity menu">
+    <div class="menu-inner">
+      <header class="menu-head">
+        <p class="menu-kicker">Bora Bora &middot; French Polynesia</p>
+        <h1 class="menu-title">Hale Moana</h1>
+        <p class="menu-sub">Tiki bar &amp; lagoon club &mdash; the cocktail menu of things to do</p>
+        <svg class="menu-flourish" viewBox="0 0 190 18" aria-hidden="true">
+          <path d="M4 9 H70 M120 9 H186" stroke="#6B4226" stroke-width="2" stroke-dasharray="2 5" stroke-linecap="round" />
+          <g transform="translate(95 9)">
+            <g fill="#E03E52" stroke="#3A2416" stroke-width="1">
+              <ellipse cx="0" cy="-5" rx="3.5" ry="5" /><ellipse cx="0" cy="-5" rx="3.5" ry="5" transform="rotate(72)" />
+              <ellipse cx="0" cy="-5" rx="3.5" ry="5" transform="rotate(144)" /><ellipse cx="0" cy="-5" rx="3.5" ry="5" transform="rotate(216)" />
+              <ellipse cx="0" cy="-5" rx="3.5" ry="5" transform="rotate(288)" />
+            </g>
+            <circle r="2" fill="#F28C28" />
+          </g>
+        </svg>
+      </header>
+      <div id="menu"></div>
+      <p class="menu-foot">All prices quoted in minutes. Ice, umbrellas and sunsets included.</p>
+      <div class="status-note loading" id="status-note">Lighting the torches&hellip;</div>
+    </div>
+  </aside>
+</div>
+
+<script>
+// Fictional activities at real places around Bora Bora ([lng, lat]).
+// "Lagoon" spots sit in shallow lagoon water, "Island" and "After Dark" on land.
+const ICONS = {
+  coral: '<path d="M12 21v-8M12 13c-3.5 0-4.5-2.5-4.5-5.5M12 13c3.5 0 4.5-2.5 4.5-5.5M7.5 7.5V4M16.5 7.5V4M12 13V3.5M5 21h14"/>',
+  ray: '<path d="M2 11c4-6 8-7 10-7s6 1 10 7c-4 6-8 8-10 8S6 17 2 11zM12 19v3"/><circle cx="9" cy="10" r=".9"/><circle cx="15" cy="10" r=".9"/>',
+  motu: '<path d="M12 21c0-5 .5-8 2-11M4 21h16M14 10c-1-3-4-4-7.5-3 2.5 0 4.500 1 5.500 3M14 10c1-3 4-4 7.500-3-2.500 0-4.500 1-5.500 3M14 10c-2.500-1-3.500-3.500-3.500-6 1.500 1 3.500 3 3.500 6"/>',
+  peak: '<path d="M2 20l7-13 4 7 3-4 6 10z"/>',
+  harbor: '<circle cx="12" cy="5" r="2"/><path d="M12 7v14M6.500 12h11M5 15c0 4 3 6 7 6s7-2 7-6"/>',
+  torch: '<path d="M12 2c3.500 3 3.500 6.500 0 9-3.500-2.500-3.500-6 0-9zM10 12h4l-1 10h-2z"/>',
+  pin: '<path d="M12 22s7-7 7-12a7 7 0 10-14 0c0 5 7 12 7 12z"/><circle cx="12" cy="10" r="2.500"/>',
+};
+
+const SPOTS = [
+  { id: 'coral', group: 'Lagoon', icon: 'coral', name: 'Coral Garden Snorkel', time: '90 min',
+    desc: 'Float over living coral and parrotfish in calm, clear shallows.', coord: [-151.7140, -16.5250] },
+  { id: 'rays', group: 'Lagoon', icon: 'ray', name: 'Ray & Shark Snorkel', time: '2 hrs',
+    desc: 'Gentle stingrays and blacktip reef sharks at the sandbar.', coord: [-151.7180, -16.5380] },
+  { id: 'tapu', group: 'Lagoon', icon: 'motu', name: 'Motu Tapu Picnic', time: '3 hrs',
+    desc: 'Outrigger ride to a tiny islet with a coconut-cracking lunch.', coord: [-151.7767, -16.5047] },
+  { id: 'otemanu', group: 'Island', icon: 'peak', name: 'Mount Otemanu Viewpoint', time: '2 hrs',
+    desc: 'A jeep and a short walk to the volcano plug and its lookout.', coord: [-151.7415, -16.5020] },
+  { id: 'vaitape', group: 'Island', icon: 'harbor', name: 'Vaitape Market Stroll', time: '1 hr',
+    desc: 'Pareos, vanilla and fresh pineapple on the harbour front.', coord: [-151.7495, -16.5100] },
+  { id: 'matira', group: 'After Dark', icon: 'torch', name: 'Matira Beach Luau', time: '3 hrs',
+    desc: 'Fire dancers, drums and a pit-roasted feast on white sand.', coord: [-151.7388, -16.5383], nudge: [-14, -8] },
+  { id: 'point', group: 'After Dark', icon: 'pin', name: 'Point Matira Moon Walk', time: '45 min',
+    desc: 'Torch-lit stroll to the tip of the peninsula for the stars.', coord: [-151.7351, -16.5442], nudge: [14, 10] },
+];
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const statusEl = $('status-note');
+const icon = (k) => `<svg class="ml-icon" viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>`;
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard-satellite',
+  center: [-151.745, -16.52],
+  zoom: 12,
+  attributionControl: true,
+});
+
+// Light preset + label config (Standard Satellite keys; guarded -- unknown keys no-op).
+function applyConfig(preset) {
+  const set = (k, v) => { try { map.setConfigProperty('basemap', k, v); } catch (e) { /* ignore */ } };
+  set('lightPreset', preset);
+  set('showPointOfInterestLabels', false);
+  set('showPlaceLabels', false);
+  set('showRoadLabels', false);
+  set('showTransitLabels', false);
+}
+let night = false;
+map.on('style.load', () => {
+  applyConfig(night ? 'night' : 'dusk');
+  statusEl.className = 'status-note success';
+  statusEl.textContent = 'Torches lit. Tap a menu line to sail.';
+});
+map.on('error', (e) => {
+  statusEl.className = 'status-note error';
+  statusEl.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+/* ---- Dusk / Night carved switch ---- */
+const sw = $('light-switch');
+sw.addEventListener('click', () => {
+  night = !night;
+  sw.setAttribute('aria-checked', String(night));
+  applyConfig(night ? 'night' : 'dusk');
+});
+
+/* ---- Menu, markers and popup ---- */
+let activeId = null;
+let popup = null;
+const items = {}; // id -> { spot, line, hib }
+const phone = () => window.matchMedia('(max-width: 820px)').matches;
+
+const HIBISCUS = '<svg viewBox="-20 -20 40 40" aria-hidden="true">' +
+  '<g fill="#E03E52" stroke="#FFF4E0" stroke-width="1.6" stroke-linejoin="round">' +
+  [0, 72, 144, 216, 288].map((a) => `<path d="M0 0 C-9 -6 -9 -17 0 -18 C9 -17 9 -6 0 0Z" transform="rotate(${a})"/>`).join('') +
+  '</g><g stroke="#8E1F30" stroke-width="1" stroke-linecap="round">' +
+  [0, 72, 144, 216, 288].map((a) => `<path d="M0 -3 L0 -12" transform="rotate(${a})"/>`).join('') +
+  '</g><path d="M0 0 L7 -10" stroke="#F28C28" stroke-width="2" stroke-linecap="round"/>' +
+  '<circle cx="7" cy="-10" r="2.4" fill="#F28C28" stroke="#3A2416" stroke-width=".8"/>' +
+  '<circle r="3" fill="#F2E3C6" stroke="#8E1F30" stroke-width="1"/></svg>';
+
+const UMBRELLA = '<svg class="tag-umbrella" viewBox="0 0 44 30" aria-hidden="true">' +
+  '<path d="M3 20 C3 6 41 6 41 20 C37 16 33 16 30 20 C27 16 17 16 14 20 C11 16 7 16 3 20Z" fill="#18C2C2" stroke="#3A2416" stroke-width="2" stroke-linejoin="round"/>' +
+  '<path d="M14 20 C16 12 20 8 22 8 M30 20 C28 12 24 8 22 8" fill="none" stroke="#F2E3C6" stroke-width="2"/>' +
+  '<path d="M22 8 V29" stroke="#3A2416" stroke-width="2.4" stroke-linecap="round"/></svg>';
+
+function select(id, fly) {
+  const it = items[id];
+  if (!it) return;
+  if (activeId && items[activeId]) {
+    items[activeId].line.classList.remove('is-active');
+    items[activeId].hib.classList.remove('is-active');
+  }
+  activeId = id;
+  it.line.classList.add('is-active');
+  it.hib.classList.add('is-active');
+  if (popup) popup.remove();
+  const s = it.spot;
+  popup = new mapboxgl.Popup({ className: 'tiki-popup', offset: [0, -34], maxWidth: '260px', closeOnClick: false })
+    .setLngLat(s.coord)
+    .setHTML(`<div class="tag">${UMBRELLA}<h3 class="tag-title">${s.name}</h3><p class="tag-desc">${s.desc}</p><span class="tag-time">${s.time}</span></div>`)
+    .addTo(map);
+  popup.on('close', () => {
+    if (activeId === id) {
+      it.line.classList.remove('is-active');
+      it.hib.classList.remove('is-active');
+      activeId = null;
+    }
+  });
+  if (fly) {
+    // Pad so the point sits low enough for the umbrella tag above it, clear of the logo.
+    const opts = { center: s.coord, zoom: 14.2, duration: 2400,
+      padding: phone() ? { top: 150, bottom: 70, left: 30, right: 30 } : { top: 190, bottom: 80, left: 60, right: 60 } };
+    if (reduce) map.jumpTo(opts); else map.flyTo(opts);
+  }
+}
+
+let group = null, ul = null;
+SPOTS.forEach((s) => {
+  if (s.group !== group) {
+    group = s.group;
+    ul = document.createElement('ul');
+    ul.className = 'menu-group';
+    ul.setAttribute('aria-label', group);
+    const h = document.createElement('h2');
+    h.className = 'menu-group-title';
+    h.textContent = group;
+    const wrap = document.createElement('div');
+    wrap.append(h, ul);
+    $('menu').appendChild(wrap);
+  }
+  const li = document.createElement('li');
+  li.innerHTML = `<button type="button" class="menu-line">${icon(s.icon)}<span class="ml-name">${s.name}</span>` +
+    `<span class="ml-leader"></span><span class="ml-time">${s.time}</span><span class="ml-desc">${s.desc}</span></button>`;
+  const line = li.firstChild;
+  line.addEventListener('click', () => select(s.id, true));
+  ul.appendChild(li);
+
+  // Marker root is untouched; the flower is an inner child.
+  const root = document.createElement('div');
+  root.innerHTML = `<div class="hib" title="${s.name}">${HIBISCUS}</div>`;
+  const hib = root.firstChild;
+  root.addEventListener('click', (e) => { e.stopPropagation(); select(s.id, true); });
+  new mapboxgl.Marker({ element: root, offset: s.nudge || [0, 0] }).setLngLat(s.coord).addTo(map);
+  items[s.id] = { spot: s, line, hib };
+});
+
+// Frame every spot on load: left/right padding keeps Motu Tapu and the east lagoon off the poles.
+const bounds = SPOTS.reduce((b, s) => b.extend(s.coord), new mapboxgl.LngLatBounds(SPOTS[0].coord, SPOTS[0].coord));
+map.fitBounds(bounds, {
+  padding: phone() ? { top: 60, bottom: 70, left: 40, right: 40 } : { top: 70, bottom: 80, left: 70, right: 70 },
+  duration: 0,
+});
+</script>
+</body>
+</html>

@@ -687,5 +687,225 @@
       "tone": "light",
       "layout": "split"
     }
+  },
+  {
+    "name": "ukiyo-e-coast",
+    "description": {
+      "en": "Woodblock-print triptych — seal-stamped stations along a coast road",
+      "ja": "木版画の三幅対 — 海岸道路に沿って落款を押す宿場"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "sidebar"
+    }
+  },
+  {
+    "name": "herbarium",
+    "description": {
+      "en": "Pressed-specimen sheet — archival label, ruler and pencil rings",
+      "ja": "押し花の標本シート — 標本ラベルと定規、鉛筆の丸印"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
+    }
+  },
+  {
+    "name": "film-noir",
+    "description": {
+      "en": "1940s detective picture — letterbox scenes and a typed case file",
+      "ja": "1940年代の探偵映画 — レターボックスの場面とタイプ打ちの調書"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "overlay"
+    }
+  },
+  {
+    "name": "dive-log",
+    "description": {
+      "en": "Dive computer and depth rail over satellite reefs",
+      "ja": "衛星画像のリーフに重ねたダイブコンピュータと水深レール"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "overlay"
+    }
+  },
+  {
+    "name": "illuminated",
+    "description": {
+      "en": "Illuminated manuscript spread — gold initials and a pilgrim route",
+      "ja": "装飾写本の見開き — 金の頭文字と巡礼路"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
+    }
+  },
+  {
+    "name": "stage-profile",
+    "description": {
+      "en": "Cycling race broadcast — terrain-sampled elevation profile and live gaps",
+      "ja": "自転車レース中継 — 地形から測る高低図とタイム差"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "split"
+    }
+  },
+  {
+    "name": "treasure-hunt",
+    "description": {
+      "en": "Kids' pirate scavenger hunt — sealed clues and a revealing trail",
+      "ja": "子ども向け海賊の宝探し — 封印された手がかりと伸びるルート"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
+    }
+  },
+  {
+    "name": "tiki-lagoon",
+    "description": {
+      "en": "Tiki-bar cocktail menu beside a bamboo-framed lagoon map",
+      "ja": "竹枠のラグーン地図とティキバーのカクテルメニュー"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "split"
+    }
+  },
+  {
+    "name": "rally-dash",
+    "description": {
+      "en": "1960s GT cockpit — analog gauges, route book and a chase cam",
+      "ja": "1960年代GTのコックピット — アナログ計器とコマ図、追従カメラ"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "device"
+    }
+  },
+  {
+    "name": "grand-hotel",
+    "description": {
+      "en": "Symmetric pastel spa hotel — façade windows light up per key",
+      "ja": "左右対称のパステル調ホテル — 鍵ごとに窓が灯るファサード"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
+    }
+  },
+  {
+    "name": "orienteering",
+    "description": {
+      "en": "Orienteering course overprint with control descriptions and splits",
+      "ja": "オリエンテーリングのコース図、記号説明とスプリット"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "sidebar"
+    }
+  },
+  {
+    "name": "museum-label",
+    "description": {
+      "en": "White-cube gallery wall — framed map and tombstone placards",
+      "ja": "ホワイトキューブの展示壁 — 額装の地図とキャプション"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
+    }
+  },
+  {
+    "name": "regatta",
+    "description": {
+      "en": "Race committee boat — signal-flag hoist, countdown and live fleet",
+      "ja": "レース本部艇 — 信号旗、スタートのカウントダウンと艇団"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "sidebar"
+    }
+  },
+  {
+    "name": "code-editor",
+    "description": {
+      "en": "Dark IDE — live GeoJSON editor, terminal log and map preview",
+      "ja": "ダークなIDE — GeoJSONエディタ、ターミナルとマッププレビュー"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "device"
+    }
+  },
+  {
+    "name": "watercolor",
+    "description": {
+      "en": "Watercolour sketchbook — painted swatches and a soft-edged vignette",
+      "ja": "水彩のスケッチブック — 絵の具のスウォッチとにじむ地図"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
+    }
+  },
+  {
+    "name": "annual-report",
+    "description": {
+      "en": "Corporate annual report — KPIs, linked charts and a map figure",
+      "ja": "企業の年次報告書 — KPI、地図と連動するグラフ"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
+    }
+  },
+  {
+    "name": "truck-art",
+    "description": {
+      "en": "Hand-painted truck art — floral frame, mud-flap stops, rolling truck",
+      "ja": "手描きのトラックアート — 花柄の額と泥よけの停留地"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "page"
+    }
+  },
+  {
+    "name": "papel-picado",
+    "description": {
+      "en": "Fiesta bunting and lotería cards that flip to fly the map",
+      "ja": "フィエスタの切り紙飾りと裏返るロテリアカード"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
+    }
+  },
+  {
+    "name": "vinyl-crate",
+    "description": {
+      "en": "Record-store crawl — turntable, liner notes and a crate of sleeves",
+      "ja": "レコード店めぐり — ターンテーブルとジャケットの箱"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "split"
+    }
+  },
+  {
+    "name": "art-nouveau",
+    "description": {
+      "en": "Belle Époque poster — arched ironwork window and tendril cartouches",
+      "ja": "ベル・エポックのポスター — アーチの鉄細工窓と蔓草のカルトゥーシュ"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
+    }
   }
 ]

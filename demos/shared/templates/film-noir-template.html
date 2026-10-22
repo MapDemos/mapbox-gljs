@@ -1,0 +1,263 @@
+<!--
+  Working EXAMPLE of the Film Noir style pack (film-noir.css, in this same
+  folder). Open this file directly to see the pattern working: a cinematic
+  letterbox around a Mapbox Standard map (night preset, monochrome theme)
+  of Downtown Los Angeles. Six scenes of a fictional 1940s detective
+  picture -- click a SCENE chip (or a red-ringed marker) and the camera
+  flies there while a circular iris closes and reopens over the map, the
+  subtitle line types itself out, and the grey photo-paper case note
+  beside the map updates. A dashed silver "tail" line connects the scenes
+  in order. Copy the markup below into your own demo and link
+  film-noir.css from its <head> -- see the class/id contract documented at
+  the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief. The places are real Downtown LA landmarks; "The Last
+  Stop on Bunker Hill", Marlowe Pictures, Case 47 and every line of
+  narration are fictional placeholders -- swap in your own.
+
+  What's NOT included: search/geocoding, routing, popups, real film
+  assets, or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Film Noir</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Lusitana:wght@400;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="film-noir.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="reel">
+  <header class="bar bar-top">
+    <div class="title-card">
+      <p class="kicker">A Marlowe Pictures Production</p>
+      <h1>The Last Stop on Bunker Hill</h1>
+    </div>
+    <div class="reel-counter" aria-live="polite">
+      <span class="reel-disc" aria-hidden="true"></span>
+      <span id="counter">Reel 1 &middot; Titles</span>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div id="map"></div>
+  </main>
+
+  <aside class="case-note" aria-label="Case file">
+    <span class="case-stamp">Case 47</span>
+    <p class="case-head" id="case-head">Los Angeles Police Dept.<br />Homicide Bureau &middot; Oct. 1947</p>
+    <h2 class="case-title" id="case-title">Case File</h2>
+    <dl class="case-body">
+      <dt>Location</dt><dd id="case-loc">&mdash;</dd>
+      <dt>Time</dt><dd id="case-time">&mdash;</dd>
+      <dt>Notes</dt><dd id="case-note">&mdash;</dd>
+    </dl>
+  </aside>
+
+  <footer class="bar bar-bottom">
+    <p class="subtitle" id="subtitle" aria-label=""></p>
+    <nav class="scene-chips" id="chips" aria-label="Scenes">
+      <button class="btn" id="roll" aria-pressed="false">Roll film</button>
+    </nav>
+  </footer>
+</div>
+
+<script>
+// Six scenes, in story order. c = [lng, lat] of a real Downtown LA landmark.
+const SCENES = [
+  { n: 'I',   name: 'Union Station', c: [-118.2365, 34.0561], b: -35, z: 16.6,
+    time: '9:15 p.m. Rain.',
+    loc: 'Union Station, Alameda St.',
+    note: 'One grey overcoat on an empty seat. Ticket stub from the 9:15 out of Chicago. Nobody saw who left it.',
+    line: 'The 9:15 from Chicago came in empty, except for one coat left on a seat. Somebody wanted it found.' },
+  { n: 'II',  name: 'City Hall', c: [-118.2428, 34.0537], b: 20, z: 16.4,
+    time: '10:40 p.m.',
+    loc: 'Los Angeles City Hall, Spring St.',
+    note: 'A ledger kept by a clerk on the 22nd floor. Two men asked for it. Only one signed in.',
+    line: 'Twenty-seven floors of civic virtue. Somebody up there kept a ledger, and somebody else wanted it burned.' },
+  { n: 'III', name: 'Bradbury Building', c: [-118.2478, 34.0507], b: -70, z: 17.2,
+    time: '4:00 p.m. (she said).',
+    loc: 'Bradbury Building, S. Broadway',
+    note: 'Iron stairwell, caged elevator, light through the glass roof. Witness gave the wrong hour on purpose.',
+    line: 'Iron stairs, caged elevators, sunlight through glass. She said meet at four. She lied about the time.' },
+  { n: 'IV',  name: 'Grand Central Market', c: [-118.2489, 34.0508], b: 110, z: 17.2,
+    time: '11:05 p.m.',
+    loc: 'Grand Central Market, S. Broadway',
+    note: 'Noodle counter, back door onto Hill Street. Bartender saw nothing. Paid in cash.',
+    line: 'A noodle counter, a back door, a bartender who never saw a thing. In this town nobody ever does.' },
+  { n: 'V',   name: 'Angels Flight', c: [-118.2505, 34.0516], b: 60, z: 17.2,
+    time: '12:30 a.m.',
+    loc: 'Angels Flight Railway, Hill St.',
+    note: 'Two cars, one rail. The ledger changed hands at the top of the hill. Fare: five cents.',
+    line: 'The little railway climbs Bunker Hill for a nickel. Going down, it costs you more.' },
+  { n: 'VI',  name: 'Pershing Square', c: [-118.2504, 34.0488], b: -15, z: 16.9,
+    time: '5:50 a.m. Dawn.',
+    loc: 'Pershing Square, S. Hill St.',
+    note: 'Ledger recovered. Subject boarded the 6:10 out. Case closed. For tonight.',
+    line: 'Dawn on the palms. The ledger was in my pocket and she was on the 6:10 out. Case closed. For tonight.' },
+];
+const INTRO = 'Los Angeles, 1947. A city that never tells the truth twice. Pick a scene.';
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const phone = () => window.matchMedia('(max-width: 760px)').matches;
+const PAD = () => ({ top: 56, bottom: 72, left: 40, right: 40 });
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  bounds: [[-118.2505, 34.0488], [-118.2365, 34.0561]], // opening shot, refined by opening()
+  fitBoundsOptions: { padding: { top: 56, bottom: 72, left: 40, right: 40 }, pitch: 35, maxZoom: 16 },
+  config: { basemap: {
+    lightPreset: 'night',
+    theme: 'monochrome',
+    showPointOfInterestLabels: false,
+  } },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'top-right');
+
+// The iris lives in the canvas container: above markers, below the logo,
+// attribution and controls (which stay visible at all times).
+const iris = document.createElement('div');
+iris.className = 'iris';
+map.getCanvasContainer().appendChild(iris);
+
+let idx = -1;
+let rolling = null;
+let typer = null;
+
+/* ---- Subtitle: types itself out (instant under reduced motion) ---- */
+function narrate(text) {
+  const el = $('subtitle');
+  clearInterval(typer);
+  el.setAttribute('aria-label', text);
+  if (reduce) { el.textContent = text; return; }
+  let i = 0;
+  el.textContent = '';
+  const caret = document.createElement('span');
+  caret.className = 'caret';
+  typer = setInterval(() => {
+    i++;
+    el.textContent = text.slice(0, i);
+    el.appendChild(caret);
+    if (i >= text.length) { clearInterval(typer); caret.remove(); }
+  }, 26);
+}
+
+/* ---- Iris: black disc grows then shrinks, <= 600 ms ---- */
+function playIris() {
+  if (reduce || !iris.animate) return;
+  iris.getAnimations().forEach((a) => a.cancel());
+  iris.animate([
+    { clipPath: 'circle(0% at 50% 50%)' },
+    { clipPath: 'circle(80% at 50% 50%)', offset: 0.45 },
+    { clipPath: 'circle(0% at 50% 50%)' },
+  ], { duration: 600, easing: 'ease-in-out' });
+}
+
+/* ---- Scenes ---- */
+function go(i) {
+  idx = i;
+  const s = SCENES[i];
+  document.querySelectorAll('.scene-chip').forEach((c, k) => {
+    c.classList.toggle('is-active', k === i);
+    c.setAttribute('aria-current', k === i ? 'true' : 'false');
+    if (k === i) c.scrollIntoView({ block: 'nearest', inline: 'center', behavior: reduce ? 'auto' : 'smooth' });
+  });
+  markers.forEach((m, k) => m.classList.toggle('is-active', k === i));
+  $('counter').textContent = `Reel 1 · Scene ${s.n} / VI`;
+  $('case-title').textContent = s.name;
+  $('case-loc').textContent = s.loc;
+  $('case-time').textContent = s.time;
+  $('case-note').textContent = s.note;
+  narrate(s.line);
+
+  const cam = { center: s.c, zoom: s.z, pitch: 58, bearing: s.b, padding: PAD() };
+  if (reduce) { map.jumpTo(cam); return; }
+  playIris();
+  map.flyTo({ ...cam, duration: 2600, essential: false });
+}
+
+const markers = [];
+SCENES.forEach((s, i) => {
+  const chip = document.createElement('button');
+  chip.className = 'scene-chip';
+  chip.textContent = `Scene ${s.n}`;
+  chip.title = s.name;
+  chip.addEventListener('click', () => { stopRoll(); go(i); });
+  $('chips').insertBefore(chip, $('roll'));
+
+  // Marker root is left alone; only the inner child is styled.
+  const root = document.createElement('div');
+  const mk = document.createElement('button');
+  mk.className = 'mk';
+  mk.textContent = s.n;
+  mk.setAttribute('aria-label', `Scene ${s.n}: ${s.name}`);
+  mk.addEventListener('click', () => { stopRoll(); go(i); });
+  root.appendChild(mk);
+  // III and IV are ~110 m apart: nudge them in opposite directions so they never overlap.
+  const offset = s.n === 'III' ? [11, -9] : s.n === 'IV' ? [-11, 9] : [0, 0];
+  new mapboxgl.Marker({ element: root, offset }).setLngLat(s.c).addTo(map);
+  markers.push(mk);
+});
+
+/* ---- Roll film: play the scenes in order ---- */
+function stopRoll() {
+  clearTimeout(rolling);
+  rolling = null;
+  $('roll').setAttribute('aria-pressed', 'false');
+  $('roll').textContent = 'Roll film';
+}
+function rollNext(i) {
+  if (i >= SCENES.length) { stopRoll(); return; }
+  go(i);
+  rolling = setTimeout(() => rollNext(i + 1), 7000);
+}
+$('roll').addEventListener('click', () => {
+  if (rolling) { stopRoll(); return; }
+  $('roll').setAttribute('aria-pressed', 'true');
+  $('roll').textContent = 'Cut';
+  rollNext(0);
+});
+
+/* ---- Map: the dashed silver tail line connecting the scenes ---- */
+map.on('style.load', () => {
+  map.addSource('tail', {
+    type: 'geojson',
+    data: { type: 'Feature', geometry: { type: 'LineString', coordinates: SCENES.map((s) => s.c) } },
+  });
+  map.addLayer({
+    id: 'tail-line', type: 'line', source: 'tail', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': '#EDE8DF', 'line-width': 2.5, 'line-opacity': 0.9,
+      'line-dasharray': [2, 2], 'line-emissive-strength': 1,
+    },
+  });
+});
+
+/* ---- Opening shot: the whole route, slightly tilted ---- */
+function opening() {
+  const b = SCENES.reduce((bb, s) => bb.extend(s.c), new mapboxgl.LngLatBounds(SCENES[0].c, SCENES[0].c));
+  map.fitBounds(b, { padding: PAD(), pitch: 35, bearing: 0, duration: 0, maxZoom: 16 });
+}
+opening();
+map.on('load', opening);
+narrate(INTRO);
+map.on('error', (e) => console.warn('Map error:', e && e.error && e.error.message));
+</script>
+</body>
+</html>

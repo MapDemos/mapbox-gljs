@@ -1,0 +1,612 @@
+/*
+  Grand Hotel -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a symmetrical pastel confectionery spa
+  hotel -- strict centre-axis symmetry, pink / mauve / lilac facade bands,
+  bellhop-red accents, gold trim, cake-box ribbons and brass key tags),
+  deliberately distinct from every other pack in this folder: Academic
+  Paper, Aero Gadgets, Amber Terminal, Arena, Atomic Motel, Audio Guide,
+  Aurora Command, Blueprint, Board Game, Bottom Sheet, Broadcast, Brutalist
+  Guide, Case Board, Celestial Tarot, Chalkboard, Chronicle, Clinic Finder,
+  Comic Panel, Constructivist, Data Notebook, Deco Voyage, Drop Culture,
+  E-Ink, Editorial Paper, Estate Luxe, Event Invite, Field Journal, Fleet
+  Ops, Frontier Poster, Highway Sign, Isotype, Line Diagram, Memphis,
+  Moving Map, Neon HUD, Nordic Cabin, Papercraft, Pastel Bento, Pixel Quest,
+  Postcards, Raw Web, Retro OS, Riso Zine, Ski Piste, Slate Console, Soft
+  UI, Split Flap, Stained Glass, Sticker Book, Storefront, Story Scroll,
+  Swiss Grid, Tarmac Glass, Thermal Receipt, Trailhead, Trip Kanban, Vapor
+  Sunset, Vintage Chart, Washi Seasons, Weather Console, Whiteboard and
+  Zellige; and also distinct from the 19 sibling packs being built in
+  parallel right now: Ukiyo-e Coast, Herbarium, Film Noir, Dive Log,
+  Illuminated, Stage Profile, Treasure Hunt, Tiki Lagoon, Rally Dash,
+  Orienteering, Museum Label, Regatta, Code Editor, Watercolor, Annual
+  Report, Truck Art, Papel Picado, Vinyl Crate and Art Nouveau.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/grand-hotel.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Gloock for headings, Outfit for
+  body text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Gloock&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  Signature touch: the page is a mirrored hotel elevation. A centred inline
+  SVG facade (rows of windows, a central entrance arch, a funicular on one
+  flank answered by a tower on the other) sits above a stage whose map is
+  framed like a proscenium, flanked by two equal-height columns of cards
+  with cake-box ribbon edges that face the map. Picking a place lights its
+  facade window (.win.lit) and rings a little bell (.dinging); the
+  "turn-down" switch (body.is-night) lights every window.
+
+  Class/id contract (see grand-hotel-template.html in this same folder for
+  a full working example):
+
+  - body.is-night               night state: dark sky behind the facade and
+                                 every .win glows (map lightPreset is the
+                                 demo's job)
+  - .facade                     centred header band holding the facade SVG
+    .facade-title                 pediment-height name plate over the sky
+    .facade-title h1 / .facade-sub
+    svg .win / .win.lit          a facade window / a window lit warm
+    svg .win-bar                 muntin line across a window (decor)
+  - .stage                      desktop grid: [left col | map | right col],
+                                 a heading row then equal-height card rows;
+                                 stacks on phones
+  - .proscenium                 gold-trimmed map frame with a red valance;
+    .proscenium-window            inner box the demo's #map fills (demo
+                                 positions #map absolute / inset 0)
+  - .col, .col-left, .col-right column wrappers (display: contents on
+                                 desktop so cards align row by row)
+  - .col-head                   cake-box ribbon heading (h2 + .col-sub)
+  - .room-card (+.active)       a place card (a <button>); the right-hand
+                                 column is mirrored automatically
+    .tag                         brass key tag with the room number
+    .card-text, .card-name, .card-note
+    .ding (+ svg)                bell icon; .room-card.dinging plays the
+                                 one-shot ring
+  - .key-marker, .key-tag       map marker: root .key-marker is left alone,
+                                 style the inner .key-tag (+.active)
+  - .concierge                  desk card holding the switch + status
+    .switch (aria-checked)       "turn-down" toggle
+    .status-note (+.loading/     status line
+      .success/.error)
+  - .btn, .btn-primary,         ribbon-style buttons
+    .btn-secondary
+  - .hidden                     utility: display: none !important
+*/
+
+:root {
+  --pink: #F2B5C2;
+  --pink-soft: #FBE3E8;
+  --mauve: #B07BA1;
+  --mauve-deep: #6E4A66;
+  --lilac: #D9C6E8;
+  --powder: #BFD9EA;
+  --red: #A6192E;
+  --red-deep: #7F1223;
+  --cream: #FFF4EA;
+  --gold: #C8A15A;
+  --gold-deep: #7D5F1E;
+  --ink: #3B2540;
+  --ink-muted: #6E5877;
+  --sky: #CFE3F1;
+  --glass: #A9C6DC;
+  --glow: #FFD27A;
+  --success: #3F7A52;
+  --error: #A6192E;
+  --shadow: rgba(59, 37, 64, 0.18);
+
+  --font-heading: 'Gloock', Georgia, 'Times New Roman', serif;
+  --font-body: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+body.is-night {
+  --sky: #2C2142;
+  --glass: #55486E;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  color: var(--ink);
+  font-family: var(--font-body);
+  /* cake-box stripes, very soft */
+  background: repeating-linear-gradient(90deg, var(--cream) 0 28px, #FDEBE6 28px 56px);
+}
+
+button { font-family: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 3px solid var(--red);
+  outline-offset: 2px;
+}
+
+/* ---------- Facade ---------- */
+.facade {
+  position: relative;
+  flex: none;
+  display: flex;
+  justify-content: center;
+  background: var(--sky);
+  border-bottom: 4px solid var(--gold);
+  box-shadow: 0 4px 0 var(--mauve);
+  transition: background 0.6s ease;
+}
+
+.facade svg {
+  display: block;
+  height: 200px;
+  width: auto;
+  max-width: 100%;
+}
+
+.facade-title {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.facade-title h1 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  color: var(--red);
+}
+
+.facade-sub {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--mauve-deep);
+}
+
+body.is-night .facade-title h1 { color: var(--pink); }
+body.is-night .facade-sub { color: var(--lilac); }
+
+/* windows */
+.win {
+  fill: var(--glass);
+  stroke: var(--mauve-deep);
+  stroke-width: 1.5;
+  transition: fill 0.5s ease, filter 0.5s ease;
+}
+
+.win-bar {
+  stroke: var(--mauve-deep);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.win.lit,
+body.is-night .win {
+  fill: var(--glow);
+  filter: drop-shadow(0 0 4px rgba(255, 190, 90, 0.95));
+}
+
+body.is-night .win.lit {
+  fill: #FFF0B8;
+  filter: drop-shadow(0 0 7px rgba(255, 220, 130, 1));
+}
+
+/* ---------- Stage ---------- */
+.stage {
+  flex: 1;
+  width: 100%;
+  max-width: 1180px;
+  min-height: 520px;
+  margin: 0 auto;
+  padding: 18px 16px 16px;
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr) 250px;
+  grid-template-rows: auto repeat(4, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.col { display: contents; }
+
+.proscenium {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  position: relative;
+  min-height: 0;
+  display: flex;
+  padding: 24px 12px 12px;
+  background: var(--pink);
+  border: 3px solid var(--gold);
+  border-radius: 6px;
+  box-shadow: 0 10px 26px var(--shadow), inset 0 0 0 2px var(--cream);
+}
+
+/* red scalloped valance along the top of the frame */
+.proscenium::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 0, var(--red) 10px, transparent 11px) 0 0 / 24px 20px repeat-x;
+}
+
+.proscenium-window {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 360px;
+  border: 3px solid var(--gold);
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--powder);
+}
+
+/* ---------- Column headings: cake-box ribbons ---------- */
+.col-head {
+  grid-row: 1;
+  align-self: start;
+  margin: 0;
+  padding: 8px 22px 9px;
+  text-align: center;
+  color: var(--cream);
+  background: var(--red);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 50%, 100% 100%, 0 100%, 12px 50%);
+  filter: drop-shadow(0 3px 0 var(--red-deep));
+}
+
+.col-left .col-head { grid-column: 1; }
+.col-right .col-head { grid-column: 3; }
+
+.col-head h2 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: 0.03em;
+}
+
+.col-sub {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--pink-soft);
+}
+
+/* ---------- Cards ---------- */
+.room-card {
+  grid-row: var(--r);
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  background: var(--cream);
+  border: 2px solid var(--gold);
+  border-radius: 6px;
+  box-shadow: 0 4px 0 var(--lilac), 0 8px 16px var(--shadow);
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.col-left .room-card { grid-column: 1; border-right: 9px solid var(--pink); }
+
+.col-right .room-card {
+  grid-column: 3;
+  flex-direction: row-reverse;
+  text-align: right;
+  border-left: 9px solid var(--pink);
+}
+
+.room-card:hover { background: #fff; }
+
+.room-card.active {
+  background: #fff;
+  border-color: var(--red);
+  box-shadow: 0 4px 0 var(--red), 0 10px 18px var(--shadow);
+}
+
+.card-text { flex: 1; min-width: 0; }
+
+.card-name {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: 17px;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.card-note {
+  display: block;
+  margin-top: 3px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink-muted);
+}
+
+/* brass key tag (used on cards and on the map) */
+.tag,
+.key-tag {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 34px;
+  padding: 0 8px 0 18px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  color: #3F2D0C;
+  background: linear-gradient(160deg, #EAD08F, var(--gold) 55%, #A98440);
+  border: 1.5px solid var(--gold-deep);
+  border-radius: 4px 12px 12px 4px;
+}
+
+.tag::before,
+.key-tag::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: var(--cream);
+  border: 1.5px solid var(--gold-deep);
+}
+
+/* bell: rings once when its card is picked */
+.ding {
+  position: relative;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  color: var(--gold-deep);
+  opacity: 0.55;
+}
+
+.ding svg { display: block; width: 24px; height: 24px; transform-origin: 50% 12%; }
+
+.room-card.active .ding { opacity: 1; color: var(--red); }
+
+.room-card.dinging .ding svg { animation: gh-ding 0.9s ease-in-out 1; }
+
+.room-card.dinging .ding::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid var(--gold);
+  animation: gh-wave 0.9s ease-out 1 forwards;
+}
+
+@keyframes gh-ding {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(22deg); }
+  35% { transform: rotate(-18deg); }
+  55% { transform: rotate(12deg); }
+  75% { transform: rotate(-6deg); }
+}
+
+@keyframes gh-wave {
+  from { transform: scale(0.8); opacity: 0.9; }
+  to { transform: scale(1.9); opacity: 0; }
+}
+
+/* ---------- Map markers (inner child styled; root untouched) ---------- */
+.key-marker { cursor: pointer; }
+
+.key-tag {
+  cursor: pointer;
+  box-shadow: 0 2px 0 var(--gold-deep), 0 4px 8px rgba(59, 37, 64, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.key-tag:hover { transform: scale(1.08); }
+
+.key-tag.active {
+  transform: scale(1.18);
+  box-shadow: 0 0 0 3px var(--red), 0 4px 10px rgba(59, 37, 64, 0.4);
+}
+
+/* ---------- Concierge desk ---------- */
+.concierge {
+  grid-column: 3;
+  grid-row: 5;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
+  text-align: center;
+  background: var(--lilac);
+  border: 2px solid var(--gold);
+  border-radius: 6px;
+  box-shadow: 0 4px 0 var(--mauve), 0 8px 16px var(--shadow);
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.switch {
+  position: relative;
+  flex: none;
+  width: 48px;
+  height: 26px;
+  padding: 0;
+  cursor: pointer;
+  background: var(--pink);
+  border: 2px solid var(--gold-deep);
+  border-radius: 13px;
+  transition: background 0.3s ease;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--cream);
+  border: 1.5px solid var(--gold-deep);
+  transition: left 0.3s ease;
+}
+
+.switch[aria-checked="true"] { background: var(--mauve-deep); }
+.switch[aria-checked="true"]::after { left: 24px; background: var(--glow); }
+
+.status-note {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink-muted);
+}
+
+.status-note .status-icon { flex: none; }
+.status-note.loading .status-icon { display: inline-block; animation: gh-spin 1s linear infinite; }
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); }
+
+@keyframes gh-spin { to { transform: rotate(360deg); } }
+
+/* ---------- Buttons: ribbon-style ---------- */
+.btn {
+  display: inline-block;
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-align: center;
+  cursor: pointer;
+  color: var(--red);
+  background: var(--cream);
+  border: 2px solid var(--red);
+  border-radius: 999px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.btn:hover { background: var(--red); color: var(--cream); }
+.btn-primary { background: var(--red); color: var(--cream); border-color: var(--red-deep); }
+.btn-primary:hover { background: var(--red-deep); }
+.btn-secondary { color: var(--mauve-deep); border-color: var(--mauve); }
+.btn-secondary:hover { background: var(--mauve-deep); border-color: var(--mauve-deep); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.hidden { display: none !important; }
+
+/* ---------- Desktop: fit exactly one screen ---------- */
+@media (min-width: 761px) and (min-height: 700px) {
+  body { height: 100dvh; overflow: hidden; }
+  .facade svg { height: 150px; }
+  .facade-title { top: 5px; }
+  .facade-title h1 { font-size: 24px; }
+  .facade-sub { font-size: 10px; margin-top: 0; }
+  .stage { min-height: 0; padding-top: 12px; padding-bottom: 12px; gap: 8px 14px; overflow: hidden; }
+  .proscenium-window { min-height: 0; }
+  .room-card { padding: 6px 10px; gap: 8px; }
+  .card-name { font-size: 15px; }
+  .card-note { font-size: 12px; margin-top: 2px; line-height: 1.3; }
+  .col-head { padding: 5px 22px 6px; }
+  .col-head h2 { font-size: 18px; }
+  .concierge { padding: 6px 10px; gap: 5px; }
+}
+
+/* ---------- Narrower desktops ---------- */
+@media (max-width: 1100px) {
+  .stage { grid-template-columns: 210px minmax(0, 1fr) 210px; padding-left: 12px; padding-right: 12px; }
+  .card-note { font-size: 12px; }
+  .tag { min-width: 40px; font-size: 14px; }
+}
+
+/* ---------- Phones: compact facade, map, then the two lists ---------- */
+@media (max-width: 760px) {
+  .facade svg { height: auto; width: 100%; }
+  .facade-title { top: 3px; }
+  .facade-title h1 { font-size: 17px; }
+  .facade-sub { display: none; }
+
+  .stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    min-height: 0;
+    padding: 14px 16px 24px;
+    gap: 14px;
+  }
+
+  .proscenium { grid-column: 1 !important; grid-row: auto !important; order: 0; height: 50dvh; min-height: 340px; }
+  .proscenium-window { min-height: 0; }
+
+  .concierge { grid-column: 1 !important; grid-row: auto !important; order: 1; }
+
+  .col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+  .col-left { order: 2; }
+  .col-right { order: 3; }
+
+  .col-head,
+  .room-card { grid-column: auto !important; grid-row: auto !important; }
+
+  .col-head { align-self: stretch; }
+
+  .room-card,
+  .col-left .room-card,
+  .col-right .room-card {
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 14px;
+    text-align: center;
+    border-left: 2px solid var(--gold);
+    border-right: 2px solid var(--gold);
+    border-top: 9px solid var(--pink);
+  }
+
+  .room-card.active { border-color: var(--red); border-top-color: var(--pink); }
+  .card-name { overflow-wrap: break-word; }
+  .key-tag { min-width: 32px; height: 26px; padding: 0 6px 0 14px; font-size: 12px; }
+  .key-tag::before { left: 4px; width: 6px; height: 6px; margin-top: -3px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .room-card.dinging .ding svg,
+  .room-card.dinging .ding::after,
+  .status-note.loading .status-icon { animation: none; }
+  .room-card.dinging .ding::after { display: none; }
+  .win, .switch, .switch::after, .key-tag, .room-card, .facade { transition: none; }
+}

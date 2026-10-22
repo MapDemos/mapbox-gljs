@@ -1,0 +1,506 @@
+/*
+  Art Nouveau -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a Belle Epoque poster -- whiplash-curve
+  ironwork, stylised lilies and hair-like tendrils, a mosaic halo roundel,
+  muted sage / ochre / plum with gold, ornamental lettering frames; no
+  imitation of any specific artist's signed work), deliberately distinct
+  from every other style pack in this folder: Academic Paper, Aero Gadgets,
+  Amber Terminal, Arena, Atomic Motel, Audio Guide, Aurora Command,
+  Blueprint, Board Game, Bottom Sheet, Broadcast, Brutalist Guide, Case
+  Board, Celestial Tarot, Chalkboard, Chronicle, Clinic Finder, Comic
+  Panel, Constructivist, Data Notebook, Deco Voyage, Drop Culture, E-Ink,
+  Editorial Paper, Estate Luxe, Event Invite, Field Journal, Fleet Ops,
+  Frontier Poster, Highway Sign, Isotype, Line Diagram, Memphis, Moving
+  Map, Neon HUD, Nordic Cabin, Papercraft, Pastel Bento, Pixel Quest,
+  Postcards, Raw Web, Retro OS, Riso Zine, Ski Piste, Slate Console, Soft
+  UI, Split Flap, Stained Glass, Sticker Book, Storefront, Story Scroll,
+  Swiss Grid, Tarmac Glass, Thermal Receipt, Trailhead, Trip Kanban, Vapor
+  Sunset, Vintage Chart, Washi Seasons, Weather Console, Whiteboard,
+  Zellige -- and also distinct from the sibling packs built alongside it:
+  Ukiyo-e Coast, Herbarium, Film Noir, Dive Log, Illuminated, Stage
+  Profile, Treasure Hunt, Tiki Lagoon, Rally Dash, Grand Hotel,
+  Orienteering, Museum Label, Regatta, Code Editor, Watercolor, Annual
+  Report, Truck Art, Papel Picado, Vinyl Crate. (Its layout archetype is a
+  POSTER ARCH: the map sits in a round-topped arch window wrapped in
+  ironwork, a mosaic roundel crowns it, cartouches run down the side.)
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/art-nouveau.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Federo for headings and ornamental
+  lettering, Alegreya for body text -- no other fonts):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Federo&family=Alegreya:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet" />
+
+  Signature touch: the mosaic halo roundel -- two staggered rows of
+  conic-gradient tesserae (ochre / sage / rose / teal, cream grout) ringing
+  a cream lettering disc, drawn in pure CSS. Click a cartouche and the
+  arch's inline-SVG ironwork "grows" (stroke-dashoffset, under 900ms; none
+  under prefers-reduced-motion) while the cartouche takes a gold-leaf
+  border.
+
+  Class/id contract (see art-nouveau-template.html in this same folder for
+  a full working example):
+
+  - #map                      map container, absolutely fills .arch-map
+                               (the demo positions it, per convention)
+  - .poster                   the left composition (flex column, centred)
+  - .halo                     mosaic title roundel above the arch
+    .halo-core                  cream lettering disc inside the mosaic
+    .halo-core h1               ornamental Federo title
+    .halo-core .halo-sub        small-caps line under the title
+  - .arch                     round-topped arch frame; its width comes from
+                               --aw and its top curve from --ah (both set
+                               here; phones get a shallower curve)
+    .arch-map                   the clipped window the map lives in; its
+                                 lower part is a plain rectangle so the
+                                 Mapbox logo and attribution stay visible
+    svg.iron.iron-crown         whiplash crown over the arch top
+    svg.iron.iron-side          vine strip beside the arch (.iron-side.right
+                                 is a mirror made by the page script)
+    .tendril                    any stroked ironwork path that should grow
+    .arch.grow                  add briefly to play the "grow" animation
+  - .arch-base                svg band under the arch, centred lily
+  - .walk                     the right-hand column (below on phones)
+    .plate                      lettered header plate (h2 + .plate-meta)
+    .cartouche-list             ol/ul of stops
+    .cartouche                  tendril-bordered stop button; .active gives
+                                 the gold-leaf border
+      .cartouche .num           roman numeral medallion
+      .cartouche .name          Federo stop name
+      .cartouche .note          Alegreya italic one-liner
+    .leaf-btn                   small gilded pill button
+  - .lily                     inner child of a mapboxgl.Marker (lily bud svg
+                               with .petal-c / .petal-s parts); .lily.on is
+                               the selected state
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --cream: #F4ECD8;
+  --cream-deep: #EADFC2;
+  --sage: #9CAF88;
+  --ochre: #C99A3B;
+  --plum: #6D3B5C;
+  --teal: #2F5D50;
+  --gold: #B8933A;
+  --gold-light: #E6CB7C;
+  --rose: #D8A7A0;
+  --ink: #2E2421;
+  --ink-soft: #5E4D47;
+  --shadow: rgba(46, 36, 33, 0.22);
+
+  --font-display: 'Federo', 'Palatino Linotype', Georgia, serif;
+  --font-body: 'Alegreya', Georgia, 'Times New Roman', serif;
+
+  /* arch geometry: width, top-curve height, ironwork overhang */
+  --aw: clamp(320px, min(100vw - 440px, 100dvh - 260px, 580px), 580px);
+  --ah: calc(var(--aw) * 0.5);
+  --ow: 34px;
+  --ring: 12px;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; }
+
+body {
+  min-height: 100dvh;
+  background-color: var(--cream);
+  background-image:
+    radial-gradient(ellipse at 50% 30%, rgba(255, 252, 240, 0.7), transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 140 140'%3E%3Cpath d='M0 70 C30 40 50 100 80 70 S120 50 140 70' fill='none' stroke='%23B8933A' stroke-opacity='.13' stroke-width='1.2'/%3E%3Cpath d='M70 0 C40 30 100 50 70 80 S50 120 70 140' fill='none' stroke='%239CAF88' stroke-opacity='.18' stroke-width='1.2'/%3E%3C/svg%3E");
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.4;
+}
+
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: 3px solid var(--plum);
+  outline-offset: 2px;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  margin: 0;
+}
+
+/* ---------- Poster composition ---------- */
+.poster {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---------- Mosaic halo roundel ---------- */
+.halo {
+  position: relative;
+  z-index: 3;
+  flex: none;
+  width: 190px;
+  aspect-ratio: 1;
+  margin-bottom: 36px;
+  border-radius: 50%;
+  background: var(--cream);
+  box-shadow: 0 0 0 3px var(--gold), 0 0 0 6px var(--cream), 0 0 0 7px var(--plum), 0 10px 22px var(--shadow);
+}
+
+.halo::before,
+.halo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+/* outer row of tesserae */
+.halo::before {
+  background:
+    repeating-conic-gradient(from 0deg, var(--cream) 0 1.1deg, transparent 1.1deg 10deg),
+    repeating-conic-gradient(from 0deg, var(--ochre) 0 10deg, var(--sage) 10deg 20deg, var(--rose) 20deg 30deg, var(--teal) 30deg 40deg);
+  -webkit-mask: radial-gradient(circle closest-side, transparent 0 80.5%, #000 81.5% 100%);
+          mask: radial-gradient(circle closest-side, transparent 0 80.5%, #000 81.5% 100%);
+}
+
+/* inner row, offset half a tile like brickwork, different colour order */
+.halo::after {
+  background:
+    repeating-conic-gradient(from 5deg, var(--cream) 0 1.1deg, transparent 1.1deg 10deg),
+    repeating-conic-gradient(from 5deg, var(--teal) 0 10deg, var(--rose) 10deg 20deg, var(--sage) 20deg 30deg, var(--ochre) 30deg 40deg);
+  -webkit-mask: radial-gradient(circle closest-side, transparent 0 62%, #000 63% 79.5%, transparent 80%);
+          mask: radial-gradient(circle closest-side, transparent 0 62%, #000 63% 79.5%, transparent 80%);
+}
+
+.halo-core {
+  position: absolute;
+  inset: 19%;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 50%;
+  background: var(--cream);
+  box-shadow: inset 0 0 0 2px var(--gold), inset 0 0 0 5px var(--cream), inset 0 0 0 6px var(--plum);
+  text-align: center;
+}
+
+.halo-core h1 {
+  font-size: 31px;
+  line-height: 1;
+  color: var(--plum);
+  letter-spacing: 0.02em;
+}
+
+.halo-core .halo-sub {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--teal);
+  line-height: 1.15;
+}
+
+.halo-core .halo-sub::before {
+  content: '';
+  display: block;
+  width: 34px;
+  height: 7px;
+  margin: 0 auto 4px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 7'%3E%3Cpath d='M1 4 C8 0 12 7 17 3.5 C22 0 26 7 33 3' fill='none' stroke='%23B8933A' stroke-width='1.3'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* ---------- Arch window + ironwork ---------- */
+.arch {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 380px;
+  width: var(--aw);
+  padding: var(--ring);
+  border-radius: calc(var(--aw) / 2) calc(var(--aw) / 2) 8px 8px / var(--ah) var(--ah) 8px 8px;
+  background: var(--plum);
+  box-shadow: 0 0 0 3px var(--gold), 0 14px 30px var(--shadow);
+}
+
+.arch-map {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--cream);
+  border-radius: calc(var(--aw) / 2 - var(--ring)) calc(var(--aw) / 2 - var(--ring)) 2px 2px / calc(var(--ah) - var(--ring)) calc(var(--ah) - var(--ring)) 2px 2px;
+  box-shadow: 0 0 0 2px var(--gold);
+}
+
+.iron {
+  position: absolute;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 2;
+}
+
+.iron-crown {
+  left: calc(var(--ow) * -1);
+  right: calc(var(--ow) * -1);
+  top: -34px;
+  height: calc(var(--ah) + 34px);
+  width: calc(100% + var(--ow) * 2);
+}
+
+.iron-side {
+  left: calc(var(--ow) * -1);
+  width: var(--ow);
+  top: calc(var(--ah) - 8px);
+  /* explicit height: an SVG is a replaced element, so top + bottom with height:auto
+     falls back to its aspect ratio and overflowed the page */
+  height: calc(100% - var(--ah) + 2px);
+}
+
+.iron-side.right {
+  left: auto;
+  right: calc(var(--ow) * -1);
+  transform: scaleX(-1);
+}
+
+.iron .line {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 3;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.iron .line.fine { stroke-width: 1.6; stroke: var(--teal); }
+.iron .line.plum { stroke: var(--plum); stroke-width: 3.4; }
+.iron .leaf { fill: var(--sage); stroke: var(--teal); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+.iron .petal { fill: var(--rose); stroke: var(--plum); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+.iron .petal.mid { fill: var(--ochre); }
+
+/* the "grow" animation: strokes draw themselves in, leaves fade up */
+.arch.grow .tendril {
+  stroke-dasharray: 3000;
+  animation: nouveau-grow 850ms cubic-bezier(.3, .6, .3, 1) both;
+}
+
+.arch.grow .leaf,
+.arch.grow .petal {
+  animation: nouveau-bloom 850ms ease-out both;
+}
+
+@keyframes nouveau-grow {
+  from { stroke-dashoffset: 3000; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes nouveau-bloom {
+  0% { opacity: 0; }
+  45% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.arch-base {
+  flex: none;
+  width: calc(var(--aw) + var(--ow) * 2);
+  height: 40px;
+  margin-top: 10px;
+  overflow: visible;
+}
+
+/* ---------- Cartouche column ---------- */
+.walk {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.plate {
+  position: relative;
+  padding: 14px 20px 12px;
+  text-align: center;
+  background: var(--plum);
+  color: var(--cream);
+  border-radius: 28px 6px 28px 6px;
+  box-shadow: 0 0 0 2px var(--gold), inset 0 0 0 4px var(--plum), inset 0 0 0 5px rgba(230, 203, 124, 0.7);
+}
+
+.plate h2 {
+  font-size: 25px;
+  line-height: 1.1;
+  letter-spacing: 0.03em;
+}
+
+.plate-meta {
+  margin: 4px 0 0;
+  font-style: italic;
+  font-size: 15px;
+  color: var(--gold-light);
+}
+
+.cartouche-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 2px 4px 6px 2px;
+  list-style: none;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.cartouche {
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: start;
+  width: 100%;
+  padding: 10px 16px 10px 12px;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+  background: linear-gradient(var(--cream), var(--cream)) padding-box, linear-gradient(var(--plum), var(--plum)) border-box;
+  border: 3px solid transparent;
+  border-radius: 26px 6px 26px 6px;
+  box-shadow: inset 0 0 0 3px var(--cream), inset 0 0 0 4px var(--sage);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+
+/* tiny whiplash curls in two corners */
+.cartouche::before,
+.cartouche::after {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M2 22 C2 10 10 2 20 2 C24 2 24 8 19 8 C14 8 12 14 12 22' fill='none' stroke='%23B8933A' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  pointer-events: none;
+}
+
+.cartouche::before { top: 3px; left: 3px; }
+.cartouche::after { right: 3px; bottom: 3px; transform: rotate(180deg); }
+
+.cartouche:hover { transform: translateX(-3px); }
+
+.cartouche .num {
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: var(--sage);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 14px;
+  box-shadow: 0 0 0 2px var(--cream), 0 0 0 3.5px var(--teal);
+}
+
+.cartouche .name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1.15;
+  color: var(--plum);
+}
+
+.cartouche .note {
+  margin-top: 3px;
+  font-size: 15px;
+  font-style: italic;
+  line-height: 1.3;
+  color: var(--ink-soft);
+}
+
+/* gold-leaf border for the chosen stop */
+.cartouche.active {
+  background: linear-gradient(var(--cream), var(--cream)) padding-box,
+    linear-gradient(135deg, #F0DA9B 0%, #B8933A 28%, #EBD488 50%, #A5812F 74%, #E6CB7C 100%) border-box;
+  box-shadow: inset 0 0 0 3px var(--cream), inset 0 0 0 4px var(--ochre), 0 4px 14px rgba(184, 147, 58, 0.45);
+}
+
+.cartouche.active .num {
+  background: var(--ochre);
+  box-shadow: 0 0 0 2px var(--cream), 0 0 0 3.5px var(--gold);
+}
+
+.leaf-btn {
+  align-self: center;
+  padding: 7px 20px 8px;
+  border: 2px solid var(--gold);
+  border-radius: 22px 4px 22px 4px;
+  background: var(--cream);
+  color: var(--plum);
+  font-family: var(--font-display);
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+
+.leaf-btn:hover { background: var(--plum); color: var(--cream); }
+
+/* ---------- Lily-bud map marker (inner child of the Marker element) ---------- */
+.lily {
+  display: block;
+  width: 32px;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 2px 2px rgba(46, 36, 33, 0.4));
+  transition: transform .2s ease;
+}
+
+.lily svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.lily .petal-c { fill: var(--plum); stroke: var(--cream); stroke-width: 1.5; }
+.lily .petal-s { fill: var(--rose); stroke: var(--cream); stroke-width: 1.5; }
+.lily .stem { fill: none; stroke: var(--teal); stroke-width: 2.4; stroke-linecap: round; }
+.lily .lily-leaf { fill: var(--sage); stroke: var(--teal); stroke-width: 1; }
+.lily text { fill: var(--cream); font-family: var(--font-display); font-size: 11px; text-anchor: middle; }
+.lily:hover { transform: scale(1.12); }
+.lily.on { transform: scale(1.3); }
+.lily.on .petal-c { fill: var(--gold); stroke: var(--plum); }
+.lily.on text { fill: var(--ink); }
+
+/* A raster-dem (terrain) source would hide the Mapbox logo; keep it visible. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) { display: block !important; }
+
+.hidden { display: none !important; }
+
+/* ---------- Phones: shallower arch, smaller roundel, page scrolls ---------- */
+@media (max-width: 900px) {
+  :root {
+    --aw: calc(100vw - 32px);
+    --ah: calc(var(--aw) * 0.3);
+    --ow: 12px;
+    --ring: 9px;
+  }
+
+  .halo { width: 150px; margin-bottom: 30px; }
+  .halo-core h1 { font-size: 24px; }
+  .halo-core .halo-sub { font-size: 9px; }
+  .halo-core .halo-sub::before { width: 26px; margin-bottom: 2px; }
+
+  .arch { flex: none; min-height: 0; height: clamp(420px, 124vw, 620px); }
+  .arch-base { height: 30px; }
+  .cartouche-list { overflow: visible; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arch.grow .tendril,
+  .arch.grow .leaf,
+  .arch.grow .petal { animation: none; stroke-dasharray: none; }
+  .cartouche, .lily, .leaf-btn { transition: none; }
+}

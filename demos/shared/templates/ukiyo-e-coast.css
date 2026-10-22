@@ -1,0 +1,461 @@
+/*
+  Ukiyo-e Coast -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a Japanese woodblock-print travel series
+  reimagined for a coastline -- flat colour planes, Prussian-blue bokashi
+  gradients, crisp sumi keylines, red seal stamps, rectangular title
+  cartouches and "Station n of 7" numbering -- deliberately distinct from
+  every other style pack in this folder: Academic Paper, Aero Gadgets, Amber
+  Terminal, Arena, Atomic Motel, Audio Guide, Aurora Command, Blueprint,
+  Board Game, Bottom Sheet, Broadcast, Brutalist Guide, Case Board, Celestial
+  Tarot, Chalkboard, Chronicle, Clinic Finder, Comic Panel, Constructivist,
+  Data Notebook, Deco Voyage, Drop Culture, E-Ink, Editorial Paper, Estate
+  Luxe, Event Invite, Field Journal, Fleet Ops, Frontier Poster, Highway Sign,
+  Isotype, Line Diagram, Memphis, Moving Map, Neon HUD, Nordic Cabin,
+  Papercraft, Pastel Bento, Pixel Quest, Postcards, Raw Web, Retro OS, Riso
+  Zine, Ski Piste, Slate Console, Soft UI, Split Flap, Stained Glass, Sticker
+  Book, Storefront, Story Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt,
+  Trailhead, Trip Kanban, Vapor Sunset, Vintage Chart, Washi Seasons, Weather
+  Console, Whiteboard and Zellige; and also distinct from the sibling packs
+  built alongside it: Herbarium, Film Noir, Dive Log, Illuminated, Stage
+  Profile, Treasure Hunt, Tiki Lagoon, Rally Dash, Grand Hotel, Orienteering,
+  Museum Label, Regatta, Code Editor, Watercolor, Annual Report, Truck Art,
+  Papel Picado, Vinyl Crate and Art Nouveau).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/ukiyo-e-coast.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Zen Antique for headings and
+  numerals, Zen Old Mincho for body text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Antique&family=Zen+Old+Mincho:wght@400;700;900&display=swap" rel="stylesheet" />
+
+  Signature touch: the map is framed like a woodblock print (thick sumi
+  keyline, washi inner margin, a tall title cartouche in the corner), and
+  picking a station "stamps" a vermilion seal onto its tanzaku card with a
+  quick scale/rotate thud. The only gradients anywhere are bokashi fades
+  (Prussian blue fading to paper) on headers; everything else is flat.
+
+  Layout: a vertical TRIPTYCH. Desktop: .strip (left) | .print-frame | .strip
+  (right), ~190px tanzaku strips either side. Phone (<=720px): masthead,
+  map fills the remaining height, then both strips merge into one horizontal scroller.
+
+  Class/id contract (see ukiyo-e-coast-template.html in this same folder
+  for a full working example):
+
+  - .triptych                 page grid (100dvh): masthead + three columns
+  - .masthead                 bokashi header bar spanning the page
+    .masthead h1                series title (Zen Antique)
+    .masthead .subtitle         small line under the title
+    .wave-crest                 <svg> decorative animated wave (static under
+                                 prefers-reduced-motion)
+  - .strips                   wrapper of the two strips (display: contents
+                               on desktop, the horizontal scroller on phone)
+    .strip                      one tanzaku strip (.strip-left/.strip-right)
+      .strip-head                 small bokashi caption at the top of a strip
+      .station-card             <button> stop card; .is-active = selected,
+                                 .is-stamped = visited (seal shown),
+                                 .stamping = play the stamp animation
+        .card-band                bokashi band holding .station-no
+        .station-no               "Station 1 of 7"
+        .motif                    <svg> wave/pine motif
+        .station-name             Zen Antique name
+        .station-note             one-line note
+        .seal                     vermilion seal stamp on the card
+  - .print-frame              the framed print (thick keyline + inner margin)
+    .map-well                   inner keylined well; #map + overlays live in it
+    #map                        map container (demo positions it in .map-well)
+    .cartouche                  tall title cartouche, top-right of the frame
+    .print-caption              caption card for the selected station
+      .caption-no / .caption-title / .caption-text / .caption-close
+  - .seal-marker              inner child of a map Marker: red square seal
+                               with the station numeral (.is-active = bigger)
+  - .status-note (+.loading/.error)   small status line
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --washi: #E8E2C8;
+  --washi-light: #F1ECD6;
+  --prussian: #1F3A68;
+  --indigo: #2B4C7E;
+  --vermilion: #C8402F;
+  --pine: #3F6B4A;
+  --sand: #D9C49A;
+  --sumi: #1B1B1B;
+  --sumi-soft: #4A4636;
+
+  --font-heading: 'Zen Antique', 'Zen Old Mincho', Georgia, serif;
+  --font-body: 'Zen Old Mincho', Georgia, 'Times New Roman', serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background-color: var(--washi);
+  color: var(--sumi);
+  font-family: var(--font-body);
+  font-size: 14px;
+  /* Paper grain: faint tiled noise, tooth rather than speckle */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  overflow: hidden;
+}
+
+button { font-family: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--vermilion); outline-offset: 2px; }
+
+/* ---- Triptych grid ---- */
+.triptych {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) 190px;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100dvh;
+}
+
+.masthead {
+  grid-column: 1 / -1;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 64px;
+  padding: 8px 24px;
+  color: var(--washi-light);
+  border-bottom: 4px solid var(--sumi);
+  /* Bokashi: Prussian blue fading downward into indigo-tinted paper */
+  background: linear-gradient(180deg, var(--prussian) 0%, var(--prussian) 38%, #4D6A98 100%);
+}
+
+.masthead > div { position: relative; z-index: 1; min-width: 0; }
+
+.masthead h1 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+}
+
+.masthead .subtitle {
+  margin-top: 3px;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sand);
+}
+
+.wave-crest {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 60%;
+  max-width: 760px;
+  height: 100%;
+  pointer-events: none;
+}
+
+.wave-crest .wave-row { animation: wave-drift 14s linear infinite; }
+.wave-crest .wave-row.slow { animation-duration: 22s; animation-direction: reverse; }
+
+@keyframes wave-drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(-120px); }
+}
+
+/* ---- Tanzaku strips ---- */
+.strip {
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 12px 14px;
+}
+.strip-left { grid-column: 1; }
+.strip-right { grid-column: 3; }
+
+.strip-head {
+  padding: 6px 8px;
+  text-align: center;
+  font-family: var(--font-heading);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--washi-light);
+  background: linear-gradient(180deg, var(--prussian) 0%, var(--prussian) 40%, rgba(31, 58, 104, 0.15) 100%);
+  border: 2px solid var(--sumi);
+}
+
+.station-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0 0 12px;
+  text-align: left;
+  cursor: pointer;
+  background: var(--washi-light);
+  border: 3px solid var(--sumi);
+  box-shadow: 4px 4px 0 var(--sumi);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.station-card:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--sumi); }
+.station-card.is-active { border-color: var(--vermilion); box-shadow: 4px 4px 0 var(--vermilion); }
+
+.card-band {
+  padding: 5px 8px 16px;
+  background: linear-gradient(180deg, var(--prussian) 0%, var(--prussian) 40%, rgba(31, 58, 104, 0) 100%);
+}
+
+.station-no {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--washi-light);
+}
+
+.motif {
+  display: block;
+  width: 44px;
+  height: 30px;
+  margin: -4px 10px 4px auto;
+}
+
+.station-name {
+  display: block;
+  padding: 0 10px;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  line-height: 1.25;
+  color: var(--sumi);
+}
+
+.station-note {
+  display: block;
+  margin-top: 5px;
+  padding: 0 44px 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--sumi-soft);
+}
+
+.seal {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  line-height: 1;
+  color: var(--washi-light);
+  background: var(--vermilion);
+  border: 2px solid var(--vermilion);
+  outline: 1px solid var(--washi-light);
+  outline-offset: -4px;
+  opacity: 0;
+  transform: rotate(-6deg) scale(1);
+  pointer-events: none;
+}
+.station-card.is-stamped .seal { opacity: 0.92; }
+.station-card.stamping .seal { animation: seal-stamp 0.28s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+
+@keyframes seal-stamp {
+  0% { opacity: 0; transform: rotate(-24deg) scale(2.4); }
+  70% { opacity: 1; transform: rotate(-4deg) scale(0.92); }
+  100% { opacity: 0.92; transform: rotate(-6deg) scale(1); }
+}
+
+/* ---- Print frame (the map as a woodblock print) ---- */
+.print-frame {
+  grid-column: 2;
+  grid-row: 2;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  margin: 14px 0;
+  padding: 10px;
+  background: var(--washi-light);
+  border: 6px solid var(--sumi);
+  box-shadow: 6px 6px 0 rgba(27, 27, 27, 0.25);
+}
+
+/* Inner keyline hugging the map */
+.print-frame .map-well {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border: 2px solid var(--sumi);
+  overflow: hidden;
+}
+
+.cartouche {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  width: 46px;
+  padding: 12px 6px;
+  display: flex;
+  justify-content: center;
+  background: var(--washi-light);
+  border: 3px solid var(--sumi);
+  border-top-color: var(--vermilion);
+  border-top-width: 6px;
+  box-shadow: 3px 3px 0 rgba(27, 27, 27, 0.3);
+  pointer-events: none;
+}
+
+.cartouche span {
+  writing-mode: vertical-rl;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  letter-spacing: 0.22em;
+  line-height: 1.2;
+  color: var(--prussian);
+  white-space: nowrap;
+}
+
+.print-caption {
+  position: absolute;
+  top: 12px;
+  right: 74px;
+  z-index: 3;
+  width: min(270px, calc(100% - 90px));
+  padding: 0 0 12px;
+  background: var(--washi-light);
+  border: 3px solid var(--sumi);
+  box-shadow: 4px 4px 0 rgba(27, 27, 27, 0.3);
+}
+.print-caption .card-band { padding-right: 36px; }
+
+.caption-no {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--washi-light);
+}
+
+.caption-title {
+  margin: -4px 12px 6px;
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: 19px;
+  line-height: 1.2;
+  color: var(--sumi);
+}
+
+.caption-text {
+  margin: 0 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--sumi-soft);
+}
+
+.caption-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 26px;
+  height: 26px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  background: var(--washi-light);
+  border: 2px solid var(--sumi);
+}
+.caption-close:hover { background: var(--vermilion); color: var(--washi-light); }
+
+/* ---- Map marker: square seal stamp (inner child of mapboxgl.Marker) ---- */
+.seal-marker {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  font-family: var(--font-heading);
+  font-size: 16px;
+  line-height: 1;
+  color: var(--washi-light);
+  background: var(--vermilion);
+  border: 2px solid var(--sumi);
+  outline: 1px solid var(--washi-light);
+  outline-offset: -5px;
+  box-shadow: 2px 2px 0 rgba(27, 27, 27, 0.4);
+  cursor: pointer;
+  transform: rotate(-4deg);
+  transition: transform 0.15s ease;
+}
+.seal-marker:hover, .seal-marker.is-active { transform: rotate(-4deg) scale(1.25); }
+.seal-marker.is-active { background: var(--prussian); }
+
+.status-note {
+  font-style: italic;
+  font-size: 12px;
+  color: var(--sumi-soft);
+}
+.status-note.error { color: var(--vermilion); }
+
+.hidden { display: none !important; }
+
+/* ---- Phone: map fills the rest, strips merge into one horizontal scroller ---- */
+@media (max-width: 720px) {
+  .triptych {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .masthead { min-height: 52px; padding: 6px 16px; }
+  .masthead h1 { font-size: 20px; }
+  .masthead .subtitle { font-size: 10px; letter-spacing: 0.1em; }
+  .wave-crest { width: 22%; height: 55%; opacity: 0.7; }
+  .masthead > div { max-width: 74%; }
+
+  .print-frame {
+    grid-column: 1;
+    grid-row: 2;
+    margin: 10px 16px 6px;
+    padding: 6px;
+    border-width: 4px;
+    box-shadow: 4px 4px 0 rgba(27, 27, 27, 0.25);
+  }
+
+  .cartouche { top: 6px; right: 6px; width: 36px; padding: 8px 4px; }
+  .cartouche span { font-size: 12px; }
+  .seal-marker { width: 26px; height: 26px; font-size: 14px; }
+  .print-caption { top: 8px; right: 50px; left: 8px; width: auto; padding-bottom: 8px; }
+  .caption-title { font-size: 16px; margin: -4px 10px 4px; }
+  .caption-text { font-size: 12px; margin: 0 10px; line-height: 1.4; }
+
+  .strips {
+    grid-column: 1;
+    grid-row: 3;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 6px 16px 14px;
+    scroll-snap-type: x proximity;
+  }
+  .strip { display: contents; }
+  .strip-head { display: none; }
+  .station-card { flex: none; width: 158px; padding-bottom: 38px; scroll-snap-align: start; }
+  .station-note { display: none; }
+}
+
+@media (min-width: 721px) {
+  .strips { display: contents; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wave-crest .wave-row, .wave-crest .wave-row.slow { animation: none; }
+  .station-card.stamping .seal { animation: none; opacity: 0.92; }
+  .station-card, .seal-marker { transition: none; }
+}

@@ -1,0 +1,415 @@
+/*
+  Stage Profile -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: live TV coverage of a pro cycling
+  mountain stage -- the elevation profile is the hero, race-number bibs,
+  polka-dot KOM chips, leader's-yellow slabs, time gaps and km-to-go
+  banners on asphalt grey), deliberately distinct from every other pack in
+  this folder: Academic Paper, Aero Gadgets, Amber Terminal, Arena, Atomic
+  Motel, Audio Guide, Aurora Command, Blueprint, Board Game, Bottom Sheet,
+  Broadcast, Brutalist Guide, Case Board, Celestial Tarot, Chalkboard,
+  Chronicle, Clinic Finder, Comic Panel, Constructivist, Data Notebook,
+  Deco Voyage, Drop Culture, E-Ink, Editorial Paper, Estate Luxe, Event
+  Invite, Field Journal, Fleet Ops, Frontier Poster, Highway Sign,
+  Isotype, Line Diagram, Memphis, Moving Map, Neon HUD, Nordic Cabin,
+  Papercraft, Pastel Bento, Pixel Quest, Postcards, Raw Web, Retro OS,
+  Riso Zine, Ski Piste, Slate Console, Soft UI, Split Flap, Stained Glass,
+  Sticker Book, Storefront, Story Scroll, Swiss Grid, Tarmac Glass,
+  Thermal Receipt, Trailhead, Trip Kanban, Vapor Sunset, Vintage Chart,
+  Washi Seasons, Weather Console, Whiteboard and Zellige; and also
+  distinct from the 19 sibling packs being built in parallel right now
+  (Ukiyo-e Coast, Herbarium, Film Noir, Dive Log, Illuminated, Treasure
+  Hunt, Tiki Lagoon, Rally Dash, Grand Hotel, Orienteering, Museum Label,
+  Regatta, Code Editor, Watercolor, Annual Report, Truck Art, Papel
+  Picado, Vinyl Crate, Art Nouveau).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/stage-profile.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Teko for headings and numerals,
+  Titillium Web for body text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Teko:wght@500;600;700&family=Titillium+Web:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  Signature touch: race-number BIBS (white card, four safety-pin dots,
+  big Teko numeral) used for the rider-group markers and the standings,
+  skewed leader's-yellow km-to-go slab, and red polka-dot KOM chips.
+
+  Layout: .app is a two-row grid on desktop -- .stage (the map, ~60%) on
+  top and .bottom (~40%) below, holding .profile-panel (the hero SVG) and
+  .standings to its right. The map ends ABOVE the bottom row so the Mapbox
+  logo and attribution are never covered. On phones (<= 760px) the page
+  scrolls: map 50dvh, profile full width, standings below. A raster-dem
+  (terrain) source makes GL JS hide the Mapbox logo; the rule at the
+  bottom of this file forces it back.
+
+  Class/id contract (see stage-profile-template.html in this same folder):
+
+  - .app                     page grid (100dvh desktop, scrolls on phone)
+  - .stage                   positioned map area; holds #map + overlays
+  - #map                     map container (demo-defined, not included)
+  - .race-head               top-left overlay (pointer-events none)
+    .live-tag                  red LIVE chip (pulse)
+    .race-name / .stage-name   Teko title lines
+  - .togo                    skewed yellow km-to-go slab (top-right of map)
+    .togo-num / .togo-unit / .togo-label
+  - .stat-strip > .stat      small data chips on the map (.stat-k label,
+                              .stat-v value); .stat-grade colours by class
+                              .g1 .g2 .g3 .g4 .g5
+  - .bib                     race-number card (+.bib-yellow, .bib-polka,
+                              .bib-green, .bib-sm); numeral is the text
+  - .group-marker            inner child of a mapboxgl.Marker: .bib + tail
+                              (+.chase variant); never style the Marker root
+  - .pin-flag                inner child for flamme rouge / finish markers
+                              (+.flamme, .finish); .pin-text is its label
+  - .place-tag               inner child for start/summit town labels
+  - .profile-panel           hero chart panel (asphalt)
+    .panel-head                title row: .panel-title, .controls
+    .controls > .btn           (+.btn-primary, .btn-icon); Play / step
+    .profile-body              chart area; holds <svg id="profile">,
+                                .profile-readout, .profile-status
+    SVG classes                .pf-band, .pf-silhouette, .pf-grid,
+                                .pf-axis, .pf-tick, .pf-cursor, .pf-badge,
+                                .pf-badge-text, .pf-flamme, .pf-label
+    .grade-legend > .lg        gradient colour key (.g1 ... .g5 swatches)
+  - .standings               GC table panel
+    .standings-head            .panel-title + .kom-chip (polka dots)
+    table.gc                   tr.is-yellow / .is-polka / .is-green;
+                                td.pos, td.rider, td.gap
+  - .status-note             small status line (+.loading/.success/.error)
+  - .hidden                  utility: display: none !important
+*/
+
+:root {
+  --asphalt: #1E1F22;
+  --asphalt-2: #2A2C31;
+  --asphalt-3: #383B42;
+  --white: #FFFFFF;
+  --yellow: #FFD400;
+  --polka: #E2231A;
+  --green: #19A04B;
+  --sky: #8FC7F0;
+  --km-grey: #6B7280;
+  --g1: #19A04B;
+  --g2: #8FC7F0;
+  --g3: #FFD400;
+  --g4: #F28C1B;
+  --g5: #E2231A;
+  --font-head: 'Teko', 'Arial Narrow', sans-serif;
+  --font-body: 'Titillium Web', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--asphalt);
+  color: var(--white);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+.hidden { display: none !important; }
+
+/* ---------- page grid ---------- */
+.app {
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 60fr) minmax(0, 40fr);
+  overflow: hidden;
+}
+.stage { position: relative; min-height: 0; overflow: hidden; }
+.bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  min-height: 0;
+  border-top: 4px solid var(--yellow);
+  background: var(--asphalt);
+}
+
+/* ---------- map overlays ---------- */
+.race-head {
+  position: absolute;
+  top: 12px; left: 12px;
+  z-index: 5;
+  pointer-events: none;
+  max-width: calc(100% - 200px);
+}
+.live-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--polka); color: var(--white);
+  font: 700 15px/1 var(--font-head);
+  letter-spacing: .12em;
+  padding: 3px 9px 2px;
+}
+.live-tag::before {
+  content: ''; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--white);
+  animation: sp-pulse 1.2s ease-in-out infinite;
+}
+@keyframes sp-pulse { 50% { opacity: .25; } }
+.race-name {
+  margin: 4px 0 0;
+  font: 700 34px/0.95 var(--font-head);
+  text-transform: uppercase;
+  color: var(--white);
+  background: var(--asphalt);
+  display: inline-block;
+  padding: 4px 12px 0;
+  border-left: 6px solid var(--yellow);
+}
+.stage-name {
+  display: block;
+  width: fit-content;
+  background: var(--white); color: var(--asphalt);
+  font: 600 18px/1 var(--font-head);
+  letter-spacing: .04em; text-transform: uppercase;
+  padding: 4px 12px 1px;
+}
+
+.togo {
+  position: absolute;
+  top: 12px; right: 56px;
+  z-index: 5;
+  pointer-events: none;
+  display: flex; align-items: baseline; gap: 8px;
+  background: var(--yellow); color: var(--asphalt);
+  padding: 4px 22px 0 26px;
+  transform: skewX(-10deg);
+  box-shadow: 5px 5px 0 var(--asphalt);
+}
+.togo > * { transform: skewX(10deg); }
+.togo-num { font: 700 54px/0.9 var(--font-head); font-variant-numeric: tabular-nums; }
+.togo-unit { font: 700 24px/1 var(--font-head); }
+.togo-label { font: 700 12px/1 var(--font-body); letter-spacing: .1em; text-transform: uppercase; }
+
+.stat-strip {
+  position: absolute;
+  left: 12px; bottom: 36px;
+  z-index: 5;
+  display: flex; gap: 6px;
+  pointer-events: none;
+}
+.stat {
+  background: rgba(30, 31, 34, .94);
+  border-top: 3px solid var(--km-grey);
+  padding: 3px 10px 2px;
+  min-width: 74px;
+}
+.stat-k { display: block; font: 600 11px/1.1 var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--sky); }
+.stat-v { font: 600 28px/1 var(--font-head); font-variant-numeric: tabular-nums; }
+.stat-grade.g1 { border-top-color: var(--g1); }
+.stat-grade.g2 { border-top-color: var(--g2); }
+.stat-grade.g3 { border-top-color: var(--g3); }
+.stat-grade.g4 { border-top-color: var(--g4); }
+.stat-grade.g5 { border-top-color: var(--g5); }
+
+/* ---------- bibs ---------- */
+.bib {
+  position: relative;
+  display: inline-block;
+  min-width: 36px;
+  padding: 3px 8px 0;
+  background:
+    radial-gradient(circle at 4px 4px, var(--km-grey) 1.6px, transparent 2px),
+    radial-gradient(circle at calc(100% - 4px) 4px, var(--km-grey) 1.6px, transparent 2px),
+    radial-gradient(circle at 4px calc(100% - 4px), var(--km-grey) 1.6px, transparent 2px),
+    radial-gradient(circle at calc(100% - 4px) calc(100% - 4px), var(--km-grey) 1.6px, transparent 2px),
+    var(--white);
+  color: var(--asphalt);
+  border: 2px solid var(--asphalt);
+  font: 700 22px/1 var(--font-head);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.bib-yellow { background-color: var(--yellow); }
+.bib-polka { color: var(--polka); }
+.bib-green { color: var(--green); }
+.bib-sm { min-width: 30px; font-size: 17px; padding: 2px 6px 0; }
+
+.group-marker { display: flex; flex-direction: column; align-items: center; }
+.group-marker .bib {
+  font-size: 26px;
+  box-shadow: 0 3px 0 var(--asphalt), 0 0 0 3px var(--yellow);
+}
+.group-marker.chase .bib { box-shadow: 0 3px 0 var(--asphalt), 0 0 0 3px var(--polka); }
+.group-marker::after {
+  content: '';
+  width: 0; height: 0;
+  border: 7px solid transparent;
+  border-top: 9px solid var(--asphalt);
+  border-bottom: 0;
+}
+
+.pin-flag { display: flex; flex-direction: column; align-items: center; }
+.pin-text {
+  background: var(--polka); color: var(--white);
+  font: 700 15px/1 var(--font-head);
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: 3px 8px 1px;
+  border: 2px solid var(--white);
+  white-space: nowrap;
+}
+.pin-flag::after {
+  content: ''; width: 3px; height: 12px; background: var(--white);
+}
+.pin-flag.finish .pin-text {
+  background:
+    conic-gradient(var(--asphalt) 25%, var(--white) 0 50%, var(--asphalt) 0 75%, var(--white) 0) 0 0 / 10px 10px;
+  color: var(--white);
+  text-shadow: 0 0 3px var(--asphalt), 0 0 3px var(--asphalt), 0 0 3px var(--asphalt);
+}
+.pin-flag.finish .pin-text { background-color: var(--asphalt); }
+.place-tag {
+  background: var(--asphalt); color: var(--white);
+  font: 600 16px/1 var(--font-head);
+  letter-spacing: .06em; text-transform: uppercase;
+  padding: 3px 8px 1px;
+  border-bottom: 3px solid var(--sky);
+  white-space: nowrap;
+}
+
+/* ---------- profile panel ---------- */
+.profile-panel {
+  display: flex; flex-direction: column;
+  min-width: 0; min-height: 0;
+  padding: 6px 14px 8px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 39px, rgba(255, 255, 255, .04) 39px 40px),
+    var(--asphalt);
+}
+.panel-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.panel-title {
+  margin: 0;
+  font: 700 24px/1 var(--font-head);
+  letter-spacing: .06em; text-transform: uppercase;
+  color: var(--yellow);
+}
+.controls { margin-left: auto; display: flex; gap: 6px; }
+.btn {
+  appearance: none;
+  border: 2px solid var(--white);
+  background: transparent; color: var(--white);
+  font: 600 17px/1 var(--font-head);
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: 6px 14px 3px;
+  min-height: 34px;
+  cursor: pointer;
+}
+.btn:hover { background: var(--asphalt-3); }
+.btn:focus-visible { outline: 3px solid var(--sky); outline-offset: 2px; }
+.btn-primary { background: var(--yellow); border-color: var(--yellow); color: var(--asphalt); }
+.btn-primary:hover { background: #ffe14d; }
+.btn-icon { padding-left: 10px; padding-right: 10px; min-width: 40px; }
+
+.profile-body { position: relative; flex: 1 1 auto; min-height: 0; margin-top: 4px; }
+.profile-body svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: pan-y; cursor: ew-resize; }
+.profile-body svg:focus-visible { outline: 3px solid var(--sky); outline-offset: -3px; }
+.profile-readout {
+  position: absolute; top: 4px; left: 60px;
+  display: flex; gap: 14px;
+  font: 600 22px/1 var(--font-head);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.profile-readout b { font-weight: 600; color: var(--sky); font-size: 14px; margin-right: 3px; letter-spacing: .08em; }
+.profile-status {
+  position: absolute; right: 6px; top: 4px;
+  font: 600 12px/1 var(--font-body);
+  color: var(--km-grey); letter-spacing: .06em; text-transform: uppercase;
+  pointer-events: none;
+}
+.grade-legend { display: flex; gap: 10px; font: 600 11px/1 var(--font-body); color: #c3c7ce; }
+.grade-legend .lg { display: inline-flex; align-items: center; gap: 4px; }
+.grade-legend .lg::before { content: ''; width: 12px; height: 8px; background: var(--c); }
+.lg.g1 { --c: var(--g1); } .lg.g2 { --c: var(--g2); } .lg.g3 { --c: var(--g3); }
+.lg.g4 { --c: var(--g4); } .lg.g5 { --c: var(--g5); }
+
+.pf-silhouette { fill: none; stroke: var(--white); stroke-width: 2.5; stroke-linejoin: round; }
+.pf-grid { stroke: rgba(255, 255, 255, .12); stroke-width: 1; }
+.pf-axis { stroke: var(--km-grey); stroke-width: 1.5; }
+.pf-tick { fill: #aeb3bd; font: 600 12px var(--font-body); }
+.pf-label { fill: var(--white); font: 600 15px var(--font-head); letter-spacing: .06em; }
+.pf-cursor { stroke: var(--yellow); stroke-width: 2.5; }
+.pf-badge { fill: var(--white); stroke: var(--polka); stroke-width: 3; }
+.pf-badge-text { fill: var(--polka); font: 700 18px var(--font-head); text-anchor: middle; }
+.pf-flamme { fill: var(--polka); }
+
+/* ---------- standings ---------- */
+.standings {
+  min-width: 0; min-height: 0; overflow: auto;
+  padding: 6px 12px 8px;
+  background: var(--asphalt-2);
+  border-left: 2px solid var(--asphalt-3);
+}
+.standings-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.kom-chip {
+  font: 700 14px/1 var(--font-head);
+  letter-spacing: .08em;
+  color: var(--polka);
+  background:
+    radial-gradient(circle, var(--polka) 2.2px, transparent 2.6px) 0 0 / 8px 8px,
+    var(--white);
+  padding: 4px 8px 2px;
+  text-shadow: 0 0 2px var(--white), 0 0 2px var(--white), 0 0 3px var(--white);
+}
+table.gc { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+table.gc td { padding: 3px 4px; border-bottom: 1px solid var(--asphalt-3); font-size: 13px; line-height: 1.2; }
+table.gc td.pos { font: 600 18px/1 var(--font-head); color: var(--km-grey); width: 22px; }
+table.gc td.rider { font-weight: 600; }
+table.gc td.rider small { display: block; font-weight: 400; color: #aab0ba; font-size: 11px; }
+table.gc td.gap { text-align: right; font: 600 18px/1 var(--font-head); white-space: nowrap; }
+table.gc tr.is-yellow td.pos { color: var(--yellow); }
+table.gc tr.is-yellow { background: rgba(255, 212, 0, .10); }
+table.gc tr.is-polka td.rider small::before { content: '\25CF  '; color: var(--polka); }
+table.gc tr.is-green td.rider small::before { content: '\25CF  '; color: var(--green); }
+
+.status-note {
+  display: flex; align-items: center; gap: 6px;
+  font: 600 12px/1.2 var(--font-body);
+  color: #c3c7ce;
+}
+.status-note::before { content: ''; width: 8px; height: 8px; background: var(--km-grey); }
+.status-note.loading::before { background: var(--yellow); }
+.status-note.success::before { background: var(--green); }
+.status-note.error::before { background: var(--polka); }
+
+/* ---------- compact desktop ---------- */
+@media (max-width: 1100px) {
+  .bottom { grid-template-columns: minmax(0, 1fr) 290px; }
+  .grade-legend { display: none; }
+}
+
+/* ---------- phone ---------- */
+@media (max-width: 760px) {
+  html, body { overflow-x: hidden; }
+  .app { display: block; height: auto; overflow: visible; }
+  .stage { height: 50dvh; min-height: 330px; }
+  .bottom { display: block; }
+  .profile-panel { height: 330px; padding: 8px 16px 10px; }
+  .standings { overflow: visible; padding: 10px 16px 24px; border-left: 0; border-top: 2px solid var(--asphalt-3); }
+  .race-head { max-width: calc(100% - 24px); top: 10px; left: 10px; }
+  .race-name { font-size: 26px; }
+  .stage-name { font-size: 15px; }
+  .togo { top: auto; bottom: 44px; right: 14px; padding: 3px 16px 0 20px; }
+  .togo-num { font-size: 34px; }
+  .togo-unit { font-size: 20px; }
+  .stat-strip { position: static; margin-top: 6px; }
+  .stat-strip .stat { flex: 1 1 0; }
+  .stat { min-width: 62px; padding: 2px 8px 1px; }
+  .stat-v { font-size: 22px; }
+  .profile-readout { left: 48px; font-size: 18px; gap: 10px; }
+  .panel-title { font-size: 20px; }
+  .profile-status { display: none; }
+  .btn { padding: 5px 10px 2px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-tag::before { animation: none; }
+}
+
+/* A raster-dem (terrain) source makes GL JS hide the Mapbox logo (the DEM
+   TileJSON has mapbox_logo:false). Force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) {
+  display: block !important;
+}

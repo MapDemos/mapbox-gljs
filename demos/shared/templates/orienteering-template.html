@@ -1,0 +1,346 @@
+<!--
+  Working EXAMPLE of the Orienteering style pack (orienteering.css, in this
+  same folder). Open this file directly to see the pattern working: a
+  foot-orienteering competition map (Nackareservatet, Stockholm, around
+  Hellasgarden and Kalltorpssjon) on the Outdoors style recoloured to ISOM
+  colours (white forest, yellow open land, brown contours, blue water),
+  with the course overprinted as GL layers in purple -- start triangle,
+  numbered control circles, legs that stop short of the circles, double-ring
+  finish. Beside it sits an IOF-style control description sheet (8 columns,
+  inline-SVG pictograms) and a split-times card for two runners. Click a
+  description row, a split row or a control circle to highlight that leg,
+  fly to it and sync the sheet; "Replay leg" draws runner A's route choice
+  as a dotted line (drawn instantly under reduced motion).
+
+  The area is real, the control positions are hand-placed approximations;
+  the event, club, runners, control codes and split times are fictional
+  placeholders -- swap in your own.
+
+  What's NOT included: a real course file (IOF XML), live results, routing,
+  or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orienteering</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Sofia+Sans+Condensed:wght@600;800&family=Sofia+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="orienteering.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<!-- Pictogram sprite: IOF-style control description symbols -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <symbol id="p-knoll" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5" fill="currentColor"/></symbol>
+    <symbol id="p-reentrant" viewBox="0 0 24 24"><path d="M5 5 L12 13 L19 5 M12 13 V20"/></symbol>
+    <symbol id="p-boulder" viewBox="0 0 24 24"><path d="M12 4 L20 19 H4 Z" fill="currentColor"/></symbol>
+    <symbol id="p-cross" viewBox="0 0 24 24"><path d="M5 5 L19 19 M19 5 L5 19"/></symbol>
+    <symbol id="p-depr" viewBox="0 0 24 24"><path d="M5 7 Q12 24 19 7"/></symbol>
+    <symbol id="p-junction" viewBox="0 0 24 24"><path d="M3 12 H21 M12 12 L18 5"/></symbol>
+    <symbol id="p-crag" viewBox="0 0 24 24"><path d="M4 19 L8 7 L12 14 L16 5 L20 19 Z"/></symbol>
+    <symbol id="p-clearing" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14"/></symbol>
+    <symbol id="p-low" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/><path d="M4 16 H20"/></symbol>
+    <symbol id="p-up" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/><path d="M4 8 H20"/></symbol>
+    <symbol id="p-locN" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/><circle cx="12" cy="4" r="2.6" fill="currentColor"/></symbol>
+    <symbol id="p-locE" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/><circle cx="20" cy="12" r="2.6" fill="currentColor"/></symbol>
+    <symbol id="p-locS" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/><circle cx="12" cy="20" r="2.6" fill="currentColor"/></symbol>
+    <symbol id="p-locW" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/><circle cx="4" cy="12" r="2.6" fill="currentColor"/></symbol>
+    <symbol id="p-start" viewBox="0 0 24 24"><path d="M12 3.5 L21 20 H3 Z" stroke="#A626A4" stroke-width="2.4"/></symbol>
+    <symbol id="p-finish" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="#A626A4" stroke-width="2.2"/><circle cx="12" cy="12" r="5.4" stroke="#A626A4" stroke-width="2.2"/></symbol>
+  </g>
+</svg>
+
+<div class="app">
+  <div class="stage">
+    <div id="map"></div>
+    <div class="map-tools">
+      <div class="leg-chip" aria-live="polite"><span class="leg-no" id="leg-no">Leg 1</span><span class="leg-name" id="leg-name"></span></div>
+      <button class="btn btn-primary" id="replay-btn" disabled>Replay leg</button>
+    </div>
+  </div>
+
+  <aside class="side">
+    <section class="sheet" aria-label="Control descriptions">
+      <div class="sheet-head">
+        <div class="sh-event"><span class="sh-label">Södra Skogs OK &middot; Event</span><span class="sh-value">Källtorp Open</span></div>
+        <div class="sh-class"><span class="sh-label">Class</span><span class="sh-value">H21 Elite</span></div>
+        <div class="sh-length"><span class="sh-label">Length</span><span class="sh-value" id="sh-length">&mdash;</span></div>
+        <div class="sh-climb"><span class="sh-label">Climb</span><span class="sh-value">72 m</span></div>
+      </div>
+      <div class="desc-letters" aria-hidden="true"><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span></div>
+      <div id="desc-rows"></div>
+    </section>
+
+    <section class="card" aria-label="Split times">
+      <h2 class="card-title"><span>Split times</span><span id="split-sub"></span></h2>
+      <div class="runner-key"><span><i class="swatch a"></i>A &middot; Maja Lindqvist</span><span><i class="swatch b"></i>B &middot; Oskar Berg</span></div>
+      <div class="split-head"><span>Leg</span><span>A</span><span>B</span><span>Faster</span></div>
+      <div id="split-rows"></div>
+      <div class="split-total"><span class="leg">Total</span><span id="tot-a"></span><span id="tot-b"></span><span id="tot-d"></span></div>
+    </section>
+    <div class="status-note loading" id="status">Loading map&hellip;</div>
+  </aside>
+</div>
+
+<script>
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const PURPLE = '#A626A4';
+
+/* ---- Course: Start, 8 controls, Finish (lng, lat), placed in forest around Hellasgarden ---- */
+const COURSE = [
+  { id: 'S', ll: [18.1760, 59.2672] },
+  { id: '1', code: 41, d: 'knoll',     e: '',    f: '2.5', g: 'N', ll: [18.1830, 59.2700] },
+  { id: '2', code: 52, d: 'reentrant', e: 'low', f: '',    g: '',  c: 'S', ll: [18.1880, 59.2735] },
+  { id: '3', code: 67, d: 'boulder',   e: '',    f: '1.5', g: 'E', ll: [18.1815, 59.2775] },
+  { id: '4', code: 38, d: 'cross',     e: '',    f: '',    g: '',  ll: [18.1700, 59.2755] },
+  { id: '5', code: 73, d: 'depr',      e: 'up',  f: '3×3', g: 'W', ll: [18.1620, 59.2715] },
+  { id: '6', code: 45, d: 'junction',  e: '',    f: '',    g: '',  ll: [18.1560, 59.2690] },
+  { id: '7', code: 59, d: 'crag',      e: 'low', f: '3',   g: 'S', ll: [18.1680, 59.2700] },
+  { id: '8', code: 81, d: 'clearing',  e: '',    f: '30',  g: 'N', ll: [18.1735, 59.2735] },
+  { id: 'F', ll: [18.1790, 59.2688] },
+];
+const NLEG = COURSE.length - 1;
+const R = 30; // circle radius in metres (so rings scale with the map)
+
+/* ---- Metric helpers ---- */
+const lat0 = 59.27, lng0 = 18.17, kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110574;
+const toM = (ll) => [(ll[0] - lng0) * kx, (ll[1] - lat0) * ky];
+const toLL = (m) => [lng0 + m[0] / kx, lat0 + m[1] / ky];
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const unit = (a, b) => { const d = dist(a, b) || 1; return [(b[0] - a[0]) / d, (b[1] - a[1]) / d]; };
+const P = COURSE.map((c) => toM(c.ll));
+const legLen = [];
+for (let i = 0; i < NLEG; i++) legLen.push(dist(P[i], P[i + 1]));
+
+function ring(c, r, n = 40) {
+  const out = [];
+  for (let k = 0; k <= n; k++) { const t = (k / n) * 2 * Math.PI; out.push(toLL([c[0] + r * Math.cos(t), c[1] + r * Math.sin(t)])); }
+  return out;
+}
+function triangle(c, toward, r) {
+  const u = unit(c, toward), a0 = Math.atan2(u[1], u[0]);
+  const v = [0, 1, 2, 3].map((k) => toLL([c[0] + r * Math.cos(a0 + k * 2.0944), c[1] + r * Math.sin(a0 + k * 2.0944)]));
+  return v;
+}
+
+/* ---- Overprint geometry ---- */
+const legs = [], rings = [], nums = [], hits = [];
+for (let i = 0; i < NLEG; i++) {
+  const u = unit(P[i], P[i + 1]), gap = R + 5;
+  const a = [P[i][0] + u[0] * gap, P[i][1] + u[1] * gap], b = [P[i + 1][0] - u[0] * gap, P[i + 1][1] - u[1] * gap];
+  legs.push({ type: 'Feature', properties: { leg: i + 1 }, geometry: { type: 'LineString', coordinates: [toLL(a), toLL(b)] } });
+}
+rings.push({ type: 'Feature', properties: { leg: 0 }, geometry: { type: 'LineString', coordinates: triangle(P[0], P[1], R * 1.05) } });
+for (let i = 1; i <= NLEG; i++) {
+  const last = i === NLEG;
+  rings.push({ type: 'Feature', properties: { leg: i }, geometry: { type: 'LineString', coordinates: ring(P[i], R) } });
+  if (last) rings.push({ type: 'Feature', properties: { leg: i }, geometry: { type: 'LineString', coordinates: ring(P[i], R * 0.62) } });
+  hits.push({ type: 'Feature', properties: { leg: i }, geometry: { type: 'Point', coordinates: COURSE[i].ll } });
+  if (!last) {
+    // Number sits on the side away from both neighbouring legs.
+    const a = unit(P[i], P[i - 1]), b = unit(P[i], P[i + 1]);
+    let v = [-(a[0] + b[0]), -(a[1] + b[1])];
+    if (Math.hypot(v[0], v[1]) < 0.3) v = [-a[1], a[0]];
+    const m = Math.hypot(v[0], v[1]); v = [v[0] / m, v[1] / m];
+    nums.push({ type: 'Feature', properties: { n: COURSE[i].id, leg: i }, geometry: { type: 'Point', coordinates: toLL([P[i][0] + v[0] * (R + 17), P[i][1] + v[1] * (R + 17)]) } });
+  }
+}
+const fc = (features) => ({ type: 'FeatureCollection', features });
+const EMPTY = fc([]);
+
+/* ---- Route choice for runner A: a bowed curve per leg ---- */
+function routeChoice(leg) {
+  const a = P[leg - 1], b = P[leg], len = legLen[leg - 1], u = unit(a, b);
+  const sgn = leg % 2 ? 1 : -1, off = len * 0.16 * sgn;
+  const c = [(a[0] + b[0]) / 2 - u[1] * off * 2, (a[1] + b[1]) / 2 + u[0] * off * 2];
+  const pts = [];
+  for (let k = 0; k <= 60; k++) {
+    const t = k / 60, s = 1 - t;
+    pts.push(toLL([s * s * a[0] + 2 * s * t * c[0] + t * t * b[0], s * s * a[1] + 2 * s * t * c[1] + t * t * b[1]]));
+  }
+  return pts;
+}
+
+/* ---- Fictional splits (seconds per leg, from pace x terrain factor) ---- */
+const FA = [1.00, 1.10, 0.94, 1.22, 1.03, 1.08, 0.96, 1.15, 0.88];
+const FB = [1.04, 1.02, 1.12, 1.00, 1.18, 0.97, 1.06, 1.00, 1.10];
+const tA = legLen.map((l, i) => Math.round(l / 1000 * 370 * FA[i]));
+const tB = legLen.map((l, i) => Math.round(l / 1000 * 385 * FB[i]));
+const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.abs(s) % 60).padStart(2, '0')}`;
+const sum = (a) => a.reduce((x, y) => x + y, 0);
+const legName = (leg) => `${COURSE[leg - 1].id === 'S' ? 'S' : COURSE[leg - 1].code} → ${COURSE[leg].id === 'F' ? 'F' : COURSE[leg].code}`;
+
+/* ---- Description sheet + splits markup ---- */
+const pic = (id) => `<svg class="pic" viewBox="0 0 24 24" aria-hidden="true"><use href="#${id}"/></svg>`;
+const sx = (v) => (v ? `<div class="cell">${v}</div>` : '<div class="cell"></div>');
+let rowsHtml = `<div class="desc-row static"><div class="cell seq">${pic('p-start')}</div><div class="cell span-6">Start &middot; Hellasgården meadow &middot; ${Math.round(legLen[0])} m to first control</div><div class="cell"></div></div>`;
+for (let i = 1; i < NLEG; i++) {
+  const c = COURSE[i];
+  rowsHtml += `<button class="desc-row" data-leg="${i}" aria-label="Control ${c.id}, code ${c.code}">` +
+    `<div class="cell seq">${c.id}</div><div class="cell code">${c.code}</div>${sx(c.c)}` +
+    `<div class="cell">${pic('p-' + c.d)}</div><div class="cell">${c.e ? pic('p-' + c.e) : ''}</div>` +
+    `${sx(c.f)}<div class="cell">${c.g ? pic('p-loc' + c.g) : ''}</div><div class="cell"></div></button>`;
+}
+rowsHtml += `<button class="desc-row" data-leg="${NLEG}" aria-label="Finish"><div class="cell seq">${pic('p-finish')}</div><div class="cell span-6">Finish &middot; funnel from last control, 180 m</div><div class="cell"></div></button>`;
+$('desc-rows').innerHTML = rowsHtml;
+
+const maxD = Math.max(...tA.map((a, i) => Math.abs(tB[i] - a)));
+$('split-rows').innerHTML = tA.map((a, i) => {
+  const d = tB[i] - a, w = Math.round(Math.abs(d) / maxD * 50);
+  return `<button class="split-row" data-leg="${i + 1}"><span class="leg">${i + 1}<small>${legName(i + 1)}</small></span>` +
+    `<span class="${d > 0 ? 'fast' : ''}">${fmt(a)}</span><span class="${d < 0 ? 'fast' : ''}">${fmt(tB[i])}</span>` +
+    `<span class="delta-bar" title="${d > 0 ? 'A' : 'B'} faster by ${Math.abs(d)} s"><i class="fill ${d > 0 ? 'a' : 'b'}" style="width:${w}%"></i></span></button>`;
+}).join('');
+const totD = sum(tB) - sum(tA);
+$('tot-a').textContent = fmt(sum(tA));
+$('tot-b').textContent = fmt(sum(tB));
+$('tot-d').textContent = `${totD > 0 ? 'A' : 'B'} by ${Math.abs(totD)} s`;
+$('split-sub').textContent = `${NLEG} legs`;
+$('sh-length').textContent = `${(sum(legLen) / 1000).toFixed(2)} km`;
+
+/* ---- Map ---- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/outdoors-v12',
+  center: [18.172, 59.271],
+  zoom: 13.6,
+  attributionControl: true,
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+/* Recolour the Outdoors style toward ISOM colours. Every call is guarded. */
+function recolour() {
+  const set = (id, kind, prop, val) => { try { if (map.getLayer(id)) map[kind](id, prop, val); } catch (e) { /* skip */ } };
+  map.getStyle().layers.forEach((l) => {
+    const id = l.id, sl = l['source-layer'];
+    if (l.type === 'symbol') set(id, 'setLayoutProperty', 'visibility', 'none');
+    else if (l.type === 'hillshade' || l.type === 'fill-extrusion' || l.type === 'heatmap') set(id, 'setLayoutProperty', 'visibility', 'none');
+    else if (l.type === 'background') set(id, 'setPaintProperty', 'background-color', '#FFFFFF');
+    else if (l.type === 'fill' && sl === 'landcover') {
+      set(id, 'setPaintProperty', 'fill-color', ['match', ['get', 'class'], 'grass', '#FFD24D', 'crop', '#FFD24D', 'scrub', '#FFE9A8', '#FFFFFF']);
+      set(id, 'setPaintProperty', 'fill-opacity', 1);
+    } else if (l.type === 'fill' && sl === 'landuse') {
+      set(id, 'setPaintProperty', 'fill-color', ['match', ['get', 'class'], ['park', 'pitch', 'golf_course', 'cemetery', 'agriculture'], '#FFD24D', '#FFFFFF']);
+      set(id, 'setPaintProperty', 'fill-opacity', 1);
+    } else if (l.type === 'fill' && (sl === 'national_park' || /national-park|park/.test(id))) set(id, 'setPaintProperty', 'fill-opacity', 0);
+    else if (l.type === 'fill' && /wetland/.test(id)) { set(id, 'setPaintProperty', 'fill-color', '#7CC576'); set(id, 'setPaintProperty', 'fill-opacity', 0.55); }
+    else if (l.type === 'fill' && id === 'water') set(id, 'setPaintProperty', 'fill-color', '#00A3E0');
+    else if (l.type === 'fill' && id === 'building') { set(id, 'setPaintProperty', 'fill-color', '#111111'); set(id, 'setPaintProperty', 'fill-opacity', 1); }
+    else if (l.type === 'line' && sl === 'contour') { set(id, 'setPaintProperty', 'line-color', '#B5651D'); set(id, 'setPaintProperty', 'line-opacity', 0.85); }
+    else if (l.type === 'line' && sl === 'waterway') set(id, 'setPaintProperty', 'line-color', '#00A3E0');
+    else if (l.type === 'line' && sl === 'road') {
+      if (/case|bridge-.*-case|tunnel-.*-case/.test(id)) set(id, 'setPaintProperty', 'line-opacity', 0);
+      else { set(id, 'setPaintProperty', 'line-color', '#111111'); set(id, 'setPaintProperty', 'line-opacity', 0.9); }
+    } else if (l.type === 'line' && /admin|aeroway|ferry|transit|cliff/.test(id)) set(id, 'setLayoutProperty', 'visibility', 'none');
+  });
+}
+
+let sel = 1;
+const selW = (a, b) => ['interpolate', ['linear'], ['zoom'], 12, ['case', ['==', ['get', 'leg'], sel], a * 2, a], 17, ['case', ['==', ['get', 'leg'], sel], b * 2, b]];
+
+function addOverprint() {
+  map.addSource('legs', { type: 'geojson', data: fc(legs) });
+  map.addSource('rings', { type: 'geojson', data: fc(rings) });
+  map.addSource('nums', { type: 'geojson', data: fc(nums) });
+  map.addSource('hits', { type: 'geojson', data: fc(hits) });
+  map.addSource('route-a', { type: 'geojson', data: EMPTY });
+  map.addSource('runner', { type: 'geojson', data: EMPTY });
+  map.addSource('lakes', { type: 'geojson', data: fc([
+    { type: 'Feature', properties: { name: 'Källtorpssjön' }, geometry: { type: 'Point', coordinates: [18.1665, 59.2635] } },
+    { type: 'Feature', properties: { name: 'Söderbysjön' }, geometry: { type: 'Point', coordinates: [18.1950, 59.2735] } },
+  ]) });
+  const join = { 'line-join': 'round', 'line-cap': 'butt' };
+  map.addLayer({ id: 'lake-labels', type: 'symbol', source: 'lakes', layout: { 'text-field': ['get', 'name'], 'text-font': ['DIN Pro Italic', 'Arial Unicode MS Regular'], 'text-size': 13, 'text-letter-spacing': 0.1 }, paint: { 'text-color': '#006E98', 'text-halo-color': '#fff', 'text-halo-width': 1.5 } });
+  map.addLayer({ id: 'legs-hit', type: 'line', source: 'legs', paint: { 'line-width': 20, 'line-opacity': 0 } });
+  map.addLayer({ id: 'legs', type: 'line', source: 'legs', layout: join, paint: { 'line-color': PURPLE, 'line-opacity': 0.92, 'line-width': selW(1.6, 3) } });
+  map.addLayer({ id: 'rings', type: 'line', source: 'rings', layout: { 'line-join': 'miter' }, paint: { 'line-color': PURPLE, 'line-opacity': 0.92, 'line-width': selW(1.8, 3.2) } });
+  map.addLayer({ id: 'route-a', type: 'line', source: 'route-a', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#111111', 'line-width': 4.5, 'line-dasharray': [0.01, 2] } });
+  map.addLayer({ id: 'runner', type: 'circle', source: 'runner', paint: { 'circle-radius': 7, 'circle-color': '#111111', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
+  // Fixed, pre-spaced control numbers: overlap allowed so none ever disappear.
+  map.addLayer({ id: 'nums', type: 'symbol', source: 'nums', layout: { 'text-field': ['get', 'n'], 'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'], 'text-size': ['interpolate', ['linear'], ['zoom'], 12, 13, 16, 22], 'text-allow-overlap': true, 'text-ignore-placement': true }, paint: { 'text-color': PURPLE, 'text-halo-color': 'rgba(255,255,255,0.85)', 'text-halo-width': 1.6 } });
+  map.addLayer({ id: 'ctrl-hit', type: 'circle', source: 'hits', paint: { 'circle-radius': 18, 'circle-opacity': 0 } });
+}
+
+/* ---- Selection ---- */
+let anim = 0;
+function clearRoute() { cancelAnimationFrame(anim); map.getSource('route-a').setData(EMPTY); map.getSource('runner').setData(EMPTY); }
+
+function legBounds(leg) {
+  const b = new mapboxgl.LngLatBounds(COURSE[leg - 1].ll, COURSE[leg - 1].ll);
+  return b.extend(COURSE[leg].ll);
+}
+
+function select(leg, { fly = true, fromMap = false } = {}) {
+  sel = leg;
+  clearRoute();
+  ['legs', 'rings'].forEach((id) => map.setPaintProperty(id, 'line-width', id === 'legs' ? selW(1.6, 3) : selW(1.8, 3.2)));
+  $('leg-no').textContent = `Leg ${leg}`;
+  $('leg-name').textContent = `${legName(leg)} · ${Math.round(legLen[leg - 1])} m`;
+  document.querySelectorAll('[data-leg]').forEach((el) => {
+    const on = Number(el.dataset.leg) === leg;
+    el.classList.toggle('active', on);
+    if (on) el.setAttribute('aria-current', 'true'); else el.removeAttribute('aria-current');
+  });
+  if (window.matchMedia('(min-width: 861px)').matches && fromMap) {
+    document.querySelectorAll('[data-leg].active').forEach((el) => el.scrollIntoView({ block: 'nearest' }));
+  }
+  if (fly) map.fitBounds(legBounds(leg), { padding: { top: 90, bottom: 80, left: 70, right: 70 }, maxZoom: 16.6, duration: 900, animate: !reduce });
+}
+
+function replay() {
+  clearRoute();
+  const line = routeChoice(sel), t0 = performance.now(), DUR = 2600;
+  const draw = (n) => {
+    map.getSource('route-a').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: line.slice(0, Math.max(2, n + 1)) } });
+    map.getSource('runner').setData({ type: 'Feature', geometry: { type: 'Point', coordinates: line[Math.min(n, line.length - 1)] } });
+  };
+  if (reduce) { draw(line.length - 1); map.getSource('runner').setData(EMPTY); return; }
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / DUR);
+    draw(Math.round(k * (line.length - 1)));
+    if (k < 1) anim = requestAnimationFrame(step); else map.getSource('runner').setData(EMPTY);
+  };
+  anim = requestAnimationFrame(step);
+}
+
+document.querySelectorAll('[data-leg]').forEach((el) => el.addEventListener('click', () => select(Number(el.dataset.leg))));
+$('replay-btn').addEventListener('click', replay);
+
+map.on('style.load', () => {
+  recolour();
+  addOverprint();
+  const all = new mapboxgl.LngLatBounds(COURSE[0].ll, COURSE[0].ll);
+  COURSE.forEach((c) => all.extend(c.ll));
+  const phone = window.matchMedia('(max-width: 860px)').matches;
+  map.fitBounds(all, { padding: phone ? { top: 70, bottom: 60, left: 24, right: 24 } : { top: 90, bottom: 70, left: 50, right: 50 }, animate: false });
+  select(1, { fly: false });
+  ['ctrl-hit', 'legs-hit'].forEach((id) => {
+    map.on('click', id, (e) => { select(e.features[0].properties.leg, { fromMap: true }); });
+    map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', id, () => { map.getCanvas().style.cursor = ''; });
+  });
+  $('replay-btn').disabled = false;
+  const st = $('status');
+  st.className = 'status-note success';
+  st.textContent = `Course loaded · ${NLEG} legs · fictional event, real terrain`;
+});
+
+map.on('error', (e) => {
+  const st = $('status');
+  if (st.classList.contains('success')) return;
+  st.className = 'status-note error';
+  st.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+</script>
+</body>
+</html>

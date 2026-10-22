@@ -1,0 +1,472 @@
+/*
+  Film Noir -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a 1940s detective picture -- black and
+  white, venetian-blind shadow stripes, film grain, a title card, a typed
+  case note and ONE accent of lipstick red -- laid out as a cinematic
+  letterbox: the map sits between two black bars), deliberately distinct
+  from every other style pack in this folder: Academic Paper, Aero Gadgets,
+  Amber Terminal, Arena, Atomic Motel, Audio Guide, Aurora Command,
+  Blueprint, Board Game, Bottom Sheet, Broadcast, Brutalist Guide, Case
+  Board, Celestial Tarot, Chalkboard, Chronicle, Chat Concierge, Clinic
+  Finder, Comic Panel, Constructivist, Data Notebook, Deco Voyage, Drop
+  Culture, E-Ink, Editorial Paper, Estate Luxe, Event Invite, Field Journal,
+  Fleet Ops, Frontier Poster, Highway Sign, Isotype, Line Diagram, Memphis,
+  Moving Map, Neon HUD, Nordic Cabin, Papercraft, Pastel Bento, Pixel Quest,
+  Postcards, Raw Web, Retro OS, Riso Zine, Ski Piste, Slate Console, Soft
+  UI, Split Flap, Stained Glass, Sticker Book, Storefront, Story Scroll,
+  Swiss Grid, Tarmac Glass, Thermal Receipt, Trailhead, Trip Kanban, Vapor
+  Sunset, Vintage Chart, Washi Seasons, Weather Console, Whiteboard and
+  Zellige; and also distinct from the 19 sibling packs built alongside it:
+  Ukiyo-e Coast, Herbarium, Dive Log, Illuminated, Stage Profile, Treasure
+  Hunt, Tiki Lagoon, Rally Dash, Grand Hotel, Orienteering, Museum Label,
+  Regatta, Code Editor, Watercolor, Annual Report, Truck Art, Papel Picado,
+  Vinyl Crate and Art Nouveau.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/film-noir.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Abril Fatface for the title card,
+  chips and headings; Lusitana for narration and typed case notes):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Lusitana:wght@400;700&display=swap" rel="stylesheet" />
+
+  Signature touch: film grain (an SVG feTurbulence tile, jittered in steps)
+  and slanted venetian-blind light stripes live ONLY in the two black bars
+  and on the case-file note -- never over the map. Under
+  prefers-reduced-motion the grain is static. Lipstick red is used
+  sparingly: the active scene, the CASE stamp and the map marker.
+
+  Class/id contract (see film-noir-template.html in this same folder):
+
+  - #map                      map container (every demo defines its own
+                               positioning; the template fills .stage)
+  - .reel                     page shell: top bar / stage / bottom bar
+                               (a CSS grid filling 100dvh)
+  - .bar, .bar-top,           the two black letterbox bars (+ grain and
+    .bar-bottom                blind stripes)
+    .title-card                 title block in the top bar --
+      .title-card .kicker         small-caps line ("A Marlowe Pictures
+                                   Production")
+      .title-card h1              the film title, Abril Fatface
+    .reel-counter               "REEL 1 . SCENE I / VI" counter (right)
+    .subtitle                   subtitle-style narration line (bottom bar)
+    .scene-chips, .scene-chip   the SCENE I..VI buttons; .is-active =
+                                 lipstick red; scrolls horizontally on phone
+    .btn                        small outlined button ("Roll film")
+  - .stage                    the map cell between the bars
+    .iris                     black overlay inside the map's canvas
+                               container; clip-path circle animated by JS
+    .mk, .mk.is-active        HTML marker inner element (red ring; active
+                               = filled red)
+  - .case-note                grey photo-paper case file (beside the map on
+                               desktop, a panel below it on phone)
+    .case-stamp                 red "CASE 47" stamp
+    .case-head, .case-title     typed header / scene title
+    .case-body                  typed body (dl with dt/dd rows)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --noir-black: #0B0B0C;
+  --noir-char: #1C1C1E;
+  --silver: #EDE8DF;
+  --grey: #8A8A8A;
+  --grey-dark: #4A4A4A;
+  --red: #B3122B;
+  --photo: #C9C5BC;       /* grey photo paper */
+  --photo-ink: #1C1C1E;
+
+  --font-display: 'Abril Fatface', 'Didot', Georgia, serif;
+  --font-body: 'Lusitana', Georgia, 'Times New Roman', serif;
+
+  /* One tile of film grain: white speckle, alpha from the noise itself */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 1.7 0 0 0 -0.75'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  /* Same tile, dark speckle, for the paper */
+  --grain-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.7 0 0 0 -0.7'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--noir-black);
+  color: var(--silver);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--silver);
+  outline-offset: 2px;
+}
+
+/* ---- Page shell ---------------------------------------------------- */
+.reel {
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "top top"
+    "stage note"
+    "bottom bottom";
+  background: var(--noir-black);
+}
+
+/* ---- Letterbox bars: grain + blind stripes ------------------------- */
+.bar {
+  position: relative;
+  background: var(--noir-black);
+  overflow: hidden;
+  isolation: isolate;
+}
+.bar > * { position: relative; z-index: 2; }
+
+/* slanted venetian-blind light slats */
+.bar::before,
+.case-note::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.bar::before {
+  background: repeating-linear-gradient(
+    104deg,
+    rgba(237, 232, 223, 0.075) 0 16px,
+    rgba(237, 232, 223, 0.012) 24px 38px,
+    rgba(237, 232, 223, 0.075) 46px 62px);
+}
+
+/* film grain, jittered in steps (static under reduced motion) */
+.bar::after,
+.case-note::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image: var(--grain);
+  background-size: 220px 220px;
+  opacity: 0.2;
+  animation: grain 0.9s steps(1) infinite;
+}
+@keyframes grain {
+  0%   { background-position: 0 0; }
+  20%  { background-position: -58px 31px; }
+  40%  { background-position: 43px -77px; }
+  60%  { background-position: -96px -22px; }
+  80%  { background-position: 71px 64px; }
+}
+
+.bar-top {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 28px;
+  border-bottom: 1px solid var(--grey-dark);
+}
+.bar-bottom {
+  grid-area: bottom;
+  padding: 14px 28px 18px;
+  border-top: 1px solid var(--grey-dark);
+}
+
+.title-card { min-width: 0; }
+.title-card .kicker {
+  margin: 0 0 2px;
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+.title-card h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(24px, 3.4vw, 40px);
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  color: var(--silver);
+  text-shadow: 0 2px 0 #000, 0 0 18px rgba(237, 232, 223, 0.18);
+}
+
+.reel-counter {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--silver);
+  white-space: nowrap;
+}
+.reel-counter .reel-disc {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--grey);
+  background:
+    radial-gradient(circle, var(--noir-black) 0 3px, transparent 4px),
+    radial-gradient(circle at 50% 22%, var(--grey-dark) 0 3px, transparent 4px),
+    radial-gradient(circle at 78% 62%, var(--grey-dark) 0 3px, transparent 4px),
+    radial-gradient(circle at 22% 62%, var(--grey-dark) 0 3px, transparent 4px);
+}
+
+/* ---- Stage: the map cell ------------------------------------------- */
+.stage {
+  grid-area: stage;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: var(--noir-char);
+  overflow: hidden;
+}
+
+.iris {
+  position: absolute;
+  inset: 0;
+  z-index: 1;               /* above markers, below map controls (z 2) */
+  background: #000;
+  pointer-events: none;
+  clip-path: circle(0% at 50% 50%);
+}
+
+/* map-controls stay readable on the dark frame */
+.stage .mapboxgl-ctrl-attrib {
+  background: rgba(11, 11, 12, 0.72);
+}
+.stage .mapboxgl-ctrl-attrib a,
+.stage .mapboxgl-ctrl-attrib { color: var(--silver); }
+.stage .mapboxgl-ctrl-logo { opacity: 1; }
+
+/* ---- Markers -------------------------------------------------------- */
+.mk {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  border: 3px solid var(--red);
+  background: var(--noir-black);
+  color: var(--silver);
+  font-family: var(--font-display);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px rgba(237, 232, 223, 0.85), 0 4px 10px rgba(0, 0, 0, 0.6);
+  transition: background 0.2s, transform 0.2s;
+}
+.mk:hover { transform: scale(1.12); }
+.mk.is-active {
+  background: var(--red);
+  transform: scale(1.22);
+}
+
+/* ---- Subtitle narration -------------------------------------------- */
+.subtitle {
+  margin: 0 auto 12px;
+  max-width: 820px;
+  min-height: 2.9em;           /* two lines reserved so nothing jumps */
+  text-align: center;
+  font-size: clamp(15px, 1.7vw, 20px);
+  line-height: 1.45;
+  color: var(--silver);
+  text-shadow: 0 1px 0 #000, 0 0 6px #000;
+}
+.subtitle .caret {
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.12em;
+  background: var(--silver);
+  opacity: 0.7;
+}
+
+/* ---- Scene chips ---------------------------------------------------- */
+.scene-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+.scene-chip,
+.btn {
+  flex: none;
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid var(--grey);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--silver);
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.scene-chip:hover,
+.btn:hover {
+  border-color: var(--silver);
+  background: rgba(237, 232, 223, 0.1);
+}
+.scene-chip.is-active {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+.btn {
+  border-style: dashed;
+  color: var(--grey);
+  margin-left: 6px;
+}
+.btn:hover { color: var(--silver); }
+.btn[aria-pressed="true"] { color: var(--silver); border-style: solid; }
+
+/* ---- Case-file note: grey photo paper, typed text ------------------- */
+.case-note {
+  grid-area: note;
+  position: relative;
+  margin: 18px 22px 18px 18px;
+  align-self: center;
+  max-height: calc(100% - 36px);
+  overflow: hidden;
+  padding: 26px 22px 22px;
+  background: var(--photo);
+  color: var(--photo-ink);
+  border: 1px solid #000;
+  box-shadow: 0 0 0 6px var(--noir-char), 0 14px 30px rgba(0, 0, 0, 0.7);
+  transform: rotate(0.6deg);
+  isolation: isolate;
+}
+.case-note > * { position: relative; z-index: 2; }
+/* soft dark blind shadows across the paper */
+.case-note::before {
+  background: repeating-linear-gradient(
+    104deg,
+    rgba(0, 0, 0, 0.2) 0 14px,
+    rgba(0, 0, 0, 0.02) 26px 44px,
+    rgba(0, 0, 0, 0.2) 56px 70px);
+  mix-blend-mode: multiply;
+}
+.case-note::after {
+  background-image: var(--grain-dark);
+  opacity: 0.22;
+}
+
+.case-stamp {
+  position: absolute !important;
+  top: 12px;
+  right: 14px;
+  z-index: 3;
+  padding: 2px 10px 0;
+  border: 3px double var(--red);
+  border-radius: 3px;
+  color: var(--red);
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: 0.08em;
+  line-height: 1.25;
+  text-transform: uppercase;
+  transform: rotate(-8deg);
+  opacity: 0.92;
+  pointer-events: none;
+}
+
+.case-head {
+  margin: 0 96px 12px 0;      /* clear the stamp */
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  color: var(--grey-dark);
+}
+.case-title {
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--photo-ink);
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.1;
+}
+.case-body { margin: 0; }
+.case-body dt {
+  margin-top: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--grey-dark);
+}
+.case-body dd {
+  margin: 2px 0 0;
+  font-size: 15px;
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+}
+
+.hidden { display: none !important; }
+
+/* ---- Phone ---------------------------------------------------------- */
+@media (max-width: 760px) {
+  .reel {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: "top" "stage" "note" "bottom";
+  }
+  .bar-top { padding: 8px 16px; }
+  .title-card .kicker { display: none; }
+  .title-card h1 { font-size: 19px; }
+  .reel-counter { font-size: 10px; letter-spacing: 0.12em; gap: 6px; }
+  .reel-counter .reel-disc { width: 18px; height: 18px; border-width: 1.5px; }
+
+  .bar-bottom { padding: 8px 0 10px; }
+  .subtitle {
+    margin: 0 16px 8px;
+    font-size: 14px;
+    min-height: 4.4em;       /* up to three lines at 390px */
+  }
+  .scene-chips {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding: 2px 16px 4px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .scene-chips::-webkit-scrollbar { display: none; }
+
+  .case-note {
+    margin: 0;
+    align-self: stretch;
+    max-height: 26dvh;
+    overflow-y: auto;
+    padding: 14px 16px 12px;
+    transform: none;
+    box-shadow: none;
+    border-width: 1px 0;
+  }
+  .case-stamp { font-size: 15px; top: 8px; right: 12px; border-width: 2px; }
+  .case-head { margin-right: 84px; margin-bottom: 6px; font-size: 10px; }
+  .case-title { font-size: 19px; margin-bottom: 6px; padding-bottom: 4px; }
+  .case-body dt { margin-top: 6px; }
+  .case-body dd { font-size: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar::after,
+  .case-note::after { animation: none; }
+  .mk, .scene-chip, .btn { transition: none; }
+}

@@ -1,0 +1,249 @@
+<!--
+  Working EXAMPLE of the Museum Label style pack (museum-label.css, in this
+  same folder). Open this file directly to see the pattern working with an
+  eight-stop architecture walk through Bilbao on Mapbox Standard (monochrome
+  theme, day preset, 3D buildings on). The map hangs in a frame like an
+  artwork; click a numbered dot, a room label, or press the Left / Right
+  arrow keys to step through the rooms: the camera makes a slow rotating,
+  pitching move toward the building while the wall label cross-fades
+  (reduced motion: instant jump, no fade). Esc returns to the overview.
+  Copy the markup below into your own demo and link museum-label.css from
+  its <head> -- see the class/id contract documented at the top of that CSS
+  file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (contemporary art museum white cube: off-white wall,
+  passe-partout frame, tombstone wall labels, one signal orange) at the
+  user's request for something distinct from every other pack in this
+  folder. The places are real public landmarks with approximate positions;
+  the exhibition title, dates and the curatorial copy are fictional
+  placeholders -- swap in your own.
+
+  What's NOT included: search/geocoding, routing, popups, audio, or a
+  hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Quiet Structures</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@500;700;900&family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="museum-label.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map (inside the mat window). */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<main class="wall">
+  <header class="exhibit">
+    <h1 class="exhibit-title">Quiet Structures</h1>
+    <div class="exhibit-meta">Eight rooms in Bilbao &middot; On view through 2027</div>
+  </header>
+
+  <section class="frame" aria-label="Map of the exhibition">
+    <div class="map-well"><div id="map"></div></div>
+  </section>
+
+  <aside class="placard" aria-live="polite">
+    <div class="placard-body" id="placard-body">
+      <p class="plac-no" id="plac-no"></p>
+      <h2 class="plac-title" id="plac-title"></h2>
+      <p class="plac-place" id="plac-place"></p>
+      <ul class="plac-spec" id="plac-spec"></ul>
+      <hr class="plac-rule" />
+      <p class="plac-text" id="plac-text"></p>
+    </div>
+    <p class="status-note loading" id="status-note">Hanging the work</p>
+  </aside>
+
+  <ol class="rooms" id="rooms" aria-label="Room guide"></ol>
+  <p class="rooms-hint">Use the &larr; &rarr; keys to walk the rooms. Esc for the overview.</p>
+</main>
+
+<script>
+// Eight rooms. Coordinates are approximate [lng, lat]; bearing is the view
+// direction the camera settles on for that building.
+const STOPS = [
+  { name: 'Guggenheim Museum Bilbao', short: 'Guggenheim', place: 'Abandoibarra',
+    coord: [-2.9340, 43.2687], bearing: 35,
+    spec: ['Completed 1997', 'Titanium, glass, limestone', 'Height 50 m'],
+    text: 'A ship of curved metal moored on the river, its skin catching a different light every hour. The building asks to be walked around before it is ever entered.' },
+  { name: 'Zubizuri', short: 'Zubizuri', place: 'Campo Volantín',
+    coord: [-2.92839, 43.26631], bearing: -50,
+    spec: ['Completed 1997', 'Steel arch, glass-block deck', 'Span 75 m'],
+    text: 'A single white arch carries a walkway that glows from below at night. Crossing it is a small, deliberate act of balance.' },
+  { name: 'Azkuna Zentroa', short: 'Azkuna Zentroa', place: 'Abando',
+    coord: [-2.93712, 43.25970], bearing: 120,
+    spec: ['Opened 2010', 'Brick, steel, glass', 'One city block'],
+    text: 'A wine warehouse reborn as a civic room, held up by forty-three columns that no two repeat. A pool of light sits where the cellars once were.' },
+  { name: 'Bilbao Fine Arts Museum', short: 'Fine Arts', place: 'Doña Casilda Park',
+    coord: [-2.93810, 43.26546], bearing: -20,
+    spec: ['Opened 1908, extended 2001', 'Stone, brick, glass', 'Two wings, ninety years apart'],
+    text: 'An old gallery and a new one share a single garden. Between them the collection moves quietly from centuries past to the present.' },
+  { name: 'Teatro Arriaga', short: 'Arriaga', place: 'Casco Viejo',
+    coord: [-2.92501, 43.25947], bearing: 70,
+    spec: ['Completed 1890', 'Stone, iron, glass', 'Neo-baroque facade'],
+    text: 'A stage set in stone at the edge of the old town, its curtain of columns facing the river. Evening arrives here with a hush, then applause.' },
+  { name: 'Mercado de la Ribera', short: 'La Ribera', place: 'Casco Viejo',
+    coord: [-2.92434, 43.25555], bearing: -75,
+    spec: ['Completed 1929', 'Concrete, steel, stained glass', 'Prow-shaped hall on the river'],
+    text: 'A long covered hall shaped like a ship at the waterside, its roof lit by coloured glass. Everything inside is arranged by hand.' },
+  { name: 'Funicular de Artxanda', short: 'Artxanda', place: 'Lower station, Begoña',
+    coord: [-2.92123, 43.27280], bearing: 160,
+    spec: ['Opened 1915', 'Steel, timber cabin', 'Three-minute ascent'],
+    text: 'A small red car pulled steadily up the hillside to a wide view back across the city. The climb is short; the change of scale is not.' },
+  { name: 'La Salve Bridge', short: 'La Salve', place: 'Abandoibarra',
+    coord: [-2.93158, 43.26951], bearing: -125, nudge: [14, -14],
+    spec: ['Opened 1972, arch added 2007', 'Steel, painted red', 'Crosses the estuary beside the museum'],
+    text: 'A road bridge that wears one bold arch like a signature. It joins two banks, and two centuries of the city, in a single gesture.' },
+];
+
+const INTRO = {
+  no: 'Introduction',
+  title: 'Quiet Structures',
+  place: 'An architecture walk, Bilbao',
+  spec: ['Eight rooms', 'Open air, river level'],
+  text: 'Eight buildings and bridges hung as a single exhibition. Choose a room, or step through them in order with the arrow keys.',
+};
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const phone = () => window.matchMedia('(max-width: 720px)').matches;
+let current = -1;      // -1 = overview / introduction
+let fadeTimer = 0;
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: {
+    basemap: {
+      lightPreset: 'day',
+      theme: 'monochrome',
+      showPointOfInterestLabels: false,
+      show3dObjects: true,
+      showPlaceLabels: false,
+    },
+  },
+  center: [-2.929, 43.264],
+  zoom: 14.2,
+  pitch: 50,
+  bearing: -18,
+  attributionControl: true,
+});
+
+/* ---- Camera ---- */
+function overviewPadding() {
+  return phone() ? { top: 50, bottom: 72, left: 36, right: 36 } : { top: 54, bottom: 72, left: 56, right: 56 };
+}
+
+function showOverview(instant) {
+  const b = STOPS.reduce((acc, s) => acc.extend(s.coord), new mapboxgl.LngLatBounds(STOPS[0].coord, STOPS[0].coord));
+  map.fitBounds(b, { padding: overviewPadding(), pitch: 50, bearing: -18, duration: instant || reduce ? 0 : 2600 });
+}
+
+function flyToStop(s) {
+  const opts = { center: s.coord, zoom: 16.8, pitch: 62, bearing: s.bearing, padding: { top: 20, bottom: 40, left: 20, right: 20 } };
+  if (reduce) map.jumpTo(opts);
+  else map.flyTo({ ...opts, duration: 3600, curve: 1.3, essential: false });
+}
+
+/* ---- Wall label ---- */
+function fillPlacard(d) {
+  $('plac-no').textContent = d.no;
+  $('plac-title').textContent = d.title;
+  $('plac-place').textContent = d.place;
+  $('plac-spec').innerHTML = d.spec.map((t) => `<li>${t}</li>`).join('');
+  $('plac-text').textContent = d.text;
+}
+
+function setPlacard(d) {
+  clearTimeout(fadeTimer);
+  const body = $('placard-body');
+  if (reduce) { fillPlacard(d); return; }
+  body.classList.add('fading');
+  fadeTimer = setTimeout(() => { fillPlacard(d); body.classList.remove('fading'); }, 320);
+}
+
+function goTo(i) {
+  if (i < 0 || i >= STOPS.length) return;
+  current = i;
+  const s = STOPS[i];
+  setPlacard({ no: `Room ${String(i + 1).padStart(2, '0')} / ${String(STOPS.length).padStart(2, '0')}`, title: s.name, place: s.place, spec: s.spec, text: s.text });
+  syncActive();
+  flyToStop(s);
+}
+
+function goOverview() {
+  current = -1;
+  setPlacard(INTRO);
+  syncActive();
+  showOverview();
+}
+
+function syncActive() {
+  roomBtns.forEach((b, i) => {
+    b.classList.toggle('active', i === current);
+    if (i === current) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
+  });
+  dots.forEach((d, i) => d.classList.toggle('active', i === current));
+}
+
+/* ---- Room guide + markers ---- */
+const roomBtns = [];
+const dots = [];
+
+STOPS.forEach((s, i) => {
+  const li = document.createElement('li');
+  const btn = document.createElement('button');
+  btn.className = 'room';
+  btn.type = 'button';
+  btn.innerHTML = `<span class="room-dot">${i + 1}</span><span class="room-name">${s.short}</span>`;
+  btn.addEventListener('click', () => goTo(i));
+  li.appendChild(btn);
+  $('rooms').appendChild(li);
+  roomBtns.push(btn);
+
+  // Marker root stays untouched; only the inner child is styled.
+  const root = document.createElement('div');
+  root.innerHTML = `<button class="wall-dot" type="button" aria-label="Room ${i + 1}: ${s.name}">${i + 1}</button>`;
+  const dot = root.firstElementChild;
+  dot.addEventListener('click', () => goTo(i));
+  dots.push(dot);
+  new mapboxgl.Marker({ element: root, offset: s.nudge || [0, 0] }).setLngLat(s.coord).addTo(map);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); goTo(current < 0 ? 0 : Math.min(STOPS.length - 1, current + 1)); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); if (current > 0) goTo(current - 1); else goOverview(); }
+  else if (e.key === 'Escape') goOverview();
+});
+
+/* ---- Map lifecycle ---- */
+map.on('style.load', () => {
+  $('status-note').classList.add('hidden');
+});
+
+map.on('error', (e) => {
+  const n = $('status-note');
+  n.classList.remove('hidden', 'loading');
+  n.classList.add('error');
+  n.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+fillPlacard(INTRO);
+showOverview(true);
+window.addEventListener('resize', () => { if (current < 0) showOverview(true); });
+</script>
+</body>
+</html>

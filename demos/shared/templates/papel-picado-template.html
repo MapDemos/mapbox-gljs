@@ -1,0 +1,278 @@
+<!--
+  Working EXAMPLE of the Papel Picado style pack (papel-picado.css, in this
+  same folder). Open this file directly to see the pattern working with
+  seven real places in Oaxaca City, Mexico on Mapbox Standard (dusk): two
+  strings of swaying cut-paper flags across the top, the map in a cream
+  frame on the left and a lotería-style card for each stop on the right.
+  Click a card to flip it (rotateY; a crossfade under reduced motion), read
+  the short note on its back, fly the map there and watch the marigold
+  marker hop. A dotted rosa walking route (Mapbox Directions, walking,
+  simplified and embedded here) links the stops. Copy the markup below
+  into your own demo and link papel-picado.css from its <head> -- see the
+  class/id contract at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (cut tissue-paper bunting, fiesta colours, lotería
+  cards) at the user's request for something distinct from every other
+  pack in this folder. The places are real; the descriptions, card
+  numbers and "Oaxaca en Fiesta" title are illustrative placeholders --
+  swap in your own.
+
+  What's NOT included: live routing (the route is a baked-in snapshot),
+  search/geocoding, popups, or a hard-coded access token (demo-kit.js
+  sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Papel Picado</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Sancreek&family=Asap:wght@400;500;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="papel-picado.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: the map fills .map-frame (papel-picado.css sizes it). */
+  #map { width: 100%; }
+  .defs-only { position: absolute; width: 0; height: 0; overflow: hidden; }
+</style>
+</head>
+<body>
+<!-- Cut-out masks: white = paper, black = hole. Flag box is 52 x 46. -->
+<svg class="defs-only" aria-hidden="true" focusable="false">
+  <defs>
+    <mask id="pp-a" maskUnits="userSpaceOnUse" x="0" y="0" width="52" height="46">
+      <path fill="#fff" d="M0 0H52V38L45.5 46L39 38L32.5 46L26 38L19.5 46L13 38L6.5 46L0 38Z"/>
+      <g fill="#000"><circle cx="26" cy="23" r="8"/><circle cx="10" cy="23" r="2.6"/><circle cx="42" cy="23" r="2.6"/><circle cx="26" cy="10" r="2"/><circle cx="26" cy="36" r="2"/></g>
+      <circle cx="26" cy="23" r="3" fill="#fff"/>
+    </mask>
+    <mask id="pp-b" maskUnits="userSpaceOnUse" x="0" y="0" width="52" height="46">
+      <path fill="#fff" d="M0 0H52V38L45.5 46L39 38L32.5 46L26 38L19.5 46L13 38L6.5 46L0 38Z"/>
+      <path fill="#000" d="M26 11L38 23L26 35L14 23Z"/>
+      <g fill="#000"><circle cx="7" cy="14" r="2"/><circle cx="45" cy="14" r="2"/><circle cx="7" cy="32" r="2"/><circle cx="45" cy="32" r="2"/></g>
+      <path fill="#fff" d="M26 17L32 23L26 29L20 23Z"/>
+    </mask>
+    <mask id="pp-c" maskUnits="userSpaceOnUse" x="0" y="0" width="52" height="46">
+      <path fill="#fff" d="M0 0H52V38L45.5 46L39 38L32.5 46L26 38L19.5 46L13 38L6.5 46L0 38Z"/>
+      <g fill="#000">
+        <ellipse cx="26" cy="14" rx="3.5" ry="6"/><ellipse cx="26" cy="32" rx="3.5" ry="6"/>
+        <ellipse cx="17" cy="23" rx="6" ry="3.5"/><ellipse cx="35" cy="23" rx="6" ry="3.5"/>
+        <rect x="6" y="12" width="3" height="9" rx="1.5"/><rect x="43" y="12" width="3" height="9" rx="1.5"/>
+        <rect x="6" y="26" width="3" height="9" rx="1.5"/><rect x="43" y="26" width="3" height="9" rx="1.5"/>
+      </g>
+      <circle cx="26" cy="23" r="3.2" fill="#fff"/>
+    </mask>
+    <mask id="pp-d" maskUnits="userSpaceOnUse" x="0" y="0" width="52" height="46">
+      <path fill="#fff" d="M0 0H52V38L45.5 46L39 38L32.5 46L26 38L19.5 46L13 38L6.5 46L0 38Z"/>
+      <g fill="#000">
+        <path d="M26 11L29 20L38 23L29 26L26 35L23 26L14 23L23 20Z"/>
+        <rect x="6" y="13" width="3" height="20" rx="1.5"/><rect x="12" y="13" width="3" height="6" rx="1.5"/>
+        <rect x="43" y="13" width="3" height="20" rx="1.5"/><rect x="37" y="13" width="3" height="6" rx="1.5"/>
+        <rect x="12" y="27" width="3" height="6" rx="1.5"/><rect x="37" y="27" width="3" height="6" rx="1.5"/>
+      </g>
+    </mask>
+  </defs>
+</svg>
+
+<div class="fiesta">
+  <header>
+    <div class="bunting-row" aria-hidden="true"></div>
+    <div class="masthead">
+      <h1>Oaxaca en Fiesta</h1>
+      <div class="sub">Lotería de lugares &middot; siete paradas a pie</div>
+    </div>
+    <div class="bunting-row second" aria-hidden="true"></div>
+  </header>
+
+  <main class="fiesta-main">
+    <section class="map-frame" aria-label="Map of Oaxaca City">
+      <div class="map-bar">
+        <div class="status-note loading" id="status" role="status" aria-live="polite">Loading the map&hellip;</div>
+        <button class="btn btn-primary" id="reset" type="button">Ver toda la ruta</button>
+      </div>
+      <div id="map"></div>
+    </section>
+    <section class="lc-grid" id="cards" aria-label="Lotería cards"></section>
+  </main>
+</div>
+
+<script>
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#2A1A12';
+const TISSUE = ['#E4007C', '#F7A000', '#00A6A6', '#8CC63F', '#7B3FA0', '#E53935'];
+const MASKS = ['pp-a', 'pp-b', 'pp-c', 'pp-d'];
+const NS = 'http://www.w3.org/2000/svg';
+
+// Walking route (Mapbox Directions, simplified) through the stops in card order.
+const ROUTE = [[-96.73375,17.06087],[-96.73365,17.06073],[-96.73352,17.0608],[-96.7318,17.06049],[-96.72613,17.05929],[-96.72624,17.05871],[-96.72592,17.06024],[-96.72692,17.06043],[-96.72597,17.06509],[-96.72691,17.06527],[-96.72672,17.0662],[-96.7248,17.06584],[-96.72462,17.06673],[-96.72362,17.06657],[-96.72314,17.06964],[-96.71999,17.06915],[-96.71994,17.06953],[-96.71781,17.06928],[-96.71771,17.06989],[-96.71708,17.06987],[-96.71707,17.06994],[-96.71708,17.06987],[-96.71771,17.06989],[-96.71776,17.07023],[-96.71824,17.07059],[-96.72191,17.07103],[-96.72175,17.07212],[-96.72364,17.07248],[-96.72359,17.0731],[-96.72645,17.07358],[-96.72665,17.07322],[-96.72759,17.07348],[-96.7279,17.07343],[-96.72777,17.07468],[-96.7279,17.07514],[-96.72861,17.07513],[-96.72897,17.07579],[-96.72949,17.07618],[-96.7295,17.07602],[-96.72985,17.07599],[-96.72991,17.07607],[-96.7309,17.07615]];
+
+// Card art: 100x100 viewBox, flat fills + ink outlines.
+const S = `stroke="${INK}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"`;
+const ART = {
+  basilica: `<rect x="16" y="56" width="68" height="30" fill="#F7A000" ${S}/><path d="M31 56A19 19 0 0 1 69 56Z" fill="#E53935" ${S}/><rect x="46" y="30" width="8" height="9" fill="#FFF8EC" ${S}/><circle cx="50" cy="26" r="3.5" fill="#E4007C" ${S}/><path d="M43 86V73a7 7 0 0 1 14 0V86Z" fill="${INK}"/><circle cx="27" cy="70" r="4.5" fill="#FFF8EC" ${S}/><circle cx="73" cy="70" r="4.5" fill="#FFF8EC" ${S}/><rect x="10" y="86" width="80" height="5" fill="#FFF8EC" ${S}/><rect x="5" y="91" width="90" height="5" fill="#FFF8EC" ${S}/>`,
+  market: `<path d="M18 58H82L74 90H26Z" fill="#F7A000" ${S}/><path d="M24 70H76M28 80H72M40 58L42 90M60 58L58 90" fill="none" ${S} stroke-width="1.8"/><circle cx="35" cy="52" r="11" fill="#E53935" ${S}/><circle cx="53" cy="44" r="12" fill="#8CC63F" ${S}/><circle cx="68" cy="53" r="10" fill="#E4007C" ${S}/><path d="M80 26C90 34 88 48 78 52C82 42 80 36 80 26Z" fill="#E53935" ${S}/><path d="M53 32C57 26 62 25 66 26" fill="none" ${S}/>`,
+  plaza: `<path d="M20 42L50 22L80 42Z" fill="#E53935" ${S}/><rect x="26" y="44" width="5" height="28" fill="#FFF8EC" ${S}/><rect x="40" y="44" width="5" height="28" fill="#FFF8EC" ${S}/><rect x="55" y="44" width="5" height="28" fill="#FFF8EC" ${S}/><rect x="69" y="44" width="5" height="28" fill="#FFF8EC" ${S}/><rect x="18" y="72" width="64" height="9" fill="#7B3FA0" ${S}/><rect x="6" y="64" width="4" height="22" fill="#7B3FA0" ${S}/><circle cx="8" cy="56" r="11" fill="#8CC63F" ${S}/><rect x="90" y="64" width="4" height="22" fill="#7B3FA0" ${S}/><circle cx="92" cy="56" r="11" fill="#8CC63F" ${S}/><circle cx="50" cy="17" r="3.5" fill="#E4007C" ${S}/><path d="M6 86H94" ${S}/>`,
+  templo: `<rect x="14" y="40" width="22" height="46" fill="#F7A000" ${S}/><rect x="64" y="40" width="22" height="46" fill="#F7A000" ${S}/><path d="M14 40Q25 18 36 40Z" fill="#E53935" ${S}/><path d="M64 40Q75 18 86 40Z" fill="#E53935" ${S}/><rect x="36" y="50" width="28" height="36" fill="#FFF8EC" ${S}/><path d="M43 86V72a7 7 0 0 1 14 0V86Z" fill="${INK}"/><circle cx="50" cy="59" r="5" fill="#E4007C" ${S}/><rect x="21" y="52" width="8" height="12" rx="4" fill="#FFF8EC" ${S}/><rect x="71" y="52" width="8" height="12" rx="4" fill="#FFF8EC" ${S}/><path d="M8 86H92" ${S}/>`,
+  cactus: `<rect x="42" y="22" width="16" height="62" rx="8" fill="#8CC63F" ${S}/><rect x="24" y="54" width="22" height="10" rx="5" fill="#8CC63F" ${S}/><rect x="24" y="36" width="10" height="28" rx="5" fill="#8CC63F" ${S}/><rect x="54" y="46" width="22" height="10" rx="5" fill="#8CC63F" ${S}/><rect x="66" y="28" width="10" height="28" rx="5" fill="#8CC63F" ${S}/><path d="M50 28V78M29 42V58M71 34V50" fill="none" ${S} stroke-width="1.6"/><path d="M32 82H68L63 96H37Z" fill="#7B3FA0" ${S}/><circle cx="50" cy="20" r="6" fill="#F7A000" ${S}/>`,
+  barrio: `<rect x="6" y="52" width="27" height="36" fill="#F7A000" ${S}/><rect x="36" y="44" width="28" height="44" fill="#FFF8EC" ${S}/><rect x="67" y="52" width="27" height="36" fill="#00A6A6" ${S}/><path d="M6 52H33M36 44H64M67 52H94" ${S} stroke-width="5"/><rect x="14" y="68" width="11" height="20" fill="${INK}"/><rect x="44" y="64" width="12" height="24" rx="6" fill="#E4007C" ${S}/><rect x="75" y="68" width="11" height="20" fill="${INK}"/><rect x="12" y="57" width="8" height="7" fill="#FFF8EC" ${S}/><rect x="80" y="57" width="8" height="7" fill="#FFF8EC" ${S}/><path d="M2 24Q50 42 98 24" fill="none" ${S}/><path d="M12 28L19 29L15 38ZM30 32L37 33L33 42ZM48 34L55 34L51 43ZM66 32L73 31L69 41ZM84 28L91 27L87 37Z" fill="#E4007C" ${S} stroke-width="1.8"/>`,
+  fortin: `<circle cx="78" cy="24" r="10" fill="#FFF8EC" ${S}/><path d="M78 8V4M91 24H95M62 24H58M87 13L90 10M69 13L66 10" fill="none" ${S}/><path d="M0 88L26 56Q50 30 74 56L100 88Z" fill="#8CC63F" ${S}/><path d="M30 82Q50 62 70 82M20 88Q50 56 80 88" fill="none" stroke="#FFF8EC" stroke-width="2.6" stroke-linecap="round"/><rect x="42" y="72" width="16" height="7" fill="#E4007C" ${S}/><path d="M50 54V46M44 50H56" fill="none" ${S}/><circle cx="50" cy="43" r="3" fill="#F7A000" ${S}/>`
+};
+
+const PLACES = [
+  { n: 1, name: 'Basílica de la Soledad', art: 'basilica', c: '#8CC63F', pos: [-96.73375, 17.06087],
+    desc: 'A 17th-century baroque church at the top of a wide stairway, with a richly carved stone facade. Chocolate shops and sweet stalls crowd the plaza beside it.' },
+  { n: 2, name: 'Mercado 20 de Noviembre', art: 'market', c: '#7B3FA0', pos: [-96.72624, 17.05871], off: [12, 14],
+    desc: 'A covered market famous for its smoky Pasillo de Humo, where you choose meats and have them grilled. Chocolate, mole pastes and bread fill the nearby aisles.' },
+  { n: 3, name: 'Zócalo', art: 'plaza', c: '#F7A000', pos: [-96.72663, 17.06038], off: [-12, -14],
+    desc: 'The leafy main square, ringed by arcades and cafés. Bandstand concerts, balloon sellers and strolling musicians keep it lively from afternoon until late.' },
+  { n: 4, name: 'Templo de Santo Domingo', art: 'templo', c: '#00A6A6', pos: [-96.72679, 17.06584],
+    desc: 'A grand baroque church and former convent, lined inside with gilded plasterwork. The plaza out front is a favourite spot for festivals and evening strolls.' },
+  { n: 5, name: 'Jardín Etnobotánico', art: 'cactus', c: '#E4007C', pos: [-96.72467, 17.06644],
+    desc: 'A garden beside the old convent that grows the plants of Oaxaca: towering cacti, agave and native herbs. Visits are by guided tour only.' },
+  { n: 6, name: 'Barrio de Jalatlaco', art: 'barrio', c: '#E53935', pos: [-96.71707, 17.06994],
+    desc: 'A quiet old neighbourhood of colourful low houses, cobbled lanes and street murals, with small cafés tucked behind painted doors.' },
+  { n: 7, name: 'Auditorio Guelaguetza', art: 'fortin', c: '#00A6A6', pos: [-96.7309, 17.07615],
+    desc: 'An open-air amphitheatre on Cerro del Fortín that hosts the Guelaguetza dance festival each July. The hilltop view over the city is worth the climb.' }
+];
+
+/* ---------- Bunting: strung procedurally, masks make the cut-outs ---------- */
+function buildBunting(row, shift) {
+  const w = row.clientWidth;
+  if (!w) return;
+  const h = row.clientHeight || 62;
+  const n = Math.max(3, Math.floor(w / 58));
+  const gap = w / n;
+  const sag = Math.max(6, Math.min(12, w * 0.012));
+  const k = 0.8;
+  let g = `<path class="rope" d="M0 4Q${w / 2} ${4 + 2 * sag} ${w} 4"/>`;
+  for (let i = 0; i < n; i++) {
+    const x = gap * (i + 0.5), t = x / w;
+    const y = 4 + 2 * sag * 2 * t * (1 - t) - 3;
+    const idx = i + shift;
+    g += `<g transform="translate(${(x - 26 * k).toFixed(1)} ${y.toFixed(1)}) scale(${k})"><g class="flag-sway" style="--i:${idx}">` +
+      `<rect width="52" height="46" fill="${TISSUE[idx % TISSUE.length]}" mask="url(#${MASKS[(idx * 3 + shift) % MASKS.length]})"/>` +
+      `<rect class="flag-top" width="52" height="6"/></g></g>`;
+  }
+  row.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMin meet" xmlns="${NS}">${g}</svg>`;
+}
+const rows = [...document.querySelectorAll('.bunting-row')];
+function stringAll() { rows.forEach((r, i) => buildBunting(r, i * 3)); }
+stringAll();
+let rz = 0;
+window.addEventListener('resize', () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(stringAll); });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(stringAll);
+
+/* ---------- Map ---------- */
+const bounds = ROUTE.reduce((b, c) => b.extend(c), new mapboxgl.LngLatBounds(ROUTE[0], ROUTE[0]));
+const PAD = { top: 40, bottom: 70, left: 40, right: 40 };
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: { basemap: { lightPreset: 'dusk', showPointOfInterestLabels: false } },
+  bounds,
+  fitBoundsOptions: { padding: PAD },
+  pitch: 0
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+const statusEl = document.getElementById('status');
+function setStatus(html, cls) {
+  statusEl.className = 'status-note' + (cls ? ' ' + cls : '');
+  statusEl.innerHTML = html;
+}
+
+map.on('style.load', () => {
+  map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE } } });
+  map.addLayer({
+    id: 'route-glow', type: 'line', source: 'route', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#E4007C', 'line-opacity': 0.3, 'line-blur': 3, 'line-emissive-strength': 1,
+      'line-width': ['interpolate', ['linear'], ['zoom'], 12, 8, 17, 18] }
+  });
+  map.addLayer({
+    id: 'route-dots', type: 'line', source: 'route', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#E4007C', 'line-emissive-strength': 1, 'line-dasharray': [0.1, 2.2],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 12, 4, 17, 9] }
+  });
+  setStatus('Pick a card to flip it and fly to the stop.');
+});
+
+/* ---------- Markers + cards ---------- */
+function flowerSvg(num) {
+  let petals = '';
+  for (let a = 0; a < 360; a += 45) petals += `<ellipse cx="0" cy="-10.5" rx="6" ry="8.5" transform="rotate(${a})" fill="#F7A000" stroke="${INK}" stroke-width="1.6"/>`;
+  return `<svg viewBox="-22 -22 44 44" aria-hidden="true"><g>${petals}</g><circle r="8.5" fill="#FFF8EC" stroke="${INK}" stroke-width="1.8"/><text y="4.2" text-anchor="middle" font-family="Asap, sans-serif" font-weight="700" font-size="12" fill="${INK}">${num}</text></svg>`;
+}
+
+const cardsEl = document.getElementById('cards');
+let current = -1;
+
+PLACES.forEach((p, i) => {
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'lc-card';
+  card.style.setProperty('--c', p.c);
+  card.setAttribute('aria-pressed', 'false');
+  card.setAttribute('aria-label', `${p.n}. ${p.name}. Flip card and show on map`);
+  card.innerHTML =
+    `<span class="lc-inner">` +
+      `<span class="lc-face lc-front"><span class="lc-num">${p.n}</span>` +
+        `<span class="lc-art"><svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${ART[p.art]}</svg></span>` +
+        `<span class="lc-name">${p.name}</span></span>` +
+      `<span class="lc-face lc-back"><span class="lc-num">${p.n}</span>` +
+        `<span class="lc-title">${p.name}</span><span class="lc-desc">${p.desc}</span></span>` +
+    `</span>`;
+  card.addEventListener('click', () => select(i));
+  cardsEl.appendChild(card);
+  p.card = card;
+
+  const el = document.createElement('div'); // Marker root: never styled
+  const inner = document.createElement('div');
+  inner.className = 'pp-marker';
+  inner.title = p.name;
+  inner.innerHTML = flowerSvg(p.n);
+  inner.addEventListener('animationend', () => inner.classList.remove('bounce'));
+  el.appendChild(inner);
+  el.addEventListener('click', () => select(i));
+  p.inner = inner;
+  new mapboxgl.Marker({ element: el, anchor: 'center', offset: p.off || [0, 0] }).setLngLat(p.pos).addTo(map);
+});
+
+function clearSelection() {
+  PLACES.forEach((p) => {
+    p.card.classList.remove('is-flipped');
+    p.card.setAttribute('aria-pressed', 'false');
+    p.inner.classList.remove('is-active');
+  });
+  current = -1;
+}
+
+function select(i) {
+  const p = PLACES[i];
+  if (current === i) { clearSelection(); setStatus('Pick a card to flip it and fly to the stop.'); return; }
+  clearSelection();
+  current = i;
+  p.card.classList.add('is-flipped');
+  p.card.setAttribute('aria-pressed', 'true');
+  p.inner.classList.add('is-active');
+  setStatus(`Stop ${p.n}: <strong>${p.name}</strong>`);
+  const opts = { center: p.pos, zoom: 15.8, pitch: 0, padding: PAD };
+  if (reduce) { map.jumpTo(opts); return; }
+  map.flyTo({ ...opts, duration: 1800 });
+  map.once('moveend', () => { if (current === i) { p.inner.classList.remove('bounce'); void p.inner.offsetWidth; p.inner.classList.add('bounce'); } });
+}
+
+document.getElementById('reset').addEventListener('click', () => {
+  clearSelection();
+  setStatus('Pick a card to flip it and fly to the stop.');
+  const opts = { padding: PAD };
+  if (reduce) map.fitBounds(bounds, { ...opts, duration: 0 }); else map.fitBounds(bounds, { ...opts, duration: 1400 });
+});
+</script>
+</body>
+</html>

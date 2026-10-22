@@ -1,0 +1,241 @@
+<!--
+  Working EXAMPLE of the Herbarium style pack (herbarium.css, in this same
+  folder). Open this file directly to see the pattern working with seven
+  Madrid gardens (Real Jardin Botanico, Palacio de Cristal, Rosaleda del
+  Retiro, Bosque del Recuerdo, Estanque Grande, the CaixaForum vertical
+  garden and the Parque del Oeste rose garden) on Mapbox Standard (day,
+  faded theme, POI labels off). The map is mounted as a pressed specimen
+  sheet with tape hinges, a cm ruler and a colour-checker strip; an
+  archival label (Collector / Locality / Date / Accession No.) updates
+  when you click a plant card, the map flies to the spot and a pencil
+  ring draws itself around the pin. "Show collecting walk" toggles a real
+  walking route (Mapbox Directions, fetched once and embedded, simplified)
+  drawn as a pencil-grey dashed line. Copy the markup below into your own
+  demo and link herbarium.css from its <head> -- see the class/id contract
+  at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo. The
+  places are real; the collector, dates, accession numbers and species
+  pairings are fictional placeholders -- swap in your own.
+
+  What's NOT included: search/geocoding, live routing, popups, or a
+  hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Herbarium</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Gilda+Display&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="herbarium.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="specimen-sheet" aria-label="Specimen sheet with map">
+    <span class="tape tl"></span><span class="tape tr"></span>
+    <span class="tape bl"></span><span class="tape br"></span>
+    <div class="checker" aria-hidden="true">
+      <i style="background:#735244"></i><i style="background:#C29682"></i><i style="background:#627A9D"></i>
+      <i style="background:#576C43"></i><i style="background:#8580B1"></i><i style="background:#67BDAA"></i>
+      <i style="background:#D67E2C"></i><i style="background:#B5656B"></i><i style="background:#E1C655"></i>
+      <i style="background:#F2F2F2"></i><i style="background:#9A9A9A"></i><i style="background:#343434"></i>
+    </div>
+    <div class="ruler" id="ruler" aria-hidden="true"></div>
+    <div class="sheet-body">
+      <div class="sheet-map"><div id="map"></div></div>
+      <aside class="label-card" aria-live="polite">
+        <div class="label-head">Herbarium Matritense</div>
+        <div class="label-title" id="lb-title">&nbsp;</div>
+        <table class="label">
+          <tr><th>Collector</th><td class="fill" id="lb-col">&mdash;</td></tr>
+          <tr><th>Locality</th><td id="lb-loc">&mdash;</td></tr>
+          <tr><th>Date</th><td class="fill" id="lb-date">&mdash;</td></tr>
+          <tr><th>Accession No.</th><td id="lb-acc">&mdash;</td></tr>
+        </table>
+      </aside>
+    </div>
+  </section>
+
+  <main class="shelf">
+    <header class="shelf-head">
+      <h1>Gardens of Madrid</h1>
+      <hr class="rule" />
+      <p class="lede">Seven pressed specimens, one from each garden. Choose a card to find it on the sheet.</p>
+    </header>
+    <button class="toggle" id="walk-toggle" aria-pressed="false"><span class="dash"></span>Show collecting walk</button>
+    <p class="status-note error hidden" id="status"></p>
+    <div class="card-grid" id="cards"></div>
+  </main>
+</div>
+
+<script>
+/* Walking route between the gardens: Mapbox Directions (walking), simplified. */
+const WALK = [[-3.71819,40.43126],[-3.71541,40.42779],[-3.71463,40.42826],[-3.71194,40.42450],[-3.71118,40.42356],[-3.70999,40.42285],[-3.71009,40.42276],[-3.70936,40.42228],[-3.70922,40.42236],[-3.70905,40.42225],[-3.70914,40.42216],[-3.70630,40.42035],[-3.70630,40.42029],[-3.70581,40.41998],[-3.70560,40.41980],[-3.70479,40.41875],[-3.70393,40.41798],[-3.70365,40.41760],[-3.70351,40.41686],[-3.70330,40.41671],[-3.70329,40.41661],[-3.70322,40.41525],[-3.70336,40.41472],[-3.70336,40.41449],[-3.70356,40.41418],[-3.70161,40.41349],[-3.70011,40.41288],[-3.69683,40.41119],[-3.69672,40.41165],[-3.69616,40.41165],[-3.69302,40.41142],[-3.69284,40.41088],[-3.69151,40.41104],[-3.69231,40.41094],[-3.69206,40.40982],[-3.69166,40.40920],[-3.69123,40.40886],[-3.69137,40.40874],[-3.69151,40.40834],[-3.69126,40.40824],[-3.68891,40.40665],[-3.68841,40.40643],[-3.68520,40.40557],[-3.68514,40.40570],[-3.68505,40.40569],[-3.68307,40.40518],[-3.68291,40.40531],[-3.68117,40.40559],[-3.67780,40.40419],[-3.67613,40.40615],[-3.67500,40.40561],[-3.67412,40.40665],[-3.67354,40.40657],[-3.67412,40.40665],[-3.67378,40.40706],[-3.67825,40.40755],[-3.67836,40.40779],[-3.67856,40.40790],[-3.67835,40.40820],[-3.67855,40.40823],[-3.67859,40.40855],[-3.67898,40.40872],[-3.67861,40.40883],[-3.67852,40.40901],[-3.67896,40.40910],[-3.67888,40.40933],[-3.67916,40.40977],[-3.67934,40.40972],[-3.67972,40.40978],[-3.67999,40.40997],[-3.68010,40.41022],[-3.68059,40.41027],[-3.68071,40.41035],[-3.68090,40.41065],[-3.68103,40.41069],[-3.68121,40.41085],[-3.68135,40.41078],[-3.68121,40.41085],[-3.68129,40.41115],[-3.68078,40.41127],[-3.68056,40.41140],[-3.68090,40.41234],[-3.68141,40.41252],[-3.68150,40.41276],[-3.68173,40.41299],[-3.68184,40.41329],[-3.68245,40.41283],[-3.68290,40.41273],[-3.68296,40.41286],[-3.68358,40.41274],[-3.68382,40.41341],[-3.68410,40.41336],[-3.68421,40.41368],[-3.68478,40.41359],[-3.68517,40.41536],[-3.68500,40.41536]];
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = () => window.matchMedia('(max-width: 860px)').matches;
+const $ = (id) => document.getElementById(id);
+
+/* ---- Hand-drawn illustrations (inline SVG, 80x80) ---- */
+const G = '#5E7D4A', R = '#B5656B', K = '#2E2A24';
+const svg = (inner) => '<svg class="illus" viewBox="0 0 80 80" fill="none" stroke="' + K + '" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + inner + '</svg>';
+// Little leaves along a line (feathery sprigs)
+function sprig(x1, y1, x2, y2, n, len, fill) {
+  let s = '<path d="M' + x1 + ' ' + y1 + 'L' + x2 + ' ' + y2 + '" stroke="' + G + '" stroke-width="1.4"/>';
+  for (let i = 1; i <= n; i++) {
+    const t = i / (n + 1), x = x1 + (x2 - x1) * t, y = y1 + (y2 - y1) * t, l = len * (1.15 - t * 0.7);
+    s += '<path d="M' + x.toFixed(1) + ' ' + y.toFixed(1) + 'l' + (-l).toFixed(1) + ' ' + (-l * 0.5).toFixed(1) + 'M' + x.toFixed(1) + ' ' + y.toFixed(1) + 'l' + (l * 0.5).toFixed(1) + ' ' + l.toFixed(1) + '" stroke="' + G + '" fill="' + (fill || 'none') + '"/>';
+  }
+  return s;
+}
+const ILLUS = {
+  ginkgo: svg('<path d="M40 72V54" stroke="' + G + '" stroke-width="1.6"/><path d="M40 54C20 52 10 34 14 20C22 27 30 23 40 14C50 23 58 27 66 20C70 34 60 52 40 54Z" fill="' + G + '" fill-opacity=".28" stroke="' + G + '"/><path d="M40 54V22M40 54L26 28M40 54L54 28M40 54L18 36M40 54L62 36" stroke="' + G + '" stroke-width=".8"/>'),
+  cypress: svg(sprig(14, 68, 66, 14, 9, 11)),
+  rose: svg('<path d="M40 74C38 62 42 54 40 46" stroke="' + G + '" stroke-width="1.6"/><path d="M40 62C30 62 24 56 22 50C32 50 38 54 40 62ZM41 56C50 56 56 50 58 44C48 44 43 48 41 56Z" fill="' + G + '" fill-opacity=".3" stroke="' + G + '"/><circle cx="40" cy="30" r="19" fill="' + R + '" fill-opacity=".3" stroke="' + R + '"/><path d="M40 30m-3 0a3 3 0 1 1 6 0a6 6 0 1 1-10-4a10 10 0 1 1 15 8a14 14 0 1 1-24-8" stroke="' + R + '"/>'),
+  grove: svg('<path d="M40 74V62" stroke="' + G + '" stroke-width="1.6"/><path d="M40 6C54 24 56 48 40 64C24 48 26 24 40 6Z" fill="' + G + '" fill-opacity=".28" stroke="' + G + '"/><path d="M40 12V62M40 24L30 30M40 24L50 30M40 36L29 44M40 36L51 44M40 48L33 54M40 48L47 54" stroke="' + G + '" stroke-width=".8"/>'),
+  lily: svg('<path d="M42 56L68 52A28 13 0 1 1 42 56Z" fill="' + G + '" fill-opacity=".3" stroke="' + G + '" transform="translate(-6 8)"/><g transform="translate(40 36)" fill="#FBF8EF" stroke="' + R + '"><path d="M0 0C-5-8-5-15 0-20C5-15 5-8 0 0Z"/><path d="M0 0C-9-3-14-9-14-16C-7-13-2-8 0 0Z"/><path d="M0 0C9-3 14-9 14-16C7-13 2-8 0 0Z"/><path d="M0 0C-12 3-18-1-20-7C-12-8-5-5 0 0Z"/><path d="M0 0C12 3 18-1 20-7C12-8 5-5 0 0Z"/></g><circle cx="40" cy="36" r="2.4" fill="#E1C655" stroke="' + K + '"/>'),
+  ivy: svg('<path d="M40 74C40 66 40 62 40 56" stroke="' + G + '" stroke-width="1.6"/><path d="M40 70C30 62 12 58 20 42C14 36 20 26 30 30C30 18 36 12 40 8C44 12 50 18 50 30C60 26 66 36 60 42C68 58 50 62 40 70Z" fill="' + G + '" fill-opacity=".28" stroke="' + G + '"/><path d="M40 68V16M40 58L24 46M40 58L56 46M40 40L30 34M40 40L50 34" stroke="' + G + '" stroke-width=".8"/>'),
+  wild: svg('<path d="M26 74C34 62 38 52 40 40" stroke="' + G + '" stroke-width="1.6"/><path d="M33 62C24 62 18 56 17 50C26 50 31 55 33 62ZM37 52C46 52 52 46 54 40C44 40 39 44 37 52Z" fill="' + G + '" fill-opacity=".3" stroke="' + G + '"/><g fill="' + R + '" fill-opacity=".28" stroke="' + R + '" transform="translate(40 28)"><circle cx="0" cy="-12" r="9"/><circle cx="11.4" cy="-3.7" r="9"/><circle cx="7" cy="9.7" r="9"/><circle cx="-7" cy="9.7" r="9"/><circle cx="-11.4" cy="-3.7" r="9"/></g><circle cx="40" cy="28" r="4" fill="#E1C655" stroke="' + K + '"/><path d="M40 28l-2-3M40 28l3-1M40 28l1 3M40 28l-3 2" stroke="' + K + '" stroke-width=".7"/>')
+};
+// Small flower / leaf glyphs for the round map pins
+const PIN_FLOWER = '<svg viewBox="0 0 26 26" aria-hidden="true"><g fill="#B5656B" fill-opacity=".55" stroke="#B5656B" stroke-width=".8" transform="translate(13 13)"><circle cy="-5" r="3.6"/><circle cx="4.8" cy="-1.5" r="3.6"/><circle cx="3" cy="4" r="3.6"/><circle cx="-3" cy="4" r="3.6"/><circle cx="-4.8" cy="-1.5" r="3.6"/></g><circle cx="13" cy="13" r="2.2" fill="#E1C655"/></svg>';
+const PIN_LEAF = '<svg viewBox="0 0 26 26" aria-hidden="true"><path d="M13 21C6 17 5 9 13 4C21 9 20 17 13 21Z" fill="#5E7D4A" fill-opacity=".5" stroke="#5E7D4A" stroke-width=".9"/><path d="M13 21V8" stroke="#5E7D4A" stroke-width=".8"/></svg>';
+
+/* ---- Specimens (real places; collector, dates and accession numbers are fictional) ---- */
+const SPOTS = [
+  { place: 'Real Jardín Botánico', latin: 'Ginkgo biloba', acc: 'MAD-0412', date: '14 Apr 1887', coord: [-3.6915, 40.4110], off: [10, 7], ill: 'ginkgo', kind: 'leaf' },
+  { place: 'Palacio de Cristal', latin: 'Taxodium distichum', acc: 'MAD-0518', date: '2 Oct 1891', coord: [-3.6818, 40.4133], ill: 'cypress', kind: 'leaf' },
+  { place: 'Rosaleda del Retiro', latin: 'Rosa × centifolia', acc: 'MAD-0623', date: '9 Jun 1903', coord: [-3.6813, 40.4108], ill: 'rose', kind: 'flower' },
+  { place: 'Bosque del Recuerdo', latin: 'Cupressus sempervirens', acc: 'MAD-0704', date: '21 Mar 1912', coord: [-3.6735, 40.4066], ill: 'grove', kind: 'leaf' },
+  { place: 'Estanque Grande', latin: 'Nymphaea alba', acc: 'MAD-0836', date: '30 Jul 1924', coord: [-3.6845, 40.4153], ill: 'lily', kind: 'flower' },
+  { place: 'Vertical garden, Paseo del Prado', latin: 'Hedera helix', acc: 'MAD-0951', date: '5 Nov 1936', coord: [-3.6942, 40.4115], off: [-10, -7], ill: 'ivy', kind: 'leaf' },
+  { place: 'Rosaleda Ramón Ortiz, Parque del Oeste', latin: 'Rosa gallica', acc: 'MAD-1067', date: '17 May 1948', coord: [-3.7182, 40.4313], ill: 'wild', kind: 'flower' },
+];
+const COLLECTOR = 'A. Villanueva';
+const CORE = SPOTS.slice(0, 6).map((s) => s.coord); // dense central cluster for the opening view
+
+/* ---- Map ---- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [-3.686, 40.411],
+  zoom: 14,
+  attributionControl: true,
+  config: { basemap: { lightPreset: 'day', theme: 'faded', showPointOfInterestLabels: false, showTransitLabels: false } },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+function pad() {
+  // Desktop: the label card sits lower-left (SW of the data is empty), so the fit can be tight. Phone: label is below the map.
+  return phone() ? { top: 40, bottom: 70, left: 34, right: 34 } : { top: 50, bottom: 70, left: 50, right: 50 };
+}
+function frame(coords, duration) {
+  const b = coords.reduce((bb, c) => bb.extend(c), new mapboxgl.LngLatBounds(coords[0], coords[0]));
+  map.fitBounds(b, { padding: pad(), duration: reduce ? 0 : duration, maxZoom: 16 });
+}
+
+/* ---- Pins, pencil ring, cards ---- */
+const RING_PATH = 'M36 5C54 3 69 18 67 36C65 55 48 68 29 66C11 63 3 46 7 29C11 13 28 5 46 9C54 11 60 15 64 20';
+const ringEl = document.createElement('div');
+ringEl.className = 'ring-root';
+ringEl.innerHTML = '<svg class="ring" viewBox="0 0 72 72" aria-hidden="true"><path d="' + RING_PATH + '" pathLength="1"/></svg>';
+const ringMarker = new mapboxgl.Marker({ element: ringEl, offset: [0, 0] });
+let current = -1;
+
+function drawRing() {
+  const r = ringEl.querySelector('.ring');
+  r.classList.remove('draw');
+  if (reduce) { r.style.visibility = 'visible'; r.classList.add('draw'); return; }
+  void r.getBoundingClientRect(); // restart the transition
+  r.classList.add('draw');
+}
+
+function select(i, fly) {
+  const s = SPOTS[i];
+  current = i;
+  $('lb-title').textContent = s.latin;
+  $('lb-col').textContent = COLLECTOR;
+  $('lb-loc').textContent = s.place;
+  $('lb-date').textContent = s.date;
+  $('lb-acc').textContent = s.acc;
+  document.querySelectorAll('.plant-card').forEach((c, k) => c.classList.toggle('active', k === i));
+  document.querySelectorAll('.pin').forEach((p, k) => p.classList.toggle('active', k === i));
+  ringMarker.setOffset(s.off || [0, 0]).setLngLat(s.coord).addTo(map);
+  drawRing();
+  if (fly) {
+    const o = { center: s.coord, zoom: 16.2, padding: pad() };
+    if (reduce) map.jumpTo(o); else map.flyTo({ ...o, duration: 2000, essential: false });
+  }
+}
+
+SPOTS.forEach((s, i) => {
+  const card = document.createElement('button');
+  card.className = 'plant-card';
+  card.innerHTML = ILLUS[s.ill] + '<span class="latin">' + s.latin + '</span><span class="place">' + s.place + '</span><span class="acc">' + s.acc + '</span>';
+  card.addEventListener('click', () => {
+    select(i, true);
+    if (phone()) $('map').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+  });
+  $('cards').appendChild(card);
+
+  const root = document.createElement('div');
+  root.innerHTML = '<span class="pin ' + s.kind + '" title="' + s.place + '">' + (s.kind === 'flower' ? PIN_FLOWER : PIN_LEAF) + '</span>';
+  root.addEventListener('click', () => select(i, true));
+  new mapboxgl.Marker({ element: root, offset: s.off || [0, 0] }).setLngLat(s.coord).addTo(map);
+});
+
+/* ---- Cm ruler numbers (1 cm = 37.8 css px) ---- */
+function buildRuler() {
+  const el = $('ruler');
+  const n = Math.floor(el.clientHeight / 37.8);
+  el.innerHTML = '';
+  for (let k = 1; k <= n; k++) {
+    const b = document.createElement('b');
+    b.style.top = (k * 37.8) + 'px';
+    b.textContent = k;
+    el.appendChild(b);
+  }
+}
+window.addEventListener('resize', buildRuler);
+buildRuler();
+
+/* ---- Collecting walk (pencil dashed line) ---- */
+const toggle = $('walk-toggle');
+function setWalk(on) {
+  toggle.setAttribute('aria-pressed', on);
+  if (map.getLayer('walk-line')) map.setLayoutProperty('walk-line', 'visibility', on ? 'visible' : 'none');
+  frame(on ? WALK : CORE, 1200);
+}
+toggle.addEventListener('click', () => setWalk(toggle.getAttribute('aria-pressed') !== 'true'));
+
+map.on('style.load', () => {
+  map.addSource('walk', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: WALK } } });
+  map.addLayer({
+    id: 'walk-line', type: 'line', source: 'walk', slot: 'top',
+    layout: { 'line-join': 'round', 'line-cap': 'round', visibility: 'none' },
+    paint: { 'line-color': '#7D776C', 'line-width': 2.6, 'line-dasharray': [2, 1.6], 'line-emissive-strength': 1 },
+  });
+});
+
+map.on('load', () => {
+  frame(CORE, 0);
+  select(0, false);
+});
+
+map.on('error', (e) => {
+  const el = $('status');
+  el.textContent = 'Map note: ' + ((e.error && e.error.message) || 'could not load tiles');
+  el.classList.remove('hidden');
+});
+</script>
+</body>
+</html>

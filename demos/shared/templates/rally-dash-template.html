@@ -1,0 +1,525 @@
+<!--
+  Working EXAMPLE of the Rally Dash style pack (rally-dash.css, in this same
+  folder). Open this file directly to see the pattern working with one
+  route: the Stelvio Pass, Italy, from Prato allo Stelvio up the famous
+  hairpins to Passo dello Stelvio, on Mapbox Standard with 3D terrain. The
+  map is the windscreen of a 1960s GT car; below it a walnut dashboard has
+  three chrome-bezel analog gauges (speed, revs, altitude), amber-lamp
+  toggle switches (Dusk light, Terrain, Follow cam) and a big chrome Start
+  key that drives a little car up the road with a follow camera, while a
+  co-driver's paper route-book roll highlights the next tulip diagram.
+  With prefers-reduced-motion there is no drive animation: Prev / Next keys
+  jump the car from tulip to tulip. Copy the markup below into your own
+  demo and link rally-dash.css from its <head> -- see the class/id contract
+  documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (1960s Italian GT cockpit: walnut, chrome, cream
+  gauge faces, red needles, amber lamps, racing green) at the user's
+  request for something distinct from every other pack in this folder. The
+  road geometry is real (Mapbox Directions, driving, simplified) but the
+  tulip kilometres/hairpin numbers are approximate, and "Ventura GT" and
+  "Rally dei Tornanti" are fictional placeholders -- swap in your own.
+
+  What's NOT included: live driving physics, turn-by-turn navigation,
+  search/geocoding, popups, or a hard-coded access token (demo-kit.js sets
+  that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rally Dash</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="rally-dash.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<div class="cockpit">
+  <div class="windscreen">
+    <div id="map"></div>
+    <div class="plate">
+      <span class="plate-title">Ventura GT</span>
+      <span class="plate-sub">Rally dei Tornanti &middot; Stage 7</span>
+    </div>
+    <div class="status-note loading" id="status-note">Loading the road</div>
+  </div>
+
+  <div class="dashboard">
+    <div class="dash-brow"></div>
+    <div class="dash-main">
+      <div class="gauges">
+        <div class="gauge"><svg class="gauge-svg" id="g-speed" viewBox="0 0 200 200" role="img" aria-label="Speedometer"></svg><span class="gauge-label">Speed km/h</span></div>
+        <div class="gauge tach"><svg class="gauge-svg" id="g-revs" viewBox="0 0 200 200" role="img" aria-label="Tachometer"></svg><span class="gauge-label">Revs x1000</span></div>
+        <div class="gauge"><svg class="gauge-svg" id="g-alt" viewBox="0 0 200 200" role="img" aria-label="Altimeter"></svg><span class="gauge-label">Altitude m</span></div>
+      </div>
+      <div class="controls">
+        <button class="btn btn-primary" id="start-btn"><i class="btn-lamp"></i><span id="start-text">Start</span></button>
+        <div class="keys">
+          <button class="btn btn-secondary" id="prev-btn" aria-label="Previous tulip">&#9664; Prev</button>
+          <button class="btn btn-secondary" id="next-btn" aria-label="Next tulip">Next &#9654;</button>
+        </div>
+        <button class="switch" id="sw-dusk" role="switch" aria-checked="false"><span class="switch-lamp"></span><span class="switch-slot"><span class="switch-lever"></span></span><span class="switch-text">Dusk<br>light</span></button>
+        <button class="switch" id="sw-terrain" role="switch" aria-checked="true"><span class="switch-lamp"></span><span class="switch-slot"><span class="switch-lever"></span></span><span class="switch-text">Terrain</span></button>
+        <button class="switch" id="sw-follow" role="switch" aria-checked="true"><span class="switch-lamp"></span><span class="switch-slot"><span class="switch-lever"></span></span><span class="switch-text">Follow<br>cam</span></button>
+      </div>
+    </div>
+
+    <section class="routebook" aria-label="Route book">
+      <div class="rb-head"><h2 class="rb-title">Libro di marcia</h2><span class="rb-total" id="rb-total"></span></div>
+      <ol class="rb-list" id="rb-list"></ol>
+    </section>
+  </div>
+</div>
+
+<script>
+// Prato allo Stelvio -> Passo dello Stelvio [lng, lat]: Mapbox Directions (driving), simplified.
+const ROUTE = [
+  [10.59558,46.62784],[10.59662,46.62725],[10.59581,46.62578],[10.59026,46.62103],[10.58984,46.62128],[10.58818,
+  46.61917],[10.58723,46.61837],[10.58795,46.61777],[10.58848,46.61754],[10.59126,46.61704],[10.59003,46.61652],
+  [10.58714,46.61468],[10.58463,46.61415],[10.58318,46.61358],[10.57936,46.61119],[10.57696,46.61078],[10.57449,
+  46.61018],[10.57354,46.60982],[10.57131,46.60850],[10.56944,46.60764],[10.56877,46.60746],[10.56680,46.60639],
+  [10.56436,46.60604],[10.56232,46.60512],[10.56123,46.60479],[10.56013,46.60380],[10.55879,46.60349],[10.55835,
+  46.60283],[10.55756,46.60238],[10.55705,46.60175],[10.55693,46.60114],[10.55602,46.60021],[10.55491,46.59752],
+  [10.55451,46.59728],[10.55350,46.59711],[10.55330,46.59653],[10.55343,46.59603],[10.55285,46.59499],[10.55139,
+  46.59385],[10.55075,46.59258],[10.54970,46.59225],[10.54912,46.59151],[10.54878,46.58977],[10.54826,46.58879],
+  [10.54762,46.58803],[10.54758,46.58731],[10.54778,46.58674],[10.54699,46.58463],[10.54454,46.58249],[10.54314,
+  46.58034],[10.54189,46.57747],[10.54049,46.57592],[10.53921,46.57506],[10.53394,46.57298],[10.52995,46.57097],
+  [10.52845,46.57053],[10.52694,46.56978],[10.52501,46.56950],[10.52421,46.56914],[10.52242,46.56689],[10.52227,
+  46.56692],[10.52266,46.56752],[10.52114,46.56605],[10.52096,46.56558],[10.52010,46.56491],[10.51916,46.56340],
+  [10.51853,46.56292],[10.51827,46.56226],[10.51622,46.56137],[10.51562,46.56096],[10.51534,46.56041],[10.51526,
+  46.55886],[10.51477,46.55782],[10.51393,46.55655],[10.51294,46.55559],[10.51255,46.55464],[10.51174,46.55395],
+  [10.51100,46.55276],[10.51065,46.55144],[10.51015,46.55065],[10.50997,46.55058],[10.50981,46.55067],[10.50959,
+  46.55192],[10.50933,46.55128],[10.50888,46.55078],[10.50702,46.54993],[10.50665,46.54962],[10.50553,46.54801],
+  [10.50550,46.54740],[10.50584,46.54620],[10.50562,46.54448],[10.50479,46.54315],[10.50514,46.54447],[10.50489,
+  46.54512],[10.50488,46.54442],[10.50453,46.54413],[10.50365,46.54268],[10.50305,46.54232],[10.50305,46.54183],
+  [10.50339,46.54155],[10.50354,46.54117],[10.50301,46.54031],[10.50288,46.54035],[10.50324,46.54104],[10.50316,
+  46.54125],[10.50202,46.54139],[10.50295,46.54109],[10.50292,46.54099],[10.50108,46.54138],[10.50232,46.54088],
+  [10.50107,46.54097],[10.50107,46.54088],[10.50209,46.54072],[10.50126,46.54069],[10.50062,46.54081],[10.49960,
+  46.54142],[10.50073,46.54026],[10.50122,46.53921],[10.50142,46.53853],[10.50142,46.53732],[10.50089,46.53862],
+  [10.50005,46.53931],[10.50051,46.53853],[10.50047,46.53739],[10.50025,46.53709],[10.49950,46.53676],[10.49927,
+  46.53638],[10.49870,46.53598],[10.49737,46.53565],[10.49595,46.53476],[10.49382,46.53375],[10.49192,46.53324],
+  [10.49292,46.53378],[10.49286,46.53386],[10.49178,46.53352],[10.49016,46.53267],[10.48768,46.53193],[10.48758,
+  46.53203],[10.48928,46.53296],[10.49043,46.53382],[10.48773,46.53288],[10.48552,46.53236],[10.48548,46.53245],
+  [10.48766,46.53338],[10.48835,46.53391],[10.48747,46.53354],[10.48517,46.53291],[10.48511,46.53299],[10.48684,
+  46.53380],[10.48511,46.53328],[10.48434,46.53331],[10.48381,46.53304],[10.48221,46.53274],[10.48335,46.53325],
+  [10.48122,46.53302],[10.48321,46.53365],[10.48052,46.53334],[10.47776,46.53329],[10.47626,46.53291],[10.47787,
+  46.53361],[10.47629,46.53340],[10.47780,46.53392],[10.47446,46.53352],[10.47324,46.53304],[10.47107,46.53258],
+  [10.47295,46.53337],[10.47038,46.53285],[10.46621,46.53280],[10.46352,46.53183],[10.46344,46.53190],[10.46468,
+  46.53258],[10.46275,46.53200],[10.46180,46.53162],[10.46091,46.53093],[10.46152,46.53182],[10.46396,46.53301],
+  [10.46148,46.53242],[10.46066,46.53205],[10.45931,46.53038],[10.45958,46.53150],[10.45997,46.53226],[10.46127,
+  46.53314],[10.45936,46.53234],[10.45845,46.53084],[10.45727,46.52993],[10.45716,46.52995],[10.45802,46.53100],
+  [10.45823,46.53174],[10.45782,46.53102],[10.45672,46.53033],[10.45649,46.53003],[10.45668,46.53051],[10.45753,
+  46.53122],[10.45648,46.53068],[10.45570,46.52994],[10.45574,46.52943],[10.45542,46.53002],[10.45548,46.52948],
+  [10.45534,46.52944],[10.45522,46.53010],[10.45578,46.53114],[10.45640,46.53158],[10.45565,46.53127],[10.45473,
+  46.53035],[10.45424,46.52911],[10.45345,46.52864],[10.45303,46.52864],[10.45272,46.52884],[10.45262,46.52878]
+];
+// Route-book tulips: km along the road, turn angle (deg, + right / - left), approximate.
+const TULIPS = [
+  { km: 0,    a: 0,    name: 'Start, Prato allo Stelvio', note: 'Flag drops. Road climbs west.' },
+  { km: 1.4,  a: -80,  name: 'Left at the junction', note: 'Onto the Stelvio road' },
+  { km: 1.7,  a: 133,  name: 'Sharp right', note: 'Tight, then open valley' },
+  { km: 5.6,  a: -62,  name: 'Fast left', note: 'Flat out, then brake' },
+  { km: 10.0, a: -180, name: 'Tornante 48 left', note: 'The hairpins begin' },
+  { km: 12.3, a: 137,  name: 'Tornante 42 right', note: 'Stack of switchbacks' },
+  { km: 13.5, a: 167,  name: 'Tornante 37 right', note: 'Keep it tidy, hairpin' },
+  { km: 15.3, a: -165, name: 'Tornante 31 left', note: 'Treeline falls away' },
+  { km: 17.2, a: -164, name: 'Tornante 25 left', note: 'Long wall on the left' },
+  { km: 19.1, a: -169, name: 'Tornante 19 left', note: 'Rock walls, no run-off' },
+  { km: 21.6, a: -168, name: 'Tornante 13 left', note: 'Thin air, lift early' },
+  { km: 23.2, a: -169, name: 'Tornante 8 left', note: 'Pass buildings in sight' },
+  { km: 24.5, a: 165,  name: 'Tornante 5 right', note: 'Last short straights' },
+  { km: 25.5, a: 167,  name: 'Tornante 2 right', note: 'Almost there' },
+  { km: 26.2, a: 'F',  name: 'Finish, Passo dello Stelvio', note: '2,757 m. Time card here.' },
+];
+// Rough altitude profile [km, m] used when the terrain DEM can't be queried.
+const ALT_FALLBACK = [[0, 915], [1.7, 980], [5.6, 1200], [10, 1540], [12.3, 1760], [15.3, 2000],
+  [17.2, 2190], [19.1, 2300], [21.6, 2480], [23.2, 2590], [25.5, 2700], [26.3, 2757]];
+
+const $ = (id) => document.getElementById(id);
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const STEP = 0.04;   // km between resampled points
+const FOLLOW_ZOOM = 15, PITCH = 60, CHASE_PITCH = 66;
+const TIME_SCALE = 36; // sim speed multiplier: the whole climb takes about a minute
+
+/* ---- Geometry ---- */
+function hav(a, b) {
+  const r = Math.PI / 180, dLat = (b[1] - a[1]) * r, dLng = (b[0] - a[0]) * r;
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * r) * Math.cos(b[1] * r) * Math.sin(dLng / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(s));
+}
+function bearing(a, b) {
+  const r = Math.PI / 180, y = Math.sin((b[0] - a[0]) * r) * Math.cos(b[1] * r);
+  const x = Math.cos(a[1] * r) * Math.sin(b[1] * r) - Math.sin(a[1] * r) * Math.cos(b[1] * r) * Math.cos((b[0] - a[0]) * r);
+  return (Math.atan2(y, x) / r + 360) % 360;
+}
+const angDiff = (a, b) => ((b - a + 540) % 360) - 180;
+
+const CUM = [0];
+for (let i = 1; i < ROUTE.length; i++) CUM.push(CUM[i - 1] + hav(ROUTE[i - 1], ROUTE[i]));
+const TOTAL = CUM[CUM.length - 1];
+
+// Resample every STEP km, then derive heading and a hairpin-aware target speed.
+const PTS = [];
+{
+  let seg = 0;
+  const n = Math.ceil(TOTAL / STEP);
+  for (let k = 0; k <= n; k++) {
+    const d = Math.min(TOTAL, k * STEP);
+    while (seg < ROUTE.length - 2 && CUM[seg + 1] < d) seg++;
+    const t = (d - CUM[seg]) / (CUM[seg + 1] - CUM[seg] || 1);
+    PTS.push({ lng: ROUTE[seg][0] + (ROUTE[seg + 1][0] - ROUTE[seg][0]) * t, lat: ROUTE[seg][1] + (ROUTE[seg + 1][1] - ROUTE[seg][1]) * t, d });
+  }
+  const P = (i) => [PTS[i].lng, PTS[i].lat];
+  PTS.forEach((p, i) => { p.hd = bearing(P(i), P(Math.min(PTS.length - 1, i + 2))); });
+  const raw = PTS.map((p, i) => {
+    const a = Math.max(0, i - 2), b = Math.min(PTS.length - 1, i + 2);
+    const turn = Math.abs(angDiff(bearing(P(a), P(i)), bearing(P(i), P(b))));
+    return Math.max(24, 92 - turn * 0.9);
+  });
+  // brake early: take the slowest target in the next ~240 m, then smooth
+  const braked = raw.map((_, i) => Math.min(...raw.slice(i, i + 7)));
+  PTS.forEach((p, i) => {
+    const w = braked.slice(Math.max(0, i - 2), i + 3);
+    p.spd = w.reduce((s, v) => s + v, 0) / w.length;
+  });
+}
+function at(km) {
+  const f = Math.min(PTS.length - 1.001, Math.max(0, km / STEP)), i = Math.floor(f), t = f - i;
+  const a = PTS[i], b = PTS[i + 1];
+  return { lng: a.lng + (b.lng - a.lng) * t, lat: a.lat + (b.lat - a.lat) * t, hd: a.hd + angDiff(a.hd, b.hd) * t, spd: a.spd + (b.spd - a.spd) * t };
+}
+function fallbackAlt(km) {
+  const k = (km / TOTAL) * 26.3;
+  for (let i = 1; i < ALT_FALLBACK.length; i++) {
+    if (k <= ALT_FALLBACK[i][0]) {
+      const [k0, m0] = ALT_FALLBACK[i - 1], [k1, m1] = ALT_FALLBACK[i];
+      return m0 + ((m1 - m0) * (k - k0)) / (k1 - k0);
+    }
+  }
+  return 2757;
+}
+
+/* ---- Analog gauges (inline SVG, built here so the markup stays small) ---- */
+const needles = [];
+let needleRaf = 0;
+function needleLoop() {
+  let moving = false;
+  needles.forEach((n) => {
+    const d = n.tgt - n.cur;
+    if (Math.abs(d) > 0.05) { n.cur += reduce ? d : d * 0.2; moving = true; } else n.cur = n.tgt;
+    n.el.setAttribute('transform', `rotate(${n.cur.toFixed(2)} 100 100)`);
+  });
+  needleRaf = moving ? requestAnimationFrame(needleLoop) : 0;
+}
+
+function buildGauge(svgId, o) {
+  const svg = $(svgId), pt = (a, r) => [100 + r * Math.sin((a * Math.PI) / 180), 100 - r * Math.cos((a * Math.PI) / 180)];
+  const ang = (v) => -135 + ((v - o.min) / (o.max - o.min)) * 270;
+  let g = `<defs>
+    <linearGradient id="${svgId}-ch" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F7F8F9"/><stop offset=".3" stop-color="#D6D9DC"/><stop offset=".55" stop-color="#8C9196"/><stop offset=".8" stop-color="#CDD0D3"/><stop offset="1" stop-color="#7A7F84"/></linearGradient>
+    <linearGradient id="${svgId}-ch2" x1="1" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#E4E6E8"/><stop offset=".5" stop-color="#7E8388"/><stop offset="1" stop-color="#C9CDD1"/></linearGradient>
+    <radialGradient id="${svgId}-fc" cx=".5" cy=".42" r=".6"><stop offset="0" stop-color="#FBF7EA"/><stop offset=".8" stop-color="#F4EEDC"/><stop offset="1" stop-color="#DCD2B4"/></radialGradient>
+    <linearGradient id="${svgId}-gl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <radialGradient id="${svgId}-hub" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#C9CDD1"/><stop offset="1" stop-color="#6A6F74"/></radialGradient>
+  </defs>
+  <circle cx="100" cy="100" r="99" fill="url(#${svgId}-ch)"/>
+  <circle cx="100" cy="100" r="92" fill="url(#${svgId}-ch2)"/>
+  <circle cx="100" cy="100" r="88" fill="#1B1714"/>
+  <circle cx="100" cy="100" r="85" fill="url(#${svgId}-fc)"/>
+  <circle cx="100" cy="100" r="85" fill="none" stroke="rgba(0,0,0,.35)" stroke-width="3"/>`;
+  if (o.red) {
+    const [x1, y1] = pt(ang(o.red[0]), 79), [x2, y2] = pt(ang(o.red[1]), 79);
+    g += `<path d="M${x1} ${y1}A79 79 0 0 1 ${x2} ${y2}" fill="none" stroke="#D2281E" stroke-width="5"/>`;
+  }
+  for (let v = o.min; v <= o.max + 1e-6; v += o.minor) {
+    const major = Math.abs((v - o.min) % o.major) < 1e-6 || Math.abs(((v - o.min) % o.major) - o.major) < 1e-6;
+    const a = ang(v), [x1, y1] = pt(a, 82), [x2, y2] = pt(a, major ? 70 : 76);
+    g += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#1B1714" stroke-width="${major ? 2.4 : 1.2}"/>`;
+    if (major) { const [tx, ty] = pt(a, 58); g += `<text x="${tx}" y="${ty + 3.5}" text-anchor="middle" font-family="Michroma,sans-serif" font-size="9.5" fill="#1B1714">${o.fmtTick(v)}</text>`; }
+  }
+  g += `<text x="100" y="124" text-anchor="middle" font-family="Michroma,sans-serif" font-size="7" letter-spacing="1.5" fill="#5a4e3a">${o.caption}</text>
+  <rect x="68" y="138" width="64" height="22" rx="3" fill="#1B1714" stroke="#8C9196" stroke-width="1.5"/>
+  <text id="${svgId}-val" x="100" y="154" text-anchor="middle" font-family="Michroma,sans-serif" font-size="12" fill="#F5A623">0</text>
+  <g id="${svgId}-needle"><polygon points="96.5,122 103.5,122 101,34 100,26 99,34" fill="#D2281E" stroke="rgba(0,0,0,.3)" stroke-width=".6"/><rect x="97.5" y="112" width="5" height="16" fill="#D2281E"/></g>
+  <circle cx="100" cy="100" r="9" fill="url(#${svgId}-hub)" stroke="#555" stroke-width=".8"/><circle cx="100" cy="100" r="3" fill="#1B1714"/>
+  <path d="M24 90A78 78 0 0 1 176 90Q100 58 24 90Z" fill="url(#${svgId}-gl)"/>`;
+  svg.innerHTML = g;
+  const n = { el: $(`${svgId}-needle`), cur: ang(o.min), tgt: ang(o.min) };
+  n.el.setAttribute('transform', `rotate(${n.cur} 100 100)`);
+  needles.push(n);
+  const valEl = $(`${svgId}-val`);
+  return (v) => {
+    n.tgt = ang(Math.min(o.max, Math.max(o.min, v)));
+    valEl.textContent = o.fmtVal(v);
+    if (!needleRaf) needleRaf = requestAnimationFrame(needleLoop);
+  };
+}
+const setSpeed = buildGauge('g-speed', { min: 0, max: 160, major: 20, minor: 10, caption: 'KM/H', fmtTick: (v) => v, fmtVal: (v) => Math.round(v) });
+const setRevs = buildGauge('g-revs', { min: 0, max: 8, major: 1, minor: 0.5, red: [6.5, 8], caption: 'RPM X1000', fmtTick: (v) => v, fmtVal: (v) => v.toFixed(1) });
+const setAlt = buildGauge('g-alt', { min: 0, max: 3000, major: 500, minor: 100, caption: 'METRES', fmtTick: (v) => v / 100, fmtVal: (v) => Math.round(v).toLocaleString('en') });
+function rpmFor(v) {
+  if (v < 1) return 0;
+  const gears = [0, 22, 42, 66, 96, 160];
+  let g = 0;
+  while (g < gears.length - 2 && v >= gears[g + 1]) g++;
+  return 2.2 + ((v - gears[g]) / (gears[g + 1] - gears[g])) * 4.3;
+}
+
+/* ---- Route book ---- */
+function tulipSvg(a) {
+  const open = '<svg class="tulip" viewBox="0 0 46 52" aria-hidden="true" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">';
+  const head = (x, y, deg) => `<polygon class="t-head" stroke="none" points="-5.5,3 5.5,3 0,-7" transform="translate(${x} ${y}) rotate(${deg})"/>`;
+  if (a === 'F') {
+    let c = '';
+    for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) c += `<rect x="${12 + k * 6}" y="${8 + r * 6}" width="6" height="6" fill="${(r + k) % 2 ? '#F4EBD0' : '#1B1714'}"/>`;
+    return `${open}${c}<path class="t-road" d="M12 8V46"/><circle class="t-dot" cx="12" cy="47" r="3" stroke="none"/></svg>`;
+  }
+  let d, tipX, tipY, deg;
+  if (Math.abs(a) > 100) {
+    const s = a > 0 ? 1 : -1, x0 = s > 0 ? 13 : 33, x1 = s > 0 ? 33 : 13;
+    return `${open}<path class="t-road" d="M${x0} 46V25"/><path class="t-turn" d="M${x0} 25C${x0} 6 ${x1} 6 ${x1} 25V37"/>${head(x1, 40, 180)}<circle class="t-dot" cx="${x0}" cy="47" r="3" stroke="none"/></svg>`;
+  }
+  const r = (a * Math.PI) / 180, len = 20;
+  tipX = 23 + len * Math.sin(r); tipY = 26 - len * Math.cos(r); deg = a;
+  return `${open}<path class="t-road" d="M23 46V26"/><path class="t-turn" d="M23 26L${tipX.toFixed(1)} ${tipY.toFixed(1)}"/>${head(tipX.toFixed(1), tipY.toFixed(1), deg)}<circle class="t-dot" cx="23" cy="47" r="3" stroke="none"/></svg>`;
+}
+const list = $('rb-list');
+TULIPS.forEach((t, i) => {
+  const li = document.createElement('li');
+  li.className = 'rb-item'; li.tabIndex = 0;
+  li.innerHTML = `${tulipSvg(t.a)}<span class="rb-km">${t.km.toFixed(1)}<small>KM</small></span><span><span class="rb-name">${t.name}</span><span class="rb-note">${t.note}</span></span>`;
+  li.addEventListener('click', () => goTo(i));
+  li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goTo(i); } });
+  list.appendChild(li);
+});
+$('rb-total').textContent = `${TOTAL.toFixed(1)} km · +1,842 m`;
+
+/* ---- Map ---- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: { basemap: { lightPreset: 'day', showPointOfInterestLabels: false } },
+  center: [10.50, 46.55], zoom: 12, pitch: PITCH, bearing: 235, maxPitch: 80,
+});
+
+// Car marker: root left untouched, the inner svg is rotated to the heading.
+const carRoot = document.createElement('div');
+carRoot.innerHTML = '<svg class="car-marker" viewBox="0 0 26 40" aria-hidden="true">' +
+  '<rect x="3" y="2" width="20" height="36" rx="9" fill="#D2281E" stroke="#1B1714" stroke-width="2"/>' +
+  '<rect x="11" y="3" width="4" height="34" fill="#F4EEDC" opacity=".85"/>' +
+  '<path d="M6 13Q13 8 20 13L19 19H7Z" fill="#1B1714"/><rect x="7" y="26" width="12" height="5" rx="2" fill="#1B1714" opacity=".8"/></svg>';
+const carSvg = carRoot.firstChild;
+const carMarker = new mapboxgl.Marker({ element: carRoot, pitchAlignment: 'viewport', rotationAlignment: 'viewport' });
+
+let s = 0, speed = 0, alt = fallbackAlt(0), camBearing = 270;
+let driving = false, lastT = 0, frameN = 0, activeTulip = -1, follow = true, terrainOn = true;
+const stopMarkers = [];
+
+function readAltitude(p) {
+  let m = null;
+  if (terrainOn) { try { m = map.queryTerrainElevation([p.lng, p.lat], { exaggerated: false }); } catch (e) { m = null; } }
+  return m == null ? fallbackAlt(s) : m;
+}
+
+function updateTulip() {
+  let idx = TULIPS.findIndex((t) => t.km >= s - 0.04);
+  if (idx < 0) idx = TULIPS.length - 1;
+  if (idx === activeTulip) return;
+  activeTulip = idx;
+  [...list.children].forEach((li, i) => {
+    li.classList.toggle('active', i === idx);
+    li.classList.toggle('done', i < idx);
+    li.setAttribute('aria-current', i === idx ? 'step' : 'false');
+  });
+  stopMarkers.forEach((el, i) => el.classList.toggle('active', i === idx));
+  if (typeof updateStopVisibility === 'function') updateStopVisibility();
+  const el = list.children[idx];
+  list.scrollTo({ top: Math.max(0, el.offsetTop - list.clientHeight / 3), behavior: reduce ? 'auto' : 'smooth' });
+}
+
+function updateCar() {
+  const p = at(s);
+  carMarker.setLngLat([p.lng, p.lat]);
+  carSvg.style.transform = `rotate(${p.hd - map.getBearing()}deg)`;
+}
+map.on('rotate', updateCar);
+
+// Place the car at distance s; optionally move the camera with it.
+function place(opts = {}) {
+  const p = at(s);
+  updateCar();
+  alt += (readAltitude(p) - alt) * (opts.snap ? 1 : 0.25);
+  setAlt(alt);
+  setSpeed(speed);
+  setRevs(rpmFor(speed));
+  updateTulip();
+  if (map.getSource('done') && (opts.snap || frameN % 4 === 0)) {
+    const i = Math.max(1, Math.floor(s / STEP));
+    const coords = PTS.slice(0, i).map((q) => [q.lng, q.lat]);
+    coords.push([p.lng, p.lat]);
+    map.getSource('done').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords } });
+  }
+  return p;
+}
+
+// Chase cam: the car sits in the lower third of the windscreen (top padding pushes the centre down).
+const chasePad = () => ({ top: Math.round(map.getContainer().clientHeight * 0.42), bottom: 0, left: 0, right: 0 });
+function cameraTo(p) {
+  const look = at(Math.min(TOTAL, s + 0.25));
+  const o = { center: [p.lng, p.lat], bearing: look.hd, pitch: CHASE_PITCH, zoom: FOLLOW_ZOOM, padding: chasePad() };
+  if (reduce) map.jumpTo(o); else map.easeTo({ ...o, duration: 900 });
+}
+
+/* ---- Driving ---- */
+function frame(t) {
+  if (!driving) return;
+  const dt = Math.min(0.05, (t - lastT) / 1000 || 0.016);
+  lastT = t; frameN++;
+  const p = at(s);
+  speed += (p.spd - speed) * Math.min(1, dt * 1.4);
+  s = Math.min(TOTAL, s + (speed * TIME_SCALE * dt) / 3600);
+  place();
+  if (follow) {
+    const look = at(Math.min(TOTAL, s + 0.2));
+    camBearing = (camBearing + angDiff(camBearing, look.hd) * Math.min(1, dt * 2.2) + 360) % 360;
+    const q = at(s);
+    map.jumpTo({ center: [q.lng, q.lat], bearing: camBearing, pitch: CHASE_PITCH, zoom: FOLLOW_ZOOM, padding: chasePad() });
+  }
+  if (s >= TOTAL - 0.001) { finish(); return; }
+  requestAnimationFrame(frame);
+}
+function setRunning(on) {
+  driving = on;
+  $('start-btn').classList.toggle('running', on);
+  $('start-text').textContent = on ? 'Pause' : (s >= TOTAL - 0.01 ? 'Again' : (s > 0 ? 'Resume' : 'Start'));
+}
+function finish() {
+  speed = 0; place({ snap: true }); setRunning(false);
+}
+function startDrive() {
+  if (driving) { setRunning(false); return; }
+  if (s >= TOTAL - 0.01) { s = 0; speed = 0; activeTulip = -1; }
+  camBearing = map.getBearing();
+  setRunning(true);
+  lastT = performance.now();
+  if (follow) cameraTo(at(s));
+  requestAnimationFrame(frame);
+}
+function goTo(i) {
+  setRunning(false);
+  i = Math.max(0, Math.min(TULIPS.length - 1, i));
+  s = Math.min(TULIPS[i].km, TOTAL);
+  speed = 0; activeTulip = -1;
+  const p = place({ snap: true });
+  camBearing = p.hd;
+  map.stop();
+  const look = at(Math.min(TOTAL, s + 0.25));
+  const o = { center: [p.lng, p.lat], bearing: i === TULIPS.length - 1 ? p.hd : look.hd, pitch: CHASE_PITCH, zoom: FOLLOW_ZOOM, padding: chasePad() };
+  if (reduce) map.jumpTo(o); else map.easeTo({ ...o, duration: 1100 });
+}
+function step(dir) {
+  const eps = 0.05;
+  const idx = dir > 0 ? TULIPS.findIndex((t) => t.km > s + eps)
+    : TULIPS.map((t) => t.km).reduce((b, k, i) => (k < s - eps ? i : b), 0);
+  if (dir > 0 && idx < 0) { goTo(TULIPS.length - 1); return; }
+  goTo(idx);
+}
+
+$('start-btn').addEventListener('click', startDrive);
+$('prev-btn').addEventListener('click', () => step(-1));
+$('next-btn').addEventListener('click', () => step(1));
+if (reduce) $('start-btn').classList.add('hidden'); // no drive animation: use Prev / Next
+['dragstart', 'wheel'].forEach((ev) => map.on(ev, () => {
+  if (driving && follow) { follow = false; setSwitch($('sw-follow'), false); }
+}));
+
+/* ---- Switches ---- */
+function setSwitch(el, on) { el.setAttribute('aria-checked', on ? 'true' : 'false'); }
+function bindSwitch(id, fn) {
+  const el = $(id);
+  el.addEventListener('click', () => {
+    const on = el.getAttribute('aria-checked') !== 'true';
+    setSwitch(el, on); fn(on);
+  });
+}
+function applyTerrain(on) {
+  if (!map.getSource('rally-dem')) return;
+  map.setTerrain(on ? { source: 'rally-dem', exaggeration: 1.3 } : null);
+}
+bindSwitch('sw-dusk', (on) => map.setConfigProperty('basemap', 'lightPreset', on ? 'dusk' : 'day'));
+bindSwitch('sw-terrain', (on) => { terrainOn = on; applyTerrain(on); });
+bindSwitch('sw-follow', (on) => { follow = on; if (on && driving) cameraTo(at(s)); });
+
+/* ---- Road layers ---- */
+map.on('style.load', () => {
+  map.addSource('rally-dem', { type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14 });
+  applyTerrain(terrainOn);
+  map.addSource('road', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE } } });
+  map.addSource('done', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [ROUTE[0], ROUTE[0]] } } });
+  const join = { 'line-join': 'round', 'line-cap': 'round' };
+  const w = (a, b) => ['interpolate', ['linear'], ['zoom'], 11, a, 16, b];
+  map.addLayer({ id: 'road-casing', type: 'line', source: 'road', slot: 'top', layout: join,
+    paint: { 'line-color': '#D6D9DC', 'line-width': w(2, 9), 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'road-line', type: 'line', source: 'road', slot: 'top', layout: join,
+    paint: { 'line-color': '#0E4D3A', 'line-width': w(1.2, 6), 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'road-done', type: 'line', source: 'done', slot: 'top', layout: join,
+    paint: { 'line-color': '#F5A623', 'line-width': w(0.8, 3), 'line-emissive-strength': 1 } });
+});
+
+// Tulip stops as amber numbered lamps (HTML markers so labels can't hide them).
+TULIPS.forEach((t, i) => {
+  const p = at(Math.min(t.km, TOTAL));
+  const root = document.createElement('div');
+  root.innerHTML = `<div class="stop-marker" title="${t.name}">${i + 1}</div>`;
+  const inner = root.firstChild;
+  stopMarkers.push(inner);
+  inner.dataset.i = i;
+  inner.addEventListener('click', () => goTo(i));
+  new mapboxgl.Marker({ element: root }).setLngLat([p.lng, p.lat]).addTo(map);
+});
+carMarker.setLngLat([PTS[0].lng, PTS[0].lat]).addTo(map);
+
+// Overview: show every 3rd tulip lamp (plus the active one); all of them from zoom 13.5.
+function updateStopVisibility() {
+  const all = map.getZoom() >= 13.5;
+  stopMarkers.forEach((el, i) => el.classList.toggle('hidden', !(all || i % 3 === 0 || i === activeTulip || i === TULIPS.length - 1)));
+}
+map.on('zoom', updateStopVisibility);
+
+// Frame the hairpin climb from the open valley side (camera NE looking SW).
+function frameRoute() {
+  const climb = PTS.filter((p) => p.d >= 14).map((p) => [p.lng, p.lat]);
+  const b = climb.reduce((bb, c) => bb.extend(c), new mapboxgl.LngLatBounds(climb[0], climb[0]));
+  const c = map.getContainer();
+  const tall = c.clientHeight > c.clientWidth * 0.8;
+  const padding = tall ? { top: 70, bottom: 70, left: 24, right: 24 } : { top: 60, bottom: 80, left: 60, right: 60 };
+  const cam = map.cameraForBounds(b, { padding, bearing: 255, pitch: 52 });
+  if (!cam) return;
+  // With terrain on, cameraForBounds allows for the summit's height and comes out ~0.8 zoom too far
+  // out; the hairpins run along the view axis, so the extra zoom only crops the valley approach.
+  map.jumpTo({ ...cam, bearing: 255, pitch: 52, zoom: cam.zoom + (map.getTerrain() ? 0.8 : -0.1), padding: { top: 0, bottom: 0, left: 0, right: 0 } });
+}
+
+map.on('load', () => {
+  frameRoute();
+  place({ snap: true });
+  updateStopVisibility();
+  $('status-note').classList.add('hidden');
+});
+map.on('error', (e) => {
+  const n = $('status-note');
+  n.className = 'status-note error'; n.classList.remove('hidden');
+  n.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,290 @@
+<!--
+  Working EXAMPLE of the Ukiyo-e Coast style pack (ukiyo-e-coast.css, in this
+  same folder). Open this file directly to see the pattern working with a
+  seven-station Highway 1 journey down the Big Sur coast, California: a
+  vertical triptych with the map framed like a woodblock print between two
+  tanzaku strips of station cards. Click a card (or a red seal on the map)
+  to fly there, stamp the card and open a print caption. Copy the markup
+  below into your own demo and link ukiyo-e-coast.css from its <head> -- see
+  the class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (woodblock travel series, Prussian blue bokashi, sumi
+  keylines, vermilion seals). The places are real; the route is Mapbox
+  Directions (driving) along Highway 1, simplified and embedded; the series
+  title and station notes are illustrative placeholders -- swap in your own.
+
+  What's NOT included: live routing, search/geocoding, popups, or a
+  hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ukiyo-e Coast</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Zen+Antique&family=Zen+Old+Mincho:wght@400;700;900&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="ukiyo-e-coast.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: #map fills the inner print well. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="m-wave" viewBox="0 0 44 30">
+      <path d="M0 24 C8 24 10 10 20 10 C28 10 30 18 25 21 C30 19 34 22 44 22 V30 H0Z" fill="#1F3A68"/>
+      <path d="M4 18 C10 8 20 6 26 12" fill="none" stroke="#1B1B1B" stroke-width="1.5"/>
+      <circle cx="30" cy="9" r="1.6" fill="#1B1B1B"/><circle cx="36" cy="12" r="1.2" fill="#1B1B1B"/>
+    </symbol>
+    <symbol id="m-pine" viewBox="0 0 44 30">
+      <path d="M22 2 L30 12 H25 L33 22 H11 L19 12 H14Z" fill="#3F6B4A"/>
+      <rect x="20" y="22" width="4" height="6" fill="#1B1B1B"/>
+      <path d="M0 28 H44" stroke="#1B1B1B" stroke-width="2"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="triptych">
+  <header class="masthead">
+    <div>
+      <h1>Seven Views of the Big Sur Coast</h1>
+      <div class="subtitle">Highway 1 &middot; a woodblock series &middot; north to south</div>
+    </div>
+    <svg class="wave-crest" viewBox="0 0 760 64" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <pattern id="wave-a" width="120" height="64" patternUnits="userSpaceOnUse">
+          <path d="M0 46 C20 46 28 22 48 22 C64 22 70 34 60 40 C70 36 78 42 90 46 C104 50 112 46 120 46 V64 H0Z" fill="#2B4C7E"/>
+        </pattern>
+        <pattern id="wave-b" width="120" height="64" patternUnits="userSpaceOnUse">
+          <path d="M0 56 C14 56 22 40 40 40 C54 40 58 50 52 54 C62 50 72 56 84 58 C100 60 110 56 120 56 V64 H0Z" fill="#E8E2C8"/>
+        </pattern>
+      </defs>
+      <rect class="wave-row slow" x="0" y="0" width="900" height="64" fill="url(#wave-a)"/>
+      <rect class="wave-row" x="0" y="0" width="900" height="64" fill="url(#wave-b)"/>
+    </svg>
+  </header>
+
+  <div class="strips">
+    <nav class="strip strip-left" id="strip-left" aria-label="Stations 1 to 4">
+      <div class="strip-head">North</div>
+    </nav>
+    <nav class="strip strip-right" id="strip-right" aria-label="Stations 5 to 7">
+      <div class="strip-head">South</div>
+    </nav>
+  </div>
+
+  <main class="print-frame">
+    <div class="map-well">
+      <div id="map"></div>
+      <div class="cartouche"><span>Big Sur &middot; Highway One</span></div>
+      <section class="print-caption hidden" id="caption" aria-live="polite">
+        <div class="card-band"><div class="caption-no" id="cap-no"></div></div>
+        <button class="caption-close" id="cap-close" aria-label="Close caption">&times;</button>
+        <h2 class="caption-title" id="cap-title"></h2>
+        <p class="caption-text" id="cap-text"></p>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+// Highway 1, Carmel to Ragged Point: Mapbox Directions (driving), simplified.
+const ROUTE = [
+  [-121.9203,36.5413],[-121.9211,36.5428],[-121.9195,36.5435],[-121.9102,36.5394],[-121.919,36.5291],[-121.9271,36.5225],[-121.9346,36.5183],[-121.9372,36.5151],
+  [-121.9381,36.5103],[-121.9359,36.5073],[-121.9381,36.5017],[-121.9357,36.4983],[-121.9383,36.4916],[-121.9378,36.4851],[-121.9349,36.472],[-121.9291,36.4669],
+  [-121.9243,36.4592],[-121.924,36.4544],[-121.9264,36.4509],[-121.9264,36.4488],[-121.9179,36.433],[-121.9126,36.4254],[-121.9124,36.4217],[-121.9144,36.4156],
+  [-121.9146,36.4102],[-121.9033,36.3971],[-121.9002,36.3832],[-121.9039,36.3778],[-121.905,36.3738],[-121.9021,36.3721],[-121.9019,36.3693],[-121.8994,36.3647],
+  [-121.9003,36.3587],[-121.9027,36.357],[-121.9012,36.3534],[-121.8978,36.3519],[-121.8961,36.3476],[-121.8919,36.3441],[-121.8907,36.3408],[-121.8915,36.3366],
+  [-121.8853,36.3331],[-121.8864,36.3317],[-121.8908,36.3319],[-121.8943,36.3268],[-121.8915,36.3161],[-121.8861,36.3097],[-121.8894,36.3106],[-121.8971,36.3066],
+  [-121.8979,36.3043],[-121.8993,36.3037],[-121.9004,36.3058],[-121.8993,36.3037],[-121.8985,36.3039],[-121.8971,36.3066],[-121.8881,36.3106],[-121.8757,36.2998],
+  [-121.8538,36.2892],[-121.8438,36.2883],[-121.8399,36.2845],[-121.8335,36.2822],[-121.8251,36.2761],[-121.8194,36.2751],[-121.8165,36.2728],[-121.8096,36.2718],
+  [-121.8014,36.2644],[-121.7952,36.264],[-121.7929,36.2608],[-121.7887,36.2591],[-121.7868,36.2508],[-121.7821,36.2478],[-121.7779,36.2408],[-121.7689,36.2362],
+  [-121.7639,36.2272],[-121.762,36.2255],[-121.7583,36.2247],[-121.759,36.2226],[-121.7542,36.2207],[-121.7547,36.2187],[-121.7504,36.2172],[-121.7504,36.2149],
+  [-121.7427,36.2125],[-121.7419,36.2107],[-121.7376,36.2082],[-121.734,36.2086],[-121.7352,36.2053],[-121.7312,36.205],[-121.7286,36.2017],[-121.7262,36.202],
+  [-121.7206,36.1998],[-121.7137,36.1952],[-121.7111,36.1966],[-121.7108,36.1927],[-121.7002,36.1828],[-121.6985,36.1769],[-121.6938,36.1771],[-121.6942,36.175],
+  [-121.6923,36.1734],[-121.6784,36.1677],[-121.6739,36.1635],[-121.6725,36.16],[-121.6705,36.1587],[-121.6701,36.1563],[-121.658,36.147],[-121.6473,36.1358],
+  [-121.6425,36.1284],[-121.6308,36.1207],[-121.6285,36.1125],[-121.6212,36.103],[-121.6174,36.0867],[-121.6138,36.0841],[-121.6106,36.0787],[-121.6064,36.0761],
+  [-121.6057,36.0724],[-121.5921,36.0657],[-121.59,36.0566],[-121.5876,36.0543],[-121.5875,36.0515],[-121.5897,36.0492],[-121.581,36.0406],[-121.571,36.0242],
+  [-121.5651,36.0212],[-121.5546,36.022],[-121.5515,36.0206],[-121.5424,36.0205],[-121.5365,36.0185],[-121.5341,36.0166],[-121.5281,36.0146],[-121.5235,36.0099],
+  [-121.5113,36.007],[-121.5017,36.0004],[-121.4983,35.9965],[-121.4902,35.9817],[-121.4875,35.9737],[-121.4836,35.9686],[-121.4838,35.9618],[-121.4817,35.9578],
+  [-121.4805,35.9518],[-121.4694,35.9353],[-121.466,35.9235],[-121.4692,35.9154],[-121.4611,35.9045],[-121.4628,35.9006],[-121.4597,35.897],[-121.4612,35.8897],
+  [-121.4603,35.887],[-121.4477,35.8777],[-121.4438,35.8721],[-121.4391,35.8707],[-121.4316,35.864],[-121.4246,35.8601],[-121.4167,35.8585],[-121.4128,35.8562],
+  [-121.4076,35.8493],[-121.407,35.8467],[-121.4056,35.846],[-121.4052,35.8443],[-121.4012,35.8421],[-121.4009,35.84],[-121.395,35.8358],[-121.3921,35.8362],
+  [-121.3931,35.8345],[-121.3919,35.8324],[-121.3858,35.8264],[-121.3778,35.8227],[-121.3772,35.8211],[-121.3744,35.8217],[-121.3738,35.8178],[-121.3706,35.8171],
+  [-121.3697,35.8143],[-121.3667,35.8136],[-121.3659,35.8117],[-121.3622,35.8116],[-121.3587,35.8156],[-121.3586,35.8118],[-121.3606,35.8087],[-121.3562,35.8061],
+  [-121.3531,35.8059],[-121.3514,35.8035],[-121.3496,35.8041],[-121.3478,35.7987],[-121.3462,35.7992],[-121.3468,35.7971],[-121.3452,35.795],[-121.3417,35.7943],
+  [-121.3384,35.789],[-121.3355,35.7884],[-121.3335,35.7855],
+];
+
+const STATIONS = [
+  { name: 'Carmel Mission', motif: 'pine', coord: [-121.9199, 36.5400],
+    note: 'Where the road begins.',
+    text: 'A sandstone basilica from 1771, ringed by gardens. The series starts here, in quiet pine shade.' },
+  { name: 'Point Lobos', motif: 'wave', coord: [-121.9410, 36.5195],
+    note: 'Cypress and sea otters.',
+    text: 'Granite headlands, cypress groves and kelp coves. Swells fold against the rocks below the trail.' },
+  { name: 'Bixby Creek Bridge', motif: 'wave', coord: [-121.9017, 36.3715],
+    note: 'One arch over the canyon.',
+    text: 'A concrete arch of 1932 spanning the creek canyon, the most printed view on the whole coast.' },
+  { name: 'Point Sur Lighthouse', motif: 'wave', coord: [-121.9014, 36.3055],
+    note: 'A light on a volcanic rock.',
+    text: 'The lightstation stands on a rock island joined to shore by a sandbar, above a long drift of fog.' },
+  { name: 'Pfeiffer Beach', motif: 'wave', coord: [-121.8150, 36.2380],
+    note: 'Violet sand, keyhole rock.',
+    text: 'A short side road ends at a beach of purple sand, where waves pass through an arch in the rock.' },
+  { name: 'McWay Falls', motif: 'pine', coord: [-121.6716, 36.1578],
+    note: 'A fall onto the sand.',
+    text: 'An eighty-foot cascade drops straight onto the beach below a cliff of redwood and pine.' },
+  { name: 'Ragged Point', motif: 'pine', coord: [-121.3330, 35.7860],
+    note: 'Last view south.',
+    text: 'A cliff-top lookout at the end of the wild stretch. The road eases toward open ranchland.' },
+];
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phoneMQ = window.matchMedia('(max-width: 720px)');
+const $ = (id) => document.getElementById(id);
+const cards = [];
+const markerEls = [];
+let activeIdx = -1;
+
+/* ---- Strips: stations 1-4 left, 5-7 right ---- */
+STATIONS.forEach((s, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'station-card';
+  btn.innerHTML =
+    `<div class="card-band"><div class="station-no">Station ${i + 1} of 7</div></div>` +
+    `<svg class="motif" aria-hidden="true"><use href="#m-${s.motif}"/></svg>` +
+    `<span class="station-name">${s.name}</span><span class="station-note">${s.note}</span>` +
+    `<span class="seal" aria-hidden="true">${i + 1}</span>`;
+  btn.addEventListener('click', () => select(i));
+  $(i < 4 ? 'strip-left' : 'strip-right').appendChild(btn);
+  cards.push(btn);
+});
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  center: [-121.65, 36.2],
+  zoom: 8,
+});
+
+const markers = [];
+const PHONE_OFFSETS = [[16, -12], [-16, 12], [15, -6], [-15, 6], [15, 0], [0, 0], [0, 0]];
+function markerOffset(i) {
+  if (phoneMQ.matches) return PHONE_OFFSETS[i];
+  return i === 0 ? [16, -16] : i === 1 ? [-16, 16] : [0, 0];
+}
+phoneMQ.addEventListener('change', () => markers.forEach((m, i) => m.setOffset(markerOffset(i))));
+
+/* ---- Seal markers (HTML Marker, styled inner child only) ---- */
+STATIONS.forEach((s, i) => {
+  const root = document.createElement('div');
+  root.innerHTML = `<div class="seal-marker" role="button" aria-label="Station ${i + 1}: ${s.name}">${i + 1}</div>`;
+  root.addEventListener('click', () => select(i));
+  markerEls.push(root.firstChild);
+  // Neighbouring stations sit close at the opening zoom: nudge them apart
+  // (alternating sides on phone, where the whole coast is in view).
+  const marker = new mapboxgl.Marker({ element: root, offset: markerOffset(i) })
+    .setLngLat(s.coord).addTo(map);
+  markers.push(marker);
+});
+
+/* ---- Selection: fly, stamp the card, show the caption ---- */
+const caption = $('caption');
+function pad() {
+  return phoneMQ.matches
+    ? { top: caption.classList.contains('hidden') ? 24 : 130, bottom: 64, left: 24, right: 60 }
+    : { top: 60, bottom: 64, left: 40, right: 90 };
+}
+
+function select(i) {
+  const s = STATIONS[i];
+  activeIdx = i;
+  cards.forEach((c, k) => c.classList.toggle('is-active', k === i));
+  markerEls.forEach((m, k) => m.classList.toggle('is-active', k === i));
+
+  const card = cards[i];
+  card.classList.add('is-stamped');
+  card.classList.remove('stamping');
+  void card.offsetWidth; // restart the stamp animation
+  card.classList.add('stamping');
+  card.scrollIntoView({ block: 'nearest', inline: 'center', behavior: reduce ? 'auto' : 'smooth' });
+
+  $('cap-no').textContent = `Station ${i + 1} of 7`;
+  $('cap-title').textContent = s.name;
+  $('cap-text').textContent = s.text;
+  $('caption').classList.remove('hidden');
+
+  const opts = { center: s.coord, zoom: 11.5, padding: pad() };
+  if (reduce) map.jumpTo(opts); else map.flyTo({ ...opts, duration: 1800, essential: false });
+}
+
+$('cap-close').addEventListener('click', () => $('caption').classList.add('hidden'));
+
+/* ---- Recolour light-v11 into flat woodblock planes (all guarded) ---- */
+const C = { washi: '#E8E2C8', blue: '#2B4C7E', pine: '#3F6B4A', sand: '#D9C49A', sumi: '#1B1B1B' };
+function safe(fn) { try { fn(); } catch (err) { /* layer shape differs; skip */ } }
+
+function recolour() {
+  map.getStyle().layers.forEach((l) => {
+    const id = l.id;
+    safe(() => {
+      if (l.type === 'background') map.setPaintProperty(id, 'background-color', C.washi);
+      else if (l.type === 'fill' && /^water/.test(id)) map.setPaintProperty(id, 'fill-color', C.blue);
+      else if (l.type === 'line' && /^waterway/.test(id)) map.setPaintProperty(id, 'line-color', C.blue);
+      else if (l.type === 'fill' && /park|green|wood|grass|scrub|pitch/.test(id)) {
+        map.setPaintProperty(id, 'fill-color', C.pine);
+        map.setPaintProperty(id, 'fill-opacity', 0.85);
+      } else if (l.type === 'fill' && /^landuse|^land-structure|^landcover/.test(id)) {
+        map.setPaintProperty(id, 'fill-color', C.sand);
+      } else if (l.type === 'fill' && /building/.test(id)) {
+        map.setLayoutProperty(id, 'visibility', 'none');
+      } else if (l.type === 'line' && /^(road|bridge|tunnel)/.test(id) && !/case|link-case/.test(id)) {
+        map.setPaintProperty(id, 'line-color', C.sumi);
+        map.setPaintProperty(id, 'line-opacity', 0.7);
+      } else if (l.type === 'line' && /case/.test(id)) {
+        map.setLayoutProperty(id, 'visibility', 'none');
+      } else if (l.type === 'line' && /^admin/.test(id)) {
+        map.setPaintProperty(id, 'line-color', C.sumi);
+      } else if (l.type === 'symbol') {
+        if (/poi|transit|airport|ferry|rail/.test(id)) map.setLayoutProperty(id, 'visibility', 'none');
+        else {
+          map.setPaintProperty(id, 'text-color', C.sumi);
+          map.setPaintProperty(id, 'text-halo-color', C.washi);
+        }
+      }
+    });
+  });
+}
+
+function addRoute() {
+  const first = map.getStyle().layers.find((l) => l.type === 'symbol');
+  const before = first ? first.id : undefined;
+  map.addSource('hwy1', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE } } });
+  const join = { 'line-join': 'round', 'line-cap': 'round' };
+  map.addLayer({ id: 'hwy1-casing', type: 'line', source: 'hwy1', layout: join,
+    paint: { 'line-color': '#C8402F', 'line-width': ['interpolate', ['linear'], ['zoom'], 7, 5, 12, 11] } }, before);
+  map.addLayer({ id: 'hwy1-line', type: 'line', source: 'hwy1', layout: join,
+    paint: { 'line-color': '#1B1B1B', 'line-width': ['interpolate', ['linear'], ['zoom'], 7, 2, 12, 4.5] } }, before);
+}
+
+map.on('style.load', () => {
+  recolour();
+  addRoute();
+  const b = ROUTE.reduce((bb, c) => bb.extend(c), new mapboxgl.LngLatBounds(ROUTE[0], ROUTE[0]));
+  // Bearing -33 turns the NW-SE coast to run top-to-bottom, filling the print.
+  map.fitBounds(b, { padding: pad(), bearing: -33, duration: 0 });
+});
+
+map.on('error', (e) => {
+  console.warn('Map error:', (e.error && e.error.message) || e);
+});
+</script>
+</body>
+</html>

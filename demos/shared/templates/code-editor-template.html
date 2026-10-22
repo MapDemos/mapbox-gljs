@@ -1,0 +1,359 @@
+<!--
+  Working EXAMPLE of the Code Editor style pack (code-editor.css, in this
+  same folder). Open this file directly: a fictional dark IDE called
+  "Glyph" shows the REAL GeoJSON of seven Bengaluru stops (generated in JS
+  and coloured by a tiny hand-written tokenizer) next to the map, which is
+  the live-preview pane. Click a Feature block in the editor or an entry in
+  the file tree to fly to it; click a point on the map and the editor
+  scrolls to that feature's lines. Every camera move is logged in the
+  terminal; the status bar tracks the cursor lng/lat and zoom. On phones a
+  tab strip switches Editor / Preview / Terminal.
+
+  This is a brand-new style, not extracted from an existing demo. "Glyph",
+  its file names and the project are fictional; the seven places are real
+  public landmarks and the driving route was fetched once from the
+  Directions API, simplified and embedded.
+
+  What's NOT included: real editing, file saving, geocoding, live routing,
+  or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Glyph - Code Editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Victor+Mono:ital,wght@0,400;0,600;1,400&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="code-editor.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: the map fills the preview pane's body. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<div class="ide" id="ide" data-view="preview">
+  <div class="viewtabs" role="tablist">
+    <button class="vtab" data-view="editor" role="tab">Editor</button>
+    <button class="vtab active" data-view="preview" role="tab">Preview</button>
+    <button class="vtab" data-view="term" role="tab">Terminal</button>
+  </div>
+
+  <div class="view-editor">
+    <nav class="filetree" id="filetree" aria-label="Files">
+      <div class="tree-head">Explorer</div>
+      <div class="tree-dir">&#9662; bengaluru-tour</div>
+    </nav>
+    <div class="tabbar" id="tabbar"></div>
+    <div class="code" id="code" tabindex="0" aria-label="Editor"><div class="lines" id="lines"></div></div>
+  </div>
+
+  <div class="view-term">
+    <div class="term-head"><b>Terminal</b><span>Map events</span></div>
+    <div id="terminal"></div>
+  </div>
+
+  <div class="view-prev">
+    <div class="prev-head"><span class="prev-live"></span>Live preview<span class="prev-url">glyph://localhost:5173</span></div>
+    <div class="prev-body"><div id="map"></div></div>
+  </div>
+
+  <div class="statusbar">
+    <div class="sb-item ui">&#9671; Glyph</div>
+    <div class="sb-item" id="sb-lnglat">lng 77.5946 lat 12.9763</div>
+    <div class="sb-item" id="sb-zoom">zoom 11.00</div>
+    <div class="sb-grow"></div>
+    <div class="sb-item sb-opt" id="sb-pos">Ln 1, Col 1</div>
+    <div class="sb-item sb-opt">Spaces: 2</div>
+    <div class="sb-item" id="sb-lang">GeoJSON</div>
+    <div class="sb-item">UTF-8</div>
+  </div>
+</div>
+
+<script>
+const ACCENT = '#7FDBCA';
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- data ---------- */
+const STOPS = [
+  { name: 'Cubbon Park',            kind: 'park',     c: [77.5946, 12.9763] },
+  { name: 'Vidhana Soudha',         kind: 'landmark', c: [77.5907, 12.9796] },
+  { name: 'MG Road',                kind: 'street',   c: [77.6068, 12.9756] },
+  { name: '100 Feet Road',          kind: 'street',   c: [77.6408, 12.9784] },
+  { name: 'Koramangala 5th Block',  kind: 'district', c: [77.6211, 12.9352] },
+  { name: 'Lalbagh Garden',         kind: 'park',     c: [77.5846, 12.9507] },
+  { name: 'Bangalore Palace',       kind: 'landmark', c: [77.5920, 12.9988] },
+];
+// Directions API (driving), fetched once, simplified, embedded.
+const ROUTE = [[77.5922,12.9991],[77.5919,13.0001],[77.591,13.0004],[77.5905,12.9998],[77.5902,12.9983],[77.5899,12.9968],[77.5902,12.9958],[77.5895,12.9945],[77.5889,12.9932],[77.5886,12.9922],[77.5886,12.991],[77.5875,12.9908],[77.5864,12.991],[77.5858,12.9901],[77.5861,12.989],[77.587,12.9883],[77.5884,12.987],[77.5895,12.9861],[77.5888,12.9852],[77.5882,12.9845],[77.5887,12.9831],[77.5886,12.9818],[77.588,12.9802],[77.5876,12.9792],[77.5887,12.9789],[77.5894,12.9795],[77.5899,12.9802],[77.5907,12.9808],[77.5919,12.9804],[77.5913,12.9796],[77.5922,12.9801],[77.591,12.9779],[77.59,12.9772],[77.5892,12.9768],[77.5883,12.9764],[77.5877,12.9758],[77.5869,12.9751],[77.5866,12.9742],[77.5867,12.9729],[77.5869,12.9714],[77.5871,12.9703],[77.5872,12.969],[77.5876,12.9678],[77.5888,12.9679],[77.5896,12.9684],[77.5917,12.9702],[77.5935,12.9718],[77.5942,12.9725],[77.595,12.9734],[77.5958,12.9741],[77.5965,12.9746],[77.5975,12.9754],[77.5982,12.9759],[77.599,12.9765],[77.5981,12.977],[77.5967,12.9768],[77.5952,12.9767],[77.5945,12.9762],[77.5937,12.9752],[77.5936,12.9735],[77.5939,12.9725],[77.5948,12.9731],[77.5954,12.9737],[77.5965,12.9746],[77.5975,12.9754],[77.5982,12.9759],[77.599,12.9765],[77.6003,12.9767],[77.6016,12.9766],[77.6036,12.9762],[77.6054,12.9758],[77.6068,12.9755],[77.6078,12.9752],[77.6088,12.975],[77.611,12.9745],[77.6128,12.974],[77.6139,12.9738],[77.6152,12.9735],[77.6163,12.9732],[77.6173,12.973],[77.6185,12.9727],[77.6198,12.9727],[77.621,12.9728],[77.622,12.9731],[77.6231,12.9737],[77.6239,12.9742],[77.6252,12.975],[77.6261,12.9757],[77.6267,12.9765],[77.6271,12.9773],[77.628,12.9778],[77.6287,12.9784],[77.63,12.9784],[77.6314,12.9783],[77.6325,12.9782],[77.6348,12.9782],[77.6361,12.9783],[77.6375,12.9783],[77.6388,12.9784],[77.6402,12.9784],[77.641,12.9777],[77.641,12.9761],[77.6411,12.9741],[77.6412,12.972],[77.6413,12.9704],[77.6414,12.9686],[77.6415,12.9673],[77.6415,12.9661],[77.6417,12.9635],[77.6417,12.9619],[77.6418,12.9604],[77.6415,12.9594],[77.6414,12.9582],[77.6415,12.9568],[77.6414,12.9554],[77.6413,12.9542],[77.6409,12.9533],[77.6403,12.9524],[77.6399,12.9516],[77.6393,12.9505],[77.6395,12.9495],[77.6404,12.9487],[77.6409,12.9478],[77.6405,12.9465],[77.6395,12.945],[77.6389,12.9441],[77.6384,12.9433],[77.6379,12.9424],[77.6374,12.9416],[77.6369,12.9408],[77.6364,12.9399],[77.6356,12.9391],[77.6348,12.9387],[77.6336,12.9384],[77.6318,12.9385],[77.6306,12.9384],[77.6293,12.9384],[77.6284,12.9381],[77.6275,12.9376],[77.6267,12.937],[77.6255,12.9361],[77.6246,12.9353],[77.624,12.9346],[77.6234,12.9334],[77.6226,12.9343],[77.6211,12.9352],[77.6205,12.9343],[77.6196,12.9338],[77.6183,12.9335],[77.6173,12.9338],[77.6163,12.9344],[77.6158,12.9352],[77.6147,12.9355],[77.6137,12.935],[77.6126,12.9345],[77.6117,12.9354],[77.6111,12.9366],[77.6106,12.9375],[77.6101,12.9384],[77.6097,12.9392],[77.6091,12.9403],[77.6086,12.9411],[77.6082,12.9419],[77.6079,12.943],[77.6076,12.9439],[77.6062,12.9439],[77.6044,12.9442],[77.603,12.9443],[77.6025,12.9456],[77.6018,12.9463],[77.6006,12.9468],[77.5992,12.947],[77.5982,12.9476],[77.5974,12.9481],[77.5967,12.9486],[77.5963,12.9494],[77.5958,12.9503],[77.5952,12.9513],[77.5946,12.9519],[77.5936,12.9528],[77.5927,12.9533],[77.5916,12.9537],[77.5907,12.9519],[77.5891,12.952],[77.588,12.9524],[77.5871,12.9527],[77.5861,12.9535],[77.5854,12.954],[77.5841,12.954],[77.5837,12.9533],[77.5832,12.9523],[77.5829,12.9515]];
+
+const stopsFC = {
+  type: 'FeatureCollection', name: 'bengaluru-stops',
+  features: STOPS.map((s, i) => ({
+    type: 'Feature', id: i + 1,
+    properties: { name: s.name, kind: s.kind, order: i + 1 },
+    geometry: { type: 'Point', coordinates: s.c },
+  })),
+};
+const routeFC = {
+  type: 'FeatureCollection', name: 'bengaluru-route',
+  features: [{ type: 'Feature', properties: { name: 'Driving route', profile: 'driving' },
+    geometry: { type: 'LineString', coordinates: ROUTE } }],
+};
+const styleDoc = {
+  version: 8, basemap: 'standard',
+  config: { lightPreset: 'night', showPointOfInterestLabels: false },
+  layers: ['route-casing', 'route-line', 'stops-circle', 'stops-label', 'sel-ring'],
+};
+
+// JSON pretty-print with coordinate pairs kept on one line, like a formatter would.
+const pretty = (o) => JSON.stringify(o, null, 2).replace(/\[\s+(-?[\d.]+),\s+(-?[\d.]+)\s+\]/g, '[$1, $2]');
+const README = [
+  '# Bengaluru tour', '',
+  'Seven stops across the city, joined by a driving route.', '',
+  '## Try it', '',
+  '- Click a Feature block in `stops.geojson`', '- Or click a point in the live preview', '- Watch `moveend` land in the terminal', '',
+  'Rendered with `mapbox-gl` on the Standard style, night preset.',
+].join('\n');
+
+const FILES = [
+  { id: 'stops',  name: 'stops.geojson',  lang: 'GeoJSON',  text: pretty(stopsFC) },
+  { id: 'route',  name: 'route.geojson',  lang: 'GeoJSON',  text: pretty(routeFC) },
+  { id: 'style',  name: 'style.json',     lang: 'JSON',     text: pretty(styleDoc) },
+  { id: 'readme', name: 'README.md',      lang: 'Markdown', text: README },
+];
+
+/* ---------- tiny tokenizer ---------- */
+const JSON_RE = /("(?:[^"\\]|\\.)*")(\s*:)?|(-?\d+(?:\.\d+)?)|\b(true|false|null)\b|([{}\[\],:])/g;
+function tokenize(line, lang) {
+  const out = [];
+  if (lang === 'Markdown') {
+    if (/^#/.test(line)) return [['tok-head', line]];
+    line.split(/(`[^`]*`)/).forEach((p) => p && out.push([p[0] === '`' ? 'tok-str' : '', p]));
+    return out;
+  }
+  let last = 0, m;
+  JSON_RE.lastIndex = 0;
+  while ((m = JSON_RE.exec(line))) {
+    if (m.index > last) out.push(['', line.slice(last, m.index)]);
+    if (m[1]) { out.push([m[2] ? 'tok-key' : 'tok-str', m[1]]); if (m[2]) out.push(['tok-punct', m[2]]); }
+    else if (m[3]) out.push(['tok-num', m[3]]);
+    else if (m[4]) out.push(['tok-kw', m[4]]);
+    else out.push(['tok-punct', m[5]]);
+    last = JSON_RE.lastIndex;
+  }
+  if (last < line.length) out.push(['', line.slice(last)]);
+  return out;
+}
+
+/* ---------- editor ---------- */
+const $ = (id) => document.getElementById(id);
+const linesEl = $('lines'), codeEl = $('code'), termEl = $('terminal');
+let curFile = FILES[0], curLine = 0, selected = null, pendingSelect = null;
+let featRanges = []; // per stop: [startLine, endLine]
+
+function computeRanges(file) {
+  featRanges = [];
+  if (file.id !== 'stops') return;
+  const L = file.text.split('\n');
+  let start = -1;
+  L.forEach((t, i) => {
+    if (t === '    {') start = i;
+    else if (start >= 0 && /^    \},?$/.test(t)) { featRanges.push([start, i]); start = -1; }
+  });
+}
+const featureOfLine = (i) => (curFile.id !== 'stops' ? -1 : featRanges.findIndex(([a, b]) => i >= a && i <= b));
+
+function renderFile(file) {
+  curFile = file; computeRanges(file);
+  linesEl.textContent = '';
+  const frag = document.createDocumentFragment();
+  file.text.split('\n').forEach((t, i) => {
+    const ln = document.createElement('div'); ln.className = 'ln'; ln.dataset.i = i;
+    const g = document.createElement('span'); g.className = 'gutter'; g.textContent = i + 1;
+    const s = document.createElement('span'); s.className = 'src';
+    tokenize(t, file.lang).forEach(([cls, txt]) => {
+      const sp = document.createElement('span'); if (cls) sp.className = cls; sp.textContent = txt; s.appendChild(sp);
+    });
+    if (!t) s.textContent = ' ';
+    ln.append(g, s); frag.appendChild(ln);
+  });
+  linesEl.appendChild(frag);
+  $('sb-lang').textContent = file.lang;
+  document.querySelectorAll('.tab, .tree-item[data-file]').forEach((b) => b.classList.toggle('active', b.dataset.file === file.id));
+  setCursor(file.id === 'stops' && selected != null ? featRanges[selected][0] + 4 : 0);
+  markSelection();
+  codeEl.scrollTop = 0;
+}
+
+function setCursor(i) {
+  curLine = i;
+  linesEl.querySelectorAll('.cur').forEach((e) => e.classList.remove('cur'));
+  document.querySelectorAll('.caret').forEach((e) => e.remove());
+  const ln = linesEl.children[i]; if (!ln) return;
+  ln.classList.add('cur');
+  const c = document.createElement('span'); c.className = 'caret'; ln.querySelector('.src').appendChild(c);
+  const col = ln.querySelector('.src').textContent.search(/\S/) + 1;
+  $('sb-pos').textContent = `Ln ${i + 1}, Col ${Math.max(1, col)}`;
+}
+
+function markSelection() {
+  linesEl.querySelectorAll('.sel').forEach((e) => e.classList.remove('sel'));
+  document.querySelectorAll('.tree-child').forEach((b, k) => b.classList.toggle('active', k === selected));
+  if (curFile.id !== 'stops' || selected == null) return;
+  const [a, b] = featRanges[selected];
+  for (let i = a; i <= b; i++) linesEl.children[i].classList.add('sel');
+}
+
+function scrollToLine(i) {
+  const ln = linesEl.children[i]; if (!ln) return;
+  const r = ln.getBoundingClientRect(), c = codeEl.getBoundingClientRect();
+  codeEl.scrollTo({ top: codeEl.scrollTop + (r.top - c.top) - 40, behavior: reduceMotion ? 'auto' : 'smooth' });
+}
+
+/* ---------- file tree + tabs ---------- */
+function addTree() {
+  const tree = $('filetree'), tabs = $('tabbar');
+  FILES.forEach((f) => {
+    const b = document.createElement('button'); b.className = 'tree-item'; b.dataset.file = f.id;
+    b.innerHTML = '<svg class="tree-ico" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M3 1.5h5l3 3v8H3z"/><path d="M8 1.5v3h3"/></svg>';
+    b.append(f.name); b.addEventListener('click', () => openFile(f.id)); tree.appendChild(b);
+    const t = document.createElement('button'); t.className = 'tab'; t.dataset.file = f.id;
+    t.innerHTML = f.id === 'stops' ? '<span class="dot"></span>' : '';
+    t.append(f.name); t.addEventListener('click', () => openFile(f.id)); tabs.appendChild(t);
+    if (f.id === 'stops') STOPS.forEach((s, i) => {
+      const c = document.createElement('button'); c.className = 'tree-item tree-child';
+      c.innerHTML = '<span class="tree-sub" style="margin:0">' + String(i + 1).padStart(2, '0') + '</span>';
+      c.append(s.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+      c.addEventListener('click', () => { if (curFile.id !== 'stops') openFile('stops'); selectStop(i, 'tree'); });
+      tree.appendChild(c);
+    });
+  });
+}
+function openFile(id) { renderFile(FILES.find((f) => f.id === id)); setView('editor', true); }
+
+/* ---------- terminal ---------- */
+const clock = () => new Date().toTimeString().slice(0, 8);
+function log(evt, vals, cls) {
+  const d = document.createElement('div'); d.className = 't-line';
+  const t = document.createElement('span'); t.className = 't-time'; t.textContent = clock();
+  const e = document.createElement('span'); e.className = cls || 't-evt'; e.textContent = evt;
+  d.append(t, e);
+  if (vals) vals.split(' ').forEach((kv) => {
+    const [k, v] = kv.split('=');
+    d.append(' ', k + '=');
+    const s = document.createElement('span'); s.className = 't-val'; s.textContent = v; d.appendChild(s);
+  });
+  const stick = termEl.scrollTop + termEl.clientHeight >= termEl.scrollHeight - 30;
+  termEl.appendChild(d);
+  while (termEl.children.length > 40) termEl.firstChild.remove();
+  if (stick) termEl.scrollTop = termEl.scrollHeight;
+}
+(function boot() {
+  const d = document.createElement('div'); d.className = 't-line';
+  d.innerHTML = '<span class="t-ok">$</span> <span class="t-cmd">glyph preview --watch stops.geojson</span>';
+  termEl.appendChild(d);
+  log('ready', 'features=7 route=driving', 't-ok');
+})();
+
+/* ---------- phone view switcher ---------- */
+function setView(v, fromEditorOnly) {
+  const ide = $('ide');
+  if (fromEditorOnly && !matchMedia('(max-width:760px)').matches) return;
+  ide.dataset.view = v;
+  document.querySelectorAll('.vtab').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
+  if (v === 'preview') {
+    map.resize();
+    if (pendingSelect != null) { const i = pendingSelect; pendingSelect = null; flyToStop(i); }
+    else if (selected == null) map.fitBounds(bounds, FIT);
+  }
+}
+document.querySelectorAll('.vtab').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view)));
+
+/* ---------- map ---------- */
+const bounds = STOPS.concat(ROUTE.map((c) => ({ c }))).reduce((b, s) => b.extend(s.c), new mapboxgl.LngLatBounds(STOPS[0].c, STOPS[0].c));
+const FIT = { padding: { top: 60, bottom: 80, left: 110, right: 110 }, maxZoom: 14, duration: 0 };
+const fitAll = () => { map.resize(); map.fitBounds(bounds, FIT); };
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  bounds, fitBoundsOptions: { padding: { top: 60, bottom: 80, left: 110, right: 110 }, maxZoom: 14 },
+  config: { basemap: { lightPreset: 'night', showPointOfInterestLabels: false, showTransitLabels: false, showPlaceLabels: false } },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+const emissive = { 'circle-emissive-strength': 1 };
+map.on('style.load', () => {
+  map.addSource('stops', { type: 'geojson', data: stopsFC });
+  map.addSource('route', { type: 'geojson', data: routeFC });
+  map.addSource('sel', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({ id: 'route-casing', type: 'line', source: 'route', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#1E1F29', 'line-width': 7, 'line-opacity': 0.8, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'route-line', type: 'line', source: 'route', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': ACCENT, 'line-width': 3.5, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'sel-ring', type: 'circle', source: 'sel', slot: 'top',
+    paint: { 'circle-radius': 17, 'circle-color': ACCENT, 'circle-opacity': 0.18, 'circle-stroke-color': ACCENT, 'circle-stroke-width': 2.5, ...emissive, 'circle-stroke-opacity': 1 } });
+  map.addLayer({ id: 'stops-circle', type: 'circle', source: 'stops', slot: 'top',
+    paint: { 'circle-radius': 8, 'circle-color': '#F78C6C', 'circle-stroke-color': '#1E1F29', 'circle-stroke-width': 2.5, ...emissive } });
+  map.addLayer({ id: 'stops-label', type: 'symbol', source: 'stops', slot: 'top',
+    layout: {
+      'text-field': ['get', 'name'], 'text-size': 12.5,
+      'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+      'text-variable-anchor': ['right', 'left', 'top', 'bottom'], 'text-radial-offset': 1.1, 'symbol-sort-key': ['get', 'order'], 'text-padding': 4,
+    },
+    paint: { 'text-color': '#D6DEEB', 'text-halo-color': '#1E1F29', 'text-halo-width': 1.6, 'text-emissive-strength': 1 } });
+  fitAll();
+  log('load', 'style=standard preset=night', 't-ok');
+});
+
+map.on('moveend', () => {
+  const c = map.getCenter();
+  log('moveend', `zoom=${map.getZoom().toFixed(2)} center=${c.lng.toFixed(2)},${c.lat.toFixed(2)}`);
+  $('sb-zoom').textContent = `zoom ${map.getZoom().toFixed(2)}`;
+});
+map.on('zoom', () => { $('sb-zoom').textContent = `zoom ${map.getZoom().toFixed(2)}`; });
+map.on('mousemove', (e) => { $('sb-lnglat').textContent = `lng ${e.lngLat.lng.toFixed(4)} lat ${e.lngLat.lat.toFixed(4)}`; });
+map.on('mouseenter', 'stops-circle', () => (map.getCanvas().style.cursor = 'pointer'));
+map.on('mouseleave', 'stops-circle', () => (map.getCanvas().style.cursor = ''));
+map.on('click', (e) => {
+  const f = map.getLayer('stops-circle') && map.queryRenderedFeatures(e.point, { layers: ['stops-circle'] })[0];
+  if (!f) return;
+  const i = f.properties.order - 1;
+  log('click', `feature=${f.properties.order} name=${f.properties.name.replace(/ /g, '_')}`);
+  selectStop(i, 'map');
+});
+
+function flyToStop(i) {
+  const opts = { center: STOPS[i].c, zoom: Math.max(map.getZoom(), 14.2), padding: { top: 40, bottom: 72, left: 30, right: 30 } };
+  if (reduceMotion) map.jumpTo(opts); else map.flyTo({ ...opts, duration: 1400 });
+}
+
+function selectStop(i, from) {
+  selected = i;
+  const s = map.getSource('sel');
+  if (s) s.setData({ type: 'FeatureCollection', features: [stopsFC.features[i]] });
+  if (curFile.id !== 'stops') renderFile(FILES[0]);
+  markSelection();
+  setCursor(featRanges[i][0] + 4);
+  if (from !== 'editor') scrollToLine(featRanges[i][0]);
+  if (from === 'map') { if (matchMedia('(max-width:760px)').matches) return flyToStop(i); }
+  if (map.getContainer().clientWidth === 0) pendingSelect = i; else flyToStop(i);
+}
+
+linesEl.addEventListener('click', (e) => {
+  const ln = e.target.closest('.ln'); if (!ln) return;
+  const i = +ln.dataset.i; setCursor(i);
+  const f = featureOfLine(i);
+  if (f >= 0) selectStop(f, 'editor');
+});
+
+addTree();
+renderFile(FILES[0]);
+</script>
+</body>
+</html>

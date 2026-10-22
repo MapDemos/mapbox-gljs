@@ -1,0 +1,517 @@
+/*
+  Truck Art -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: South Asian hand-painted truck art --
+  dazzling saturated colour, floral borders, mirror-work dots, a fringe of
+  chains and bells, painted lettering panels and rear-panel slogans. A
+  celebratory folk-craft tribute, laid out as the decorated BACK of a truck),
+  deliberately distinct from every other style pack in this folder: Academic
+  Paper, Aero Gadgets, Amber Terminal, Arena, Atomic Motel, Audio Guide,
+  Aurora Command, Blueprint, Board Game, Bottom Sheet, Broadcast, Brutalist
+  Guide, Case Board, Celestial Tarot, Chalkboard, Chronicle, Clinic Finder,
+  Comic Panel, Constructivist, Data Notebook, Deco Voyage, Drop Culture,
+  E-Ink, Editorial Paper, Estate Luxe, Event Invite, Field Journal, Fleet
+  Ops, Frontier Poster, Highway Sign, Isotype, Line Diagram, Memphis, Moving
+  Map, Neon HUD, Nordic Cabin, Papercraft, Pastel Bento, Pixel Quest,
+  Postcards, Raw Web, Retro OS, Riso Zine, Ski Piste, Slate Console, Soft UI,
+  Split Flap, Stained Glass, Sticker Book, Storefront, Story Scroll, Swiss
+  Grid, Tarmac Glass, Thermal Receipt, Trailhead, Trip Kanban, Vapor Sunset,
+  Vintage Chart, Washi Seasons, Weather Console, Whiteboard and Zellige; and
+  also distinct from the 19 sibling packs built alongside it (Ukiyo-e Coast,
+  Herbarium, Film Noir, Dive Log, Illuminated, Stage Profile, Treasure Hunt,
+  Tiki Lagoon, Rally Dash, Grand Hotel, Orienteering, Museum Label, Regatta,
+  Code Editor, Watercolor, Annual Report, Papel Picado, Vinyl Crate, Art
+  Nouveau).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/truck-art.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Rozha One for the painted lettering,
+  Hind for body text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Rozha+One&family=Hind:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  Signature touch: a fringe of tiny chains and bells hangs along the top
+  edge of the truck panel and gently sways (static under reduced motion). It
+  sits in its own row above the arch title, never over the map. Pair it with
+  the ornate floral border (inline SVG, mirror-work dots) around the map.
+
+  Class/id contract (see truck-art-template.html in this same folder):
+
+  - .truck                    page root: a grid of fringe / arch / stage /
+                               rear panel (100dvh on desktop, scrolls on phones)
+  - .truck-fringe             the chain-and-bell row; fill it with
+    .chain > .links + .bell     <span class="chain"> elements (script sets --d
+                                 as an animation delay)
+  - .arch                     arched title panel
+    .arch h1                    painted lettering (outline + drop shadow)
+    .arch .arch-sub             small caption under the title
+  - .stage                    middle row: .flap | .map-frame | .flap
+    .flap                       mud-flap column holding .tile buttons
+                                 (phone: dissolves so tiles form a 2-col grid)
+    .tile                       painted stop tile (button), colour set by
+                                 data-c="0..5"; states .is-active, .sparkle
+      .tile-num / .tile-name / .tile-sub
+  - .map-frame                ornate frame: an inline <svg class="frame-svg">
+                               (floral border) + .map-wrap (put #map inside,
+                               demo positions it) + .controls strip
+    .controls                   button row + .status-note
+    .btn, .btn-primary,         painted enamel buttons
+      .btn-secondary
+    .status-note (+.loading/    one-line status text (aria-live)
+      .success/.error)
+  - .roundel                  inner child of a mapboxgl.Marker: painted
+                               numeral roundel (.is-active when selected)
+  - .truck-ico                inner child of the moving truck Marker
+  - .rear-panel               bottom lettering panel; child <span>s get
+                               painted colours (nth-child cycle)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --plum: #3B0A45;
+  --plum-deep: #260630;
+  --plum-soft: #5A1766;
+  --saffron: #FF9F1C;
+  --magenta: #E6197F;
+  --emerald: #0FA968;
+  --blue: #1D4ED8;
+  --scarlet: #E11D48;
+  --sunflower: #FFD60A;
+  --silver: #E5E7EB;
+  --ink: #1B0620;
+  --accent: #FF9F1C;
+  --success: #0FA968;
+  --error: #E11D48;
+
+  --font-paint: 'Rozha One', 'Playfair Display', Georgia, serif;
+  --font-body: 'Hind', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  color: var(--silver);
+  font-family: var(--font-body);
+  font-size: 15px;
+  background-color: var(--plum);
+  /* faint painted diamond lattice on the plum base */
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(255, 159, 28, 0.14) 0 2px, transparent 3px),
+    linear-gradient(45deg, rgba(230, 25, 127, 0.10) 25%, transparent 25% 75%, rgba(230, 25, 127, 0.10) 75%),
+    linear-gradient(45deg, rgba(230, 25, 127, 0.10) 25%, transparent 25% 75%, rgba(230, 25, 127, 0.10) 75%);
+  background-size: 28px 28px, 56px 56px, 56px 56px;
+  background-position: 0 0, 0 0, 28px 28px;
+}
+
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: 3px solid var(--sunflower);
+  outline-offset: 2px;
+}
+
+.hidden { display: none !important; }
+
+/* ---------- page grid ---------- */
+.truck {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto;
+  gap: 10px;
+  padding: 0 16px 14px;
+}
+
+/* ---------- chain & bell fringe ---------- */
+.truck-fringe {
+  position: relative;
+  height: 40px;
+  margin: 0 -16px;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 6px;
+  overflow: hidden;
+  border-bottom: 0;
+}
+.truck-fringe::before {            /* the painted rail the chains hang from */
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 8px;
+  background: repeating-linear-gradient(90deg, var(--saffron) 0 14px, var(--magenta) 14px 28px, var(--emerald) 28px 42px, var(--blue) 42px 56px);
+  box-shadow: 0 2px 0 var(--sunflower);
+}
+.chain {
+  position: relative;
+  width: 14px;
+  height: 100%;
+  transform-origin: 50% 6px;
+  animation: truck-sway 3.2s ease-in-out infinite alternate;
+  animation-delay: var(--d, 0s);
+}
+.chain .links {
+  position: absolute;
+  top: 8px; left: 50%;
+  width: 4px; height: 16px;
+  margin-left: -2px;
+  background: repeating-linear-gradient(180deg, var(--silver) 0 3px, transparent 3px 5px);
+  border-radius: 2px;
+}
+.chain .bell {
+  position: absolute;
+  top: 22px; left: 50%;
+  width: 12px; height: 13px;
+  margin-left: -6px;
+  background: radial-gradient(circle at 35% 30%, #fff6bf, var(--sunflower) 45%, var(--saffron));
+  border-radius: 50% 50% 3px 3px;
+  box-shadow: 0 1px 0 var(--plum-deep);
+}
+.chain .bell::after {              /* clapper */
+  content: '';
+  position: absolute;
+  bottom: -3px; left: 50%;
+  width: 4px; height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: var(--scarlet);
+}
+@keyframes truck-sway {
+  from { transform: rotate(-9deg); }
+  to   { transform: rotate(9deg); }
+}
+
+/* ---------- arched title panel ---------- */
+.arch {
+  justify-self: center;
+  width: min(880px, 100%);
+  text-align: center;
+  padding: 16px 28px 12px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 214, 10, 0.28), transparent 60%),
+    var(--scarlet);
+  border: 5px solid var(--sunflower);
+  border-radius: 50% 50% 14px 14px / 64px 64px 14px 14px;
+  box-shadow:
+    inset 0 0 0 4px var(--plum),
+    inset 0 0 0 8px var(--saffron),
+    inset 0 0 0 11px var(--plum),
+    0 0 0 3px var(--plum-deep),
+    0 6px 0 3px var(--magenta);
+}
+.arch h1 {
+  margin: 0;
+  font-family: var(--font-paint);
+  font-weight: 400;
+  font-size: clamp(26px, 4vw, 46px);
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  color: var(--sunflower);
+  /* painted lettering: dark outline, then a stepped multi-colour drop shadow */
+  -webkit-text-stroke: 5px var(--plum-deep);
+  paint-order: stroke fill;
+  text-shadow: 3px 3px 0 var(--magenta), 5px 5px 0 var(--blue), 7px 7px 0 var(--plum-deep);
+  text-wrap: balance;
+}
+.arch .arch-sub {
+  margin: 8px 0 0;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+/* ---------- stage: flaps + framed map ---------- */
+.stage {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr) 200px;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.flap {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 14px 12px 30px;
+  background: var(--plum-deep);
+  border: 4px solid var(--sunflower);
+  border-radius: 10px 10px 46px 46px;
+  box-shadow: inset 0 0 0 3px var(--magenta), 0 4px 0 var(--plum-deep);
+}
+
+/* painted header at the top of each mud flap */
+.flap-title {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-paint);
+  font-weight: 400;
+  font-size: 20px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sunflower);
+  -webkit-text-stroke: 3px var(--plum);
+  paint-order: stroke fill;
+  text-shadow: 2px 2px 0 var(--magenta);
+}
+
+/* painted stop tiles */
+.tile {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "num name" "num sub";
+  column-gap: 10px;
+  align-items: center;
+  align-content: center;
+  flex: 1 1 auto;
+  max-height: 150px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  border: 0;
+  border-radius: 12px;
+  background: var(--tc, var(--saffron));
+  color: var(--tt, var(--ink));
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.65), inset 0 0 0 5px rgba(27, 6, 32, 0.35), 0 3px 0 var(--plum);
+  transition: transform 0.15s;
+}
+.tile[data-c="0"] { --tc: var(--saffron);   --tt: var(--ink); }
+.tile[data-c="1"] { --tc: var(--magenta);   --tt: #fff; }
+.tile[data-c="2"] { --tc: var(--emerald);   --tt: var(--ink); }
+.tile[data-c="3"] { --tc: var(--blue);      --tt: #fff; }
+.tile[data-c="4"] { --tc: var(--scarlet);   --tt: #fff; }
+.tile[data-c="5"] { --tc: var(--sunflower); --tt: var(--ink); }
+.tile:hover { transform: translateY(-2px); }
+.tile-num {
+  grid-area: num;
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--silver);
+  color: var(--plum);
+  font-family: var(--font-paint);
+  font-size: 18px;
+  box-shadow: 0 0 0 2px var(--plum), 0 0 0 4px var(--silver);
+}
+.tile-name {
+  grid-area: name;
+  font-family: var(--font-paint);
+  font-size: 18px;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.tile-sub {
+  grid-area: sub;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.2;
+}
+.tile.is-active {
+  box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 6px var(--plum), 0 0 0 3px var(--sunflower), 0 3px 0 3px var(--plum);
+}
+/* mirror-sparkle sweep (reduced motion: the static .is-active ring above) */
+.tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.95) 48%, rgba(229, 231, 235, 0.9) 52%, transparent 65%);
+  background-size: 250% 100%;
+  background-position: 130% 0;
+}
+.tile.sparkle::after { animation: truck-sparkle 1.1s ease-out 1; }
+@keyframes truck-sparkle {
+  0%   { opacity: 1; background-position: 130% 0; }
+  100% { opacity: 1; background-position: -30% 0; }
+}
+@keyframes truck-pop {
+  0%, 100% { transform: scale(1); }
+  40%      { transform: scale(1.06); }
+}
+.tile.sparkle { animation: truck-pop 0.5s ease-out 1; }
+
+/* ornate map frame */
+.map-frame {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 32px;
+  background: var(--plum-deep);
+  border-radius: 16px;
+  box-shadow: 0 0 0 3px var(--sunflower), 0 0 0 6px var(--plum-deep), 0 8px 0 6px var(--magenta);
+}
+.frame-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  border-radius: 16px;
+}
+.map-wrap {
+  position: relative;
+  min-height: 260px;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 0 0 3px var(--sunflower), 0 0 0 5px var(--plum-deep);
+}
+
+.controls {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  min-width: 0;
+}
+.btn {
+  appearance: none;
+  cursor: pointer;
+  padding: 9px 18px;
+  font-family: var(--font-paint);
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+  border: 3px solid var(--plum);
+  box-shadow: 0 3px 0 var(--plum), 0 0 0 2px var(--sunflower);
+  transition: transform 0.12s;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(2px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--saffron); color: var(--ink); }
+.btn-secondary { background: var(--emerald); color: var(--ink); }
+
+.status-note {
+  flex: 1 1 160px;
+  min-width: 0;
+  margin: 0;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--silver);
+}
+.status-note.loading { color: var(--sunflower); }
+.status-note.success { color: #6FE3B0; }
+.status-note.error { color: #FF8AA3; }
+
+/* ---------- map markers ---------- */
+.roundel {
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--rc, var(--magenta));
+  color: var(--rt, #fff);
+  font-family: var(--font-paint);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  border: 3px solid var(--silver);
+  box-shadow: 0 0 0 2px var(--plum-deep), 0 3px 6px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s;
+}
+.roundel[data-c="0"] { --rc: var(--saffron);   --rt: var(--ink); }
+.roundel[data-c="1"] { --rc: var(--magenta);   --rt: #fff; }
+.roundel[data-c="2"] { --rc: var(--emerald);   --rt: var(--ink); }
+.roundel[data-c="3"] { --rc: var(--blue);      --rt: #fff; }
+.roundel[data-c="4"] { --rc: var(--scarlet);   --rt: #fff; }
+.roundel[data-c="5"] { --rc: var(--sunflower); --rt: var(--ink); }
+.roundel:hover { transform: scale(1.15); }
+.roundel.is-active {
+  transform: scale(1.3);
+  box-shadow: 0 0 0 3px var(--sunflower), 0 0 0 5px var(--plum-deep), 0 3px 8px rgba(0, 0, 0, 0.6);
+}
+.truck-ico {
+  display: block;
+  width: 46px; height: 30px;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.6));
+}
+.truck-ico svg { display: block; width: 100%; height: 100%; }
+
+/* ---------- rear lettering panel ---------- */
+.rear-panel {
+  justify-self: center;
+  width: min(1000px, 100%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px 14px;
+  padding: 10px 22px;
+  background: var(--plum-deep);
+  border: 4px solid var(--sunflower);
+  border-radius: 14px 14px 40px 40px;
+  box-shadow: inset 0 0 0 3px var(--emerald), 0 4px 0 var(--magenta);
+  font-family: var(--font-paint);
+  font-size: clamp(16px, 2.2vw, 26px);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  -webkit-text-stroke: 3px var(--plum);
+  paint-order: stroke fill;
+  text-shadow: 2px 2px 0 var(--plum);
+}
+.rear-panel > span:nth-child(4n+1) { color: var(--sunflower); }
+.rear-panel > span:nth-child(4n+2) { color: var(--magenta); }
+.rear-panel > span:nth-child(4n+3) { color: var(--saffron); }
+.rear-panel > span:nth-child(4n)   { color: #6FE3B0; }
+
+/* ---------- desktop: fixed-height truck back ---------- */
+@media (min-width: 900px) {
+  .truck {
+    height: 100dvh;
+    overflow: hidden;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+  }
+  .arch { padding: 12px 28px 8px; }
+  .arch h1 { font-size: clamp(26px, 3.4vw, 42px); }
+}
+@media (min-width: 900px) and (max-height: 800px) {
+  .arch .arch-sub { display: none; }
+  .arch { border-radius: 50% 50% 12px 12px / 40px 40px 12px 12px; padding-top: 10px; }
+}
+
+/* ---------- phone / tablet: compact arch, map ~55dvh, 2-col tile grid ---------- */
+@media (max-width: 899px) {
+  .stage {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .flap { display: contents; }
+  .flap-title { display: none; }
+  .tile { max-height: none; }
+  .map-frame {
+    grid-column: 1 / -1;
+    order: -1;
+    padding: 30px;
+  }
+  .map-wrap { min-height: calc(55dvh - 70px); }
+  .tile {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "num" "name" "sub";
+    row-gap: 3px;
+    padding: 10px;
+    justify-items: start;
+  }
+  .tile-name { font-size: 16px; }
+  .arch { padding: 12px 18px 10px; border-radius: 50% 50% 12px 12px / 34px 34px 12px 12px; }
+  .arch h1 { -webkit-text-stroke-width: 4px; text-shadow: 2px 2px 0 var(--magenta), 4px 4px 0 var(--plum-deep); }
+  .arch .arch-sub { font-size: 11px; letter-spacing: 0.08em; }
+  .rear-panel { padding: 10px 16px; -webkit-text-stroke-width: 2px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chain { animation: none; transform: rotate(0deg); }
+  .tile.sparkle, .tile.sparkle::after { animation: none; }
+  .tile.sparkle::after { opacity: 0; }
+  .tile, .roundel, .btn { transition: none; }
+}
