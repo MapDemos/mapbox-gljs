@@ -1,0 +1,1697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Heavy Vehicle Routing — Australia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Archivo+Black&display=swap" rel="stylesheet" />
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.26.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.26.0/mapbox-gl.js"></script>
+<script src="shared/demo-kit.js"></script>
+<style>
+:root {
+  --white: #FFFFFF;
+  --black: #000000;
+  --red: #E30613;
+  --red-ink: #FFFFFF;
+  --hairline: #D4D4D4;
+  --grey: #6E6E6E;
+  --grey-light: #EDEDED;
+  --success: #000000;
+  --error: #E30613;
+  --yellow: #FFE500;
+  --yellow-ink: #1A1A1A;
+  --yellow-bg: #FFFBE0;
+  --teal: #0E7C7B;
+
+  --font-body: 'Archivo', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-display: 'Archivo Black', 'Archivo', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-label: 'Archivo', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+
+  --gutter: 24px;
+}
+
+* {
+  box-sizing: border-box;
+  border-radius: 0;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--white);
+  color: var(--black);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+button, select {
+  font-family: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--red);
+  outline-offset: -3px;
+}
+
+/* ---- Split screen: 5/12 index | 7/12 map ---- */
+.split {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  height: 100vh;
+  height: 100dvh;
+}
+
+.index {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 var(--gutter) 48px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--black) var(--white);
+}
+
+.kicker {
+  margin: 0;
+  padding: 20px 0 0;
+  border-top: 8px solid var(--red);
+  font-family: var(--font-label);
+  font-stretch: 125%;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.display {
+  margin: 20px 0 14px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(34px, 4.6vw, 68px);
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  text-align: left;
+}
+
+.intro {
+  max-width: 44ch;
+  margin: 0 0 24px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: left;
+  color: var(--grey);
+}
+
+/* ---- Section headers ---- */
+.section-head {
+  margin: 28px 0 10px;
+  padding-top: 14px;
+  border-top: 2px solid var(--black);
+  font-family: var(--font-label);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.section-head .num {
+  color: var(--red);
+  margin-right: 8px;
+}
+
+/* ---- Field / select ---- */
+.field-label {
+  display: block;
+  margin: 0 0 6px;
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+.select-wrap select {
+  width: 100%;
+  padding: 12px 10px;
+  border: 2px solid var(--black);
+  background-color: var(--white);
+  color: var(--black);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--black) 50%), linear-gradient(135deg, var(--black) 50%, transparent 50%);
+  background-position: calc(100% - 20px) 50%, calc(100% - 14px) 50%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+/* ---- Heavy vehicle list ---- */
+.vehicle-list {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--black);
+}
+
+.vehicle-list li {
+  border-bottom: 1px solid var(--black);
+}
+
+.vehicle-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  padding: 12px 8px;
+  border: 0;
+  background: var(--white);
+  text-align: left;
+  cursor: pointer;
+}
+
+.vehicle-row:hover { background: var(--grey-light); }
+
+.vehicle-row[aria-pressed="true"] {
+  background: var(--black);
+  color: var(--white);
+}
+
+.vehicle-row[aria-pressed="true"] .vehicle-sub { color: #CFCFCF; }
+.vehicle-row[aria-pressed="true"] .fig-unit { color: #CFCFCF; }
+.vehicle-row[aria-pressed="true"] .silhouette-shape { background: var(--white); border-color: var(--white); }
+.vehicle-row[aria-pressed="true"] .silhouette-shape.cab { background: var(--red); border-color: var(--red); }
+.vehicle-row[aria-pressed="true"] .wheel { background: #555; }
+
+.vehicle-row.is-active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--gutter) * -1);
+  width: 8px;
+  background: var(--red);
+}
+
+.silhouette {
+  position: relative;
+  width: 64px;
+  height: 36px;
+}
+
+.silhouette-shape {
+  position: absolute;
+  background: var(--black);
+  border: 1px solid var(--black);
+}
+
+.wheel {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #333;
+  bottom: 0;
+}
+
+.vehicle-name {
+  display: block;
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.vehicle-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--grey);
+  letter-spacing: 0.02em;
+}
+
+.vehicle-figs {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.vehicle-figs .fig {
+  display: block;
+  line-height: 1.3;
+  white-space: nowrap;
+  margin-bottom: 2px;
+}
+
+.vehicle-figs .fig .fig-num {
+  font-family: var(--font-display);
+  font-size: 15px;
+}
+
+.vehicle-figs .fig .fig-unit {
+  font-family: var(--font-label);
+  font-size: 9px;
+  font-weight: 700;
+  margin-left: 3px;
+  text-transform: uppercase;
+  color: var(--grey);
+  letter-spacing: 0.04em;
+}
+
+.vehicle-note {
+  margin: 12px 0 0;
+  font-size: 11px;
+  color: var(--grey);
+  line-height: 1.5;
+}
+
+/* ---- Toolbar / presets ---- */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px 18px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--black);
+  font-family: var(--font-label);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.txt-btn {
+  padding: 4px 0;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  font-size: inherit;
+  font-weight: 700;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.txt-btn:hover { color: var(--red); }
+
+.txt-btn[aria-pressed="true"] {
+  border-bottom-color: var(--red);
+  color: var(--red);
+}
+
+/* ---- Mode row ---- */
+.mode-row {
+  display: flex;
+  gap: 10px;
+  padding: 14px 0 4px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.mode-btn {
+  flex: 1 1 auto;
+  padding: 12px 10px;
+  border: 2px solid var(--black);
+  background: var(--white);
+  font-family: var(--font-label);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-align: center;
+}
+
+.mode-btn:hover { background: var(--grey-light); }
+
+.mode-btn[aria-pressed="true"] {
+  background: var(--black);
+  color: var(--white);
+}
+
+/* Plain text Clear/Reset-style button, no box */
+.reset-btn {
+  flex: 0 0 auto;
+  padding: 4px 2px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  font-family: var(--font-label);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--red);
+  cursor: pointer;
+}
+
+.reset-btn:hover {
+  border-bottom-color: var(--red);
+}
+
+.click-instructions {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--grey);
+  line-height: 1.5;
+}
+
+.current-points {
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+.current-points .pt-label {
+  color: var(--grey);
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+/* ---- Waypoint controls ---- */
+.waypoint-row {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0 4px;
+  flex-wrap: wrap;
+}
+
+.waypoint-list {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--hairline);
+}
+
+.waypoint-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 12px;
+}
+
+.waypoint-badge {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 0;
+  background: var(--teal);
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.waypoint-coord {
+  font-variant-numeric: tabular-nums;
+  color: var(--grey);
+  font-weight: 600;
+}
+
+.waypoint-empty {
+  padding: 8px 0;
+  font-size: 12px;
+  color: var(--grey);
+}
+
+/* ---- Get route button ---- */
+.get-route-btn {
+  display: block;
+  width: 100%;
+  margin: 20px 0 0;
+  padding: 18px 14px;
+  border: 2px solid var(--black);
+  background: var(--black);
+  color: var(--white);
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.get-route-btn:hover { background: var(--red); border-color: var(--red); }
+
+.get-route-btn:disabled {
+  background: var(--grey);
+  border-color: var(--grey);
+  cursor: not-allowed;
+}
+
+/* ---- Results panel ---- */
+.results {
+  margin-top: 6px;
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--black);
+  border: 1px solid var(--black);
+  margin: 10px 0;
+}
+
+.result-cell {
+  background: var(--white);
+  padding: 12px 10px;
+}
+
+.result-cell.heavy { background: var(--grey-light); }
+
+.result-cell .cell-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--grey);
+  margin-bottom: 6px;
+}
+
+.result-cell .cell-value {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-cell .cell-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--grey);
+  font-variant-numeric: tabular-nums;
+}
+
+.delta-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 10px 0;
+  border-top: 2px solid var(--black);
+  border-bottom: 2px solid var(--black);
+  margin-bottom: 14px;
+}
+
+.delta-line .delta-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+.delta-line .delta-value {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  color: var(--red);
+}
+
+.restriction-list {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.restriction-item {
+  padding: 10px 10px;
+  margin-bottom: 6px;
+  border: 2px solid var(--yellow-ink);
+  background: var(--yellow-bg);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.restriction-item .r-type {
+  display: block;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--yellow-ink);
+  margin-bottom: 4px;
+}
+
+.restriction-empty {
+  padding: 10px 0;
+  font-size: 12px;
+  color: var(--grey);
+}
+
+.match-note {
+  display: block;
+  padding: 10px;
+  margin: 10px 0;
+  border: 2px solid var(--black);
+  background: var(--grey-light);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.fallback-note {
+  display: block;
+  padding: 10px;
+  margin: 10px 0;
+  border: 2px solid var(--black);
+  background: var(--grey-light);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.context-note {
+  margin: 16px 0 0;
+  font-size: 11px;
+  color: var(--grey);
+  line-height: 1.6;
+}
+
+.pending-note {
+  padding: 10px 0;
+  font-size: 12px;
+  color: var(--grey);
+  line-height: 1.5;
+}
+
+/* ---- Map cell ---- */
+.frame {
+  position: relative;
+  margin: var(--gutter) var(--gutter) var(--gutter) 0;
+  border: 2px solid var(--black);
+  background: var(--grey-light);
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---- Layer order control, bottom left of map ---- */
+.layer-order {
+  position: absolute;
+  left: -2px;
+  bottom: -2px;
+  z-index: 3;
+  display: flex;
+  border-top: 2px solid var(--black);
+  border-right: 2px solid var(--black);
+  background: var(--white);
+}
+
+.layer-order-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 0;
+  border-right: 1px solid var(--black);
+  background: var(--white);
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.layer-order-btn:last-child { border-right: 0; }
+
+.layer-order-btn .swatch {
+  width: 18px;
+  height: 4px;
+  display: inline-block;
+  flex: none;
+}
+
+.layer-order-btn .swatch.standard { background: #8A8A8A; }
+.layer-order-btn .swatch.heavy { background: var(--red); height: 6px; }
+
+.layer-order-btn:hover { background: var(--grey-light); }
+
+.layer-order-btn[aria-pressed="true"] {
+  background: var(--black);
+  color: var(--white);
+}
+
+/* ---- 12-column grid overlay ---- */
+.grid-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+.grid-overlay i {
+  border-left: 1px solid var(--hairline);
+}
+
+.grid-overlay i:last-child {
+  border-right: 1px solid var(--hairline);
+}
+
+.grid-toggle {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  z-index: 11;
+  padding: 8px 12px;
+  border: 0;
+  border-top: 2px solid var(--black);
+  border-left: 2px solid var(--black);
+  background: var(--white);
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.grid-toggle:hover,
+.grid-toggle[aria-pressed="true"] {
+  background: var(--black);
+  color: var(--white);
+}
+
+/* ---- Status line ---- */
+.status-note {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  margin: 16px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.status-note.loading { color: var(--grey); }
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); }
+
+.hidden {
+  display: none !important;
+}
+
+/* ---- Popups ---- */
+.mapboxgl-popup-content {
+  border-radius: 0 !important;
+  border: 2px solid var(--black) !important;
+  box-shadow: none !important;
+  font-family: var(--font-body);
+  padding: 10px 12px !important;
+}
+
+.mapboxgl-popup-tip { display: none !important; }
+
+.popup-title {
+  font-weight: 800;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.popup-body {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--grey);
+}
+
+/* ---- Phone ---- */
+@media (max-width: 760px) {
+  :root { --gutter: 16px; }
+
+  .split {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .frame {
+    order: -1;
+    flex: none;
+    height: 45vh;
+    margin: var(--gutter);
+  }
+
+  .index {
+    flex: 1;
+    min-height: 0;
+    padding-bottom: 64px;
+  }
+
+  .display { font-size: clamp(30px, 10vw, 48px); }
+
+  .result-grid { grid-template-columns: 1fr; }
+
+  .layer-order-btn span.label-text { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="split">
+  <section class="index" id="index">
+    <p class="kicker">Freight &amp; access routing</p>
+    <h1 class="display">Heavy vehicle<br>routing</h1>
+    <p class="intro">Compares a standard route against a heavy-vehicle route across Australia, shown together on the map, and lists the height, width and weight restrictions the heavy route had to avoid — or could not avoid.</p>
+
+    <div class="section-head"><span class="num">01</span>Profile</div>
+    <label class="field-label" for="profile-select">Routing profile</label>
+    <div class="select-wrap">
+      <select id="profile-select">
+        <option value="driving" selected>Driving</option>
+        <option value="driving-traffic">Driving (traffic)</option>
+      </select>
+    </div>
+
+    <div class="section-head"><span class="num">02</span>Heavy vehicle</div>
+    <ol class="vehicle-list" id="vehicle-list"></ol>
+    <p class="vehicle-note">Dimensions shown are indicative class presets for illustration, not official permit values. Always confirm with the relevant road authority and your permit conditions before travel.</p>
+
+    <div class="section-head"><span class="num">03</span>Route</div>
+    <div class="toolbar" id="preset-toolbar" role="group" aria-label="Route presets"></div>
+
+    <p class="click-instructions" id="click-instructions">Click a preset above to run its route immediately, or press Set start / Set end, then click the map to place that point — then press Get route to fetch it.</p>
+
+    <div class="mode-row" role="group" aria-label="Click-to-set mode">
+      <button class="mode-btn" id="mode-start" type="button" aria-pressed="false">Set start</button>
+      <button class="mode-btn" id="mode-end" type="button" aria-pressed="false">Set end</button>
+      <button class="reset-btn" id="clear-btn" type="button">Clear</button>
+    </div>
+    <p class="current-points" id="current-points"></p>
+
+    <div class="waypoint-row" role="group" aria-label="Waypoint controls">
+      <button class="mode-btn" id="mode-waypoint" type="button" aria-pressed="false">Add waypoint</button>
+      <button class="mode-btn" id="clear-waypoints-btn" type="button">Clear all waypoints</button>
+    </div>
+    <ul class="waypoint-list" id="waypoint-list"></ul>
+
+    <button class="get-route-btn" id="get-route-btn" type="button">Get route</button>
+
+    <div class="section-head"><span class="num">04</span>Results</div>
+    <div class="results" id="results">
+      <p class="pending-note" id="pending-note">Choose a preset to see a route immediately, or set a start and end point and press Get route.</p>
+    </div>
+
+    <p class="context-note">Height-restriction context comes from state open data for NSW, QLD, WA, SA, TAS and the ACT. Weight-restriction context comes from NHVR and ACT posted bridge load limits. Victoria and the Northern Territory have no restriction data in this demo, so avoidance is never claimed there.</p>
+  </section>
+
+  <div class="frame">
+    <div id="map" role="application" aria-label="Map of Australia showing standard and heavy vehicle routes"></div>
+    <div class="layer-order" role="group" aria-label="Bring route to top">
+      <button class="layer-order-btn" id="layer-btn-standard" type="button" aria-pressed="false">
+        <span class="swatch standard" aria-hidden="true"></span><span class="label-text">Standard route</span>
+      </button>
+      <button class="layer-order-btn" id="layer-btn-heavy" type="button" aria-pressed="true">
+        <span class="swatch heavy" aria-hidden="true"></span><span class="label-text">Heavy vehicle route</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="grid-overlay" id="grid-overlay" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+<button class="grid-toggle" id="grid-toggle" type="button" aria-pressed="true" title="Toggle grid (G)">Grid [G]</button>
+
+<script>
+(() => {
+
+  /* ----------------------------------------------------------------
+     City coordinates -- resolved via the Mapbox Geocoding API
+     (forward lookup, country=au, types=place) and stored statically.
+     Each query ("Sydney", "Brisbane", etc. with country=AU, types=place)
+     resolved to that city's official place centroid, as returned by
+     https://api.mapbox.com/geocoding/v5/mapbox.places/{query}.json?country=au&types=place
+  ---------------------------------------------------------------- */
+  const CITIES = {
+    Sydney:    { name: 'Sydney',    coord: [151.2093, -33.8688] },
+    Brisbane:  { name: 'Brisbane',  coord: [153.0251, -27.4698] },
+    Canberra:  { name: 'Canberra',  coord: [149.1300, -35.2809] },
+    Melbourne: { name: 'Melbourne', coord: [144.9631, -37.8136] },
+    Adelaide:  { name: 'Adelaide',  coord: [138.6007, -34.9285] },
+    Perth:     { name: 'Perth',     coord: [115.8605, -31.9523] },
+  };
+
+  const PRESETS = [
+    { id: 'syd-bne', label: 'Sydney → Brisbane', from: 'Sydney', to: 'Brisbane' },
+    { id: 'syd-cbr', label: 'Sydney → Canberra', from: 'Sydney', to: 'Canberra' },
+    { id: 'syd-mel', label: 'Sydney → Melbourne', from: 'Sydney', to: 'Melbourne' },
+    { id: 'mel-adl', label: 'Melbourne → Adelaide', from: 'Melbourne', to: 'Adelaide' },
+    { id: 'adl-per', label: 'Adelaide → Perth', from: 'Adelaide', to: 'Perth' },
+  ];
+
+  /* ----------------------------------------------------------------
+     Heavy vehicle presets -- indicative illustrative values only,
+     not official permit figures. heightM / widthM / weightT feed
+     max_height / max_width / max_weight on the heavy request.
+  ---------------------------------------------------------------- */
+  const VEHICLES = [
+    { id: 'rigid', name: 'Rigid truck', sub: 'General Access', heightM: 4.3, widthM: 2.5, weightT: 26 },
+    { id: 'semi', name: 'Semi-trailer', sub: 'General Access', heightM: 4.3, widthM: 2.5, weightT: 42.5 },
+    { id: 'bdouble', name: 'B-double', sub: 'Class 2', heightM: 4.6, widthM: 2.5, weightT: 62.5 },
+    { id: 'roadtrain', name: 'Road train', sub: 'Class 2', heightM: 4.6, widthM: 2.5, weightT: 79 },
+    { id: 'lowloader', name: 'Prime mover & low loader', sub: 'Class 1 oversize', heightM: 4.6, widthM: 3.0, weightT: 60 },
+    { id: 'crane', name: 'Mobile crane', sub: 'Class 1 special purpose', heightM: 4.0, widthM: 3.0, weightT: 50 },
+    { id: 'coach', name: 'Coach', sub: 'Class 2 controlled access bus', heightM: 3.9, widthM: 2.5, weightT: 18 },
+  ];
+
+  const numFmt0 = new Intl.NumberFormat('en-AU', { maximumFractionDigits: 0 });
+  const numFmt1 = new Intl.NumberFormat('en-AU', { maximumFractionDigits: 1 });
+  const numFmt4 = new Intl.NumberFormat('en-AU', { maximumFractionDigits: 4, minimumFractionDigits: 4 });
+
+  /* ---- State ---- */
+  let profile = 'driving';
+  let selectedVehicleId = 'semi';
+  let activePresetId = 'syd-bne';
+  let clickMode = null; // 'start' | 'end' | 'waypoint' | null
+  let origin = { ...CITIES.Sydney };
+  let destination = { ...CITIES.Brisbane };
+  let waypoints = []; // ordered list of { coord: [lng,lat] }
+  let requestToken = 0;
+  let topLayer = 'heavy'; // 'heavy' | 'standard' -- default top layer is heavy vehicle route
+  let hasRoute = false;
+
+  const resultsEl = document.getElementById('results');
+  const currentPointsEl = document.getElementById('current-points');
+  const getRouteBtn = document.getElementById('get-route-btn');
+  const waypointListEl = document.getElementById('waypoint-list');
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function renderCurrentPoints() {
+    if (!origin && !destination) {
+      currentPointsEl.innerHTML = '';
+      return;
+    }
+    currentPointsEl.innerHTML =
+      `<span class="pt-label">Start:</span>${origin ? escapeHtml(origin.name) : '—'}<br>` +
+      `<span class="pt-label">End:</span>${destination ? escapeHtml(destination.name) : '—'}`;
+  }
+
+  function renderWaypointList() {
+    waypointListEl.innerHTML = '';
+    if (waypoints.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'waypoint-empty';
+      li.style.border = 'none';
+      li.textContent = 'No waypoints added.';
+      waypointListEl.appendChild(li);
+      return;
+    }
+    waypoints.forEach((wp, i) => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="waypoint-badge">${i + 1}</span><span class="waypoint-coord">${numFmt4.format(wp.coord[1])}, ${numFmt4.format(wp.coord[0])}</span>`;
+      waypointListEl.appendChild(li);
+    });
+  }
+
+  function showPendingState(message) {
+    resultsEl.innerHTML = `<p class="pending-note">${escapeHtml(message)}</p>`;
+  }
+
+  function setStatus(message, kind) {
+    const existing = document.getElementById('status-note');
+    if (existing) existing.remove();
+    const p = document.createElement('p');
+    p.className = 'status-note ' + kind;
+    p.id = 'status-note';
+    p.textContent = message;
+    resultsEl.prepend(p);
+  }
+
+  /* ---------------------------------------------------------------- Map */
+  const map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/standard',
+    center: [134.5, -25.5],
+    zoom: 4.3,
+  });
+
+  map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+  let originMarker = null;
+  let destMarker = null;
+  let violationMarkers = [];
+  let waypointMarkers = [];
+
+  // Pin builder for origin/destination -- 28x36 pin outline, anchor bottom.
+  function makePinEl(label, fillColor) {
+    const wrap = document.createElement('div');
+    wrap.style.display = 'flex';
+    wrap.style.flexDirection = 'column';
+    wrap.style.alignItems = 'center';
+    wrap.setAttribute('role', 'img');
+    wrap.setAttribute('aria-label', label);
+    wrap.innerHTML = `
+      <svg width="28" height="36" viewBox="0 0 28 36" aria-hidden="true">
+        <path d="M14 0C6.3 0 0 6.3 0 14c0 10.5 14 22 14 22s14-11.5 14-22C28 6.3 21.7 0 14 0z" fill="${fillColor}" stroke="#000" stroke-width="1.5"/>
+        <circle cx="14" cy="14" r="5" fill="#fff"/>
+      </svg>`;
+    return wrap;
+  }
+
+  // Warning triangle builder for violation markers -- 28x36 footprint,
+  // bright yellow fill with dark outline, centre-anchored so the
+  // triangle's centre sits exactly on the violation coordinate.
+  function makeWarningEl(label) {
+    const wrap = document.createElement('div');
+    wrap.style.display = 'flex';
+    wrap.setAttribute('role', 'img');
+    wrap.setAttribute('aria-label', label);
+    wrap.innerHTML = `
+      <svg width="28" height="36" viewBox="0 0 28 36" aria-hidden="true">
+        <path d="M14 1 L27 33 L1 33 Z" fill="#FFE500" stroke="#1A1A1A" stroke-width="2" stroke-linejoin="round"/>
+        <rect x="12.4" y="13" width="3.2" height="12" fill="#1A1A1A"/>
+        <rect x="12.4" y="27" width="3.2" height="3.2" fill="#1A1A1A"/>
+      </svg>`;
+    return wrap;
+  }
+
+  // Numbered waypoint marker -- teal circle, ~28px, white number,
+  // centre-anchored to match the violation marker anchor behaviour.
+  function makeWaypointEl(index) {
+    const wrap = document.createElement('div');
+    wrap.setAttribute('role', 'img');
+    wrap.setAttribute('aria-label', 'Waypoint ' + index);
+    wrap.innerHTML = `
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
+        <circle cx="14" cy="14" r="13" fill="#0E7C7B" stroke="#fff" stroke-width="2"/>
+        <text x="14" y="19" text-anchor="middle" font-family="Archivo, Arial, sans-serif" font-weight="800" font-size="13" fill="#fff">${index}</text>
+      </svg>`;
+    return wrap;
+  }
+
+  function clearViolationMarkers() {
+    violationMarkers.forEach((m) => m.remove());
+    violationMarkers = [];
+  }
+
+  function clearWaypointMarkers() {
+    waypointMarkers.forEach((m) => m.remove());
+    waypointMarkers = [];
+  }
+
+  function rebuildWaypointMarkers() {
+    clearWaypointMarkers();
+    waypoints.forEach((wp, i) => {
+      const el = makeWaypointEl(i + 1);
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+        .setLngLat(wp.coord)
+        .setPopup(new mapboxgl.Popup({ offset: 16 }).setHTML(
+          `<div class="popup-title">Waypoint ${i + 1}</div><div class="popup-body">${numFmt4.format(wp.coord[1])}, ${numFmt4.format(wp.coord[0])}</div>`
+        ))
+        .addTo(map);
+      waypointMarkers.push(marker);
+    });
+    renderWaypointList();
+  }
+
+  function updateOriginMarker() {
+    if (originMarker) { originMarker.remove(); originMarker = null; }
+    if (!origin) { renderCurrentPoints(); return; }
+    const originEl = makePinEl('Origin: ' + origin.name, '#000000');
+    originMarker = new mapboxgl.Marker({ element: originEl, anchor: 'bottom' })
+      .setLngLat(origin.coord)
+      .setPopup(new mapboxgl.Popup({ offset: 20 }).setHTML(
+        `<div class="popup-title">${escapeHtml(origin.name)}</div><div class="popup-body">Start point</div>`
+      ))
+      .addTo(map);
+    renderCurrentPoints();
+  }
+
+  function updateDestMarker() {
+    if (destMarker) { destMarker.remove(); destMarker = null; }
+    if (!destination) { renderCurrentPoints(); return; }
+    const destEl = makePinEl('Destination: ' + destination.name, '#E30613');
+    destMarker = new mapboxgl.Marker({ element: destEl, anchor: 'bottom' })
+      .setLngLat(destination.coord)
+      .setPopup(new mapboxgl.Popup({ offset: 20 }).setHTML(
+        `<div class="popup-title">${escapeHtml(destination.name)}</div><div class="popup-body">End point</div>`
+      ))
+      .addTo(map);
+    renderCurrentPoints();
+  }
+
+  function removeEndpointMarkers() {
+    if (originMarker) { originMarker.remove(); originMarker = null; }
+    if (destMarker) { destMarker.remove(); destMarker = null; }
+    renderCurrentPoints();
+  }
+
+  function updateEndpointMarkers() {
+    updateOriginMarker();
+    updateDestMarker();
+  }
+
+  function clearRouteLines() {
+    clearViolationMarkers();
+    if (map.getSource('standard-route')) {
+      map.getSource('standard-route').setData({ type: 'FeatureCollection', features: [] });
+    }
+    if (map.getSource('heavy-route')) {
+      map.getSource('heavy-route').setData({ type: 'FeatureCollection', features: [] });
+    }
+    hasRoute = false;
+  }
+
+  function markStale(reason) {
+    clearRouteLines();
+    showPendingState(reason);
+    getRouteBtn.disabled = false;
+  }
+
+  map.on('style.load', () => {
+    map.setLanguage('en');
+    try {
+      map.setConfigProperty('basemap', 'showPointOfInterestLabels', true);
+    } catch (e) { /* ignore if unsupported */ }
+
+    map.addSource('standard-route', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+    });
+    map.addSource('heavy-route', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+    });
+
+    map.addLayer({
+      id: 'standard-route-line',
+      type: 'line',
+      source: 'standard-route',
+      slot: 'top',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#8A8A8A',
+        'line-width': 4,
+      },
+    });
+
+    map.addLayer({
+      id: 'heavy-route-line',
+      type: 'line',
+      source: 'heavy-route',
+      slot: 'top',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#E30613',
+        'line-width': 6,
+      },
+    });
+
+    applyLayerOrder();
+    updateEndpointMarkers();
+    renderWaypointList();
+
+    // Default preset (Sydney -> Brisbane) runs automatically on first load.
+    runRoutes();
+  });
+
+  map.on('click', (e) => {
+    if (!clickMode) return;
+    const coord = [e.lngLat.lng, e.lngLat.lat];
+    if (clickMode === 'start') {
+      origin = { name: 'Custom start', coord };
+      activePresetId = null;
+      syncPresetButtons();
+      updateOriginMarker();
+      markStale('Start or end point changed — press Get route to fetch updated routes.');
+    } else if (clickMode === 'end') {
+      destination = { name: 'Custom end', coord };
+      activePresetId = null;
+      syncPresetButtons();
+      updateDestMarker();
+      markStale('Start or end point changed — press Get route to fetch updated routes.');
+    } else if (clickMode === 'waypoint') {
+      waypoints.push({ coord });
+      rebuildWaypointMarkers();
+      markStale('Waypoints changed — press Get route to fetch updated routes.');
+    }
+  });
+
+  map.on('error', (e) => {
+    setStatus('Map error: ' + ((e.error && e.error.message) || 'unknown'), 'error');
+  });
+
+  /* ---------------------------------------------------------------- Layer order control */
+  const layerBtnStandard = document.getElementById('layer-btn-standard');
+  const layerBtnHeavy = document.getElementById('layer-btn-heavy');
+
+  function applyLayerOrder() {
+    if (!map.getLayer('standard-route-line') || !map.getLayer('heavy-route-line')) return;
+    if (topLayer === 'heavy') {
+      map.moveLayer('heavy-route-line');
+    } else {
+      map.moveLayer('standard-route-line');
+    }
+    layerBtnStandard.setAttribute('aria-pressed', String(topLayer === 'standard'));
+    layerBtnHeavy.setAttribute('aria-pressed', String(topLayer === 'heavy'));
+  }
+
+  layerBtnStandard.addEventListener('click', () => {
+    topLayer = 'standard';
+    applyLayerOrder();
+  });
+  layerBtnHeavy.addEventListener('click', () => {
+    topLayer = 'heavy';
+    applyLayerOrder();
+  });
+
+  /* ---------------------------------------------------------------- Presets toolbar */
+  const presetToolbar = document.getElementById('preset-toolbar');
+  PRESETS.forEach((p) => {
+    const btn = document.createElement('button');
+    btn.className = 'txt-btn';
+    btn.type = 'button';
+    btn.dataset.presetId = p.id;
+    btn.textContent = p.label;
+    btn.setAttribute('aria-pressed', String(p.id === activePresetId));
+    btn.addEventListener('click', () => {
+      activePresetId = p.id;
+      origin = { ...CITIES[p.from] };
+      destination = { ...CITIES[p.to] };
+      waypoints = [];
+      rebuildWaypointMarkers();
+      setClickMode(null);
+      syncPresetButtons();
+      updateEndpointMarkers();
+      // Presets run immediately -- no Get route click needed.
+      runRoutes();
+    });
+    presetToolbar.appendChild(btn);
+  });
+
+  function syncPresetButtons() {
+    presetToolbar.querySelectorAll('.txt-btn').forEach((b) => {
+      b.setAttribute('aria-pressed', String(b.dataset.presetId === activePresetId));
+    });
+  }
+
+  /* ---------------------------------------------------------------- Click-to-set mode */
+  const modeStartBtn = document.getElementById('mode-start');
+  const modeEndBtn = document.getElementById('mode-end');
+  const modeWaypointBtn = document.getElementById('mode-waypoint');
+  const clearWaypointsBtn = document.getElementById('clear-waypoints-btn');
+  const clearBtn = document.getElementById('clear-btn');
+  const instructionsEl = document.getElementById('click-instructions');
+
+  function setClickMode(mode) {
+    clickMode = mode;
+    modeStartBtn.setAttribute('aria-pressed', String(mode === 'start'));
+    modeEndBtn.setAttribute('aria-pressed', String(mode === 'end'));
+    modeWaypointBtn.setAttribute('aria-pressed', String(mode === 'waypoint'));
+    map.getCanvas().style.cursor = mode ? 'crosshair' : '';
+    if (mode === 'start') {
+      instructionsEl.textContent = 'Click anywhere on the map to set the start point, then press Get route.';
+    } else if (mode === 'end') {
+      instructionsEl.textContent = 'Click anywhere on the map to set the end point, then press Get route.';
+    } else if (mode === 'waypoint') {
+      instructionsEl.textContent = 'Click the map to add numbered waypoints in order, then press Get route.';
+    } else {
+      instructionsEl.textContent = 'Click a preset above to run its route immediately, or press Set start / Set end, then click the map to place that point — then press Get route to fetch it.';
+    }
+  }
+
+  modeStartBtn.addEventListener('click', () => setClickMode(clickMode === 'start' ? null : 'start'));
+  modeEndBtn.addEventListener('click', () => setClickMode(clickMode === 'end' ? null : 'end'));
+  modeWaypointBtn.addEventListener('click', () => setClickMode(clickMode === 'waypoint' ? null : 'waypoint'));
+
+  clearWaypointsBtn.addEventListener('click', () => {
+    if (waypoints.length === 0) return;
+    waypoints = [];
+    rebuildWaypointMarkers();
+    markStale('Waypoints changed — press Get route to fetch updated routes.');
+  });
+
+  // Clear: removes everything (pins, waypoints, route lines, results,
+  // notices). Does not reload or reselect any preset, and runs no request.
+  clearBtn.addEventListener('click', () => {
+    requestToken++; // invalidate any in-flight request
+    activePresetId = null;
+    origin = null;
+    destination = null;
+    waypoints = [];
+    setClickMode(null);
+    syncPresetButtons();
+    removeEndpointMarkers();
+    clearWaypointMarkers();
+    clearRouteLines();
+    renderWaypointList();
+    renderCurrentPoints();
+    resultsEl.innerHTML = '';
+    getRouteBtn.disabled = false;
+    showPendingState('Everything cleared. Choose a preset, or press Set start / Set end to begin a new route.');
+  });
+
+  /* ---------------------------------------------------------------- Profile select */
+  const profileSelect = document.getElementById('profile-select');
+  profileSelect.addEventListener('change', () => {
+    profile = profileSelect.value;
+    if (!origin || !destination) return;
+    markStale('Profile changed — press Get route to fetch updated routes.');
+  });
+
+  /* ---------------------------------------------------------------- Vehicle list with CSS silhouettes */
+  function buildSilhouette(vehicleId) {
+    const s = document.createElement('div');
+    s.className = 'silhouette';
+    s.setAttribute('aria-hidden', 'true');
+
+    switch (vehicleId) {
+      case 'rigid':
+        s.innerHTML = `<div class="silhouette-shape" style="left:4px;bottom:8px;width:40px;height:14px;"></div>
+          <div class="silhouette-shape cab" style="left:44px;bottom:8px;width:13px;height:20px;background:#E30613;border-color:#E30613;"></div>
+          <div class="wheel" style="left:10px;"></div><div class="wheel" style="left:30px;"></div><div class="wheel" style="left:48px;"></div>`;
+        break;
+      case 'semi':
+        s.innerHTML = `<div class="silhouette-shape" style="left:2px;bottom:8px;width:38px;height:16px;"></div>
+          <div class="silhouette-shape cab" style="left:42px;bottom:8px;width:14px;height:22px;background:#E30613;border-color:#E30613;"></div>
+          <div class="wheel" style="left:6px;"></div><div class="wheel" style="left:24px;"></div><div class="wheel" style="left:46px;"></div>`;
+        break;
+      case 'bdouble':
+        s.innerHTML = `<div class="silhouette-shape" style="left:0;bottom:8px;width:22px;height:16px;"></div>
+          <div class="silhouette-shape" style="left:23px;bottom:8px;width:22px;height:16px;"></div>
+          <div class="silhouette-shape cab" style="left:46px;bottom:8px;width:14px;height:22px;background:#E30613;border-color:#E30613;"></div>
+          <div class="wheel" style="left:3px;"></div><div class="wheel" style="left:18px;"></div><div class="wheel" style="left:30px;"></div><div class="wheel" style="left:50px;"></div>`;
+        break;
+      case 'roadtrain':
+        s.innerHTML = `<div class="silhouette-shape" style="left:0;bottom:8px;width:16px;height:16px;"></div>
+          <div class="silhouette-shape" style="left:17px;bottom:8px;width:16px;height:16px;"></div>
+          <div class="silhouette-shape" style="left:34px;bottom:8px;width:16px;height:16px;"></div>
+          <div class="silhouette-shape cab" style="left:51px;bottom:8px;width:11px;height:22px;background:#E30613;border-color:#E30613;"></div>
+          <div class="wheel" style="left:2px;"></div><div class="wheel" style="left:19px;"></div><div class="wheel" style="left:36px;"></div><div class="wheel" style="left:54px;"></div>`;
+        break;
+      case 'lowloader':
+        s.innerHTML = `<div class="silhouette-shape" style="left:0;bottom:4px;width:42px;height:8px;"></div>
+          <div class="silhouette-shape" style="left:10px;bottom:11px;width:22px;height:12px;"></div>
+          <div class="silhouette-shape cab" style="left:44px;bottom:8px;width:14px;height:22px;background:#E30613;border-color:#E30613;"></div>
+          <div class="wheel" style="left:4px;"></div><div class="wheel" style="left:16px;"></div><div class="wheel" style="left:28px;"></div><div class="wheel" style="left:48px;"></div>`;
+        break;
+      case 'crane':
+        s.innerHTML = `<div class="silhouette-shape" style="left:4px;bottom:8px;width:34px;height:14px;"></div>
+          <div class="silhouette-shape cab" style="left:38px;bottom:8px;width:12px;height:18px;background:#E30613;border-color:#E30613;"></div>
+          <div class="silhouette-shape" style="left:14px;bottom:20px;width:30px;height:3px;transform:rotate(-18deg);transform-origin:left bottom;"></div>
+          <div class="wheel" style="left:10px;"></div><div class="wheel" style="left:24px;"></div><div class="wheel" style="left:42px;"></div>`;
+        break;
+      case 'coach':
+        s.innerHTML = `<div class="silhouette-shape" style="left:2px;bottom:8px;width:52px;height:20px;"></div>
+          <div class="silhouette-shape" style="left:4px;bottom:20px;width:48px;height:5px;background:#fff;border-color:#000;"></div>
+          <div class="wheel" style="left:10px;"></div><div class="wheel" style="left:44px;"></div>`;
+        break;
+      default:
+        s.innerHTML = `<div class="silhouette-shape" style="left:4px;bottom:8px;width:40px;height:14px;"></div>`;
+    }
+    return s;
+  }
+
+  const vehicleListEl = document.getElementById('vehicle-list');
+  VEHICLES.forEach((v) => {
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.className = 'vehicle-row';
+    btn.type = 'button';
+    btn.dataset.vehicleId = v.id;
+    btn.setAttribute('aria-pressed', String(v.id === selectedVehicleId));
+    if (v.id === selectedVehicleId) btn.classList.add('is-active');
+
+    const silhouette = buildSilhouette(v.id);
+
+    const nameWrap = document.createElement('span');
+    nameWrap.innerHTML = `<span class="vehicle-name">${escapeHtml(v.name)}</span><span class="vehicle-sub">${escapeHtml(v.sub)}</span>`;
+
+    const figsWrap = document.createElement('span');
+    figsWrap.className = 'vehicle-figs';
+    figsWrap.innerHTML = `
+      <span class="fig"><span class="fig-num">${numFmt1.format(v.heightM)} m</span><span class="fig-unit">Max height</span></span>
+      <span class="fig"><span class="fig-num">${numFmt1.format(v.widthM)} m</span><span class="fig-unit">Max width</span></span>
+      <span class="fig"><span class="fig-num">${numFmt1.format(v.weightT)} t</span><span class="fig-unit">Max weight</span></span>`;
+
+    btn.appendChild(silhouette);
+    btn.appendChild(nameWrap);
+    btn.appendChild(figsWrap);
+
+    btn.addEventListener('click', () => {
+      selectedVehicleId = v.id;
+      syncVehicleRows();
+      if (!origin || !destination) return;
+      // Vehicle selection runs immediately -- no Get route click needed.
+      runRoutes();
+    });
+
+    li.appendChild(btn);
+    vehicleListEl.appendChild(li);
+  });
+
+  function syncVehicleRows() {
+    vehicleListEl.querySelectorAll('.vehicle-row').forEach((row) => {
+      const active = row.dataset.vehicleId === selectedVehicleId;
+      row.setAttribute('aria-pressed', String(active));
+      row.classList.toggle('is-active', active);
+    });
+  }
+
+  /* ---------------------------------------------------------------- Grid toggle */
+  function toggleGrid() {
+    const hidden = document.getElementById('grid-overlay').classList.toggle('hidden');
+    document.getElementById('grid-toggle').setAttribute('aria-pressed', String(!hidden));
+  }
+  document.getElementById('grid-toggle').addEventListener('click', toggleGrid);
+  if (window.matchMedia('(max-width: 760px)').matches) toggleGrid();
+  window.addEventListener('keydown', (e) => {
+    if ((e.key === 'g' || e.key === 'G') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      toggleGrid();
+    }
+  });
+
+  /* ---------------------------------------------------------------- Directions requests */
+  function coordsParam() {
+    const all = [origin.coord, ...waypoints.map((w) => w.coord), destination.coord];
+    return all.map((c) => `${c[0]},${c[1]}`).join(';');
+  }
+
+  function maskToken(url) {
+    const token = mapboxgl.accessToken || '';
+    if (!token) return url;
+    const masked = token.slice(0, 6) + '...';
+    return url.split(token).join(masked);
+  }
+
+  async function fetchDirections(useProfile, heavy, label) {
+    const base = `https://api.mapbox.com/directions/v5/mapbox/${useProfile}/${coordsParam()}`;
+    const params = new URLSearchParams({
+      geometries: 'geojson',
+      overview: 'full',
+      alternatives: 'false',
+      notifications: 'all',
+      access_token: mapboxgl.accessToken,
+    });
+    let vehicle = null;
+    if (heavy) {
+      vehicle = VEHICLES.find((x) => x.id === selectedVehicleId);
+      params.set('max_height', String(vehicle.heightM));
+      params.set('max_width', String(vehicle.widthM));
+      params.set('max_weight', String(vehicle.weightT));
+    }
+    const url = `${base}?${params.toString()}`;
+
+    console.log(`${label} — request`, {
+      url: maskToken(url),
+      profile: useProfile,
+      origin: origin.coord,
+      waypoints: waypoints.map((w) => w.coord),
+      destination: destination.coord,
+      vehicle: vehicle ? { heightM: vehicle.heightM, widthM: vehicle.widthM, weightT: vehicle.weightT } : null,
+    });
+
+    const res = await fetch(url);
+    const json = await res.json();
+
+    console.log(`${label} — response status`, res.status);
+    console.log(`${label} — full raw JSON response`, json);
+    if (json && Array.isArray(json.routes)) {
+      console.log(`${label} — routes summary`, json.routes.map((r) => ({
+        distance: r.distance,
+        duration: r.duration,
+        legs: (r.legs || []).map((leg) => ({
+          distance: leg.distance,
+          duration: leg.duration,
+          notifications: leg.notifications || [],
+        })),
+      })));
+      const allNotifications = (json.routes[0] && json.routes[0].legs || []).flatMap((leg) => leg.notifications || []);
+      console.log(`${label} — notifications`, allNotifications);
+    }
+
+    return { ok: res.ok, status: res.status, json };
+  }
+
+  function metersToKm(m) { return m / 1000; }
+  function secondsToMin(s) { return s / 60; }
+
+  function extractNotifications(route) {
+    const notifications = [];
+    (route.legs || []).forEach((leg) => {
+      (leg.notifications || []).forEach((n) => notifications.push(n));
+    });
+    return notifications;
+  }
+
+  function violationCoordAtIndex(routeGeometry, idx) {
+    if (!routeGeometry || !routeGeometry.coordinates) return null;
+    const coords = routeGeometry.coordinates;
+    const clamped = Math.max(0, Math.min(idx, coords.length - 1));
+    return coords[clamped];
+  }
+
+  function geometriesIdentical(a, b) {
+    const ca = (a && a.coordinates) || [];
+    const cb = (b && b.coordinates) || [];
+    if (ca.length !== cb.length) return false;
+    for (let i = 0; i < ca.length; i++) {
+      if (ca[i][0] !== cb[i][0] || ca[i][1] !== cb[i][1]) return false;
+    }
+    return true;
+  }
+
+  getRouteBtn.addEventListener('click', () => {
+    if (!origin || !destination) {
+      showPendingState('Set a start and end point first — choose a preset, or press Set start / Set end then click the map.');
+      return;
+    }
+    runRoutes();
+  });
+
+  async function runRoutes() {
+    if (!origin || !destination) return;
+    const myToken = ++requestToken;
+    getRouteBtn.disabled = true;
+    clearViolationMarkers();
+    resultsEl.innerHTML = '';
+    setStatus('Loading routes…', 'loading');
+
+    const vehicle = VEHICLES.find((v) => v.id === selectedVehicleId);
+    let fallbackNote = null;
+    let standardResult = null;
+    let heavyResult = null;
+
+    try {
+      standardResult = await fetchDirections(profile, false, 'Request 1 (standard)');
+      if (myToken !== requestToken) return;
+
+      heavyResult = await fetchDirections(profile, true, 'Request 2 (heavy vehicle)');
+      if (myToken !== requestToken) return;
+
+      const heavyFailed = !heavyResult.ok || heavyResult.json.code !== 'Ok';
+      if (heavyFailed && profile === 'driving-traffic') {
+        fallbackNote = 'Heavy-vehicle parameters were not accepted with Driving (traffic). Falling back to the Driving profile for the heavy-vehicle route.';
+        heavyResult = await fetchDirections('driving', true, 'Request 2 (heavy vehicle, fallback)');
+        if (myToken !== requestToken) return;
+      }
+
+      if (!standardResult.ok || standardResult.json.code !== 'Ok') {
+        throw new Error((standardResult.json && standardResult.json.message) || 'Standard route request failed.');
+      }
+      if (!heavyResult.ok || heavyResult.json.code !== 'Ok') {
+        throw new Error((heavyResult.json && heavyResult.json.message) || 'Heavy vehicle route request failed.');
+      }
+    } catch (err) {
+      if (myToken !== requestToken) return;
+      setStatus('Error: ' + err.message, 'error');
+      getRouteBtn.disabled = false;
+      return;
+    }
+
+    if (myToken !== requestToken) return;
+
+    const standardRoute = standardResult.json.routes[0];
+    const heavyRoute = heavyResult.json.routes[0];
+
+    /* ---- Route comparison log ---- */
+    const standardNotifications = extractNotifications(standardRoute);
+    const heavyNotifications = extractNotifications(heavyRoute);
+    const identicalGeometry = geometriesIdentical(standardRoute.geometry, heavyRoute.geometry);
+
+    console.log('Route comparison — distance & duration', {
+      standardDistanceM: standardRoute.distance,
+      standardDurationS: standardRoute.duration,
+      heavyDistanceM: heavyRoute.distance,
+      heavyDurationS: heavyRoute.duration,
+      geometriesIdentical: identicalGeometry,
+      standardNotificationCount: standardNotifications.length,
+      heavyNotificationCount: heavyNotifications.length,
+    });
+    standardNotifications.forEach((n, i) => {
+      console.log(`Route comparison — standard notification ${i + 1}`, { type: n.type, text: n.details && n.details.message ? n.details.message : JSON.stringify(n) });
+    });
+    heavyNotifications.forEach((n, i) => {
+      console.log(`Route comparison — heavy notification ${i + 1}`, { type: n.type, text: n.details && n.details.message ? n.details.message : JSON.stringify(n) });
+    });
+
+    map.getSource('standard-route').setData({
+      type: 'Feature',
+      properties: {},
+      geometry: standardRoute.geometry,
+    });
+    map.getSource('heavy-route').setData({
+      type: 'Feature',
+      properties: {},
+      geometry: heavyRoute.geometry,
+    });
+    hasRoute = true;
+    applyLayerOrder();
+
+    const violations = heavyNotifications.filter((n) => n.type === 'violation' &&
+      n.subtype && ['maxHeight', 'maxWidth', 'maxWeight'].includes(n.subtype));
+
+    clearViolationMarkers();
+    violations.forEach((v) => {
+      const idx = v.geometry_index != null ? v.geometry_index :
+        (v.geometry_index_start != null ? v.geometry_index_start : null);
+      if (idx == null) return;
+      const coord = violationCoordAtIndex(heavyRoute.geometry, idx);
+      if (!coord) return;
+      // Same 28x36 overall footprint as origin/destination, centre-anchored warning triangle.
+      const el = makeWarningEl((v.subtype || 'Restriction') + ' violation');
+      const popupHtml = `<div class="popup-title">${escapeHtml(v.subtype || 'Restriction')} violation</div><div class="popup-body">${escapeHtml((v.details && v.details.message) || 'Restriction could not be fully avoided.')}</div>`;
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+        .setLngLat(coord)
+        .setPopup(new mapboxgl.Popup({ offset: 20 }).setHTML(popupHtml))
+        .addTo(map);
+      violationMarkers.push(marker);
+    });
+
+    const bounds = new mapboxgl.LngLatBounds();
+    standardRoute.geometry.coordinates.forEach((c) => bounds.extend(c));
+    heavyRoute.geometry.coordinates.forEach((c) => bounds.extend(c));
+    map.fitBounds(bounds, { padding: 60, duration: 1000 });
+
+    getRouteBtn.disabled = false;
+
+    renderResults({
+      standardRoute,
+      heavyRoute,
+      vehicle,
+      violations,
+      fallbackNote,
+      identicalGeometry,
+      usedHeavyProfile: fallbackNote ? 'driving' : profile,
+    });
+  }
+
+  function renderResults(data) {
+    const { standardRoute, heavyRoute, vehicle, violations, fallbackNote, identicalGeometry, usedHeavyProfile } = data;
+
+    const stdKm = metersToKm(standardRoute.distance);
+    const heavyKm = metersToKm(heavyRoute.distance);
+    const stdMin = secondsToMin(standardRoute.duration);
+    const heavyMin = secondsToMin(heavyRoute.duration);
+
+    const deltaKm = heavyKm - stdKm;
+    const deltaMin = heavyMin - stdMin;
+
+    resultsEl.innerHTML = '';
+
+    if (fallbackNote) {
+      const note = document.createElement('p');
+      note.className = 'fallback-note';
+      note.textContent = fallbackNote + ` (Heavy route shown uses the ${usedHeavyProfile === 'driving' ? 'Driving' : 'Driving (traffic)'} profile.)`;
+      resultsEl.appendChild(note);
+    }
+
+    if (identicalGeometry) {
+      const match = document.createElement('p');
+      match.className = 'match-note';
+      match.textContent = 'The heavy vehicle route matches the standard route exactly — no restriction applies on this path.';
+      resultsEl.appendChild(match);
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'result-grid';
+    grid.innerHTML = `
+      <div class="result-cell">
+        <span class="cell-label">Standard — Distance</span>
+        <span class="cell-value">${numFmt0.format(stdKm)} <span style="font-size:14px;">km</span></span>
+        <span class="cell-sub">${numFmt0.format(stdMin)} min</span>
+      </div>
+      <div class="result-cell heavy">
+        <span class="cell-label">Heavy — Distance</span>
+        <span class="cell-value">${numFmt0.format(heavyKm)} <span style="font-size:14px;">km</span></span>
+        <span class="cell-sub">${numFmt0.format(heavyMin)} min</span>
+      </div>
+    `;
+    resultsEl.appendChild(grid);
+
+    const deltaLine = document.createElement('div');
+    deltaLine.className = 'delta-line';
+    const kmSign = deltaKm >= 0 ? '+' : '−';
+    const minSign = deltaMin >= 0 ? '+' : '−';
+    deltaLine.innerHTML = `
+      <span class="delta-label">Extra for heavy route</span>
+      <span class="delta-value">${kmSign}${numFmt0.format(Math.abs(deltaKm))} km · ${minSign}${numFmt0.format(Math.abs(deltaMin))} min</span>
+    `;
+    resultsEl.appendChild(deltaLine);
+
+    const restrictionHead = document.createElement('div');
+    restrictionHead.className = 'field-label';
+    restrictionHead.style.margin = '0 0 8px';
+    restrictionHead.textContent = `Restrictions for ${vehicle.name} (${numFmt1.format(vehicle.heightM)} m / ${numFmt1.format(vehicle.widthM)} m / ${numFmt1.format(vehicle.weightT)} t)`;
+    resultsEl.appendChild(restrictionHead);
+
+    if (violations.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'restriction-empty';
+      empty.textContent = 'No height, width or weight violations reported on the heavy-vehicle route for this profile and vehicle.';
+      resultsEl.appendChild(empty);
+    } else {
+      const list = document.createElement('ul');
+      list.className = 'restriction-list';
+      violations.forEach((v) => {
+        const li = document.createElement('li');
+        li.className = 'restriction-item';
+        const message = (v.details && v.details.message) || 'Restriction could not be fully avoided on this route.';
+        li.innerHTML = `<span class="r-type">${escapeHtml(v.subtype || 'Restriction')} violation</span>${escapeHtml(message)}`;
+        list.appendChild(li);
+      });
+      resultsEl.appendChild(list);
+    }
+
+    setStatus(`Routes updated — ${violations.length === 0 ? 'no restriction violations' : violations.length + ' restriction violation' + (violations.length === 1 ? '' : 's')}`, violations.length === 0 ? 'success' : 'error');
+    const sn = document.getElementById('status-note');
+    if (sn && violations.length > 0) {
+      sn.style.color = '#8A6D00';
+    }
+  }
+
+  /* ---------------------------------------------------------------- Init */
+  renderCurrentPoints();
+  renderWaypointList();
+
+})();
+</script>
+</body>
+</html>

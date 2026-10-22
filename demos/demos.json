@@ -810,5 +810,19 @@
     ],
     "tagsVerified": false,
     "description": "Demonstrates excluding road types/areas from Directions API routes."
+  },
+  {
+    "slug": "heavy-vehicle-routing",
+    "title": "Heavy vehicle routing",
+    "type": "local",
+    "url": "heavy-vehicle-routing.html",
+    "tags": [
+      "Directions API",
+      "Data visualization",
+      "Logistics"
+    ],
+    "description": "Compares a standard driving route against a heavy-vehicle route across Australia, highlighting height, width and weight restrictions the truck route must avoid, with presets, custom points and multiple vehicle types to try.",
+    "tagsVerified": false,
+    "source": "demo-generator"
   }
 ]
