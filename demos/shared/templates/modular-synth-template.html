@@ -1,0 +1,366 @@
+<!--
+  Working EXAMPLE of the Modular Synth style pack (modular-synth.css, in
+  this same folder). Open this file directly to see the pattern working with
+  a night of eight fictional Berlin clubs (Mitte, Kreuzberg, Friedrichshain,
+  Neukoelln) on Mapbox Standard (night light). The page is a two-row
+  Eurorack case: a black SCOPE module holds the map, an aluminium CAMERA
+  module has three real rotary knobs (drag up/down, or arrow keys) bound to
+  pitch, bearing and zoom (and reflecting map moves back), a black LIGHT
+  module is a 3-way switch for the lightPreset, and an 8-step SEQUENCER
+  along the bottom has one LED key per venue, a RUN/STOP key and a TEMPO
+  knob. RUN chases the LEDs from venue to venue and flies the camera;
+  coloured patch cables (inline SVG) run from the sequencer jacks to the
+  scope jacks. On a phone the modules stack and the page scrolls. Copy the
+  markup below into your own demo and link modular-synth.css from its
+  <head> -- see the class/id contract documented at the top of that CSS
+  file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (a Eurorack modular synthesizer) at the user's request
+  for something distinct from every other pack in this folder. The venue
+  names and the module maker are fictional; the districts and streets are
+  real. All knobs, jacks, cables and screws are hand-written CSS / inline
+  SVG.
+
+  What's NOT included: audio, search/geocoding, routing, popups, or a
+  hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Modular Synth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Tomorrow:wght@400;500;600;700&family=Reddit+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="modular-synth.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<main class="case" id="case">
+  <div class="rail"><span class="rail-text">Ferrite &amp; Foil &middot; System 7 &middot; Berlin Night Shift</span><span class="rail-text">+12V -12V 5V</span></div>
+
+  <div class="row row-top">
+    <!-- SCOPE: the map -->
+    <section class="mod mod-blk scope" aria-label="Scope module">
+      <div class="mod-head"><h1 class="mod-name">Scope</h1><span class="status-note loading" id="status-note"><span id="status-text">Warming up&hellip;</span></span><span class="mod-hp">42HP</span></div>
+      <div class="scope-screen"><div id="map"></div></div>
+      <div class="mod-foot">
+        <div class="jack-row" id="scope-jacks"></div>
+        <div class="lcd" aria-live="polite">
+          <div class="lcd-line" id="lcd-now">PRESS RUN</div>
+          <div class="lcd-line dim" id="lcd-pos">LNG --- LAT ---</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CAMERA: three knobs -->
+    <section class="mod mod-alu camera" aria-label="Camera module">
+      <div class="mod-head"><h2 class="mod-name">Camera</h2><span class="mod-hp">10HP</span></div>
+      <div class="cam-knobs" id="cam-knobs"></div>
+    </section>
+
+    <!-- LIGHT: 3-way switch -->
+    <section class="mod mod-blk light" aria-label="Light module">
+      <div class="mod-head"><h2 class="mod-name">Light</h2></div>
+      <div class="sw" id="sw" role="radiogroup" aria-label="Light preset" style="--i:2">
+        <span class="sw-slot"></span><span class="sw-lever"></span>
+        <button class="sw-opt" type="button" role="radio" aria-checked="false" data-p="day"><span class="led" style="--c:#FFD60A"></span>Day</button>
+        <button class="sw-opt" type="button" role="radio" aria-checked="false" data-p="dusk"><span class="led" style="--c:#FF9F0A"></span>Dusk</button>
+        <button class="sw-opt" type="button" role="radio" aria-checked="true" data-p="night"><span class="led on" style="--c:#32D2F5"></span>Night</button>
+      </div>
+      <div class="mod-foot">lightPreset</div>
+    </section>
+  </div>
+
+  <div class="rail rail-mid"><span class="rail-text">Row 1 &middot; 3 modules</span><span class="rail-text">Row 2 &middot; 1 module</span></div>
+
+  <div class="row row-bottom">
+    <section class="mod mod-alu seq" aria-label="Sequencer module">
+      <div class="seq-left">
+        <div class="seq-top">
+          <h2 class="mod-name">SEQ-8<span class="sub">VENUE SEQUENCER &middot; 8HP</span></h2>
+          <div class="jack-row" id="seq-jacks"></div>
+        </div>
+        <div class="seq-ctl">
+          <button class="btn btn-primary btn-run" id="run" type="button" aria-pressed="false"><span class="led"></span><span id="run-label">Run</span></button>
+          <div class="knob-unit" id="tempo-unit"></div>
+        </div>
+      </div>
+      <div class="steps" id="steps" role="group" aria-label="Venue steps"></div>
+    </section>
+  </div>
+
+  <div class="rail"><span class="rail-text">Eurorack 3U &middot; 84HP per row</span><span class="rail-text">Patch &amp; play</span></div>
+
+  <svg class="cables" id="cables" aria-hidden="true"></svg>
+</main>
+
+<script>
+// Fictional venues on real streets (approximate coordinates), in night order.
+const Y = '#FFD60A', C = '#32D2F5', M = '#FF4FA3', O = '#FF9F0A', R = '#FF3B30', G = '#34C759';
+const VENUES = [
+  { name: 'Auguststrasse Arp',   area: 'Mitte',          time: '19:30', coord: [13.3995, 52.5252], color: Y, bearing: -20 },
+  { name: 'Torstrasse Tape Room', area: 'Mitte',          time: '21:00', coord: [13.4075, 52.5287], color: C, bearing: 25 },
+  { name: 'Oranien Oscillator',  area: 'Kreuzberg',      time: '22:30', coord: [13.4150, 52.5013], color: M, bearing: -35 },
+  { name: 'Schlesi Static',      area: 'Kreuzberg',      time: '23:45', coord: [13.4425, 52.5010], color: O, bearing: 40 },
+  { name: 'Revaler Relay',       area: 'Friedrichshain', time: '00:30', coord: [13.4530, 52.5073], color: R, bearing: -15 },
+  { name: 'Boxhagen Basement',   area: 'Friedrichshain', time: '01:30', coord: [13.4695, 52.5106], color: G, bearing: 30 },
+  { name: 'Weser Wavefold',      area: 'Neukoelln',      time: '03:00', coord: [13.4388, 52.4868], color: Y, bearing: -40 },
+  { name: 'Karl-Marx Kilohertz', area: 'Neukoelln',      time: '05:00', coord: [13.4399, 52.4812], color: C, bearing: 15 },
+];
+const CABLE_COLORS = ['#FFD60A', '#32D2F5', '#FF4FA3', '#FF9F0A'];
+
+const $ = (id) => document.getElementById(id);
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = () => window.matchMedia('(max-width: 900px)').matches;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+let current = -1, prev = -1, running = false, bpm = 40, timer = null, dragging = null;
+
+/* ---- Map ---- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: { basemap: { lightPreset: 'night', showPointOfInterestLabels: false, showPlaceLabels: false, showTransitLabels: false } },
+  center: [13.425, 52.505],
+  zoom: 11,
+  attributionControl: true,
+});
+// the map container is sized by the grid, which settles after load
+new ResizeObserver(() => { map.resize(); drawCables(); }).observe($('map'));
+
+const pad = () => ({ top: 24, bottom: 70, left: 24, right: 24 });
+function fitAll(instant) {
+  const b = new mapboxgl.LngLatBounds();
+  VENUES.forEach((v) => b.extend(v.coord));
+  map.fitBounds(b, { padding: { top: 50, bottom: 80, left: 50, right: 50 }, pitch: 0, bearing: 0, duration: instant || reduce ? 0 : 1400 });
+}
+
+/* ---- Knobs ---- */
+function tickSVG() {
+  let s = '<svg class="ticks" viewBox="-50 -50 100 100" aria-hidden="true">';
+  for (let i = 0; i <= 10; i++) {
+    const a = ((-135 + i * 27) * Math.PI) / 180, r1 = i % 5 === 0 ? 40 : 43, r2 = 47;
+    s += `<line x1="${(Math.sin(a) * r1).toFixed(2)}" y1="${(-Math.cos(a) * r1).toFixed(2)}" x2="${(Math.sin(a) * r2).toFixed(2)}" y2="${(-Math.cos(a) * r2).toFixed(2)}"/>`;
+  }
+  return s + '</svg>';
+}
+const knobs = [];
+function makeKnob(host, o) {
+  host.insertAdjacentHTML('beforeend',
+    `<span class="knob-label">${o.label}</span><div class="dial">${tickSVG()}<div class="knob" role="slider" tabindex="0" aria-label="${o.label.toLowerCase()}" aria-valuemin="${o.min}" aria-valuemax="${o.max}"><div class="knob-body"><div class="knob-cap"></div></div></div></div><span class="knob-readout"></span>`);
+  const k = { ...o, el: host.querySelector('.knob'), out: host.querySelector('.knob-readout') };
+  knobs.push(k);
+  const render = (v) => {
+    const f = (clamp(v, k.min, k.max) - k.min) / (k.max - k.min);
+    k.el.firstChild.style.setProperty('--a', (-135 + 270 * f).toFixed(1) + 'deg');
+    k.el.setAttribute('aria-valuenow', v.toFixed(2));
+    k.out.textContent = k.fmt(v);
+  };
+  k.render = render;
+  const apply = (v) => { v = clamp(v, k.min, k.max); k.set(v); render(v); };
+  let y0 = 0, v0 = 0;
+  k.el.addEventListener('pointerdown', (e) => {
+    k.el.setPointerCapture(e.pointerId);
+    dragging = k; y0 = e.clientY; v0 = k.get();
+    k.el.classList.add('dragging');
+    e.preventDefault();
+  });
+  k.el.addEventListener('pointermove', (e) => {
+    if (dragging !== k) return;
+    apply(v0 + ((y0 - e.clientY) / (e.shiftKey ? 700 : 190)) * (k.max - k.min));
+  });
+  const up = () => { if (dragging === k) { dragging = null; k.el.classList.remove('dragging'); } };
+  k.el.addEventListener('pointerup', up);
+  k.el.addEventListener('pointercancel', up);
+  k.el.addEventListener('keydown', (e) => {
+    const m = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1, PageUp: 5, PageDown: -5 }[e.key];
+    if (m) { apply(k.get() + m * k.step); e.preventDefault(); }
+    else if (e.key === 'Home') { apply(k.min); e.preventDefault(); }
+    else if (e.key === 'End') { apply(k.max); e.preventDefault(); }
+  });
+  render(k.get());
+  return k;
+}
+function knobUnit(parent) {
+  const u = document.createElement('div');
+  u.className = 'knob-unit';
+  parent.appendChild(u);
+  return u;
+}
+const camHost = $('cam-knobs');
+const NF = (d) => (v) => v.toFixed(d);
+makeKnob(knobUnit(camHost), { label: 'Pitch', min: 0, max: 80, step: 2, get: () => map.getPitch(),
+  set: (v) => map.jumpTo({ pitch: v < 0.001 ? 0 : v }), fmt: (v) => v.toFixed(0) + '°' });
+makeKnob(knobUnit(camHost), { label: 'Bearing', min: -180, max: 180, step: 5, get: () => map.getBearing(),
+  set: (v) => map.jumpTo({ bearing: v }), fmt: (v) => v.toFixed(0) + '°' });
+makeKnob(knobUnit(camHost), { label: 'Zoom', min: 9, max: 19, step: 0.25, get: () => map.getZoom(),
+  set: (v) => map.jumpTo({ zoom: v }), fmt: NF(2) });
+// TEMPO knob: not bound to the map, sets the step rate
+const tempo = makeKnob($('tempo-unit'), { label: 'Tempo', min: 20, max: 90, step: 2, get: () => bpm,
+  set: (v) => { bpm = v; schedule(); }, fmt: (v) => v.toFixed(0) + ' BPM' });
+
+function syncKnobs() {
+  knobs.forEach((k) => { if (k !== dragging && k !== tempo) k.render(k.get()); });
+  const c = map.getCenter();
+  $('lcd-pos').textContent = `LNG ${c.lng.toFixed(4)} LAT ${c.lat.toFixed(4)}`;
+}
+map.on('move', syncKnobs);
+
+/* ---- Jacks, steps ---- */
+$('scope-jacks').innerHTML = ['A', 'B', 'C', 'D'].map((l, i) =>
+  `<div class="jack-cell"><span class="jack" data-j="scope-${i}"></span><span class="jack-label">In ${l}</span></div>`).join('');
+$('seq-jacks').innerHTML = [1, 2, 3, 4].map((n, i) =>
+  `<div class="jack-cell"><span class="jack" data-j="seq-${i}"></span><span class="jack-label">Out ${n}</span></div>`).join('');
+
+const stepEls = VENUES.map((v, i) => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'step';
+  b.style.setProperty('--c', v.color);
+  b.setAttribute('aria-label', `Step ${i + 1}: ${v.name}, ${v.area}, ${v.time}`);
+  b.innerHTML = `<span class="led"></span><span class="step-no">${String(i + 1).padStart(2, '0')}</span><span class="step-name">${v.name}</span><span class="step-area">${v.area}</span><span class="step-time">${v.time}</span>`;
+  b.addEventListener('click', () => select(i));
+  $('steps').appendChild(b);
+  return b;
+});
+
+/* ---- Patch cables: sequencer outs -> scope ins, drawn from jack positions ---- */
+function jackPos(name, cr) {
+  const r = document.querySelector(`[data-j="${name}"]`).getBoundingClientRect();
+  return { x: r.left + r.width / 2 - cr.left, y: r.top + r.height / 2 - cr.top };
+}
+function drawCables() {
+  const svg = $('cables');
+  if (phone()) { svg.innerHTML = ''; return; }
+  const cr = $('case').getBoundingClientRect();
+  svg.setAttribute('width', cr.width);
+  svg.setAttribute('height', cr.height);
+  svg.setAttribute('viewBox', `0 0 ${cr.width} ${cr.height}`);
+  let out = '';
+  for (let i = 0; i < 4; i++) {
+    const b = jackPos(`scope-${i}`, cr), a = jackPos(`seq-${i}`, cr);
+    const dy = a.y - b.y, bow = (i % 2 ? 1 : -1) * (26 + i * 9);
+    // gentle sag: hang down from the scope jack, swing, then drop into the sequencer jack
+    const d = `M${b.x} ${b.y} C${b.x + bow} ${b.y + dy * 0.85} ${a.x - bow * 0.6} ${a.y - dy * 0.2} ${a.x} ${a.y}`;
+    const col = CABLE_COLORS[i];
+    out += `<g class="cable${current >= 0 && current % 4 === i ? ' on' : ''}" style="--cc:${col}"><path class="c-out" d="${d}"/><path class="c-core" stroke="${col}" d="${d}"/><path class="c-hi" d="${d}" transform="translate(-1 -1)"/>` +
+      [b, a].map((p) => `<circle class="plug-sleeve" cx="${p.x}" cy="${p.y}" r="10"/><circle cx="${p.x}" cy="${p.y}" r="5.5" fill="${col}"/><circle cx="${p.x}" cy="${p.y}" r="2" fill="#07080a"/>`).join('') + '</g>';
+  }
+  svg.innerHTML = out;
+}
+window.addEventListener('resize', drawCables);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(drawCables);
+
+/* ---- Selection ---- */
+function flightMs() { return clamp(120000 / bpm * 0.8, 900, 2600); }
+function select(i, userClick) {
+  const v = VENUES[i];
+  prev = current;
+  current = i;
+  stepEls.forEach((el, k) => {
+    const led = el.firstChild;
+    el.classList.toggle('on', k === i);
+    el.setAttribute('aria-pressed', k === i ? 'true' : 'false');
+    led.classList.toggle('on', k === i);
+    led.classList.toggle('half', k === prev && k !== i);
+  });
+  if (prev >= 0) { clearTimeout(select.t); select.t = setTimeout(() => stepEls[prev] && stepEls[prev].firstChild.classList.remove('half'), 700); }
+  $('lcd-now').textContent = `${String(i + 1).padStart(2, '0')} ${v.name.toUpperCase()} ${v.time}`;
+  document.querySelectorAll('.cable').forEach((g, k) => g.classList.toggle('on', k === i % 4));
+
+  const o = { center: v.coord, zoom: 15.4, pitch: 55, bearing: v.bearing, padding: pad() };
+  if (reduce) map.jumpTo(o); else map.flyTo({ ...o, duration: userClick === false ? flightMs() : 2200, essential: false });
+  setActive();
+  if (userClick !== false && running) schedule();
+}
+
+/* ---- RUN / STOP ---- */
+function schedule() {
+  clearTimeout(timer);
+  if (!running) return;
+  timer = setTimeout(() => { select((current + 1) % VENUES.length, false); schedule(); }, 120000 / bpm);
+}
+$('run').addEventListener('click', () => {
+  running = !running;
+  $('run').classList.toggle('is-running', running);
+  $('run').setAttribute('aria-pressed', running);
+  $('run-label').textContent = running ? 'Stop' : 'Run';
+  if (running) { select(current < 0 ? 0 : (current + 1) % VENUES.length, false); schedule(); } else clearTimeout(timer);
+});
+
+/* ---- Light switch ---- */
+$('sw').addEventListener('click', (e) => {
+  const b = e.target.closest('.sw-opt');
+  if (!b) return;
+  const opts = [...document.querySelectorAll('.sw-opt')];
+  opts.forEach((o, k) => {
+    o.setAttribute('aria-checked', o === b);
+    o.firstChild.classList.toggle('on', o === b);
+    if (o === b) $('sw').style.setProperty('--i', k);
+  });
+  try { map.setConfigProperty('basemap', 'lightPreset', b.dataset.p); } catch (err) { /* style not ready */ }
+});
+
+/* ---- Map layers: LED-coloured venue dots, glow, pulsing active ring ---- */
+const fc = { type: 'FeatureCollection', features: VENUES.map((v, i) => ({
+  type: 'Feature', id: i, properties: { i, name: v.name, color: v.color }, geometry: { type: 'Point', coordinates: v.coord } })) };
+function setActive() {
+  const src = map.getSource('venue-active');
+  if (!src || current < 0) return;
+  src.setData({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: VENUES[current].coord } });
+  if (map.getLayer('v-pulse')) map.setPaintProperty('v-pulse', 'circle-stroke-color', VENUES[current].color);
+  VENUES.forEach((_, k) => map.setFeatureState({ source: 'venues', id: k }, { active: k === current }));
+}
+function pulse(t) {
+  if (map.getLayer('v-pulse') && current >= 0) {
+    const p = (t % 1600) / 1600;
+    map.setPaintProperty('v-pulse', 'circle-radius', 12 + 24 * p);
+    map.setPaintProperty('v-pulse', 'circle-stroke-opacity', 0.95 * (1 - p));
+  }
+  requestAnimationFrame(pulse);
+}
+
+map.on('style.load', () => {
+  map.addSource('venues', { type: 'geojson', data: fc });
+  map.addSource('venue-active', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({ id: 'v-glow', type: 'circle', source: 'venues', slot: 'top',
+    paint: { 'circle-radius': 20, 'circle-color': ['get', 'color'], 'circle-opacity': 0.35, 'circle-blur': 0.9, 'circle-emissive-strength': 1 } });
+  map.addLayer({ id: 'v-pulse', type: 'circle', source: 'venue-active', slot: 'top',
+    paint: { 'circle-radius': reduce ? 18 : 12, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-width': 3,
+      'circle-stroke-color': '#ffffff', 'circle-stroke-opacity': 0.85, 'circle-emissive-strength': 1 } });
+  map.addLayer({ id: 'v-dot', type: 'circle', source: 'venues', slot: 'top',
+    paint: { 'circle-radius': ['case', ['boolean', ['feature-state', 'active'], false], 10.5, 8], 'circle-color': ['get', 'color'],
+      'circle-stroke-color': '#EDEFF2', 'circle-stroke-width': 2, 'circle-emissive-strength': 1 } });
+  map.addLayer({ id: 'v-label', type: 'symbol', source: 'venues', slot: 'top',
+    layout: { 'text-field': ['get', 'name'], 'text-size': 12, 'text-variable-anchor': ['top', 'bottom', 'left', 'right'],
+      'text-radial-offset': 1.2, 'text-justify': 'auto', 'text-max-width': 8 },
+    paint: { 'text-color': '#EDEFF2', 'text-halo-color': '#141518', 'text-halo-width': 1.6, 'text-emissive-strength': 1 } });
+  map.on('mouseenter', 'v-dot', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'v-dot', () => { map.getCanvas().style.cursor = ''; });
+  map.on('click', 'v-dot', (e) => { if (e.features[0]) select(e.features[0].properties.i); });
+  setActive();
+});
+
+map.once('load', () => {
+  $('status-note').className = 'status-note success';
+  $('status-text').textContent = 'Ready';
+  fitAll(true);
+  syncKnobs();
+  drawCables();
+  if (!reduce) requestAnimationFrame(pulse);
+});
+map.on('error', (e) => {
+  $('status-note').className = 'status-note error';
+  $('status-text').textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+</script>
+</body>
+</html>

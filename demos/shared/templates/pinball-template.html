@@ -1,0 +1,370 @@
+<!--
+  Working EXAMPLE of the Pinball style pack (pinball.css, in this same
+  folder). Open this file directly to see the pattern working with a
+  fictional 1980s machine, "NEON DESERT", whose playfield is a Mapbox
+  Standard map (night preset) of eight public Las Vegas valley and desert
+  landmarks. An airbrushed inline-SVG backglass and an orange dot-matrix
+  display sit on top; the map is the playfield inside chrome rails;
+  landmarks are pop-bumper markers and also appear as rollover lanes on
+  each side. LAUNCH shoots a chrome ball along a curved path to a random
+  landmark (bumper flash, camera flight, animated score, lane lamp lights);
+  the flipper buttons step to the previous/next landmark. Light all eight
+  lamps for the JACKPOT. Copy the markup below into your own demo and link
+  pinball.css from its <head> -- see the class/id contract documented at
+  the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (80s pinball cabinet) at the user's request for
+  something distinct from every other pack in this folder. The machine
+  name, scores and copy are fictional placeholders; landmark positions are
+  approximate. All art is hand-written inline SVG/CSS.
+
+  What's NOT included: audio, real scoring rules, search/geocoding,
+  routing, terrain, or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Neon Desert Pinball</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Rubik+Mono+One&family=Audiowide&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="pinball.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: the map fills the chrome-railed .map-frame. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<main class="cabinet">
+
+  <header class="backglass">
+    <div class="backglass-art-wrap">
+      <svg class="backglass-art" viewBox="0 0 800 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs>
+          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#1a0638"/>
+            <stop offset="0.45" stop-color="#8a1768"/>
+            <stop offset="0.8" stop-color="#FF2E88"/>
+            <stop offset="1" stop-color="#FF8A00"/>
+          </linearGradient>
+          <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#FFD23F"/>
+            <stop offset="1" stop-color="#FF4F6D"/>
+          </linearGradient>
+          <mask id="slits">
+            <rect width="800" height="150" fill="#fff"/>
+            <rect x="300" y="96" width="200" height="3" fill="#000"/>
+            <rect x="300" y="105" width="200" height="4" fill="#000"/>
+            <rect x="300" y="115" width="200" height="5" fill="#000"/>
+          </mask>
+          <filter id="air" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.4"/></filter>
+        </defs>
+        <rect width="800" height="150" fill="url(#sky)"/>
+        <g fill="#fff" opacity="0.9">
+          <circle cx="60" cy="20" r="1.5"/><circle cx="130" cy="45" r="1"/><circle cx="210" cy="16" r="1.6"/>
+          <circle cx="330" cy="30" r="1"/><circle cx="470" cy="14" r="1.4"/><circle cx="560" cy="40" r="1"/>
+          <circle cx="650" cy="18" r="1.6"/><circle cx="730" cy="48" r="1.2"/><circle cx="770" cy="22" r="1"/>
+        </g>
+        <circle cx="400" cy="110" r="62" fill="url(#sun)" mask="url(#slits)" filter="url(#air)"/>
+        <path d="M0 112 L70 78 L130 100 L210 66 L290 106 L360 92 L440 108 L520 74 L600 104 L680 70 L750 96 L800 84 L800 150 L0 150Z" fill="#3a0c5c" opacity="0.92"/>
+        <path d="M0 128 L90 104 L170 124 L260 100 L350 126 L450 112 L560 128 L660 106 L740 124 L800 110 L800 150 L0 150Z" fill="#1b0733"/>
+        <g stroke="#2EC5FF" stroke-width="1.2" opacity="0.8" fill="none">
+          <path d="M0 138 H800 M0 146 H800"/>
+          <path d="M400 128 L150 150 M400 128 L300 150 M400 128 L400 150 M400 128 L500 150 M400 128 L650 150"/>
+        </g>
+        <g fill="#0B0B12">
+          <g transform="translate(70 150)"><rect x="-4" y="-46" width="8" height="46" rx="4"/><path d="M-4 -26 H-14 V-38 a3 3 0 0 0 -6 0 V-22 a4 4 0 0 0 4 4 H-4Z"/><path d="M4 -32 H14 V-44 a3 3 0 0 1 6 0 V-28 a4 4 0 0 1 -4 4 H4Z"/></g>
+          <g transform="translate(735 150)"><rect x="-4" y="-38" width="8" height="38" rx="4"/><path d="M4 -22 H13 V-32 a3 3 0 0 1 6 0 V-18 a4 4 0 0 1 -4 4 H4Z"/></g>
+        </g>
+        <path d="M0 6 H800" stroke="#FFD23F" stroke-width="2" opacity="0.6"/>
+      </svg>
+      <div class="bulbs" aria-hidden="true"></div>
+      <div class="marquee">
+        <h1>NEON DESERT</h1>
+        <div class="tagline">LAS VEGAS &amp; DESERT TOUR</div>
+      </div>
+    </div>
+
+    <div class="dmd" role="status" aria-live="polite">
+      <div class="dmd-row"><span class="dmd-label">SCORE</span><span class="dmd-text" id="dmd-score">000,000</span></div>
+      <div class="dmd-row"><span class="dmd-label">BALL</span><span class="dmd-text" id="dmd-ball">1/3</span></div>
+      <div class="dmd-row wide"><span class="dmd-text" id="dmd-msg">PRESS LAUNCH</span></div>
+    </div>
+  </header>
+
+  <section class="playfield">
+    <div class="rails"><div class="map-frame"><div id="map"></div></div></div>
+    <nav class="lane lane-left" id="lane-left" aria-label="Left outlane"><div class="lane-title">WEST LANE</div></nav>
+    <nav class="lane lane-right" id="lane-right" aria-label="Right outlane"><div class="lane-title">EAST LANE</div></nav>
+  </section>
+
+  <footer class="apron">
+    <button class="flipper flipper-left" id="btn-prev" type="button">&#9664; PREV</button>
+    <button class="plunger" id="btn-launch" type="button">LAUNCH</button>
+    <button class="flipper flipper-right" id="btn-next" type="button">NEXT &#9654;</button>
+  </footer>
+</main>
+
+<script>
+// Approximate public landmark positions, all on land.
+const SPOTS = [
+  { name: 'Welcome Sign',          coord: [-115.1728, 36.0820] },
+  { name: 'Fremont Street',        coord: [-115.1439, 36.1708] },
+  { name: 'Neon Boneyard',         coord: [-115.1330, 36.1767] },
+  { name: 'Red Rock Canyon',       coord: [-115.4270, 36.1350] },
+  { name: 'Hoover Dam',            coord: [-114.7377, 36.0161] },
+  { name: 'Lake Mead',             coord: [-114.8400, 36.0150] },
+  { name: 'Valley of Fire',        coord: [-114.5250, 36.4650] },
+  { name: 'Seven Magic Mountains', coord: [-115.2713, 35.8372] },
+];
+
+const $ = (id) => document.getElementById(id);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = () => innerWidth <= 720;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+let score = 0, shownScore = 0, ball = 1, current = -1, busy = false, jackpotDone = false;
+const lit = new Array(SPOTS.length).fill(false);
+const bumpers = [], laneEls = [], markers = [];
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: { basemap: { lightPreset: 'night', showPointOfInterestLabels: false } },
+  bounds: boundsOf(SPOTS.map((s) => s.coord)),
+  fitBoundsOptions: { padding: padFor() },
+  pitch: 45,
+  attributionControl: true,
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+function boundsOf(pts) {
+  const b = new mapboxgl.LngLatBounds();
+  pts.forEach((p) => b.extend(p));
+  return b;
+}
+// Keep spots off the logo (bottom-left) and attribution (bottom-right).
+function padFor() {
+  return phone() ? { top: 40, bottom: 70, left: 34, right: 34 } : { top: 50, bottom: 80, left: 50, right: 50 };
+}
+function overview(instant) {
+  map.fitBounds(boundsOf(SPOTS.map((s) => s.coord)), {
+    padding: padFor(), pitch: 45, bearing: 0, duration: instant || reduce ? 0 : 1000,
+  });
+}
+
+// ---------- DMD ----------
+function fmt(n) {
+  const s = String(n % 1000000).padStart(6, '0');
+  return s.slice(0, 3) + ',' + s.slice(3);
+}
+function setMsg(t, flash) {
+  const el = $('dmd-msg');
+  el.textContent = t;
+  el.classList.toggle('flash', !!flash && !reduce);
+}
+function addScore(n) {
+  const from = shownScore;
+  score += n;
+  const to = score;
+  if (reduce) { shownScore = to; $('dmd-score').textContent = fmt(to); return; }
+  const t0 = performance.now(), dur = 800;
+  (function tick(now) {
+    const k = Math.min(1, (now - t0) / dur);
+    shownScore = Math.round(from + (to - from) * k);
+    $('dmd-score').textContent = fmt(shownScore);
+    if (k < 1) requestAnimationFrame(tick);
+  })(t0);
+}
+
+// ---------- Lanes + bumpers ----------
+SPOTS.forEach((s, i) => {
+  const lane = $(i < 4 ? 'lane-left' : 'lane-right');
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'lane-item';
+  b.innerHTML = '<span class="lamp"><span class="lane-no">' + (i + 1) + '</span></span><span class="name"></span>';
+  b.querySelector('.name').textContent = s.name;
+  b.addEventListener('click', () => step(i));
+  lane.appendChild(b);
+  laneEls.push(b);
+
+  const root = document.createElement('div');          // marker root: never styled
+  const inner = document.createElement('div');
+  inner.className = 'bumper';
+  inner.textContent = i + 1;
+  inner.title = s.name;
+  inner.addEventListener('click', () => step(i));
+  root.appendChild(inner);
+  markers.push(new mapboxgl.Marker({ element: root, anchor: 'center' }).setLngLat(s.coord).addTo(map));
+  bumpers.push(inner);
+});
+
+// Screen-space declutter: nudge touching bumpers apart (min gap 44px) with
+// Marker.setOffset. Offsets are recomputed from scratch on every move, so
+// they vanish as you zoom in.
+function declutter() {
+  const MIN = 44;
+  const base = SPOTS.map((s) => map.project(s.coord));
+  const off = base.map(() => [0, 0]);
+  for (let pass = 0; pass < 8; pass++) {
+    for (let a = 0; a < base.length; a++) for (let b = a + 1; b < base.length; b++) {
+      const ax = base[a].x + off[a][0], ay = base[a].y + off[a][1];
+      const bx = base[b].x + off[b][0], by = base[b].y + off[b][1];
+      let dx = bx - ax, dy = by - ay;
+      const d = Math.hypot(dx, dy);
+      if (d >= MIN) continue;
+      if (d < 0.01) { dx = 1; dy = 0; } else { dx /= d; dy /= d; }
+      const push = (MIN - d) / 2 + 0.5;
+      off[a][0] -= dx * push; off[a][1] -= dy * push;
+      off[b][0] += dx * push; off[b][1] += dy * push;
+    }
+  }
+  markers.forEach((m, i) => m.setOffset(off[i]));
+}
+map.on('move', declutter);
+map.on('resize', declutter);
+map.on('load', declutter);
+
+const ballRoot = document.createElement('div');
+const ballEl = document.createElement('div');
+ballEl.className = 'ball';
+ballRoot.appendChild(ballEl);
+const ballMarker = new mapboxgl.Marker({ element: ballRoot, anchor: 'center' });
+
+map.on('style.load', () => {
+  map.addSource('trail', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [[0, 0], [0, 0]] } } });
+  map.addLayer({ id: 'trail-glow', type: 'line', source: 'trail', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#FF2E88', 'line-width': 12, 'line-blur': 8, 'line-opacity': 0.8, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'trail-core', type: 'line', source: 'trail', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#FFD23F', 'line-width': 3.5, 'line-emissive-strength': 1 } });
+});
+function setTrail(coords) {
+  const src = map.getSource('trail');
+  if (src) src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords.length > 1 ? coords : [[0, 0], [0, 0]] } });
+}
+
+// Curvy path: quadratic bezier with a sideways bulge.
+function curve(a, b, n) {
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const c = [(a[0] + b[0]) / 2 - dy * 0.35 * side, (a[1] + b[1]) / 2 + dx * 0.35 * side];
+  const pts = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, u = 1 - t;
+    pts.push([u * u * a[0] + 2 * u * t * c[0] + t * t * b[0], u * u * a[1] + 2 * u * t * c[1] + t * t * b[1]]);
+  }
+  return pts;
+}
+
+async function shootBall(to) {
+  // Start from the last landmark, or the plunger lane (lower right of the playfield).
+  const start = current >= 0 ? SPOTS[current].coord : (() => {
+    const c = map.getContainer();
+    const p = map.unproject([c.clientWidth - 40, c.clientHeight - 100]);
+    return [p.lng, p.lat];
+  })();
+  const pts = curve(start, SPOTS[to].coord, 80);
+  ballMarker.setLngLat(pts[0]).addTo(map);
+  const t0 = performance.now(), dur = 1900;
+  await new Promise((resolve) => {
+    (function tick(now) {
+      const k = Math.min(1, (now - t0) / dur);
+      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      const idx = Math.round(e * 80);
+      ballMarker.setLngLat(pts[idx]);
+      setTrail(pts.slice(0, idx + 1));
+      if (k < 1) requestAnimationFrame(tick); else resolve();
+    })(t0);
+  });
+  await sleep(150);
+  ballMarker.remove();
+  setTrail([]);
+}
+
+// ---------- Arrival ----------
+function flyTo(i) {
+  const o = { center: SPOTS[i].coord, zoom: 11.6, pitch: 55, bearing: (i % 2 ? 18 : -18),
+    padding: { top: 30, bottom: 70, left: 30, right: 30 } };
+  if (reduce) map.jumpTo(o); else map.flyTo({ ...o, duration: 2200, essential: false });
+}
+
+function arrive(i, pts) {
+  laneEls.forEach((el, k) => el.classList.toggle('active', k === i));
+  bumpers.forEach((el, k) => el.classList.toggle('active', k === i));
+  current = i;
+  const first = !lit[i];
+  lit[i] = true;
+  laneEls[i].classList.add('lit');
+  bumpers[i].classList.add('lit');
+  if (!reduce) {
+    bumpers[i].classList.remove('hit');
+    void bumpers[i].offsetWidth;
+    bumpers[i].classList.add('hit');
+  }
+  flyTo(i);
+  addScore(pts);
+  const count = lit.filter(Boolean).length;
+  $('dmd-ball').textContent = ball + '/3';
+  if (count === SPOTS.length && !jackpotDone) {
+    jackpotDone = true;
+    addScore(25000);
+    setMsg('*** JACKPOT *** +25,000', true);
+    return;
+  }
+  setMsg(SPOTS[i].name.toUpperCase() + ' +' + pts.toLocaleString('en-US') + (first ? '' : ' AGAIN') + '  ' + count + '/8', false);
+}
+
+// A finished jackpot starts a fresh ball on the next action.
+function maybeReset() {
+  if (!jackpotDone) return;
+  jackpotDone = false;
+  lit.fill(false);
+  laneEls.forEach((el) => el.classList.remove('lit'));
+  bumpers.forEach((el) => el.classList.remove('lit'));
+  ball = ball >= 3 ? 1 : ball + 1;
+  $('dmd-ball').textContent = ball + '/3';
+}
+
+function lock(on) { busy = on; ['btn-prev', 'btn-next', 'btn-launch'].forEach((id) => { $(id).disabled = on; }); }
+
+async function launch() {
+  if (busy) return;
+  lock(true);
+  maybeReset();
+  const open = SPOTS.map((_, i) => i).filter((i) => !lit[i] && i !== current);
+  const to = open[Math.floor(Math.random() * open.length)];
+  setMsg('BALL IN PLAY...', false);
+  if (reduce) {
+    arrive(to, 1000);
+  } else {
+    overview();
+    await sleep(1100);
+    await shootBall(to);
+    arrive(to, 1000 * (1 + Math.floor(Math.random() * 5)));
+  }
+  lock(false);
+}
+
+function step(i) {
+  if (busy) return;
+  maybeReset();
+  arrive(i, 500);
+}
+
+$('btn-launch').addEventListener('click', launch);
+$('btn-prev').addEventListener('click', () => step(current <= 0 ? SPOTS.length - 1 : current - 1));
+$('btn-next').addEventListener('click', () => step((current + 1) % SPOTS.length));
+
+new ResizeObserver(() => map.resize()).observe($('map').parentElement);
+</script>
+</body>
+</html>

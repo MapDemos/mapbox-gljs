@@ -1,0 +1,331 @@
+<!--
+  Working EXAMPLE of the Science Fair style pack (science-fair.css, in this
+  same folder). Open this file directly to see the pattern working: a school
+  science-fair tri-fold poster, "Which Icelandic volcano is the most active?",
+  on a kraft-paper table. The centre panel is flat and holds the cut-out-letter
+  title and the map (Mapbox Standard Satellite, terrain x1.4, pitched); the
+  left and right wings are folded back with CSS perspective on desktop and
+  stack on phones. Click a numbered list item or a numbered paper pin: the
+  camera flies there, a sticky-note popup shows fun facts, and that volcano's
+  bar in the hand-drawn Results chart wiggles and is highlighted. "Compare
+  all" (or Esc) returns to the overview. Reduced motion: instant jump, no
+  wiggle. Copy the markup into your own demo and link science-fair.css from
+  its <head> -- see the class/id contract at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built from
+  a design brief at the user's request for something distinct from every other
+  pack in this folder. The volcano positions are real, approximate; the student,
+  hypothesis and the eruption counts (rough, since 1900) are fictional
+  placeholders -- swap in your own.
+
+  What's NOT included: search/geocoding, routing, a charting library (the chart
+  is hand-written SVG), or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Which Icelandic volcano is the most active? - Science Fair</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Delius&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="science-fair.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map (inside the map frame). */
+  .map-frame { height: clamp(380px, calc(100dvh - 315px), 820px); }
+  #map { position: absolute; inset: 0; }
+  @media (max-width: 860px) { .map-frame { height: 45dvh; min-height: 300px; } }
+</style>
+</head>
+<body>
+<div class="table">
+  <main class="board">
+
+    <!-- CENTRE: flat panel (no transforms here or on any ancestor of #map) -->
+    <section class="foam centre">
+      <h1 class="cutout-title" id="title" aria-label="Which Icelandic volcano is the most active?">Which Icelandic volcano is the most active?</h1>
+      <div class="rosette" aria-hidden="true">
+        <svg viewBox="0 0 84 108">
+          <path d="M26 62 L12 106 L30 98 L38 106 L46 66Z" fill="#1F55B0"/>
+          <path d="M58 62 L72 106 L54 98 L46 106 L38 66Z" fill="#2F6FD6"/>
+          <g fill="#2F6FD6">
+            <path d="M42 2 l6 6 8 -3 3 8 8 1 -1 8 7 4 -5 7 4 7 -8 3 -1 8 -8 -1 -3 8 -8 -3 -6 6 -6 -6 -8 3 -3 -8 -8 1 -1 -8 -8 -3 4 -7 -5 -7 7 -4 -1 -8 8 -1 3 -8 8 3z"/>
+          </g>
+          <circle cx="42" cy="38" r="22" fill="#4C8BEB" stroke="#fff" stroke-width="2" stroke-dasharray="3 3"/>
+          <text x="42" y="36" text-anchor="middle" font-family="Gaegu, cursive" font-weight="700" font-size="14" fill="#fff">1st</text>
+          <text x="42" y="50" text-anchor="middle" font-family="Gaegu, cursive" font-weight="700" font-size="12" fill="#FFD23F">PRIZE</text>
+        </svg>
+      </div>
+      <span class="byline">by Maya T. &middot; Grade 5 &middot; Room 12 &middot; Science Fair 2026</span>
+
+      <div class="mat mat-blue map-mat">
+        <div class="map-frame"><div id="map"></div></div>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn btn-primary" id="compare" type="button">Compare all</button>
+        <span class="hint">Click a numbered pin or the list. Esc = overview.</span>
+      </div>
+      <p class="status-note loading" id="status-note">Gluing the map to the board...</p>
+    </section>
+
+    <!-- LEFT WING -->
+    <aside class="foam wing wing-left" aria-label="Hypothesis, materials and volcano list">
+      <div class="mat mat-yellow">
+        <div class="glue-label">
+          <h2>Hypothesis</h2>
+          <p>I think <b>Hekla</b> is the most active volcano in Iceland, because it is famous and has a scary nickname.</p>
+        </div>
+      </div>
+      <div class="mat mat-green" style="margin-top:14px">
+        <div class="glue-label">
+          <h2>Materials</h2>
+          <ul class="materials">
+            <li>One (1) satellite map</li>
+            <li>Library books on lava</li>
+            <li>Rulers &amp; a red marker</li>
+            <li>Lots of glue sticks</li>
+          </ul>
+        </div>
+      </div>
+      <div class="glue-label" style="margin-top:14px"><h2>The 5 contenders</h2></div>
+      <ol class="volcano-list" id="volcano-list"></ol>
+    </aside>
+
+    <!-- RIGHT WING -->
+    <aside class="foam wing wing-right" aria-label="Results and conclusion">
+      <div class="mat mat-orange">
+        <div class="glue-label">
+          <h2>Results</h2>
+          <svg class="chart" id="chart" viewBox="0 -26 280 256" role="img" aria-label="Bar chart of eruptions since 1900 for each volcano"></svg>
+          <p class="chart-caption">Eruptions since 1900 (rough count). Bar number = list number.</p>
+        </div>
+      </div>
+      <div class="mat mat-red" style="margin-top:14px">
+        <div class="glue-label">
+          <h2>Conclusion</h2>
+          <p>My hypothesis was <b>wrong</b>! Gr&iacute;msv&ouml;tn erupts most often, but Hekla can start with almost no warning. And Fagradalsfjall is the newest star.</p>
+          <p id="selected-note"><i>Pick a volcano to see its bar wiggle.</i></p>
+        </div>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<script>
+// Five volcanoes. Coordinates are approximate [lng, lat].
+const VOLCANOES = [
+  { name: 'Hekla', coord: [-19.666, 63.992], bearing: 40, zoom: 11, erupts: 6, last: 2000, elev: 1491,
+    fact: 'Medieval Europeans nicknamed it the Gateway to Hell. It can erupt with under an hour of warning.' },
+  { name: 'Katla', coord: [-19.05, 63.633], bearing: -60, zoom: 10.6, erupts: 2, last: 1918, elev: 1512,
+    fact: 'Hides under an ice cap. Its caldera is about 10 km wide and it is overdue for a burp.' },
+  { name: 'Eyjafjallajökull', coord: [-19.62, 63.63], bearing: 110, zoom: 11, erupts: 1, last: 2010, elev: 1651,
+    fact: 'Its 2010 ash cloud grounded flights across Europe. Hard to spell, easy to remember.' },
+  { name: 'Grímsvötn', coord: [-17.316, 64.416], bearing: -20, zoom: 10.4, erupts: 12, last: 2011, elev: 1725,
+    fact: 'Erupts under Vatnajokull glacier, so melted ice sometimes rushes out as a giant flood.' },
+  { name: 'Fagradalsfjall', coord: [-22.27, 63.903], bearing: 150, zoom: 12, erupts: 3, last: 2023, elev: 385,
+    fact: 'Woke up in 2021 after about 800 quiet years. People hiked to watch the lava!' },
+];
+const MAX = 12;
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = () => window.matchMedia('(max-width: 860px)').matches;
+const $ = (id) => document.getElementById(id);
+const SVGNS = 'http://www.w3.org/2000/svg';
+let current = -1;      // -1 = overview
+let terrainOn = false;
+let popup = null;
+const listBtns = [], pins = [], bars = [], markers = [];
+// Phone overview: fan out the three close pins (Hekla, Katla, Eyjafjallajokull) in pixels.
+const FAN = { 0: [0, -20], 1: [20, 16], 2: [-20, 16] };
+
+/* ---- Cut-out letter title ---- */
+(function buildTitle() {
+  const h = $('title');
+  const text = h.textContent;
+  h.textContent = '';
+  text.split(' ').forEach((w) => {
+    const word = document.createElement('span');
+    word.className = 'cutout-word';
+    word.setAttribute('aria-hidden', 'true');
+    [...w].forEach((ch) => {
+      const l = document.createElement('span');
+      l.className = 'cutout-letter';
+      l.textContent = ch;
+      word.appendChild(l);
+    });
+    h.appendChild(word);
+  });
+})();
+
+/* ---- Hand-drawn bar chart ---- */
+const BAR_COLORS = ['#FF8C42', '#FFD23F', '#3BB273', '#2F6FD6', '#E4473B'];
+function wobble(x, y, w, h, seed) {
+  // A slightly uneven rectangle, deterministic per bar.
+  const j = (k) => ((Math.sin(seed * 9.1 + k * 3.7) * 1.8));
+  return `M${x + j(1)} ${y + j(2)} L${x + w + j(3)} ${y + j(4)} L${x + w + j(5)} ${y + h} L${x + j(6)} ${y + h}Z`;
+}
+function svgEl(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  Object.entries(attrs || {}).forEach(([k, v]) => e.setAttribute(k, v));
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const BASE = 190, UNIT = 11.5, BW = 38, GAP = 52, X0 = 20;
+let arrow;
+function buildChart() {
+  const c = $('chart');
+  for (let v = 4; v <= MAX; v += 4) svgEl('path', { class: 'grid', d: `M14 ${BASE - v * UNIT} H276` }, c);
+  VOLCANOES.forEach((v, i) => {
+    const g = svgEl('g', { class: 'bar' }, c);
+    const h = v.erupts * UNIT, x = X0 + i * GAP;
+    svgEl('path', { d: wobble(x, BASE - h, BW, h, i + 1), fill: BAR_COLORS[i] }, g);
+    const t = svgEl('text', { x: x + BW / 2, y: BASE - h - 6, 'text-anchor': 'middle', 'font-size': 18 }, g);
+    t.textContent = v.erupts;
+    bars.push(g);
+    const n = svgEl('text', { x: x + BW / 2, y: BASE + 24, 'text-anchor': 'middle', 'font-size': 20 }, c);
+    n.textContent = i + 1;
+  });
+  svgEl('path', { class: 'axis', d: `M12 ${BASE} Q140 ${BASE + 2} 278 ${BASE - 1} M13 ${BASE} L12 ${BASE - 172}` }, c);
+  arrow = svgEl('g', { class: 'marker-arrow hidden' }, c);
+  svgEl('path', { d: 'M0 -34 Q-3 -20 0 -4 M-8 -13 L0 -3 L8 -13' }, arrow);
+}
+function markBar(i) {
+  bars.forEach((b, k) => { b.classList.toggle('selected', k === i); b.classList.remove('wiggle'); });
+  if (i < 0) { arrow.classList.add('hidden'); return; }
+  const v = VOLCANOES[i];
+  arrow.classList.remove('hidden');
+  arrow.style.transform = `translate(${X0 + i * GAP + BW / 2}px, ${BASE - v.erupts * UNIT - 28}px)`;
+  if (!reduce) { void bars[i].getBoundingClientRect(); bars[i].classList.add('wiggle'); }
+}
+
+/* ---- Map ---- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard-satellite',
+  config: {
+    basemap: {
+      lightPreset: 'day',
+      showPlaceLabels: true,
+      showRoadLabels: false,
+      showPointOfInterestLabels: false,
+      showTransitLabels: false,
+    },
+  },
+  center: [-19.9, 64.1],
+  zoom: 6.4,
+  pitch: 50,
+  bearing: 0,
+});
+map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
+
+function overview(instant) {
+  closePopup();
+  const b = VOLCANOES.reduce((a, v) => a.extend(v.coord), new mapboxgl.LngLatBounds(VOLCANOES[0].coord, VOLCANOES[0].coord));
+  const cam = map.cameraForBounds(b, {
+    padding: phone() ? { top: 50, bottom: 70, left: 40, right: 40 } : { top: 60, bottom: 80, left: 60, right: 60 },
+    bearing: 0, pitch: 50,
+  });
+  if (!cam) return;
+  const opts = { center: cam.center, zoom: cam.zoom + (terrainOn ? 0.6 : 0.25), pitch: 50, bearing: 0 };
+  if (instant || reduce) map.jumpTo(opts); else map.flyTo({ ...opts, duration: 2400, essential: false });
+}
+
+function closePopup() { if (popup) { popup.remove(); popup = null; } }
+
+function select(i) {
+  current = i;
+  const v = VOLCANOES[i];
+  listBtns.forEach((b, k) => { b.classList.toggle('active', k === i); k === i ? b.setAttribute('aria-current', 'true') : b.removeAttribute('aria-current'); });
+  pins.forEach((p, k) => p.classList.toggle('active', k === i));
+  markBar(i);
+  $('selected-note').innerHTML = `<b>${i + 1}. ${v.name}</b>: about ${v.erupts} eruption${v.erupts > 1 ? 's' : ''} since 1900.`;
+
+  closePopup();
+  popup = new mapboxgl.Popup({ className: 'sticky', offset: 26, closeButton: true, closeOnClick: false, maxWidth: '230px' })
+    .setLngLat(v.coord)
+    .setHTML(`<h3 class="sticky-title">${v.name}</h3><p class="sticky-body"><b>Last erupted:</b> ${v.last}<br><b>Height:</b> ${v.elev.toLocaleString('en-US')} m<br>${v.fact}</p>`)
+    .addTo(map);
+  popup.on('close', () => { if (popup) popup = null; });
+
+  const opts = {
+    center: v.coord, zoom: v.zoom, pitch: 60, bearing: v.bearing,
+    padding: phone() ? { top: 150, bottom: 70, left: 20, right: 20 } : { top: 170, bottom: 70, left: 30, right: 30 },
+  };
+  if (reduce) map.jumpTo(opts); else map.flyTo({ ...opts, duration: 3200, curve: 1.4, essential: false });
+}
+
+function compareAll() {
+  current = -1;
+  listBtns.forEach((b) => { b.classList.remove('active'); b.removeAttribute('aria-current'); });
+  pins.forEach((p) => p.classList.remove('active'));
+  markBar(-1);
+  $('selected-note').innerHTML = '<i>Pick a volcano to see its bar wiggle.</i>';
+  map.easeTo({ padding: { top: 0, bottom: 0, left: 0, right: 0 }, duration: 0 });
+  overview();
+}
+
+/* ---- List + pins ---- */
+VOLCANOES.forEach((v, i) => {
+  const li = document.createElement('li');
+  li.innerHTML = `<button class="volcano" type="button"><span class="volcano-num">${i + 1}</span><span class="volcano-text"><span class="volcano-name">${v.name}</span><span class="volcano-meta">${v.elev.toLocaleString('en-US')} m &middot; last erupted ${v.last}</span></span></button>`;
+  const btn = li.firstElementChild;
+  btn.addEventListener('click', () => select(i));
+  $('volcano-list').appendChild(li);
+  listBtns.push(btn);
+
+  // Marker root is left untouched; only the inner .pin is styled.
+  const root = document.createElement('div');
+  root.innerHTML = `<button class="pin" data-n="${i + 1}" type="button" aria-label="${i + 1}: ${v.name}">${i + 1}</button>`;
+  const pin = root.firstElementChild;
+  pin.addEventListener('click', () => select(i));
+  pins.push(pin);
+  markers.push(new mapboxgl.Marker({ element: root }).setLngLat(v.coord).addTo(map));
+});
+
+buildChart();
+let fanned = null;
+function updateFan() {
+  const want = phone() && map.getZoom() < 7.5;
+  if (want === fanned) return;
+  fanned = want;
+  markers.forEach((m, i) => m.setOffset(want && FAN[i] ? FAN[i] : [0, 0]));
+}
+map.on('zoom', updateFan);
+map.on('load', updateFan);
+$('compare').addEventListener('click', compareAll);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') compareAll(); });
+
+/* ---- Lifecycle ---- */
+map.on('style.load', () => {
+  overview(true);   // fit first (without terrain), then add terrain
+  if (!map.getSource('mapbox-dem')) {
+    map.addSource('mapbox-dem', { type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14 });
+  }
+  map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.4 });
+  terrainOn = true;
+});
+map.once('idle', () => {
+  const n = $('status-note');
+  n.classList.remove('loading');
+  n.classList.add('success');
+  n.textContent = 'Board ready. Pick a volcano!';
+  setTimeout(() => n.classList.add('hidden'), 3000);
+});
+map.on('error', (e) => {
+  const n = $('status-note');
+  n.classList.remove('hidden', 'loading', 'success');
+  n.classList.add('error');
+  n.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+// The map's box is sized by the grid, which settles after load.
+new ResizeObserver(() => { map.resize(); }).observe($('map'));
+window.addEventListener('resize', () => { if (current < 0) overview(true); });
+</script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+<!--
+  Working EXAMPLE of the Metal Tour style pack (metal-tour.css, in this same
+  folder). Open this file directly to see the pattern working with an
+  eight-date Nordic / Baltic tour for the fictional band GRIMFROST on Mapbox
+  Standard (monochrome theme, night preset). Click a date: the camera flies
+  to the city, its spiky star marker pulses and a ticket-stub popup shows
+  doors time and support act. "Play tour" steps through every date, drawing
+  a progress line along the red route (line-trim-offset). Reduced motion:
+  no pulsing, no flights (jumpTo). Copy the markup below into your own demo
+  and link metal-tour.css from its <head> -- see the class/id contract at
+  the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (black-metal tour poster: black, bone, blood red,
+  grit, SOLD OUT stamps) at the user's request for something distinct from
+  every other pack in this folder. The band, tour name, venues, doors times
+  and support acts are fictional placeholders; city positions are
+  approximate -- swap in your own.
+
+  What's NOT included: ticketing, search/geocoding, routing, audio, or a
+  hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GRIMFROST - Void Harvest Tour</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Metal+Mania&family=Saira+Extra+Condensed:wght@400;600;800&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="metal-tour.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map (inside .map-wrap). */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<main class="tour">
+  <section class="poster">
+    <header class="logo-block">
+      <svg class="logo-orn" viewBox="0 0 340 72" role="img" aria-label="Thorned antler ornament">
+        <defs>
+          <g id="orn-half">
+            <path d="M170 70 L170 38 M170 52 C150 50 138 38 116 32 C98 27 80 30 60 14 M142 42 L134 10 M116 32 L102 6 M96 28 L82 12 M60 14 L36 8 M118 33 L112 52" fill="none" stroke="#E8E2D4" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M0 70 L12 50 L20 70 L34 44 L44 70 L60 52 L70 70 L90 56 L100 70 L122 60 L132 70 Z" fill="#B3001B"/>
+            <path d="M36 8 L26 2 M82 12 L74 0 M134 10 L130 0 M102 6 L98 -2" stroke="#8FB8D8" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+          </g>
+        </defs>
+        <use href="#orn-half"/>
+        <use href="#orn-half" transform="translate(340 0) scale(-1 1)"/>
+        <path d="M164 70 L170 20 L176 70 Z" fill="#E8E2D4"/>
+      </svg>
+      <h1 class="logo">Grimfrost</h1>
+      <div class="tour-name">Void Harvest Tour MMXXVII</div>
+      <p class="tour-meta">Eight nights &middot; Fjord to Baltic</p>
+    </header>
+
+    <div class="list-block">
+      <div class="section-label">Tour dates</div>
+      <ol class="tour-list" id="tour-list"></ol>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="play-btn" type="button">Play tour</button>
+        <button class="btn btn-secondary" id="reset-btn" type="button">Full route</button>
+      </div>
+      <div class="status-note loading" id="status-note" role="status">
+        <span class="status-icon" id="status-icon">&#10022;</span>
+        <span id="status-text">Summoning the map</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="map-wrap"><div id="map"></div></div>
+</main>
+
+<script>
+// Eight dates in tour order. Coordinates are approximate [lng, lat].
+// lab/venue/support/doors are fictional placeholders.
+const DATES = [
+  { d: 'FEB 06', city: 'Bergen',     venue: 'Fjordhallen',        coord: [5.3221, 60.3913],  doors: '19:00', support: 'Hollow Pines' },
+  { d: 'FEB 08', city: 'Trondheim',  venue: 'Rimstone Arena',     coord: [10.3951, 63.4305], doors: '19:30', support: 'Mourn Cathedral' },
+  { d: 'FEB 11', city: 'Oslo',       venue: 'Black Pier Arena',   coord: [10.7522, 59.9139], doors: '18:30', support: 'Ashen Choir',      sold: true },
+  { d: 'FEB 13', city: 'Gothenburg', venue: 'Ironworks Hall',     coord: [11.9746, 57.7089], doors: '19:00', support: 'Wolfmoon Rite' },
+  { d: 'FEB 15', city: 'Copenhagen', venue: 'Vesper Hall',        coord: [12.5683, 55.6761], doors: '19:00', support: 'Gravel Saint' },
+  { d: 'FEB 18', city: 'Stockholm',  venue: 'Nordlys Arena',      coord: [18.0686, 59.3293], doors: '18:30', support: 'Hollow Pines',     sold: true },
+  { d: 'FEB 20', city: 'Helsinki',   venue: 'Frostgate Hall',     coord: [24.9384, 60.1699], doors: '19:00', support: 'Ashen Choir',      sold: true },
+  { d: 'FEB 22', city: 'Tallinn',    venue: 'Old Cellar Hall',    coord: [24.7536, 59.4370], doors: '20:00', support: 'Mourn Cathedral' },
+];
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = () => window.matchMedia('(max-width: 760px)').matches;
+const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* ---- Route: bowed arcs between consecutive dates (ferries ok) ---- */
+function leg(a, b, n, bow) {
+  const k = Math.cos(60 * Math.PI / 180);          // flatten longitude
+  const dx = (b[0] - a[0]) * k, dy = b[1] - a[1];
+  const len = Math.hypot(dx, dy);
+  const out = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, off = bow * len * Math.sin(Math.PI * t);
+    out.push([a[0] + (b[0] - a[0]) * t + (-dy / len) * off / k,
+              a[1] + (b[1] - a[1]) * t + (dx / len) * off]);
+  }
+  return out;
+}
+const routeCoords = [];
+const stopIndex = [0];                               // vertex index of each date
+DATES.forEach((c, i) => {
+  if (i === 0) { routeCoords.push(c.coord); return; }
+  routeCoords.push(...leg(DATES[i - 1].coord, c.coord, 28, 0.12).slice(1));
+  stopIndex.push(routeCoords.length - 1);
+});
+// Fraction of the line length reached at each date (for line-trim-offset)
+const cum = [0];
+for (let i = 1; i < routeCoords.length; i++) {
+  const a = routeCoords[i - 1], b = routeCoords[i];
+  cum.push(cum[i - 1] + Math.hypot((b[0] - a[0]) * 0.5, b[1] - a[1]));
+}
+const stopFrac = stopIndex.map((ix) => cum[ix] / cum[cum.length - 1]);
+
+const bounds = routeCoords.reduce((b, c) => b.extend(c), new mapboxgl.LngLatBounds(routeCoords[0], routeCoords[0]));
+const overviewPad = () => phone() ? { top: 36, bottom: 64, left: 28, right: 28 } : { top: 60, bottom: 80, left: 60, right: 60 };
+// Extra top room so the stub popup above a marker stays on screen
+const cityPad = () => phone() ? { top: 190, bottom: 64, left: 30, right: 30 } : { top: 200, bottom: 80, left: 60, right: 60 };
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: {
+    basemap: {
+      theme: 'monochrome',
+      lightPreset: 'night',
+      showPointOfInterestLabels: false,
+      showRoadLabels: false,
+      showPlaceLabels: false,   // our own spiky markers replace city labels
+    },
+  },
+  center: [14, 59],
+  zoom: 4,
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+// Keep the canvas matched to the grid/flex-sized container
+new ResizeObserver(() => map.resize()).observe($('map').parentElement);
+
+/* ---- DOM list + markers ---- */
+const listEl = $('tour-list');
+const rows = [], markers = [];
+let current = -1, popup = null, playToken = 0, playing = false, progress = 0, progAnim = 0;
+
+function starSvg() {
+  let pts = '';
+  for (let i = 0; i < 16; i++) {
+    const r = i % 2 ? 5 : 14, a = Math.PI * i / 8 - Math.PI / 2;
+    pts += `${(16 + r * Math.cos(a)).toFixed(1)},${(16 + r * Math.sin(a)).toFixed(1)} `;
+  }
+  return `<svg class="star" viewBox="0 0 32 32" aria-hidden="true"><polygon points="${pts}" fill="#B3001B" stroke="#E8E2D4" stroke-width="1.6" stroke-linejoin="miter"/><circle cx="16" cy="16" r="2" fill="#0A0A0A"/></svg>`;
+}
+
+DATES.forEach((c, i) => {
+  const li = document.createElement('li');
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'date-row' + (c.sold ? ' sold-out' : '');
+  b.innerHTML = `<span class="d">${c.d}</span><span><span class="c">${c.city}</span><span class="v">${c.venue}</span></span>` +
+    (c.sold ? '<span class="stamp">SOLD OUT</span>' : '<span class="go">TICKETS</span>');
+  b.addEventListener('click', () => { stopPlay(); select(i); });
+  li.appendChild(b); listEl.appendChild(li); rows.push(b);
+
+  // Root is a plain fixed-size box (no position/transform/margin);
+  // all styling lives on the inner .mk child.
+  const root = document.createElement('div');
+  root.style.width = '30px';
+  root.style.height = '30px';
+  const el = document.createElement('div');
+  el.className = 'mk';
+  el.title = c.city;
+  el.innerHTML = starSvg() + '<span class="pulse"></span>';
+  root.appendChild(el);
+  root.addEventListener('click', (e) => { e.stopPropagation(); stopPlay(); select(i); });
+  markers.push(new mapboxgl.Marker({ element: root, anchor: 'center' }).setLngLat(c.coord));
+});
+
+function stubHtml(c) {
+  return `<div class="stub">
+    <div class="stub-main">
+      <div class="stub-kicker">${c.d} &middot; Grimfrost live</div>
+      <h3 class="stub-city">${c.city}</h3>
+      <div class="stub-venue">${c.venue}</div>
+      <div class="stub-row"><b>Support</b> ${c.support}</div>
+      ${c.sold ? '<span class="stub-sold">SOLD OUT</span>' : ''}
+    </div>
+    <div class="stub-side">
+      <div class="stub-doors"><small>DOORS</small><strong>${c.doors}</strong></div>
+      <div class="stub-admit">ADMIT<br>ONE</div>
+    </div>
+  </div>`;
+}
+
+/* ---- Progress line (line-trim-offset: hide [p,1], show 0..p) ---- */
+function applyProgress(p) {
+  progress = p;
+  if (map.getLayer('route-progress')) map.setPaintProperty('route-progress', 'line-trim-offset', [Math.min(p, 1), 1]);
+}
+function setProgress(target, ms) {
+  cancelAnimationFrame(progAnim);
+  if (reduce || !ms) { applyProgress(target); return; }
+  const from = progress, t0 = performance.now();
+  const step = (now) => {
+    const t = Math.min(1, (now - t0) / ms);
+    applyProgress(from + (target - from) * (1 - Math.pow(1 - t, 2)));
+    if (t < 1) progAnim = requestAnimationFrame(step);
+  };
+  progAnim = requestAnimationFrame(step);
+}
+
+/* ---- Selection ---- */
+function select(i, flightMs) {
+  const c = DATES[i], ms = flightMs || 2200;
+  current = i;
+  rows.forEach((r, k) => r.classList.toggle('active', k === i));
+  markers.forEach((m, k) => {
+    const el = m.getElement().firstElementChild;
+    el.classList.remove('active');
+    if (k === i) { void el.offsetWidth; el.classList.add('active'); }
+  });
+  if (rows[i].scrollIntoView && !playing) rows[i].scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+
+  if (popup) popup.remove();
+  popup = new mapboxgl.Popup({ className: 'stub-popup', offset: [0, -22], closeButton: true, closeOnMove: false, maxWidth: '300px' })
+    .setLngLat(c.coord).setHTML(stubHtml(c)).addTo(map);
+
+  const cam = { center: c.coord, zoom: phone() ? 6.2 : 6.8, padding: cityPad() };
+  if (reduce) map.jumpTo(cam); else map.flyTo({ ...cam, duration: ms, essential: false });
+  setProgress(stopFrac[i], ms);
+  setStatus('success', '✦', `${c.d} · ${c.city}${c.sold ? ' · sold out' : ''}`);
+}
+
+function overview() {
+  if (popup) { popup.remove(); popup = null; }
+  current = -1;
+  rows.forEach((r) => r.classList.remove('active'));
+  markers.forEach((m) => m.getElement().firstElementChild.classList.remove('active'));
+  const o = { padding: overviewPad(), maxZoom: 6 };
+  map.fitBounds(bounds, reduce ? { ...o, duration: 0 } : { ...o, duration: 1800 });
+  setProgress(1, 1200);
+  setStatus('success', '✦', 'Eight nights, one route');
+}
+
+function setStatus(kind, icon, text) {
+  const n = $('status-note');
+  n.classList.remove('loading', 'success', 'error');
+  n.classList.add(kind);
+  $('status-icon').textContent = icon;
+  $('status-text').textContent = text;
+}
+
+/* ---- Play tour ---- */
+function stopPlay() {
+  playToken++;
+  playing = false;
+  $('play-btn').textContent = 'Play tour';
+}
+async function playTour() {
+  if (playing) { stopPlay(); return; }
+  const token = ++playToken;
+  playing = true;
+  $('play-btn').textContent = 'Stop';
+  applyProgress(0);
+  for (let i = 0; i < DATES.length; i++) {
+    if (token !== playToken) return;
+    select(i, 2600);
+    await sleep(reduce ? 1800 : 2600 + 1500);
+  }
+  if (token === playToken) { stopPlay(); overview(); }
+}
+
+$('play-btn').addEventListener('click', playTour);
+$('reset-btn').addEventListener('click', () => { stopPlay(); overview(); });
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { stopPlay(); overview(); } });
+
+/* ---- Map layers ---- */
+map.on('style.load', () => {
+  if (!map.getSource('route')) {
+    map.addSource('route', {
+      type: 'geojson',
+      lineMetrics: true,   // required for line-trim-offset
+      data: { type: 'Feature', geometry: { type: 'LineString', coordinates: routeCoords } },
+    });
+  }
+  // Dim full route underneath, bright blood-red progress on top
+  map.addLayer({
+    id: 'route-base', type: 'line', source: 'route', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#B3001B', 'line-width': 3, 'line-opacity': 0.55, 'line-emissive-strength': 1 },
+  });
+  map.addLayer({
+    id: 'route-progress', type: 'line', source: 'route', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': '#D4132D', 'line-width': 5, 'line-emissive-strength': 1,
+      'line-trim-offset': [1, 1],
+    },
+  });
+  progress = 1;
+});
+
+map.on('load', () => {
+  map.resize();
+  markers.forEach((m) => m.addTo(map));
+  map.fitBounds(bounds, { padding: overviewPad(), maxZoom: 6, duration: 0 });
+  setStatus('success', '✦', `${DATES.length} dates · pick a night`);
+});
+
+map.on('error', (e) => {
+  if (!map.loaded()) setStatus('error', '!', 'Map failed to load');
+  console.warn(e && e.error);
+});
+</script>
+</body>
+</html>

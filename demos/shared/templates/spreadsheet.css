@@ -1,0 +1,627 @@
+/*
+  Spreadsheet -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a generic office spreadsheet -- neutral
+  greys, hairline gridlines, column letters and row numbers, a formula bar,
+  sheet tabs and conditional-formatting heat colours -- with the map embedded
+  as a floating "chart object" that has selection handles. It deliberately
+  imitates no specific product's trade dress, logo, icons or colours),
+  deliberately distinct from every other style pack in this folder: Academic
+  Paper, Aero Gadgets, Amber Terminal, Annual Report, Arena, Art Nouveau,
+  Atomic Motel, Audio Guide, Aurora Command, Blueprint, Board Game, Bottom
+  Sheet, Broadcast, Brutalist Guide, Case Board, Celestial Tarot, Chalkboard,
+  Chat Concierge, Chronicle, Clinic Finder, Code Editor, Comic Panel,
+  Constructivist, Data Notebook, Deco Voyage, Dive Log, Drop Culture, E-Ink,
+  Editorial Paper, Estate Luxe, Event Invite, Field Journal, Film Noir, Fleet
+  Ops, Frontier Poster, Grand Hotel, Herbarium, Highway Sign, Illuminated,
+  Isotype, Line Diagram, Memphis, Moving Map, Museum Label, Neon HUD, Nordic
+  Cabin, Orienteering, Papel Picado, Papercraft, Pastel Bento, Pixel Quest,
+  Postcards, Rally Dash, Raw Web, Regatta, Retro OS, Riso Zine, Ski Piste,
+  Slate Console, Soft UI, Split Flap, Stage Profile, Stained Glass, Sticker
+  Book, Storefront, Story Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt,
+  Tiki Lagoon, Trailhead, Treasure Hunt, Trip Kanban, Truck Art, Ukiyo-e
+  Coast, Vapor Sunset, Vintage Chart, Vinyl Crate, Washi Seasons, Watercolor,
+  Weather Console, Whiteboard, Zellige; and also distinct from the 24 sibling
+  packs built in parallel with it: Kintsugi, Cyanotype, Crossword, Metal
+  Tour, Periodic Table, Cross Stitch, Card Catalog, Seed Packet, Trading
+  Card, Science Fair, Modular Synth, Recipe Card, LCD Watch, Clay Toy,
+  Solarpunk, De Stijl, Block Print, Copacabana, Amphora, Dancheong, Pinball,
+  Crayon, Darkroom, Mission Patch.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/spreadsheet.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Arimo for the UI and cells, Noto Sans
+  Mono for the formula bar, cell references and numbers):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Arimo:wght@400;500;600;700&family=Noto+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  Signature touch: the map is a floating "chart object" laid over the grid
+  -- a 1px teal border, eight square resize handles (all functional in the
+  example), a draggable chart title bar and a heat-scale legend strip. The
+  grid itself uses conditional-formatting heat colours (pale peach to
+  vermilion, ink text kept AA) on the key numeric column, and the same scale
+  paints the map's circles.
+
+  Class/id contract (see spreadsheet-template.html in this same folder for a
+  full working example):
+
+  - #map                      the map container (every demo defines its own
+                               position/size; in the example it fills
+                               .chart-map inside the chart object)
+  - .app                      page shell: CSS grid of titlebar, toolbar,
+                               formula bar, sheet area, tab bar. Desktop
+                               fills 100dvh; phone flows and scrolls
+    .titlebar                   document title row (.doc-title, .menus,
+                                 .doc-state)
+    .toolbar                    button strip: .tb-btn (+ [aria-pressed=true]),
+                                 .tb-sep, .tb-spacer
+    .formula-bar                .name-box (cell ref), .fx (glyph),
+                                 .formula-input (read-only value/formula)
+  - .sheet-area               relative stage that holds the grid and the
+                               floating chart
+    .grid-scroll                the scroll container (tabindex=0) for the
+                                 grid; owns keyboard arrows
+    table.grid                  th.corner, th.col-h (A..H, .sorted-asc /
+                                 .sorted-desc, .hl), th.row-h (.hl), td
+                                 (.num, .active), tr.head, tr.total, tr.sel,
+                                 tr.blank, td.fill / th.fill (stretch cells)
+    .bar-cell                   inline-SVG bar + label inside a cell
+  - .chart-object             the floating map object (+ .selected)
+    .chart-title                draggable title bar (.chart-icon, text)
+    .chart-map                  host for #map
+    .chart-legend               legend strip under the map (.legend-bar,
+                                 .legend-swatch, .mono)
+    .handle[data-dir]           8 resize handles: nw n ne e se s sw w
+  - .statusbar                bottom row: .tabs (.tab[aria-selected=true])
+                               and .status-note (+ .loading / .error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --canvas: #FFFFFF;
+  --gridline: #E1E4E8;
+  --header: #F3F4F6;
+  --header-ink: #5F6368;
+  --toolbar: #FAFAFA;
+  --ink: #202124;
+  --ink-muted: #5F6368;
+  --rule: #DADCE0;
+  --select: #0F766E;
+  --select-fill: #E6F4F1;
+  --select-head: #CFE7E3;
+  --select-ink: #0B4F4A;
+  --heat-0: #FDECEA;
+  --heat-1: #F8B4A6;
+  --heat-2: #E4572E;
+  --heat-ink: #111111;
+  --success: #0F766E;
+  --error: #B3261E;
+
+  --font-ui: 'Arimo', Arial, 'Helvetica Neue', Helvetica, sans-serif;
+  --font-mono: 'Noto Sans Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  --row-h: 24px;
+  --colhead-h: 22px;
+  --rowhead-w: 44px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+button, input { font-family: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--select);
+  outline-offset: 1px;
+}
+
+.mono { font-family: var(--font-mono); }
+
+/* ---------- shell ---------- */
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* ---------- title row ---------- */
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 12px 2px;
+  background: var(--canvas);
+  min-width: 0;
+}
+
+.doc-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.doc-title svg { flex: none; width: 18px; height: 18px; color: var(--select); }
+
+.menus {
+  display: flex;
+  gap: 2px;
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+
+.menus span { padding: 3px 7px; border-radius: 3px; }
+
+.doc-state {
+  margin-left: auto;
+  color: var(--ink-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* ---------- toolbar ---------- */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 10px;
+  background: var(--toolbar);
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.toolbar::-webkit-scrollbar { display: none; }
+
+.tb-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tb-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.tb-btn b { font-weight: 700; font-size: 14px; }
+.tb-btn:hover { background: #ECEEF0; }
+.tb-btn:disabled { opacity: 0.38; cursor: default; background: transparent; }
+.tb-btn[aria-pressed="true"] { background: var(--select-fill); border-color: #9CCFC8; color: var(--select-ink); }
+
+.tb-sep { flex: none; width: 1px; height: 18px; margin: 0 5px; background: var(--rule); }
+.tb-spacer { flex: 1; }
+
+/* ---------- formula bar ---------- */
+.formula-bar {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  height: 28px;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--rule);
+}
+
+.name-box {
+  flex: none;
+  width: 76px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  border-right: 1px solid var(--rule);
+  background: var(--toolbar);
+}
+
+.fx {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 600;
+  color: var(--header-ink);
+  border-right: 1px solid var(--gridline);
+}
+
+.formula-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  outline: none;
+  text-overflow: ellipsis;
+}
+
+/* ---------- sheet area ---------- */
+.sheet-area {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--canvas);
+}
+
+.grid-scroll {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  outline: none;
+  background: var(--canvas);
+}
+
+table.grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  width: 100%;
+  font-size: 13px;
+}
+
+table.grid th,
+table.grid td {
+  height: var(--row-h);
+  padding: 0 8px;
+  border-right: 1px solid var(--gridline);
+  border-bottom: 1px solid var(--gridline);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  font-weight: 400;
+}
+
+table.grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  height: var(--colhead-h);
+  padding: 0 4px;
+  background: var(--header);
+  color: var(--header-ink);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  user-select: none;
+}
+
+table.grid th.col-h { cursor: pointer; }
+table.grid th.col-h:hover { background: #E8EAED; }
+
+table.grid th.row-h {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: var(--rowhead-w);
+  padding: 0;
+  background: var(--header);
+  color: var(--header-ink);
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  user-select: none;
+  cursor: default;
+}
+
+table.grid th.corner {
+  left: 0;
+  z-index: 4;
+  border-right: 1px solid var(--rule);
+}
+
+table.grid th.hl { background: var(--select-head); color: var(--select-ink); font-weight: 600; }
+
+table.grid th.col-h.sorted-asc,
+table.grid th.col-h.sorted-desc { color: var(--select-ink); }
+
+.sort-arrow {
+  display: none;
+  width: 0;
+  height: 0;
+  margin-left: 5px;
+  vertical-align: 1px;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+}
+
+.sorted-asc .sort-arrow { display: inline-block; border-bottom: 5px solid var(--select); }
+.sorted-desc .sort-arrow { display: inline-block; border-top: 5px solid var(--select); }
+
+table.grid td.fill,
+table.grid th.fill { border-right: 0; padding: 0; }
+
+table.grid td.num {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
+table.grid tr.head td {
+  background: #F8F9FA;
+  font-weight: 700;
+  border-bottom: 1px solid #C9CDD2;
+}
+
+table.grid tr.head td.num { font-family: var(--font-ui); font-size: 13px; }
+
+table.grid tr.total td {
+  font-weight: 700;
+  background: #FAFAFA;
+  border-top: 2px solid #9AA0A6;
+}
+
+table.grid tbody tr:not(.blank) td { cursor: cell; }
+
+table.grid td.bold { font-weight: 700; }
+
+/* Heat cells: ink stays AA on the full vermilion end of the scale */
+table.grid td.heat { color: var(--heat-ink); }
+
+/* Selected row: teal tint laid OVER whatever background (heat included) */
+table.grid tr.sel td {
+  background-image: linear-gradient(rgba(15, 118, 110, 0.12), rgba(15, 118, 110, 0.12));
+}
+
+/* Active cell: 2px teal border */
+table.grid td.active {
+  box-shadow: inset 0 0 0 2px var(--select);
+  background-image: linear-gradient(rgba(15, 118, 110, 0.04), rgba(15, 118, 110, 0.04));
+}
+
+.bar-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.bar-cell svg { flex: none; width: 70px; height: 10px; }
+.bar-cell .mono { font-size: 11.5px; color: var(--ink-muted); }
+
+/* ---------- floating chart object ---------- */
+.chart-object {
+  position: absolute;
+  top: 40px;
+  right: 34px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  width: 560px;
+  height: 400px;
+  max-width: calc(100% - 24px);
+  max-height: calc(100% - 52px);
+  padding: 6px;
+  background: var(--canvas);
+  border: 1px solid var(--select);
+  box-shadow: 0 6px 18px rgba(32, 33, 36, 0.2), 0 1px 3px rgba(32, 33, 36, 0.12);
+}
+
+.chart-title {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  padding: 0 4px 2px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.chart-title:active { cursor: grabbing; }
+
+.chart-icon { flex: none; width: 14px; height: 14px; fill: none; stroke: var(--select); stroke-width: 2.2; stroke-linecap: round; }
+
+.chart-map {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--gridline);
+  background: var(--header);
+}
+
+.chart-legend {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 24px;
+  padding: 2px 4px 0;
+  font-size: 11.5px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.chart-legend .mono { font-size: 11px; color: var(--ink); }
+
+.legend-bar {
+  flex: none;
+  width: 120px;
+  height: 8px;
+  border: 1px solid #C9CDD2;
+  background: linear-gradient(90deg, var(--heat-0), var(--heat-1), var(--heat-2));
+}
+
+.legend-swatch { flex: none; display: inline-block; width: 22px; height: 3px; background: var(--select); }
+
+.handle {
+  position: absolute;
+  z-index: 6;
+  width: 8px;
+  height: 8px;
+  background: #FFFFFF;
+  border: 1px solid var(--select);
+  touch-action: none;
+}
+
+.handle[data-dir="nw"] { left: -5px; top: -5px; cursor: nwse-resize; }
+.handle[data-dir="n"]  { left: calc(50% - 4px); top: -5px; cursor: ns-resize; }
+.handle[data-dir="ne"] { right: -5px; top: -5px; cursor: nesw-resize; }
+.handle[data-dir="e"]  { right: -5px; top: calc(50% - 4px); cursor: ew-resize; }
+.handle[data-dir="se"] { right: -5px; bottom: -5px; cursor: nwse-resize; }
+.handle[data-dir="s"]  { left: calc(50% - 4px); bottom: -5px; cursor: ns-resize; }
+.handle[data-dir="sw"] { left: -5px; bottom: -5px; cursor: nesw-resize; }
+.handle[data-dir="w"]  { left: -5px; top: calc(50% - 4px); cursor: ew-resize; }
+
+/* ---------- tab bar ---------- */
+.statusbar {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  background: var(--header);
+  border-top: 1px solid var(--rule);
+}
+
+.tabs { display: flex; align-items: stretch; flex: none; }
+
+.tab {
+  min-width: 82px;
+  height: 30px;
+  padding: 0 16px;
+  border: 0;
+  border-right: 1px solid var(--rule);
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tab:hover { background: #E8EAED; }
+
+.tab[aria-selected="true"] {
+  background: var(--canvas);
+  color: var(--select-ink);
+  font-weight: 700;
+  border-bottom-color: var(--select);
+}
+
+.status-note {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 14px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-note.loading::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border: 2px solid var(--gridline);
+  border-top-color: var(--select);
+  border-radius: 50%;
+  animation: sheet-spin 0.8s linear infinite;
+}
+
+.status-note.error { color: var(--error); }
+
+@keyframes sheet-spin { to { transform: rotate(360deg); } }
+
+.hidden { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .status-note.loading::before { animation: none; }
+}
+
+/* ---------- wide desktops: park the chart just right of column H (A-H end ~950px) ---------- */
+@media (min-width: 1300px) {
+  .chart-object { right: auto; left: 954px; width: min(560px, calc(100% - 970px)); }
+}
+
+/* ---------- smaller desktops ---------- */
+@media (max-width: 1100px) and (min-width: 701px) {
+  .chart-object { width: 440px; height: 340px; }
+}
+
+/* ---------- phone ---------- */
+@media (max-width: 700px) {
+  :root { --row-h: 30px; }
+
+  .app { height: auto; min-height: 100dvh; overflow: visible; grid-template-rows: auto auto auto auto auto; }
+
+  .menus, .doc-state, .tb-desktop { display: none; }
+  .titlebar { padding: 8px 16px 4px; }
+  .toolbar { padding: 4px 12px; }
+  .name-box { width: 56px; padding: 0 8px; }
+
+  .sheet-area { display: flex; flex-direction: column; overflow: visible; }
+
+  .chart-object {
+    position: relative;
+    order: -1;
+    top: auto;
+    right: auto;
+    width: 100%;
+    max-width: none;
+    height: 45dvh;
+    max-height: none;
+    border-width: 0 0 1px;
+    box-shadow: none;
+    padding: 4px 0 0;
+  }
+
+  .chart-title { padding: 0 16px 2px; cursor: default; touch-action: auto; }
+  .chart-map { border-left: 0; border-right: 0; }
+  .chart-legend { padding: 2px 16px 0; }
+  .handle { display: none; }
+
+  .grid-scroll {
+    position: static;
+    overflow-x: auto;
+    overflow-y: hidden;
+    width: 100%;
+  }
+
+  table.grid { width: max-content; }
+  table.grid tr.blank { display: none; }
+
+  .statusbar { position: sticky; bottom: 0; z-index: 8; flex-wrap: wrap; }
+  .status-note { order: -1; flex-basis: 100%; justify-content: flex-start; padding: 4px 16px; border-bottom: 1px solid var(--rule); }
+  .tab { flex: 1; min-width: 0; padding: 0 8px; }
+  .tabs { flex: 1; }
+}

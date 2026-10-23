@@ -1,0 +1,429 @@
+/*
+  Recipe Card -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: grandma's handwritten recipe card on a
+  red gingham tablecloth -- a lined 4x6 index card with a printed "From the
+  kitchen of" header, handwritten ingredients and method, a tomato-sauce
+  stain, a strip of washi tape, and the map taped beside it like a polaroid
+  photo), deliberately distinct from every other style pack in this folder:
+  Academic Paper, Aero Gadgets, Amber Terminal, Annual Report, Arena, Art
+  Nouveau, Atomic Motel, Audio Guide, Aurora Command, Blueprint, Board Game,
+  Bottom Sheet, Broadcast, Brutalist Guide, Case Board, Celestial Tarot,
+  Chalkboard, Chat Concierge, Chronicle, Clinic Finder, Code Editor, Comic
+  Panel, Constructivist, Data Notebook, Deco Voyage, Dive Log, Drop Culture,
+  E-Ink, Editorial Paper, Estate Luxe, Event Invite, Field Journal, Film
+  Noir, Fleet Ops, Frontier Poster, Grand Hotel, Herbarium, Highway Sign,
+  Illuminated, Isotype, Line Diagram, Memphis, Moving Map, Museum Label, Neon
+  HUD, Nordic Cabin, Orienteering, Papel Picado, Papercraft, Pastel Bento,
+  Pixel Quest, Postcards, Rally Dash, Raw Web, Regatta, Retro OS, Riso Zine,
+  Ski Piste, Slate Console, Soft UI, Split Flap, Stage Profile, Stained
+  Glass, Sticker Book, Storefront, Story Scroll, Swiss Grid, Tarmac Glass,
+  Thermal Receipt, Tiki Lagoon, Trailhead, Treasure Hunt, Trip Kanban, Truck
+  Art, Ukiyo-e Coast, Vapor Sunset, Vintage Chart, Vinyl Crate, Washi
+  Seasons, Watercolor, Weather Console, Whiteboard and Zellige; and also
+  distinct from the 24 sibling packs being built in parallel at the same
+  time (Kintsugi, Cyanotype, Crossword, Metal Tour, Periodic Table, Cross
+  Stitch, Card Catalog, Seed Packet, Trading Card, Science Fair, Modular
+  Synth, LCD Watch, Clay Toy, Solarpunk, De Stijl, Block Print, Copacabana,
+  Amphora, Dancheong, Spreadsheet, Pinball, Crayon, Darkroom, Mission
+  Patch).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/recipe-card.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Nanum Pen Script for everything
+  "handwritten", Merriweather for the printed header, headings and body):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&family=Merriweather:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+
+  Signature touch: the red gingham tablecloth is a pure-CSS check
+  (two crossed repeating-linear-gradients). The map stays perfectly
+  straight (never transformed); the "taped photo" tilt is faked with an
+  angled strip of translucent mint washi tape and an offset shadow. Ticking
+  an ingredient strikes it through in pen ink and drops a basil leaf on the
+  matching map doodle.
+
+  Layout archetype: RECIPE CARD ON TABLE. Desktop: the polaroid map on the
+  left, the lined card (rotated about 1deg, it holds no map) on the right.
+  Phone (<= 760px): the map photo first at about 45dvh, then the card at full
+  width; the page scrolls.
+
+  Class/id contract (see recipe-card-template.html in this same folder for a
+  full working example):
+
+  - .table                    the page: gingham tablecloth, CSS grid
+    .photo                      polaroid: white border, shadow, caption strip
+      .photo-well               inner window that holds the map; the demo owns
+                                 #map inside it (position:absolute; inset:0)
+      .photo-caption            handwritten caption under the photo
+    .tape                       a washi strip (.tape-photo top-left of photo,
+                                 .tape-card top-right of the card)
+  - .card                     the 4x6 lined index card (+ .stain sauce spot)
+    .card-from                  printed "From the kitchen of ___" line
+    .card-title                 handwritten dish / walk title
+    .card-meta                  "Serves ... Time ..." line
+    .card-h                     printed section heading (Ingredients, Method)
+    .ingredients                ul of stops
+      .ing                        li; .ing.done = ticked, .ing.active = current
+        .ing-tick                 label wrapping a real checkbox + custom box
+        .ing-name / .ing-note     stop name / small street note
+    .method                     ol of numbered walking steps (.step)
+    .progress                   handwritten "3 of 7 tasted" note
+    .card-actions / .btn        "Start over" button row
+  - .doodle                   map marker inner child (pen-drawn number circle);
+                               .doodle.active = highlighted; .doodle.done shows
+                               the basil leaf (.leaf) -- style the inner child,
+                               never the Marker root
+  - .status-note              quiet status (+ .loading / .error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --gingham: #C8312F;
+  --gingham-white: #FFFFFF;
+  --card: #FFFDF5;
+  --rule: #A8C6E8;
+  --margin: #E37B7B;
+  --ink: #23395B;
+  --ink-soft: rgba(35, 57, 91, 0.68);
+  --stain: rgba(180, 40, 20, 0.18);
+  --basil: #4E8B3A;
+  --washi: rgba(191, 227, 208, 0.82);
+  --error: #B3261E;
+
+  --font-hand: 'Nanum Pen Script', 'Segoe Print', 'Bradley Hand', cursive;
+  --font-print: 'Merriweather', Georgia, 'Times New Roman', serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  color: var(--ink);
+  font-family: var(--font-print);
+  background-color: var(--gingham-white);
+}
+
+button { font-family: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 2px dashed var(--ink);
+  outline-offset: 3px;
+}
+
+/* ---- The tablecloth: red gingham from two crossed stripe gradients ---- */
+.table {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  column-gap: clamp(28px, 4vw, 64px);
+  align-items: start;
+  padding: clamp(28px, 4vw, 56px) clamp(24px, 5vw, 72px) clamp(36px, 5vw, 64px);
+  background-color: var(--gingham-white);
+  background-image:
+    repeating-linear-gradient(0deg, rgba(200, 49, 47, 0.55) 0 28px, transparent 28px 56px),
+    repeating-linear-gradient(90deg, rgba(200, 49, 47, 0.55) 0 28px, transparent 28px 56px);
+}
+
+/* ---- Polaroid photo (the map) ---- */
+.photo {
+  position: relative;
+  background: #FFFFFF;
+  padding: 16px 16px 0;
+  border-radius: 3px;
+  box-shadow: 0 2px 3px rgba(60, 20, 10, 0.25), 8px 14px 26px rgba(60, 20, 10, 0.28);
+}
+
+.photo-well {
+  position: relative;
+  height: clamp(440px, calc(100dvh - 190px), 760px);
+  background: #E9E4D8;
+  box-shadow: inset 0 0 0 1px rgba(35, 57, 91, 0.2);
+}
+
+.photo-caption {
+  margin: 0;
+  padding: 8px 8px 10px;
+  text-align: center;
+  font-family: var(--font-hand);
+  font-size: 30px;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+/* ---- Washi tape: translucent mint strips ---- */
+.tape {
+  position: absolute;
+  width: 128px;
+  height: 34px;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.35) 0 6px, transparent 6px 12px),
+    var(--washi);
+  box-shadow: 0 1px 3px rgba(35, 57, 91, 0.2);
+  pointer-events: none;
+  z-index: 2;
+  /* zig-zag torn ends */
+  clip-path: polygon(0 0, 100% 0, 97% 25%, 100% 50%, 97% 75%, 100% 100%, 0 100%, 3% 75%, 0 50%, 3% 25%);
+}
+.tape-photo { top: -14px; left: -26px; transform: rotate(-38deg); }
+.tape-card  { top: -16px; right: 18px; transform: rotate(5deg); }
+
+/* ---- The index card ---- */
+.card {
+  position: relative;
+  margin-top: 10px;
+  padding: 18px 22px 24px 66px;
+  background-color: var(--card);
+  background-image:
+    linear-gradient(90deg, transparent 0 48px, var(--margin) 48px 50px, transparent 50px),
+    repeating-linear-gradient(180deg, transparent 0 31px, var(--rule) 31px 32px);
+  background-position: 0 0, 0 14px;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(60, 20, 10, 0.3), 6px 12px 24px rgba(60, 20, 10, 0.26);
+  transform: rotate(1deg);
+  font-size: 15px;
+  line-height: 32px;
+}
+
+/* tomato-sauce stain: pure decoration, never intercepts clicks */
+.stain {
+  position: absolute;
+  right: 26px;
+  bottom: 54px;
+  width: 92px;
+  height: 84px;
+  border-radius: 56% 44% 52% 48% / 48% 58% 42% 52%;
+  background:
+    radial-gradient(circle at 70% 30%, rgba(180, 40, 20, 0.16) 0 14%, transparent 15%),
+    radial-gradient(ellipse at 50% 50%, var(--stain) 0 55%, rgba(180, 40, 20, 0.07) 70%, transparent 72%);
+  pointer-events: none;
+}
+.stain::after {
+  content: '';
+  position: absolute;
+  left: -22px; top: 50px;
+  width: 16px; height: 14px;
+  border-radius: 50%;
+  background: var(--stain);
+}
+
+.card-from {
+  margin: 0;
+  font-size: 11px;
+  font-style: italic;
+  letter-spacing: 0.04em;
+  line-height: 32px;
+  color: var(--ink-soft);
+}
+.card-from b {
+  font-style: normal;
+  font-family: var(--font-hand);
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--ink);
+  border-bottom: 1px solid var(--ink-soft);
+  padding: 0 10px;
+}
+
+.card-title {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-weight: 400;
+  font-size: 42px;
+  line-height: 40px;
+  color: var(--ink);
+}
+
+.card-meta {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: 22px;
+  line-height: 32px;
+  color: var(--ink-soft);
+}
+
+.card-h {
+  margin: 0;
+  font-family: var(--font-print);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  line-height: 32px;
+  color: var(--ink);
+}
+
+/* ---- Ingredients (stops) ---- */
+.ingredients, .method {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-hand);
+  font-size: 23px;
+  line-height: 32px;
+  color: var(--ink);
+}
+
+.ing { position: relative; }
+
+.ing-tick {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-height: 32px;
+  cursor: pointer;
+}
+.ing-tick input {
+  position: absolute;
+  opacity: 0;
+  width: 1px; height: 1px;
+}
+.ing-box {
+  flex: 0 0 auto;
+  align-self: center;
+  position: relative;
+  width: 18px; height: 18px;
+  border: 2px solid var(--ink);
+  border-radius: 3px 5px 3px 6px;
+}
+.ing-tick input:checked + .ing-box::after {
+  content: '';
+  position: absolute;
+  left: 3px; top: -7px;
+  width: 7px; height: 16px;
+  border-right: 3px solid var(--basil);
+  border-bottom: 3px solid var(--basil);
+  transform: rotate(38deg);
+}
+.ing-tick input:focus-visible + .ing-box { outline: 2px dashed var(--ink); outline-offset: 3px; }
+
+.ing-name { min-width: 0; overflow-wrap: anywhere; }
+.ing-note {
+  font-family: var(--font-print);
+  font-size: 10.5px;
+  font-style: italic;
+  color: var(--ink-soft);
+}
+
+.ing.done .ing-name {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: var(--ink);
+  opacity: 0.62;
+}
+.ing.active .ing-name {
+  background: linear-gradient(transparent 58%, rgba(255, 224, 110, 0.7) 58% 92%, transparent 92%);
+}
+
+/* ---- Method ---- */
+.method { counter-reset: step; }
+.step {
+  counter-increment: step;
+  position: relative;
+  padding-left: 26px;
+}
+.step::before {
+  content: counter(step) '.';
+  position: absolute;
+  left: 0;
+  color: var(--margin);
+}
+
+/* ---- Progress + button ---- */
+.progress {
+  margin: 4px 0 0;
+  font-family: var(--font-hand);
+  font-size: 30px;
+  line-height: 32px;
+  color: var(--basil);
+}
+
+.card-actions { margin-top: 8px; }
+
+.btn {
+  font-family: var(--font-hand);
+  font-size: 22px;
+  line-height: 1;
+  padding: 4px 16px 6px;
+  background: transparent;
+  border: 2px solid var(--ink);
+  border-radius: 14px 18px 12px 20px / 18px 12px 20px 14px;
+  cursor: pointer;
+}
+.btn:hover { background: rgba(78, 139, 58, 0.14); }
+
+/* ---- Map markers: pen-drawn number circles (style the inner child) ---- */
+.doodle {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px; height: 34px;
+  padding: 0;
+  font-family: var(--font-hand);
+  font-size: 24px;
+  line-height: 1;
+  color: var(--ink);
+  background: #FFFDF5;
+  border: 2.5px solid var(--ink);
+  border-radius: 52% 48% 55% 45% / 48% 54% 46% 52%;
+  box-shadow: 1px 2px 0 rgba(35, 57, 91, 0.3);
+  cursor: pointer;
+}
+.doodle.active {
+  background: #FFE88A;
+  box-shadow: 0 0 0 3px rgba(255, 253, 245, 0.95), 0 0 0 5px var(--ink);
+}
+.doodle .leaf { display: none; }
+.doodle.done { background: #E7F1DD; border-color: var(--basil); color: var(--basil); }
+.doodle.done .leaf {
+  display: block;
+  position: absolute;
+  right: -9px; top: -11px;
+  width: 15px; height: 10px;
+  background: var(--basil);
+  border-radius: 100% 0 100% 0;
+  transform: rotate(-35deg);
+  box-shadow: 0 0 0 1.5px #FFFDF5;
+}
+
+/* ---- Status ---- */
+.status-note {
+  position: absolute;
+  left: 10px; top: 10px;
+  margin: 0;
+  padding: 2px 10px;
+  font-family: var(--font-hand);
+  font-size: 20px;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  z-index: 3;
+  pointer-events: none;
+}
+.status-note.error { color: var(--error); }
+
+.hidden { display: none !important; }
+
+/* ---- Phone: map photo first (~45dvh), card full width below ---- */
+@media (max-width: 760px) {
+  .table {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 40px;
+    padding: 28px 16px 40px;
+  }
+  .photo { padding: 10px 10px 0; }
+  .photo-well { height: 45dvh; min-height: 280px; }
+  .photo-caption { font-size: 26px; }
+  .tape-photo { left: -14px; top: -10px; width: 100px; }
+  .card { padding: 16px 14px 22px 54px; background-position: -8px 0, 0 14px; }
+  .card { background-image:
+      linear-gradient(90deg, transparent 0 40px, var(--margin) 40px 42px, transparent 42px),
+      repeating-linear-gradient(180deg, transparent 0 31px, var(--rule) 31px 32px); }
+  .card-title { font-size: 36px; }
+  .stain { width: 70px; height: 64px; right: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

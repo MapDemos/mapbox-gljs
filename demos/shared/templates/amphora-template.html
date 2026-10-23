@@ -1,0 +1,352 @@
+<!--
+  Working EXAMPLE of the Amphora style pack (amphora.css, in this same
+  folder). Open this file directly to see the pattern working with twelve
+  archaeological sites of Athens on Mapbox Standard (faded theme, dusk preset,
+  3D objects on). The map is the body of a black-glaze vase; below it a frieze
+  of black-figure vignettes (amphora = all eras, runner = Archaic, warrior =
+  Classical, philosopher = Hellenistic, temple = Roman) filters the numbered
+  markers and flies the camera to fit them. Click a marker (or a site chip on
+  the pottery shard) for its details; Left / Right arrow keys step the eras
+  (reduced motion: jumpTo, no animation). Copy the markup below into your own
+  demo and link amphora.css from its <head> -- see the class/id contract
+  documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built from
+  a design brief (Greek black-figure pottery: terracotta, black glaze, incised
+  cream, meander borders) at the user's request for something distinct from
+  every other pack in this folder. The sites are real public landmarks with
+  approximate positions; dates are rounded and the copy is a short
+  illustrative summary -- swap in your own.
+
+  What's NOT included: search/geocoding, routing, popups, terrain, or a
+  hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Athens in Black Figure</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=GFS+Didot&family=Fira+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="amphora.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map (inside the map well). */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<div class="vase-page">
+
+  <svg class="meander" height="28" aria-hidden="true">
+    <defs>
+      <pattern id="key-top" width="20" height="20" patternUnits="userSpaceOnUse">
+        <path d="M0 17H3V3H17V17H20M7 14V7H13V14" fill="none" stroke="#1A1411" stroke-width="2.2" />
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#key-top)" />
+  </svg>
+
+  <header class="vase-head">
+    <svg class="owl" viewBox="0 0 40 48" aria-hidden="true">
+      <path class="fig" d="M20 4 L26 9 Q33 10 34 20 Q36 34 28 44 H12 Q4 34 6 20 Q7 10 14 9 Z" />
+      <circle cx="14" cy="18" r="5" fill="#F2E3C6" /><circle cx="26" cy="18" r="5" fill="#F2E3C6" />
+      <circle cx="14" cy="18" r="2" class="fig" /><circle cx="26" cy="18" r="2" class="fig" />
+      <path d="M18 22 L20 27 L22 22 Z" fill="#E3A06E" />
+      <path class="inc" d="M12 32 l3 3 l3 -3 M22 32 l3 3 l3 -3 M16 39 l3 3 l3 -3" />
+    </svg>
+    <div>
+      <h1>Athens in Black Figure</h1>
+      <p class="vase-sub">Twelve sites, four eras. Pick a vignette on the frieze, or press the arrow keys.</p>
+    </div>
+  </header>
+
+  <main class="vase-main">
+    <section class="vase" aria-label="Map and era frieze">
+      <div class="vase-body">
+        <div class="map-well"><div id="map"></div></div>
+      </div>
+
+      <div class="frieze" id="frieze" role="group" aria-label="Eras"></div>
+    </section>
+
+    <aside class="shard-wrap" aria-live="polite">
+      <div class="shard"><div class="shard-face">
+        <p class="shard-era" id="shard-era"></p>
+        <h2 class="shard-title" id="shard-title"></h2>
+        <p class="shard-date" id="shard-date"></p>
+        <p class="shard-text" id="shard-text"></p>
+        <ul class="shard-sites" id="shard-sites"></ul>
+        <p class="status-note loading" id="status-note">Firing the kiln</p>
+      </div></div>
+    </aside>
+  </main>
+
+  <svg class="meander" height="28" aria-hidden="true">
+    <defs>
+      <pattern id="key-bottom" width="20" height="20" patternUnits="userSpaceOnUse">
+        <path d="M0 17H3V3H17V17H20M7 14V7H13V14" fill="none" stroke="#1A1411" stroke-width="2.2" />
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#key-bottom)" />
+  </svg>
+</div>
+
+<script>
+// Eras: each has a black-figure vignette (inline SVG, 80x56), a date range and a blurb.
+const ERAS = [
+  { id: 'all', name: 'All eras', date: '1100 BC - AD 400', title: 'Athens, across the ages',
+    text: 'Twelve places where the city kept its memory. Choose an era on the frieze, or click a numbered marker to read its story.',
+    svg: '<path class="fig" d="M34 6h12v6q12 4 12 20 0 12-9 20v2H31v-2q-9-8-9-20 0-16 12-20z"/><path class="fig-line" stroke-width="3" d="M34 10q-8 2-8 10M46 10q8 2 8 10"/><path class="inc" d="M25 24h30M24 34h32M27 44h26"/><path class="inc" d="M29 29h4v4M37 29h4v4M45 29h4v4"/>' },
+  { id: 'archaic', name: 'Archaic', date: '700 - 480 BC', title: 'The Archaic age',
+    text: 'Tyrants and reformers gave Athens its first assembly hill, its cemeteries of painted vases and its first games.',
+    svg: '<circle class="fig" cx="49" cy="12" r="6"/><path class="fig-line" stroke-width="8" d="M45 19L40 36"/><path class="fig-line" stroke-width="4.5" d="M44 22L54 29L61 24M44 22L34 26L26 32M40 36L52 44L50 54M40 36L28 46L14 50"/><path class="inc" d="M46 12h5M42 24l-3 9"/><path class="fig-line" stroke-width="2" d="M6 55H74"/>' },
+  { id: 'classical', name: 'Classical', date: '480 - 323 BC', title: 'The Classical age',
+    text: 'After the Persian wars the city rebuilt in marble: temples, theatre and a market where democracy was practised daily.',
+    svg: '<path class="fig" d="M50 7c4 0 7 3 7 7s-3 7-7 7-7-3-7-7 3-7 7-7z"/><path class="fig" d="M46 8q4-6 10-2-3 1-4 3z"/><path class="fig-line" stroke-width="9" d="M51 22L51 42"/><path class="fig-line" stroke-width="5" d="M51 42L46 55M51 42L58 55"/><path class="fig-line" stroke-width="2" d="M66 6L66 56"/><circle class="fig" cx="40" cy="34" r="15"/><circle class="inc" cx="40" cy="34" r="11"/><circle class="inc" cx="40" cy="34" r="4"/>' },
+  { id: 'hellenistic', name: 'Hellenistic', date: '323 - 31 BC', title: 'The Hellenistic age',
+    text: 'Athens was no longer a great power but a school for the Mediterranean; kings gave it stoas, clocks and libraries.',
+    svg: '<circle class="fig" cx="38" cy="12" r="6.5"/><path class="fig" d="M34 16q4 10 8 0v6z"/><path class="fig" d="M29 22q8-5 16 0L52 55H22z"/><path class="fig-line" stroke-width="4" d="M44 27L58 22"/><path class="fig-line" stroke-width="2.5" d="M62 6L62 56"/><path class="inc" d="M33 30l-2 22M38 28v26M43 30l3 22M36 12h4"/>' },
+  { id: 'roman', name: 'Roman', date: '31 BC - AD 400', title: 'The Roman age',
+    text: 'Emperors, Hadrian above all, adopted Athens as a cultural capital and finished what the Greeks had begun.',
+    svg: '<path class="fig" d="M8 25L40 6L72 25z"/><path class="fig" d="M10 27H70V31H10z"/><path class="fig" d="M14 33h6v18h-6zM25 33h6v18h-6zM36 33h6v18h-6zM47 33h6v18h-6zM58 33h6v18h-6z"/><path class="fig" d="M8 51H72V55H8z"/><path class="inc" d="M16 23L40 10L64 23M17 36v12M28 36v12M39 36v12M50 36v12M61 36v12"/>' },
+];
+
+// Sites (era = ERAS id). Coordinates approximate [lng, lat]. Greek letters label the markers.
+const SITES = [
+  { n: 'Α', name: 'Kerameikos', era: 'archaic', date: 'in use from c. 1100 BC', coord: [23.7115, 37.9785],
+    text: 'The potters\' quarter and city cemetery, where black-figure vases were made, then buried with the dead.' },
+  { n: 'Β', name: 'Pnyx', era: 'archaic', date: 'assembly hill, c. 507 BC', coord: [23.7170, 37.9720],
+    text: 'A rocky hillside where citizens first gathered to vote after the reforms of Cleisthenes.' },
+  { n: 'Γ', name: 'Parthenon, Acropolis', era: 'classical', date: '447 - 432 BC', coord: [23.7257, 37.9715],
+    text: 'The marble temple of Athena Parthenos, crowned with a sculpted frieze and the city\'s proudest silhouette.' },
+  { n: 'Δ', name: 'Temple of Hephaestus', era: 'classical', date: 'c. 449 - 415 BC', coord: [23.7218, 37.9757],
+    text: 'A Doric temple above the Agora, among the best preserved of the ancient Greek world.' },
+  { n: 'Ε', name: 'Theatre of Dionysus', era: 'classical', date: '5th c. BC, rebuilt c. 330 BC', coord: [23.7282, 37.9702],
+    text: 'On the Acropolis slope, where the plays of Aeschylus, Sophocles and Euripides were first staged.' },
+  { n: 'Ζ', name: 'Stoa of Attalos', era: 'hellenistic', date: 'c. 150 BC', coord: [23.7240, 37.9757],
+    text: 'A two-storey colonnade of shops given by a king of Pergamon, rebuilt in the 1950s as the Agora museum.' },
+  { n: 'Η', name: 'Tower of the Winds', era: 'hellenistic', date: 'c. 50 BC', coord: [23.7263, 37.9745], nudge: [-6, 12],
+    text: 'An octagonal marble clock tower with a water clock, sundials and reliefs of the eight winds.' },
+  { n: 'Θ', name: 'Hadrian\'s Library', era: 'roman', date: 'AD 132', coord: [23.7259, 37.9758], nudge: [8, -12],
+    text: 'A walled courtyard of columns, reading rooms and a pool, built beside the Roman Agora by the philhellene emperor.' },
+  { n: 'Ι', name: 'Temple of Olympian Zeus', era: 'roman', date: 'begun 6th c. BC, finished AD 131', coord: [23.7331, 37.9693],
+    text: 'Colossal Corinthian columns, started by tyrants and completed by Hadrian after six centuries.' },
+  { n: 'Κ', name: 'Panathenaic Stadium', era: 'roman', date: 'marble, AD 144', coord: [23.7411, 37.9684],
+    text: 'A horseshoe stadium rebuilt in white marble by Herodes Atticus, host of the 1896 Olympic Games.' },
+  { n: 'Λ', name: 'Philopappos Monument', era: 'roman', date: 'AD 114 - 116', coord: [23.7219, 37.9687],
+    text: 'A marble tomb on Philopappos Hill, with the best view of the Acropolis in the city.' },
+];
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const phone = () => window.matchMedia('(max-width: 900px)').matches;
+let eraIdx = 0;      // index into ERAS
+let siteIdx = -1;    // selected site, -1 = none
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: {
+    basemap: {
+      lightPreset: 'dusk',
+      theme: 'faded',
+      showPointOfInterestLabels: false,
+      show3dObjects: true,
+    },
+  },
+  center: [23.7260, 37.9730],
+  zoom: 14.2,
+  pitch: 50,
+  bearing: -12,
+});
+new ResizeObserver(() => map.resize()).observe($('map').parentElement);
+
+/* ---- Frieze (era filter) ---- */
+const eraBtns = ERAS.map((e, i) => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'era';
+  b.setAttribute('aria-pressed', 'false');
+  b.innerHTML = `<svg class="era-fig" viewBox="0 0 80 56" aria-hidden="true">${e.svg}</svg><span class="era-name">${e.name}</span><span class="era-date">${e.date}</span>`;
+  b.addEventListener('click', () => setEra(i));
+  $('frieze').appendChild(b);
+  return b;
+});
+
+/* ---- Markers (root untouched; inner button styled) ---- */
+const mkObjs = [];
+const markers = SITES.map((s, i) => {
+  const root = document.createElement('div');
+  root.innerHTML = `<button class="amph-marker" type="button" aria-label="${s.n}: ${s.name}">${s.n}</button>`;
+  const btn = root.firstElementChild;
+  btn.addEventListener('click', () => {
+    const k = ERAS.findIndex((e) => e.id === s.era);
+    if (eraIdx !== 0 && eraIdx !== k) setEra(k, true);
+    selectSite(i);
+  });
+  const mk = new mapboxgl.Marker({ element: root, offset: s.nudge || [0, 0] }).setLngLat(s.coord).addTo(map);
+  mkObjs.push(mk);
+  return btn;
+});
+
+/* ---- Screen-space collision pass: fan out markers closer than MIN_GAP px ---- */
+function declutter() {
+  const MIN_GAP = 38, MAX_SHIFT = 80;
+  const base = SITES.map((s) => map.project(s.coord));
+  const off = SITES.map((s) => ({ x: (s.nudge || [0, 0])[0], y: (s.nudge || [0, 0])[1] }));
+  for (let it = 0; it < 40; it++) {
+    let moved = false;
+    for (let a = 0; a < SITES.length; a++) {
+      for (let b = a + 1; b < SITES.length; b++) {
+        let dx = base[a].x + off[a].x - base[b].x - off[b].x;
+        let dy = base[a].y + off[a].y - base[b].y - off[b].y;
+        let d = Math.hypot(dx, dy);
+        if (d >= MIN_GAP) continue;
+        if (d < 0.01) { const t = (a * 2.4 + b); dx = Math.cos(t); dy = Math.sin(t); d = 1; }
+        const push = (MIN_GAP - d) / 2 + 0.5;
+        const ux = dx / d, uy = dy / d;
+        off[a].x += ux * push; off[a].y += uy * push;
+        off[b].x -= ux * push; off[b].y -= uy * push;
+        moved = true;
+      }
+    }
+    off.forEach((o) => { const m = Math.hypot(o.x, o.y); if (m > MAX_SHIFT) { o.x *= MAX_SHIFT / m; o.y *= MAX_SHIFT / m; } });
+    if (!moved) break;
+  }
+  mkObjs.forEach((m, i) => m.setOffset([off[i].x, off[i].y]));
+}
+map.on('move', declutter);
+map.on('resize', declutter);
+map.on('load', declutter);
+
+/* ---- Camera ---- */
+function fitSites(list) {
+  if (!list.length) return;
+  const b = list.reduce((acc, s) => acc.extend(s.coord), new mapboxgl.LngLatBounds(list[0].coord, list[0].coord));
+  const opts = {
+    padding: phone() ? { top: 54, bottom: 64, left: 40, right: 40 } : { top: 84, bottom: 72, left: 70, right: 70 },
+    pitch: 50, bearing: -12, maxZoom: 16.2,
+    duration: reduce ? 0 : 1800,
+  };
+  if (reduce) map.jumpTo(map.cameraForBounds(b, opts));
+  else map.fitBounds(b, opts);
+}
+
+function flyToSite(s) {
+  const o = { center: s.coord, zoom: 16.4, pitch: 58, bearing: -12,
+              padding: { top: 30, bottom: 30, left: 10, right: 10 } };
+  if (reduce) map.jumpTo(o); else map.flyTo({ ...o, duration: 2200, essential: false });
+}
+
+/* ---- State ---- */
+function visibleSites() {
+  const id = ERAS[eraIdx].id;
+  return SITES.filter((s) => id === 'all' || s.era === id);
+}
+
+function setEra(i, keepCamera) {
+  eraIdx = (i + ERAS.length) % ERAS.length;
+  siteIdx = -1;
+  const id = ERAS[eraIdx].id;
+  eraBtns.forEach((b, k) => {
+    b.classList.toggle('active', k === eraIdx);
+    b.setAttribute('aria-pressed', String(k === eraIdx));
+  });
+  markers.forEach((m, k) => {
+    m.classList.toggle('dim', id !== 'all' && SITES[k].era !== id);
+    m.classList.remove('active');
+  });
+  if (map.getLayer('sites-halo')) {
+    const f = id === 'all' ? null : ['==', ['get', 'era'], id];
+    map.setFilter('sites-halo', f);
+    map.setFilter('sites-ring', f);
+  }
+  eraBtns[eraIdx].scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+  renderShard();
+  if (!keepCamera) fitSites(visibleSites());
+}
+
+function selectSite(i) {
+  siteIdx = i;
+  markers.forEach((m, k) => m.classList.toggle('active', k === i));
+  renderShard();
+  flyToSite(SITES[i]);
+}
+
+function renderShard() {
+  const list = visibleSites();
+  const eraOf = (s) => ERAS.find((e) => e.id === s.era);
+  if (siteIdx >= 0) {
+    const s = SITES[siteIdx];
+    $('shard-era').textContent = `${s.n} · ${eraOf(s).name} era`;
+    $('shard-title').textContent = s.name;
+    $('shard-date').textContent = s.date;
+    $('shard-text').textContent = s.text;
+  } else {
+    const e = ERAS[eraIdx];
+    $('shard-era').textContent = e.id === 'all' ? 'Overview' : `${e.name} era`;
+    $('shard-title').textContent = e.title;
+    $('shard-date').textContent = `${e.date} · ${list.length} sites`;
+    $('shard-text').textContent = e.text;
+  }
+  $('shard-sites').innerHTML = '';
+  list.forEach((s) => {
+    const i = SITES.indexOf(s);
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'site-btn' + (i === siteIdx ? ' active' : '');
+    b.innerHTML = `<span class="num">${s.n}</span>${s.name}`;
+    b.addEventListener('click', () => selectSite(i));
+    li.appendChild(b);
+    $('shard-sites').appendChild(li);
+  });
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); setEra(eraIdx + 1); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); setEra(eraIdx - 1); }
+  else if (e.key === 'Escape') setEra(0);
+});
+
+/* ---- Map layers: a glowing pool and cream ring under each active site ---- */
+map.on('style.load', () => {
+  map.addSource('sites', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: SITES.map((s) => ({
+      type: 'Feature', properties: { era: s.era }, geometry: { type: 'Point', coordinates: s.coord } })) },
+  });
+  map.addLayer({
+    id: 'sites-halo', type: 'circle', source: 'sites', slot: 'top',
+    paint: { 'circle-radius': 30, 'circle-color': '#C8643B', 'circle-opacity': 0.4, 'circle-blur': 0.7,
+             'circle-pitch-alignment': 'map', 'circle-emissive-strength': 1 },
+  });
+  map.addLayer({
+    id: 'sites-ring', type: 'circle', source: 'sites', slot: 'top',
+    paint: { 'circle-radius': 22, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#F2E3C6',
+             'circle-stroke-width': 1.5, 'circle-stroke-opacity': 0.8,
+             'circle-pitch-alignment': 'map', 'circle-emissive-strength': 1 },
+  });
+  setEra(eraIdx, true);
+  $('status-note').classList.add('hidden');
+});
+
+map.on('error', (e) => {
+  const n = $('status-note');
+  n.classList.remove('hidden', 'loading');
+  n.classList.add('error');
+  n.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+setEra(0, true);
+map.once('load', () => fitSites(SITES));
+window.addEventListener('resize', () => { if (siteIdx < 0) fitSites(visibleSites()); });
+</script>
+</body>
+</html>

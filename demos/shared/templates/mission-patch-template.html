@@ -1,0 +1,382 @@
+<!--
+  Working EXAMPLE of the Mission Patch style pack (mission-patch.css, in
+  this same folder). Open this file directly to see the pattern working
+  with eight rocket launch sites of the world on Mapbox Standard
+  Satellite as a globe. A Velcro board of embroidered patches (inline SVG:
+  circle, shield and hexagon shapes with merrowed borders, textPath rim
+  lettering and simple emblems) sits on the left; the globe sits on the
+  right with a patch-ringed marker per site. Pick a patch or a marker: the
+  globe flies to the pad and a gold, white-stitched launch trajectory is
+  drawn progressively along a plausible launch azimuth, while a stitched
+  info card shows the site facts. "Back to orbit" returns to the slowly
+  spinning globe. Copy the markup below into your own demo and link
+  mission-patch.css from its <head> -- see the class/id contract
+  documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (space-mission patches on a flight-jacket Velcro
+  board) at the user's request for something distinct from every other
+  pack in this folder. The launch sites are real public places; the
+  agency-free patch names, mottos and artwork are fictional placeholders,
+  and the trajectories are illustrative azimuths, not real flight paths.
+
+  What's NOT included: search/geocoding, routing, popups, real telemetry,
+  or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mission Patch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Stardos+Stencil:wght@400;700&family=Saira+Semi+Condensed:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="mission-patch.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<!-- shared satin-stitch sheen pattern for every patch -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <pattern id="mp-satin" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
+      <rect width="3" height="1.1" fill="rgba(255,255,255,0.16)"/>
+      <rect y="1.7" width="3" height="1.1" fill="rgba(0,0,0,0.14)"/>
+    </pattern>
+  </defs>
+</svg>
+
+<div class="app">
+  <div class="map-wrap"><div id="map"></div></div>
+
+  <main class="board">
+    <header class="nametape">
+      <h1>Launch Wall</h1>
+      <div class="sub">Eight pads &middot; one jacket</div>
+    </header>
+
+    <section class="stitch-card" aria-live="polite">
+      <div class="card-kicker" id="card-kicker">Mission briefing</div>
+      <h2 class="card-title" id="card-title">Pick a patch</h2>
+      <p id="card-blurb">Tap an embroidered patch or a ringed marker on the globe to fly to a launch pad and stitch in its trajectory.</p>
+      <dl class="card-meta hidden" id="card-meta">
+        <dt>Country</dt><dd id="m-country"></dd>
+        <dt>Latitude</dt><dd id="m-lat"></dd>
+        <dt>Azimuth</dt><dd id="m-az"></dd>
+        <dt>Mission</dt><dd id="m-mission"></dd>
+      </dl>
+      <div class="card-actions">
+        <button class="btn btn-primary" id="back-btn" type="button">Back to orbit</button>
+        <div class="status-note hidden" id="status-note"><span class="status-icon" id="status-icon">&#10003;</span><span id="status-text"></span></div>
+      </div>
+    </section>
+
+    <section class="velcro" aria-label="Mission patches">
+      <div class="patch-grid" id="patch-grid"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+// ---- Data: real public launch sites, fictional patch names/colours ----
+// az = typical launch azimuth in degrees clockwise from north (illustrative)
+const SITES = [
+  { name: 'Cape Canaveral', country: 'United States', lat: 28.5729, lng: -80.649, az: 90, azNote: 'due east', mission: 'Halcyon Dawn',
+    blurb: 'Florida’s Space Coast: eastward launches ride the Earth’s spin out over the Atlantic.',
+    shape: 'circle', top: 'Halcyon Dawn', bottom: 'Tidewater Flight', emblem: 'rocket',
+    c: { field: '#1B2F6B', edge: '#E0B23C', t1: '#F4F1E8', t2: '#E0B23C', t3: '#D33A2C' }, tilt: -3 },
+  { name: 'Baikonur Cosmodrome', country: 'Kazakhstan', lat: 45.965, lng: 63.305, az: 62, azNote: 'north-east', mission: 'Steppe Star',
+    blurb: 'A steppe launch field where north-east tracks reach the classic 51.6° station orbit.',
+    shape: 'shield', top: 'Steppe Star', bottom: 'Baikonur', emblem: 'starorbit',
+    c: { field: '#8E1F1A', edge: '#E0B23C', t1: '#F4F1E8', t2: '#E0B23C', t3: '#4BA3E3' }, tilt: 2.5 },
+  { name: 'Guiana Space Centre', country: 'France (Kourou, French Guiana)', lat: 5.239, lng: -52.769, az: 90, azNote: 'due east', mission: 'Equator Run',
+    blurb: 'Five degrees from the equator: the biggest free speed boost on any launch pad.',
+    shape: 'hex', top: 'Equator Run', bottom: 'Kourou', emblem: 'equator',
+    c: { field: '#1F5A3A', edge: '#F4F1E8', t1: '#F4F1E8', t2: '#E0B23C', t3: '#F28C28' }, tilt: -2 },
+  { name: 'Vandenberg', country: 'United States', lat: 34.742, lng: -120.572, az: 190, azNote: 'polar, heading south', mission: 'Polar Sweep',
+    blurb: 'California’s west coast: launches head south over open Pacific into polar orbits.',
+    shape: 'circle', top: 'Polar Sweep', bottom: 'Pacific Range', emblem: 'polar',
+    c: { field: '#124A7A', edge: '#4BA3E3', t1: '#F4F1E8', t2: '#4BA3E3', t3: '#E0B23C' }, tilt: 3 },
+  { name: 'Wenchang', country: 'China', lat: 19.614, lng: 110.951, az: 100, azNote: 'east-south-east', mission: 'Jade Lantern',
+    blurb: 'A tropical island coast on Hainan, chosen for its low latitude and sea-facing range.',
+    shape: 'shield', top: 'Jade Lantern', bottom: 'Hainan', emblem: 'moon',
+    c: { field: '#7A1F2B', edge: '#F28C28', t1: '#F4F1E8', t2: '#E0B23C', t3: '#F28C28' }, tilt: -2.5 },
+  { name: 'Satish Dhawan', country: 'India (Sriharikota)', lat: 13.72, lng: 80.23, az: 140, azNote: 'south-east, skirting Sri Lanka', mission: 'Saffron Arc',
+    blurb: 'A barrier island on the Bay of Bengal; southward dog-legs keep clear of Sri Lanka.',
+    shape: 'hex', top: 'Saffron Arc', bottom: 'Sriharikota', emblem: 'comet',
+    c: { field: '#C4631A', edge: '#1B2440', t1: '#F4F1E8', t2: '#1B2440', t3: '#3E8E5B' }, tilt: 2 },
+  { name: 'Mahia Peninsula', country: 'New Zealand', lat: -39.26, lng: 177.865, az: 35, azNote: 'north-east (sun-synchronous)', mission: 'Long White Arc',
+    blurb: 'A windswept peninsula on the east coast of the North Island, built for small rockets.',
+    shape: 'circle', top: 'Long White Arc', bottom: 'Mahia', emblem: 'cross',
+    c: { field: '#12302A', edge: '#3E8E5B', t1: '#F4F1E8', t2: '#E0B23C', t3: '#4BA3E3' }, tilt: -3 },
+  { name: 'Plesetsk Cosmodrome', country: 'Russia', lat: 62.925, lng: 40.577, az: 8, azNote: 'near-polar, heading north', mission: 'Boreal Watch',
+    blurb: 'High in the north, with launches climbing toward steep, near-polar orbits.',
+    shape: 'shield', top: 'Boreal Watch', bottom: 'Plesetsk', emblem: 'boreal',
+    c: { field: '#1D2E55', edge: '#F4F1E8', t1: '#F4F1E8', t2: '#4BA3E3', t3: '#3E8E5B' }, tilt: 2.5 },
+];
+
+// ---- Embroidered patch SVG builders (viewBox 0 0 120 120) ----
+const SHAPES = {
+  circle: { d: 'M6 60 A54 54 0 1 1 114 60 A54 54 0 1 1 6 60 Z', topPath: 'M20 60 A40 40 0 0 1 100 60', botPath: 'M14 60 A46 46 0 0 0 106 60', cy: 60, s: 0.95 },
+  hex:    { d: 'M60 6 L106.8 33 L106.8 87 L60 114 L13.2 87 L13.2 33 Z', topPath: 'M22 44 Q60 16 98 44', botY: 93, cy: 64, s: 0.82 },
+  shield: { d: 'M12 10 H108 V62 C108 92 84 108 60 116 C36 108 12 92 12 62 Z', topPath: 'M22 38 Q60 12 98 38', botY: 96, cy: 66, s: 0.82 },
+};
+
+const star = (cx, cy, R, r = R * 0.42) => {
+  let p = '';
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? r : R;
+    p += (i ? 'L' : 'M') + (cx + rad * Math.cos(a)).toFixed(1) + ' ' + (cy + rad * Math.sin(a)).toFixed(1);
+  }
+  return `<path class="t1" d="${p}Z"/>`;
+};
+
+// Emblems are drawn around (0,0), roughly +/-22 units.
+const EMBLEMS = {
+  rocket: `<path class="t3" d="M-7 4 L-14 16 L-6 12Z M7 4 L14 16 L6 12Z"/>
+    <path class="t1" d="M0-21 C8-12 8 0 6 9 L-6 9 C-8 0-8-12 0-21Z"/>
+    <circle class="t2" cx="0" cy="-6" r="3.6"/><path class="t2" d="M-6 9H6L4 13H-4Z"/>
+    <path class="t3" d="M-3 14 L0 23 L3 14Z"/>`,
+  starorbit: `${star(0, 0, 13)}
+    <ellipse class="ln ln-t3" cx="0" cy="0" rx="21" ry="7" transform="rotate(-25)"/>
+    <circle class="t3" cx="17" cy="-9" r="3"/>`,
+  equator: `<circle class="t2" cx="0" cy="0" r="12"/>
+    <path class="t3" d="M-9-7 Q0-12 9-7 Q4-4 0-5 Q-5-4-9-7Z"/>
+    <ellipse class="ln ln-t1" cx="0" cy="0" rx="22" ry="5"/>
+    ${star(-15, -15, 4)}${star(16, 15, 3.4)}`,
+  polar: `<ellipse class="ln ln-t1" cx="0" cy="0" rx="8" ry="21"/>
+    <circle class="t2" cx="0" cy="0" r="8"/><path class="ln ln-t1" d="M0-22V22"/>
+    <circle class="t3" cx="0" cy="-16" r="3.4"/>${star(-17, 11, 3.6)}${star(17, -10, 3.2)}`,
+  moon: `<path class="t2" d="M6-19 A19 19 0 1 0 6 19 A14.5 14.5 0 1 1 6-19Z"/>
+    ${star(13, -4, 6)}${star(16, 12, 3)}`,
+  comet: `<path class="t3" d="M10-8 L-22 6 L-8 8Z"/><path class="t2" d="M10-8 L-20 -8 L-6 -2Z"/>
+    <circle class="t1" cx="10" cy="-8" r="9"/>${star(-14, -16, 3.6)}${star(14, 14, 3.4)}`,
+  cross: `${star(0, -16, 7)}${star(0, 17, 7)}${star(-15, 2, 6)}${star(15, -2, 6)}${star(7, 5, 3)}
+    <path class="ln ln-t3" d="M0-9V10M-9 1H9" stroke-dasharray="1.5 2.5"/>`,
+  boreal: `${star(0, -12, 9)}
+    <path class="ln ln-t3" d="M-22 6 Q-11-6 0 6 T22 6"/>
+    <path class="ln" d="M-22 12 Q-11 0 0 12 T22 12"/>
+    <path class="ln ln-t1" d="M-22 18 Q-11 6 0 18 T22 18"/>`,
+};
+
+function patchSVG(site, i) {
+  const sh = SHAPES[site.shape];
+  const rim = (id, txt, cls = '') =>
+    `<text class="rim ${cls}" text-anchor="middle"><textPath href="#${id}" startOffset="50%">${txt}</textPath></text>`;
+  let top, bottom;
+  if (site.shape === 'circle') {
+    top = `<path id="tp-${i}" d="${sh.topPath}" fill="none"/>${rim('tp-' + i, site.top)}`;
+    bottom = `<path id="bp-${i}" d="${sh.botPath}" fill="none"/>${rim('bp-' + i, site.bottom, 'small')}`;
+  } else {
+    top = `<path id="tp-${i}" d="${sh.topPath}" fill="none"/>${rim('tp-' + i, site.top)}`;
+    bottom = `<text class="rim small" x="60" y="${sh.botY}" text-anchor="middle">${site.bottom}</text>`;
+  }
+  return `<svg viewBox="0 0 120 120" role="img" aria-hidden="true">
+    <path class="field" d="${sh.d}"/><path class="satin" d="${sh.d}"/>
+    <g transform="translate(60 60) scale(.86) translate(-60 -60)"><path class="stitch" d="${sh.d}"/></g>
+    <path class="merrow" d="${sh.d}"/><path class="merrow-sheen" d="${sh.d}"/><path class="merrow-shade" d="${sh.d}"/>
+    ${top}${bottom}
+    <g transform="translate(60 ${sh.cy}) scale(${sh.s})">${EMBLEMS[site.emblem]}</g>
+  </svg>`;
+}
+
+function setPatchVars(el, c, tilt) {
+  el.style.setProperty('--field', c.field); el.style.setProperty('--edge', c.edge);
+  el.style.setProperty('--t1', c.t1); el.style.setProperty('--t2', c.t2); el.style.setProperty('--t3', c.t3);
+  if (tilt !== undefined) el.style.setProperty('--tilt', tilt + 'deg');
+}
+
+// ---- Geometry: great-circle destination point ----
+const R_EARTH = 6371;
+function destination(lng, lat, azDeg, distKm) {
+  const d = distKm / R_EARTH, b = azDeg * Math.PI / 180;
+  const p1 = lat * Math.PI / 180, l1 = lng * Math.PI / 180;
+  const p2 = Math.asin(Math.sin(p1) * Math.cos(d) + Math.cos(p1) * Math.sin(d) * Math.cos(b));
+  const l2 = l1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(p1), Math.cos(d) - Math.sin(p1) * Math.sin(p2));
+  return [((l2 * 180 / Math.PI + 540) % 360) - 180, p2 * 180 / Math.PI];
+}
+// Launch arcs: ~1500 km downrange, 80 points
+function trajectory(site, km = 1500, n = 80) {
+  const pts = [];
+  for (let i = 0; i <= n; i++) {
+    const [x, y] = destination(site.lng, site.lat, site.az, km * i / n);
+    // unwrap longitude so arcs crossing the antimeridian (Mahia) stay continuous
+    pts.push([site.lng + ((x - site.lng + 540) % 360) - 180, y]);
+  }
+  return pts;
+}
+
+// ---- Map ----
+const $ = (id) => document.getElementById(id);
+const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const snapPitch = (p) => (Math.abs(p) < 0.001 ? 0 : p);   // near-zero pitch can NaN on globe
+const mapEl = $('map');
+
+function homeZoom() {
+  const m = Math.min(mapEl.clientWidth, mapEl.clientHeight) || 600;
+  return Math.max(0.9, Math.min(1.9, Math.log2(m * 0.86 / 163)));
+}
+function siteZoom() { return mapEl.clientWidth < 600 ? 4.4 : 5.4; }
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard-satellite',
+  projection: 'globe',
+  config: { basemap: { showPlaceLabels: true, showRoadLabels: false, showPointOfInterestLabels: false, showTransitLabels: false } },
+  center: [10, 18],
+  zoom: homeZoom(),
+  attributionControl: true,
+});
+map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true, showCompass: true }), 'top-right');
+new ResizeObserver(() => map.resize()).observe(mapEl);
+
+const EMPTY = { type: 'FeatureCollection', features: [] };
+map.on('style.load', () => {
+  map.setFog({
+    color: 'rgb(170, 200, 235)', 'high-color': '#2a62d8', 'horizon-blend': 0.05,
+    'space-color': '#070B18', 'star-intensity': 0.9,
+  });
+  map.addSource('traj', { type: 'geojson', data: EMPTY });
+  map.addSource('tip', { type: 'geojson', data: EMPTY });
+  map.addLayer({ id: 'traj-gold', type: 'line', source: 'traj', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#E0B23C', 'line-width': 6, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'traj-stitch', type: 'line', source: 'traj', slot: 'top',
+    layout: { 'line-cap': 'butt' },
+    paint: { 'line-color': '#F4F1E8', 'line-width': 1.8, 'line-dasharray': [1.6, 1.8], 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'traj-tip', type: 'circle', source: 'tip', slot: 'top',
+    paint: { 'circle-radius': 7, 'circle-color': '#F28C28', 'circle-stroke-color': '#F4F1E8', 'circle-stroke-width': 2.5,
+             'circle-emissive-strength': 1 } });
+});
+
+// ---- Spin (paused for reduced motion and on any user interaction) ----
+let spinOn = false, mode = 'orbit', seq = 0, raf = 0;
+function spin() {
+  if (!spinOn || mode !== 'orbit' || reduced()) return;
+  const c = map.getCenter();
+  map.easeTo({ center: [c.lng + 30, c.lat], duration: 10000, easing: (t) => t });
+}
+map.on('moveend', spin);
+['mousedown', 'touchstart', 'wheel'].forEach((ev) => map.on(ev, () => { spinOn = false; }));
+
+// ---- Trajectory drawing ----
+function setTraj(coords) {
+  const src = map.getSource('traj'), tip = map.getSource('tip');
+  if (!src || !tip) return;
+  if (coords.length < 2) { src.setData(EMPTY); tip.setData(EMPTY); return; }
+  src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} });
+  tip.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: coords[coords.length - 1] }, properties: {} });
+}
+function clearTraj() { cancelAnimationFrame(raf); setTraj([]); }
+function drawTraj(pts, token, done) {
+  cancelAnimationFrame(raf);
+  if (reduced()) { setTraj(pts); done(); return; }
+  const t0 = performance.now(), dur = 2400, N = pts.length - 1;
+  const frame = (now) => {
+    if (token !== seq) return;
+    const t = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - t, 2.2);   // ease-out: rocket gathers speed early
+    const f = e * N, i = Math.min(N - 1, Math.floor(f)), k = f - i;
+    const a = pts[i], b = pts[i + 1];
+    setTraj(pts.slice(0, i + 1).concat([[a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k]]));
+    if (t < 1) raf = requestAnimationFrame(frame); else { setTraj(pts); done(); }
+  };
+  raf = requestAnimationFrame(frame);
+}
+
+// ---- UI: patches + markers ----
+const patchEls = [], markerEls = [];
+const fmtLat = (v) => Math.abs(v).toFixed(2) + '° ' + (v >= 0 ? 'N' : 'S');
+const fmtLng = (v) => Math.abs(v).toFixed(2) + '° ' + (v >= 0 ? 'E' : 'W');
+
+function setStatus(kind, icon, text) {
+  const n = $('status-note');
+  n.className = 'status-note ' + kind;
+  $('status-icon').textContent = icon;
+  $('status-text').textContent = text;
+}
+
+SITES.forEach((site, i) => {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'patch';
+  btn.title = site.name;
+  btn.setAttribute('aria-label', `${site.name}, ${site.country}: mission patch ${site.mission}`);
+  setPatchVars(btn, site.c, site.tilt);
+  btn.innerHTML = patchSVG(site, i);
+  btn.addEventListener('click', () => select(i));
+  $('patch-grid').appendChild(btn);
+  patchEls.push(btn);
+
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'mk';
+  el.setAttribute('aria-label', `${site.name} launch site`);
+  el.title = site.name;
+  const ring = document.createElement('span');
+  ring.className = 'mk-ring';
+  ring.textContent = String(i + 1);
+  setPatchVars(ring, site.c);
+  el.appendChild(ring);
+  el.addEventListener('click', () => select(i));
+  new mapboxgl.Marker({ element: el }).setLngLat([site.lng, site.lat]).addTo(map);
+  markerEls.push(el);
+});
+
+function markActive(idx) {
+  patchEls.forEach((p, i) => p.classList.toggle('is-active', i === idx));
+  markerEls.forEach((m, i) => m.classList.toggle('is-active', i === idx));
+}
+
+function select(i) {
+  const site = SITES[i], token = ++seq;
+  mode = 'site'; spinOn = false;
+  markActive(i);
+  clearTraj();
+  $('card-kicker').textContent = `Patch ${i + 1} of ${SITES.length}`;
+  $('card-title').textContent = site.name;
+  $('card-blurb').textContent = site.blurb;
+  $('m-country').textContent = site.country;
+  $('m-lat').textContent = `${fmtLat(site.lat)} · ${fmtLng(site.lng)}`;
+  $('m-az').textContent = `${site.az}° (${site.azNote})`;
+  $('m-mission').textContent = site.mission;
+  $('card-meta').classList.remove('hidden');
+  setStatus('loading', '◌', 'Flying to the pad…');
+  if (window.matchMedia('(max-width: 860px)').matches) window.scrollTo({ top: 0, behavior: reduced() ? 'auto' : 'smooth' });
+
+  const pts = trajectory(site);
+  const cam = {
+    center: pts[Math.floor(pts.length * 0.35)], zoom: siteZoom(), pitch: snapPitch(45), bearing: site.az,
+    padding: { top: 30, bottom: 80, left: 20, right: 20 },
+  };
+  const finish = () => { if (token === seq) setStatus('success', '✓', 'Trajectory stitched · 1,500 km downrange'); };
+  if (reduced()) { map.jumpTo(cam); drawTraj(pts, token, finish); return; }
+  map.flyTo({ ...cam, duration: 2600, essential: true });
+  map.once('moveend', () => { if (token === seq) drawTraj(pts, token, finish); });
+}
+
+function backToOrbit() {
+  const token = ++seq;
+  mode = 'orbit'; spinOn = true;
+  markActive(-1);
+  clearTraj();
+  $('card-kicker').textContent = 'Mission briefing';
+  $('card-title').textContent = 'Pick a patch';
+  $('card-blurb').textContent = 'Tap an embroidered patch or a ringed marker on the globe to fly to a launch pad and stitch in its trajectory.';
+  $('card-meta').classList.add('hidden');
+  setStatus('success', '✓', 'Back in orbit');
+  const cam = { center: [map.getCenter().lng, 18], zoom: homeZoom(), pitch: snapPitch(0), bearing: 0, padding: { top: 0, bottom: 0, left: 0, right: 0 } };
+  if (reduced()) { map.jumpTo(cam); return; }
+  map.flyTo({ ...cam, duration: 2400, essential: true });   // moveend then restarts the slow spin
+}
+$('back-btn').addEventListener('click', backToOrbit);
+
+map.on('load', () => { spinOn = true; spin(); });
+</script>
+</body>
+</html>

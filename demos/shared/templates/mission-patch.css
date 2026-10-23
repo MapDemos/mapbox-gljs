@@ -1,0 +1,498 @@
+/*
+  Mission Patch -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: embroidered space-mission patches on
+  a Velcro board sewn to a navy flight-jacket twill -- satin-stitch fills,
+  merrowed (rolled) borders, thread sheen, stencil lettering --
+  deliberately distinct from every other style pack in this folder:
+  Academic Paper, Aero Gadgets, Amber Terminal, Annual Report, Arena, Art
+  Nouveau, Atomic Motel, Audio Guide, Aurora Command, Blueprint, Board
+  Game, Bottom Sheet, Broadcast, Brutalist Guide, Case Board, Celestial
+  Tarot, Chalkboard, Chat Concierge, Chronicle, Clinic Finder, Code
+  Editor, Comic Panel, Constructivist, Data Notebook, Deco Voyage, Dive
+  Log, Drop Culture, E-Ink, Editorial Paper, Estate Luxe, Event Invite,
+  Field Journal, Film Noir, Fleet Ops, Frontier Poster, Grand Hotel,
+  Herbarium, Highway Sign, Illuminated, Isotype, Line Diagram, Memphis,
+  Moving Map, Museum Label, Neon HUD, Nordic Cabin, Orienteering, Papel
+  Picado, Papercraft, Pastel Bento, Pixel Quest, Postcards, Rally Dash,
+  Raw Web, Regatta, Retro OS, Riso Zine, Ski Piste, Slate Console, Soft
+  UI, Split Flap, Stage Profile, Stained Glass, Sticker Book, Storefront,
+  Story Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt, Tiki Lagoon,
+  Trailhead, Treasure Hunt, Trip Kanban, Truck Art, Ukiyo-e Coast, Vapor
+  Sunset, Vintage Chart, Vinyl Crate, Washi Seasons, Watercolor, Weather
+  Console, Whiteboard, Zellige; and also distinct from the sibling packs
+  built alongside it: Kintsugi, Cyanotype, Crossword, Metal Tour,
+  Periodic Table, Cross Stitch, Card Catalog, Seed Packet, Trading Card,
+  Science Fair, Modular Synth, Recipe Card, LCD Watch, Clay Toy,
+  Solarpunk, De Stijl, Block Print, Copacabana, Amphora, Dancheong,
+  Spreadsheet, Pinball, Crayon, Darkroom).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/mission-patch.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Stardos Stencil for patch
+  lettering and headings, Saira Semi Condensed for body copy):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Stardos+Stencil:wght@400;700&family=Saira+Semi+Condensed:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  Signature touch: "thread". Every embroidered shape is an inline SVG
+  whose colours come from CSS custom properties (--field, --edge, --t1..3),
+  with a satin pinstripe overlay for sheen and a dashed light stroke laid
+  over a fat border stroke so the border reads as a rolled merrowed edge.
+  The Velcro board is pure CSS (a grid of hook dots), the jacket is a
+  repeating-linear-gradient twill.
+
+  Layout: PATCH WALL. Desktop: Velcro board of patches on the left (~40%),
+  the map as a large globe on the right (~60%). Phone (<= 860px): map
+  (~48dvh) on top, then the info card, then patches in a 2-col grid; the
+  page scrolls.
+
+  Class/id contract (see mission-patch-template.html in this same folder
+  for a full working example):
+
+  - #map                      map container (demo-owned: position it
+                               inside .map-wrap -- not included here)
+  - .app                      page grid: .board + .map-wrap
+    .map-wrap                   map column (position: relative)
+    .board                      left column: scrolls on desktop
+  - .nametape                 woven name-tape header (h1 + .sub line)
+  - .stitch-card              stitched info card (dashed thread border)
+    .card-kicker                small stencil label
+    .card-title                 stencil site name
+    .card-meta                  <dl> grid of dt/dd facts
+    .card-actions               button row
+  - .velcro                   hook-texture board holding the patches
+    .patch-grid                 grid of patches (3 cols, 2 on phone)
+    .patch                      <button> wrapping one embroidered SVG;
+                                 .is-active = the selected patch. CSS vars
+                                 --field --edge --t1 --t2 --t3 --tilt
+    .patch svg .merrow          rolled border stroke (+ .merrow-sheen)
+    .patch svg .field           satin field fill (+ .satin overlay)
+    .patch svg .stitch          dashed inner stitch line
+    .patch svg .t1 .t2 .t3 .fld thread fills for emblem shapes
+    .patch svg .rim             textPath lettering
+  - .mk / .mk-ring            map marker (put .mk on the Marker element,
+                               style only the inner .mk-ring; .is-active)
+  - .btn, .btn-primary,       satin-button style buttons
+    .btn-secondary
+  - .status-note (+.loading/  one-line thread-coloured status
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --jacket: #1B2440;
+  --jacket-deep: #121A30;
+  --velcro: #6B6F76;
+  --velcro-dark: #565A61;
+  --gold: #E0B23C;
+  --red: #D33A2C;
+  --sky: #4BA3E3;
+  --white: #F4F1E8;
+  --orange: #F28C28;
+  --green: #3E8E5B;
+  --ink-muted: #AEB6CC;
+  --success: #7FD6A0;
+  --error: #FF8A7A;
+
+  --font-stencil: 'Stardos Stencil', 'Arial Black', Impact, sans-serif;
+  --font-body: 'Saira Semi Condensed', 'Arial Narrow', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  padding: 0;
+  color: var(--white);
+  font-family: var(--font-body);
+  font-size: 15px;
+  background-color: var(--jacket);
+  /* Twill: two crossed diagonal weaves plus a faint rib */
+  background-image:
+    repeating-linear-gradient(63deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(-27deg, rgba(0,0,0,0.12) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, #202B4B, var(--jacket-deep));
+}
+
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
+}
+
+/* ---------- page grid ---------- */
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  grid-template-areas: "board map";
+  height: 100vh;
+  height: 100dvh;
+}
+
+.board {
+  grid-area: board;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.map-wrap {
+  grid-area: map;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: #070B18;
+  border-left: 3px solid var(--gold);
+}
+
+/* ---------- name tape ---------- */
+.nametape {
+  position: relative;
+  padding: 10px 16px 9px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.12) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #F7F4EB, #DDD8C8);
+  color: var(--jacket);
+  border-radius: 3px;
+  box-shadow: 0 3px 0 rgba(0,0,0,0.35), 0 8px 16px rgba(0,0,0,0.3);
+}
+
+.nametape::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1.5px dashed rgba(27,36,64,0.55);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.nametape h1 {
+  margin: 0;
+  font-family: var(--font-stencil);
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.nametape .sub {
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #8A2A22;
+}
+
+/* ---------- stitched info card ---------- */
+.stitch-card {
+  position: relative;
+  padding: 16px 18px 16px;
+  border-radius: 12px;
+  background:
+    repeating-linear-gradient(63deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 3px),
+    #26335C;
+  border: 2px dashed var(--gold);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.4);
+  margin: 4px 6px;
+}
+
+.card-kicker {
+  font-family: var(--font-stencil);
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.card-title {
+  margin: 3px 0 8px;
+  font-family: var(--font-stencil);
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 1.12;
+  letter-spacing: 0.03em;
+  color: var(--white);
+  overflow-wrap: anywhere;
+}
+
+.stitch-card p {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+.card-meta {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 14px;
+  margin: 0 0 14px;
+  font-size: 14px;
+}
+
+.card-meta dt {
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 11px;
+  color: var(--sky);
+  padding-top: 2px;
+}
+
+.card-meta dd {
+  margin: 0;
+  color: var(--white);
+  font-weight: 500;
+}
+
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+/* ---------- buttons: satin pills ---------- */
+.btn {
+  display: inline-block;
+  padding: 9px 18px;
+  border: 2px solid var(--white);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--white);
+  font-family: var(--font-stencil);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.btn:hover { background: var(--white); color: var(--jacket); }
+.btn:active { transform: translateY(1px); }
+
+.btn-primary {
+  border-color: var(--gold);
+  background:
+    repeating-linear-gradient(115deg, rgba(255,255,255,0.18) 0 2px, transparent 2px 5px),
+    var(--gold);
+  color: var(--jacket);
+}
+
+.btn-primary:hover { background: var(--orange); border-color: var(--orange); color: var(--jacket); }
+
+.btn-secondary { border-color: var(--sky); color: var(--sky); }
+.btn-secondary:hover { background: var(--sky); color: var(--jacket); }
+
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.status-note {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.status-note .status-icon { flex: none; }
+.status-note.loading .status-icon { display: inline-block; animation: mp-spin 1s linear infinite; }
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); }
+
+@keyframes mp-spin { to { transform: rotate(360deg); } }
+
+/* ---------- Velcro board ---------- */
+.velcro {
+  position: relative;
+  padding: 18px 14px 20px;
+  border-radius: 10px;
+  background-color: var(--velcro);
+  /* hook-side dots in two offset lattices + a woven backing */
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,0.26) 0 1px, transparent 1.7px),
+    radial-gradient(circle at 50% 50%, rgba(0,0,0,0.28) 0 1px, transparent 1.7px),
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.07) 0 1px, transparent 1px 3px);
+  background-size: 6px 6px, 6px 6px, auto;
+  background-position: 0 0, 3px 3px, 0 0;
+  box-shadow:
+    inset 0 2px 6px rgba(0,0,0,0.45),
+    inset 0 -2px 0 rgba(255,255,255,0.1),
+    0 0 0 3px var(--jacket),
+    0 0 0 5px rgba(244,241,232,0.55),
+    0 14px 28px rgba(0,0,0,0.4);
+  margin: 4px 6px 6px;
+}
+
+.patch-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 10px;
+  align-items: start;
+}
+
+/* ---------- patches ---------- */
+.patch {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  rotate: var(--tilt, 0deg);
+  transition: transform 0.22s cubic-bezier(.2,.8,.3,1.2), filter 0.22s ease;
+  filter: drop-shadow(0 2px 1.5px rgba(0,0,0,0.5)) drop-shadow(0 4px 4px rgba(0,0,0,0.25));
+  -webkit-tap-highlight-color: transparent;
+}
+
+.patch:hover,
+.patch:focus-visible {
+  transform: translateY(-5px) scale(1.06);
+  filter: drop-shadow(0 10px 6px rgba(0,0,0,0.5)) drop-shadow(0 18px 14px rgba(0,0,0,0.35));
+  z-index: 2;
+}
+
+.patch.is-active {
+  transform: translateY(-3px) scale(1.05);
+  filter: drop-shadow(0 0 3px var(--gold)) drop-shadow(0 8px 7px rgba(0,0,0,0.5));
+  z-index: 1;
+}
+
+.patch svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.patch .field { fill: var(--field); }
+.patch .satin { fill: url(#mp-satin); }
+.patch .merrow { fill: none; stroke: var(--edge); stroke-width: 6; stroke-linejoin: round; }
+.patch .merrow-sheen {
+  fill: none;
+  stroke: rgba(255,255,255,0.3);
+  stroke-width: 6;
+  stroke-linejoin: round;
+  stroke-dasharray: 0.9 1.3;
+}
+.patch .merrow-shade {
+  fill: none;
+  stroke: rgba(0,0,0,0.35);
+  stroke-width: 0.7;
+  stroke-linejoin: round;
+}
+.patch .stitch {
+  fill: none;
+  stroke: var(--t1);
+  stroke-width: 0.8;
+  stroke-dasharray: 2.2 1.6;
+  opacity: 0.9;
+}
+
+.patch .t1 { fill: var(--t1); }
+.patch .t2 { fill: var(--t2); }
+.patch .t3 { fill: var(--t3); }
+.patch .fld { fill: var(--field); }
+.patch .t1, .patch .t2, .patch .t3, .patch .fld {
+  stroke: rgba(0,0,0,0.38);
+  stroke-width: 0.5;
+  stroke-linejoin: round;
+}
+.patch .ln { fill: none; stroke: var(--t2); stroke-width: 1.8; stroke-linecap: round; }
+.patch .ln-t1 { stroke: var(--t1); }
+.patch .ln-t3 { stroke: var(--t3); }
+
+.patch .rim {
+  font-family: var(--font-stencil);
+  font-weight: 700;
+  font-size: 8.4px;
+  letter-spacing: 0.7px;
+  fill: var(--t1);
+  paint-order: stroke;
+  stroke: rgba(0,0,0,0.45);
+  stroke-width: 0.9px;
+  stroke-linejoin: round;
+  text-transform: uppercase;
+}
+.patch .rim.small { font-size: 7px; letter-spacing: 0.5px; fill: var(--t2); }
+
+/* ---------- map markers (style only the inner ring) ---------- */
+.mk {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.mk-ring {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background:
+    repeating-linear-gradient(115deg, rgba(255,255,255,0.14) 0 2px, transparent 2px 4px),
+    var(--field, #1B2440);
+  border: 4px solid var(--edge, #E0B23C);
+  box-shadow: 0 0 0 1.5px rgba(0,0,0,0.55), 0 0 0 3px rgba(244,241,232,0.8), 0 4px 8px rgba(0,0,0,0.55);
+  color: var(--t1, #F4F1E8);
+  font-family: var(--font-stencil);
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.mk:hover .mk-ring { transform: scale(1.18); }
+.mk.is-active .mk-ring {
+  transform: scale(1.3);
+  box-shadow: 0 0 0 1.5px rgba(0,0,0,0.55), 0 0 0 3px var(--gold), 0 0 16px 4px rgba(224,178,60,0.7);
+}
+
+.hidden { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .patch, .mk-ring, .btn { transition: none; }
+  .status-note.loading .status-icon { animation: none; }
+}
+
+@media (max-width: 1100px) and (min-width: 861px) {
+  .patch-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------- phone: map on top, then card, then patches; page scrolls ---------- */
+@media (max-width: 860px) {
+  html, body { height: auto; }
+
+  .app {
+    display: block;
+    height: auto;
+  }
+
+  .map-wrap {
+    height: 48vh;
+    height: 48dvh;
+    min-height: 280px;
+    border-left: 0;
+    border-bottom: 3px solid var(--gold);
+  }
+
+  .board {
+    overflow: visible;
+    padding: 16px 16px 28px;
+  }
+
+  .patch-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
+  .nametape h1 { font-size: 22px; }
+}

@@ -1,0 +1,407 @@
+<!--
+  Working EXAMPLE of the Solarpunk style pack (solarpunk.css, in this same
+  folder). Open this file directly to see the pattern working: a
+  "greenhouse dashboard" for a fictional community energy and garden
+  co-op in Freiburg's Vauban and Rieselfeld districts, on Mapbox Standard
+  (3D objects on, POI labels off, pitch 50). The map sits in a large
+  arched window; on the left an arched pane lists eight sites, on the
+  right an arched pane shows a sun-arc, a CO2 counter and a live kWh bar
+  chart. A time-of-day slider (06:00-20:00) drives the sun arc, the bars
+  and the Standard lightPreset (dawn / day / dusk / night); "Play the day"
+  animates it (reduced motion: disabled, slider only). Click a site, a
+  leaf marker or a bar row to fly there at pitch 60. Copy the markup below
+  into your own demo and link solarpunk.css from its <head> -- see the
+  class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (optimistic eco-futurism: sunlit greenhouse glass,
+  arched windows, vines, gold sun, terracotta and leaf green) at the
+  user's request for something distinct from every other pack in this
+  folder. The streets are real; the co-op, the site names and every
+  figure (capacities, output, CO2) are fictional illustrative placeholders
+  -- swap in your own.
+
+  What's NOT included: search/geocoding, routing, real meter data, popups,
+  or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sunroot Commons</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Gluten:wght@500;700&family=Wix+Madefor+Text:wght@400;500;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="solarpunk.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: #map fills the arched window. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+
+<!-- Hand-drawn SVG parts: icons + vine (decorative, referenced with <use>) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <path id="lf" d="M0 0 C6 -9 18 -9 24 0 C18 9 6 9 0 0Z"/>
+    <symbol id="i-sprout" viewBox="0 0 24 24"><path d="M12 22V11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M12 12C12 7 8 4 3 4c0 5 3 8 9 8Z M12 14c0-4 3-7 9-7 0 5-3 8-9 8Z" fill="currentColor"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><g stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></g></symbol>
+    <symbol id="i-bike" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="16" r="3.8"/><circle cx="18" cy="16" r="3.8"/><path d="M6 16l4-8h5l3 8M10 8H8M9.5 12.5h7"/></g></symbol>
+    <symbol id="i-wrench" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6.5a4.2 4.2 0 0 0 5 5L11 20a2.4 2.4 0 0 1-3.4-3.4l8.4-8.4"/><path d="M14.5 6.5l1.8-2.6 2.8 2.8-2.6 1.8"/></g></symbol>
+    <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M4 20C4 9 10 4 21 3c0 11-5 17-15 17M4 20l9-9" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="vine" viewBox="0 0 60 300">
+      <path d="M30 300C12 272 50 246 30 216S12 160 30 130 48 76 30 46C22 28 34 12 30 0" fill="none" stroke="#3B7A57" stroke-width="3.5" stroke-linecap="round"/>
+      <g fill="#8DBF6A">
+        <use href="#lf" transform="translate(32 270) rotate(-35)"/>
+        <use href="#lf" transform="translate(30 240) rotate(200) scale(1.1)" fill="#3B7A57"/>
+        <use href="#lf" transform="translate(34 210) rotate(-20) scale(1.2)"/>
+        <use href="#lf" transform="translate(28 182) rotate(160) scale(1.1)" fill="#3B7A57"/>
+        <use href="#lf" transform="translate(32 150) rotate(-40) scale(1.2)"/>
+        <use href="#lf" transform="translate(30 120) rotate(195)" fill="#3B7A57"/>
+        <use href="#lf" transform="translate(36 92) rotate(-25) scale(1.2)"/>
+        <use href="#lf" transform="translate(26 66) rotate(170) scale(1.1)" fill="#3B7A57"/>
+        <use href="#lf" transform="translate(32 40) rotate(-45)"/>
+        <use href="#lf" transform="translate(30 14) rotate(-90) scale(.9)" fill="#3B7A57"/>
+      </g>
+      <circle cx="38" cy="196" r="4.5" fill="#F2B134"/><circle cx="22" cy="104" r="4.5" fill="#C8643B"/><circle cx="40" cy="58" r="4" fill="#F2B134"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="gh-page" id="page" data-phase="day">
+  <header class="gh-header">
+    <div>
+      <h1 class="coop-name">Sunroot Commons Co-op</h1>
+      <div class="coop-sub">Community energy &amp; garden map &middot; Vauban and Rieselfeld, Freiburg</div>
+    </div>
+    <div class="sun-chip"><svg aria-hidden="true" style="color:#F2B134"><use href="#i-sun"/></svg><span id="chip-text">8 sites &middot; 100% sun-powered</span></div>
+  </header>
+
+  <main class="greenhouse">
+    <!-- Left pane: site list -->
+    <section class="pane pane-left" aria-label="Sites">
+      <svg class="vine vine-l" viewBox="0 0 60 300" aria-hidden="true"><use href="#vine"/></svg>
+      <div class="arch glass">
+        <h2 class="pane-title">Our eight sites<small>Gardens, roofs, bikes &amp; repairs</small></h2>
+        <div class="pane-body"><ul class="site-list" id="site-list"></ul></div>
+      </div>
+    </section>
+
+    <!-- Centre pane: map in the big arched window -->
+    <section class="pane pane-center" aria-label="Map">
+      <svg class="vine vine-l" viewBox="0 0 60 300" aria-hidden="true"><use href="#vine"/></svg>
+      <svg class="vine vine-r" viewBox="0 0 60 300" aria-hidden="true"><use href="#vine"/></svg>
+      <div class="map-arch">
+        <div id="map"></div>
+        <div class="site-card hidden" id="site-card" role="status">
+          <button class="site-card-close" id="card-close" aria-label="Close site card">&times;</button>
+          <h3 class="site-card-title" id="card-title"></h3>
+          <div class="site-card-meta" id="card-meta"></div>
+          <p class="site-card-note" id="card-note"></p>
+        </div>
+      </div>
+      <div class="sill">
+        <label class="sill-label" for="time">Time of day</label>
+        <span class="time-readout" id="time-readout">12:00</span>
+        <input class="time-slider" id="time" type="range" min="360" max="1200" step="15" value="720" />
+        <button class="btn btn-primary" id="play" type="button">&#9654; Play the day</button>
+        <button class="btn btn-secondary" id="overview" type="button">Both districts</button>
+      </div>
+    </section>
+
+    <!-- Right pane: today's sun -->
+    <section class="pane pane-right" aria-label="Today's sun">
+      <svg class="vine vine-r" viewBox="0 0 60 300" aria-hidden="true"><use href="#vine"/></svg>
+      <div class="arch glass">
+        <h2 class="pane-title">Today's sun<small id="sun-sub">Freiburg im Breisgau</small></h2>
+        <div class="pane-body">
+          <svg class="sun-arc" viewBox="0 0 260 124" role="img" aria-label="Sun position along its daily arc">
+            <path class="arc-fill" d="M20 108 A110 110 0 0 1 240 108Z"/>
+            <path class="arc-track" d="M20 108 A110 110 0 0 1 240 108"/>
+            <path class="arc-done" id="arc-done" pathLength="100" stroke-dasharray="0 100" d="M20 108 A110 110 0 0 1 240 108"/>
+            <line class="horizon" x1="8" y1="108" x2="252" y2="108"/>
+            <text x="20" y="121">06:00</text><text x="130" y="121">13:00</text><text x="240" y="121">20:00</text>
+            <g class="sun" id="sun" transform="translate(130 20)">
+              <g><line x1="0" y1="-17" x2="0" y2="-12"/><line x1="0" y1="17" x2="0" y2="12"/><line x1="-17" y1="0" x2="-12" y2="0"/><line x1="17" y1="0" x2="12" y2="0"/>
+              <line x1="-12" y1="-12" x2="-9" y2="-9"/><line x1="12" y1="12" x2="9" y2="9"/><line x1="12" y1="-12" x2="9" y2="-9"/><line x1="-12" y1="12" x2="-9" y2="9"/></g>
+              <circle r="8"/>
+            </g>
+          </svg>
+
+          <div class="co2-counter">
+            <svg aria-hidden="true"><use href="#i-leaf"/></svg>
+            <div><span class="co2-num" id="co2-num">0</span><span class="co2-label">kg CO&#8322; saved so far today</span></div>
+          </div>
+
+          <div class="section-label">Live output, kWh this hour</div>
+          <svg class="kwh-chart" id="kwh-chart" viewBox="0 0 260 196" role="img" aria-label="Live kWh per site"></svg>
+          <p class="chart-note" id="chart-note"></p>
+        </div>
+      </div>
+    </section>
+  </main>
+  <div class="planter" aria-hidden="true"></div>
+</div>
+
+<script>
+// Fictional sites on real streets (positions approximate). kwp = peak kW.
+const SITES = [
+  { id: 1, type: 'garden', short: 'Allee Gardens',  name: 'Allee Garden Commons',   kind: 'Community garden',  kwp: 8,   center: [7.8450, 47.9905], note: 'Raised beds along Vaubanallee, watered by a sun-driven rain pump.' },
+  { id: 2, type: 'solar',  short: 'Sunny Row',      name: 'Sunny Row Solar Roofs',  kind: 'Solar roofs',       kwp: 120, center: [7.8420, 47.9868], note: 'A terrace of plus-energy homes that feeds the neighbourhood grid.' },
+  { id: 3, type: 'bike',   short: 'Bike Hub',       name: 'Platz Bike Hub',         kind: 'Bike hub',          kwp: 24,  center: [7.8462, 47.9842], note: 'Cargo-bike share and e-bike charging under a solar canopy.' },
+  { id: 4, type: 'repair', short: 'Repair Café',    name: 'Wurzel Repair Café',     kind: 'Repair café',       kwp: 18,  center: [7.8395, 47.9893], note: 'Fix it, do not bin it: toasters, bikes and shoes mended on Saturdays.' },
+  { id: 5, type: 'solar',  short: 'Platz Canopy',   name: 'Rudloff Platz Canopy',   kind: 'Solar roofs',       kwp: 85,  center: [7.7906, 47.9873], note: 'A glass-and-solar market canopy shading the square.' },
+  { id: 6, type: 'garden', short: 'Meadow Garden',  name: 'Meadow Garden Terraces', kind: 'Community garden',  kwp: 6,   center: [7.7820, 47.9858], note: 'Terraced beds and bee hotels at the nature-reserve edge.' },
+  { id: 7, type: 'garden', short: 'Orchard',        name: 'Rieselfeld Orchard',     kind: 'Community garden',  kwp: 10,  center: [7.7985, 47.9825], note: 'Apple, pear and quince trees with a solar-powered press shed.' },
+  { id: 8, type: 'solar',  short: 'School Roof',    name: 'Schoolyard Solar Roof',  kind: 'Solar roofs',       kwp: 60,  center: [7.7945, 47.9905], note: 'Pupils read the meter every morning on the school roof.' },
+];
+const ICON = { garden: 'i-sprout', solar: 'i-sun', bike: 'i-bike', repair: 'i-wrench' };
+const CLS = { garden: 'garden', solar: 'solar', bike: 'other', repair: 'other' };
+const PERF = 0.85;      // system performance ratio
+const GRID_KG = 0.38;   // kg CO2 per kWh displaced (illustrative)
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const isPhone = () => window.matchMedia('(max-width: 900px)').matches;
+const page = document.getElementById('page');
+const slider = document.getElementById('time');
+const readout = document.getElementById('time-readout');
+const playBtn = document.getElementById('play');
+
+let minutes = 720;          // initial 12:00
+let selectedId = null;
+let phase = null;
+let mapReady = false;
+
+const phaseFor = (h) => (h < 8 ? 'dawn' : h < 17 ? 'day' : h < 19 ? 'dusk' : 'night');
+const curve = (h) => Math.max(0, Math.sin(Math.PI * (h - 6) / 14));           // 0..1 solar output
+const cumul = (h) => (14 / Math.PI) * (1 - Math.cos(Math.PI * Math.min(Math.max((h - 6) / 14, 0), 1))); // integral of curve
+const kwhNow = (s, h) => s.kwp * PERF * curve(h);
+const fmtTime = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: {
+    basemap: {
+      lightPreset: phaseFor(minutes / 60),
+      show3dObjects: true,
+      showPointOfInterestLabels: false,
+    },
+  },
+  center: [7.815, 47.986],
+  zoom: 12.4,
+  pitch: 50,
+  bearing: 0,
+});
+map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
+new ResizeObserver(() => map.resize()).observe(document.getElementById('map'));
+
+// ---- Fit both districts (padding clears the arch curve, logo and card) ----
+const BOUNDS = SITES.reduce((b, s) => b.extend(s.center), new mapboxgl.LngLatBounds(SITES[0].center, SITES[0].center));
+function overview(animate) {
+  // pitch/tilt makes fitBounds leave slack, so measure instead: set the 3D camera, project
+  // all sites, then scale/re-centre until their screen bbox fills the padded box.
+  const pad = isPhone() ? { top: 80, bottom: 70, left: 34, right: 64 } : { top: 110, bottom: 70, left: 50, right: 50 };
+  const W = map.getContainer().clientWidth, H = map.getContainer().clientHeight;
+  const prev = { center: map.getCenter(), zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() };
+  map.jumpTo({ center: BOUNDS.getCenter(), zoom: 12, pitch: 50, bearing: 0, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
+  for (let n = 0; n < 4; n++) {
+    const P = SITES.map((x) => map.project(x.center));
+    const x0 = Math.min(...P.map((q) => q.x)), x1 = Math.max(...P.map((q) => q.x));
+    const y0 = Math.min(...P.map((q) => q.y)), y1 = Math.max(...P.map((q) => q.y));
+    const k = Math.min((W - pad.left - pad.right) / Math.max(x1 - x0, 1), (H - pad.top - pad.bottom) / Math.max(y1 - y0, 1));
+    const bx = (pad.left + W - pad.right) / 2, by = (pad.top + H - pad.bottom) / 2;
+    const c = map.unproject([W / 2 - (bx - (x0 + x1) / 2), H / 2 - (by - (y0 + y1) / 2)]);
+    map.jumpTo({ center: c, zoom: Math.min(map.getZoom() + Math.log2(k), 15) });
+  }
+  const target = { center: map.getCenter(), zoom: map.getZoom(), pitch: 50, bearing: 0 };
+  if (animate && !reduce) { map.jumpTo(prev); map.flyTo({ ...target, duration: 1800 }); }
+}
+map.on('load', () => { mapReady = true; overview(false); });
+
+// ---- Fan out markers closer than MIN px (offsets reset when zoomed in) ----
+const MIN = 36;
+let fanQueued = false;
+function fanOut() {
+  fanQueued = false;
+  const pts = SITES.map((s) => map.project(s.center));
+  const grp = SITES.map((_, i) => i);
+  const find = (i) => (grp[i] === i ? i : (grp[i] = find(grp[i])));
+  for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
+    if (Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y) < MIN) grp[find(j)] = find(i);
+  }
+  const groups = {};
+  SITES.forEach((_, i) => { (groups[find(i)] = groups[find(i)] || []).push(i); });
+  SITES.forEach((s) => s.marker.setOffset([0, 0]));
+  Object.values(groups).forEach((m) => {
+    if (m.length < 2) return;
+    const cx = m.reduce((a, i) => a + pts[i].x, 0) / m.length;
+    const cy = m.reduce((a, i) => a + pts[i].y, 0) / m.length;
+    const R = Math.max(26, MIN / (2 * Math.sin(Math.PI / m.length)));
+    m.forEach((i, k) => {
+      const a = -Math.PI / 2 + (2 * Math.PI * k) / m.length;
+      SITES[i].marker.setOffset([cx + R * Math.cos(a) - pts[i].x, cy + R * Math.sin(a) - pts[i].y]);
+    });
+  });
+}
+function queueFan() { if (!fanQueued) { fanQueued = true; requestAnimationFrame(fanOut); } }
+map.on('move', queueFan);
+map.on('load', queueFan);
+
+// ---- Site list, markers, chart rows ----
+const listEl = document.getElementById('site-list');
+const svgNS = 'http://www.w3.org/2000/svg';
+const chart = document.getElementById('kwh-chart');
+const maxKwh = Math.max(...SITES.map((s) => s.kwp * PERF));
+
+SITES.forEach((s, i) => {
+  // list item
+  const li = document.createElement('li');
+  li.innerHTML = `<button class="site" type="button" data-id="${s.id}">
+    <span class="site-icon ${CLS[s.type]}"><svg aria-hidden="true"><use href="#${ICON[s.type]}"/></svg></span>
+    <span class="site-text"><span class="site-name">${s.id}. ${s.name}</span><span class="site-meta">${s.kind} &middot; ${s.kwp} kWp</span></span></button>`;
+  li.firstElementChild.addEventListener('click', () => selectSite(s.id));
+  listEl.appendChild(li);
+
+  // leaf marker (style the inner child only; the root is positioned by Mapbox)
+  const el = document.createElement('div');
+  el.className = 'leaf-marker';
+  el.setAttribute('role', 'button');
+  el.setAttribute('tabindex', '0');
+  el.setAttribute('aria-label', s.name);
+  el.innerHTML = `<span class="leaf ${CLS[s.type]}"></span><span class="num">${s.id}</span>`;
+  el.addEventListener('click', (e) => { e.stopPropagation(); selectSite(s.id); });
+  el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectSite(s.id); } });
+  s.el = el;
+  s.marker = new mapboxgl.Marker({ element: el }).setLngLat(s.center).addTo(map);
+
+  // bar row
+  const y = i * 24 + 2;
+  const g = document.createElementNS(svgNS, 'g');
+  g.setAttribute('class', 'bar-row');
+  g.style.cursor = 'pointer';
+  g.innerHTML = `<circle class="bar-num-bg" cx="9" cy="${y + 9}" r="8.5"/><text class="bar-num" x="9" y="${y + 12.5}">${s.id}</text>
+    <text class="bar-name" x="24" y="${y + 13}">${s.short}</text>
+    <rect class="bar-track" x="108" y="${y + 3}" width="96" height="12" rx="6"/>
+    <rect class="bar-fill ${CLS[s.type] === 'other' ? 'other' : s.type}" x="108" y="${y + 3}" width="0" height="12" rx="6"/>
+    <text class="bar-val" x="258" y="${y + 13}">0</text>`;
+  g.addEventListener('click', () => selectSite(s.id));
+  s.row = g;
+  s.fill = g.querySelector('.bar-fill');
+  s.val = g.querySelector('.bar-val');
+  chart.appendChild(g);
+});
+document.getElementById('chart-note').textContent = 'Sun output scales each site’s peak kW across the day. Figures are illustrative.';
+
+// ---- Selection ----
+const card = document.getElementById('site-card');
+function selectSite(id) {
+  selectedId = id;
+  const s = SITES.find((x) => x.id === id);
+  SITES.forEach((x) => {
+    x.el.classList.toggle('selected', x.id === id);
+    x.row.classList.toggle('active', x.id === id);
+  });
+  document.querySelectorAll('.site').forEach((b) => b.classList.toggle('active', +b.dataset.id === id));
+  card.classList.remove('hidden');
+  document.getElementById('card-title').textContent = `${s.id}. ${s.name}`;
+  document.getElementById('card-note').textContent = s.note;
+  updateCard();
+  if (isPhone()) document.querySelector('.map-arch').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  // Padding keeps the site clear of the card (bottom-left) and the arch curve.
+  const padding = isPhone() ? { top: 30, bottom: 120, left: 20, right: 20 } : { top: 70, bottom: 190, left: 30, right: 30 };
+  const opts = { center: s.center, zoom: 16.2, pitch: 60, bearing: -20, padding };
+  if (reduce) map.jumpTo(opts); else map.flyTo({ ...opts, duration: 2200, essential: false });
+}
+function clearSelection() {
+  selectedId = null;
+  SITES.forEach((x) => { x.el.classList.remove('selected'); x.row.classList.remove('active'); });
+  document.querySelectorAll('.site').forEach((b) => b.classList.remove('active'));
+  card.classList.add('hidden');
+}
+function updateCard() {
+  if (selectedId == null) return;
+  const s = SITES.find((x) => x.id === selectedId);
+  const h = minutes / 60;
+  document.getElementById('card-meta').textContent = `${s.kind} · ${s.kwp} kWp · now ${kwhNow(s, h).toFixed(1)} kWh/h`;
+}
+document.getElementById('card-close').addEventListener('click', clearSelection);
+document.getElementById('overview').addEventListener('click', () => { clearSelection(); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 }); overview(true); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && selectedId != null) clearSelection(); });
+
+// ---- Time of day: sun arc, bars, CO2, light preset ----
+const sunEl = document.getElementById('sun');
+const arcDone = document.getElementById('arc-done');
+function update() {
+  const h = minutes / 60;
+  const t = (h - 6) / 14;
+  const mr = Math.round(minutes);
+  readout.textContent = fmtTime(mr);
+  slider.value = mr;
+  slider.style.setProperty('--p', (t * 100).toFixed(1) + '%');
+  slider.setAttribute('aria-valuetext', fmtTime(mr));
+
+  // Sun along the arc (centre 130,108 radius 110)
+  const sx = 130 - 110 * Math.cos(Math.PI * t);
+  const sy = 108 - 110 * Math.sin(Math.PI * t);
+  sunEl.setAttribute('transform', `translate(${sx.toFixed(1)} ${sy.toFixed(1)})`);
+  arcDone.setAttribute('stroke-dasharray', `${(t * 100).toFixed(1)} 100`);
+
+  // Bars
+  let total = 0, sofar = 0;
+  SITES.forEach((s) => {
+    const k = kwhNow(s, h);
+    total += k;
+    sofar += s.kwp * PERF * cumul(h);
+    s.fill.setAttribute('width', (96 * k / maxKwh).toFixed(1));
+    s.val.textContent = k.toFixed(0);
+  });
+  document.getElementById('co2-num').textContent = Math.round(sofar * GRID_KG).toLocaleString('en');
+  document.getElementById('sun-sub').textContent = `${total.toFixed(0)} kWh this hour across 8 sites`;
+  updateCard();
+
+  // Page tint + Standard light preset
+  const p = phaseFor(h);
+  if (p !== phase) {
+    phase = p;
+    page.dataset.phase = p;
+    if (mapReady) { try { map.setConfigProperty('basemap', 'lightPreset', p); } catch (e) { /* style not ready */ } }
+  }
+}
+slider.addEventListener('input', () => { stopPlay(); minutes = +slider.value; update(); });
+
+// ---- Play the day ----
+let raf = 0, last = 0;
+function stopPlay() {
+  if (raf) cancelAnimationFrame(raf);
+  raf = 0;
+  playBtn.innerHTML = '&#9654; Play the day';
+}
+function tick(now) {
+  const dt = Math.min(now - last, 100);
+  last = now;
+  minutes += dt * 0.055;        // ~15 s for the whole 14 h
+  if (minutes >= 1200) { minutes = 1200; update(); stopPlay(); return; }
+  update();
+  raf = requestAnimationFrame(tick);
+}
+playBtn.addEventListener('click', () => {
+  if (raf) { stopPlay(); return; }
+  if (minutes >= 1195) minutes = 360;
+  playBtn.innerHTML = '&#10074;&#10074; Pause';
+  last = performance.now();
+  raf = requestAnimationFrame(tick);
+});
+if (reduce) {
+  playBtn.disabled = true;
+  playBtn.title = 'Disabled because reduced motion is on; use the slider';
+}
+
+update();
+</script>
+</body>
+</html>

@@ -1,0 +1,495 @@
+/*
+  Block Print -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: hand-carved wooden-block printed
+  textiles -- buta / paisley / flower repeats stamped in indigo, madder red
+  and turmeric on natural cotton, with slight mis-registration, fringed
+  cloth edges and hanging swatches), deliberately distinct from every other
+  style pack in this folder: Academic Paper, Aero Gadgets, Amber Terminal,
+  Annual Report, Arena, Art Nouveau, Atomic Motel, Audio Guide, Aurora
+  Command, Blueprint, Board Game, Bottom Sheet, Broadcast, Brutalist Guide,
+  Case Board, Celestial Tarot, Chalkboard, Chat Concierge, Chronicle, Clinic
+  Finder, Code Editor, Comic Panel, Constructivist, Data Notebook, Deco
+  Voyage, Dive Log, Drop Culture, E-Ink, Editorial Paper, Estate Luxe, Event
+  Invite, Field Journal, Film Noir, Fleet Ops, Frontier Poster, Grand Hotel,
+  Herbarium, Highway Sign, Illuminated, Isotype, Line Diagram, Memphis,
+  Moving Map, Museum Label, Neon HUD, Nordic Cabin, Orienteering, Papel
+  Picado, Papercraft, Pastel Bento, Pixel Quest, Postcards, Rally Dash, Raw
+  Web, Regatta, Retro OS, Riso Zine, Ski Piste, Slate Console, Soft UI,
+  Split Flap, Stage Profile, Stained Glass, Sticker Book, Storefront, Story
+  Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt, Tiki Lagoon, Trailhead,
+  Treasure Hunt, Trip Kanban, Truck Art, Ukiyo-e Coast, Vapor Sunset,
+  Vintage Chart, Vinyl Crate, Washi Seasons, Watercolor, Weather Console,
+  Whiteboard and Zellige; and also distinct from the 24 sibling packs being
+  built in parallel at the same time (Kintsugi, Cyanotype, Crossword, Metal
+  Tour, Periodic Table, Cross Stitch, Card Catalog, Seed Packet, Trading
+  Card, Science Fair, Modular Synth, Recipe Card, LCD Watch, Clay Toy,
+  Solarpunk, De Stijl, Copacabana, Amphora, Dancheong, Spreadsheet, Pinball,
+  Crayon, Darkroom, Mission Patch).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/block-print.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Yatra One for headings, Mukta for
+  body / labels):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Yatra+One&family=Mukta:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  Signature touch: everything is printed from blocks. Headings carry a
+  turmeric ghost offset by a pixel or two (mis-registration), the swatch
+  patterns are tiny hand-drawn motifs each with a shifted second "pass",
+  the cards hang from a wooden rod with a thread fringe, and a selected
+  stall is STAMPED on the map: the round marker thunks down and an ink
+  ring splashes out.
+
+  Layout archetype: TEXTILE BANDS. Desktop: a printed buta/paisley band
+  across the top and a small flower repeat across the bottom (inline SVG
+  <pattern> fills, explicit heights) frame the page; the map sits in a
+  central "fabric panel" whose printed border is drawn OUTSIDE the map; on
+  the right six hanging fabric swatches list the stalls. Phone (<= 760px):
+  top band, map ~45dvh, swatches in a two-column grid, bottom band; the
+  page scrolls.
+
+  Class/id contract (see block-print-template.html in this same folder for
+  a full working example):
+
+  - .cloth                    the page: cotton ground, CSS grid (band /
+                               head / main / band); fills 100dvh on desktop
+    .band, .band-top,           inline <svg height=...> printed borders; each
+    .band-bottom                 holds a <pattern> + <rect fill=url(#...)>
+    .cloth-head                 title row
+      .cloth-title (h1)           Yatra One title with ghost misprint
+      .cloth-sub                  small caption
+      .cloth-actions              buttons ("Print the route", "Overview")
+  - .main                     two columns: .panel + .hang
+    .panel                    printed-border fabric panel around the map
+      .map-well                 inner window; the demo owns #map in it
+                                 (position:absolute; inset:0)
+      .detail                   stall detail card (over the map's top-left
+                                 on desktop, below it on phone)
+        .detail-close, .detail-tag, .detail-title, .detail-place,
+        .detail-text, .detail-icon
+    .hang                     hanging-swatch column
+      .rod                      wooden rod with tassels
+      .swatches                 the grid of cards
+        .swatch (+ .sw-1 ... .sw-6 patterns, .active)
+          .sw-icon                small wooden-block icon (inline SVG)
+          .sw-plate               cotton label plate:
+            .sw-no, .sw-name, .sw-kind
+  - .stamp                    map marker inner child (round stamp);
+                               .stamp[data-tone="indigo|turmeric"],
+                               .stamp .num, .stamp.active, .stamp.thunk
+                               (the stamp animation; style the inner child,
+                               never the Marker root)
+  - .btn, .btn-primary,       carved-block buttons (offset ink shadow)
+    .btn-secondary
+  - .status-note              one-line status (+ .loading / .success /
+                               .error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --cotton: #F3EAD7;
+  --cotton-deep: #E6D8B8;
+  --indigo: #2B3A67;
+  --madder: #A4332B;
+  --turmeric: #E0A526;
+  --leaf: #5E7A3A;
+  --sandstone: #E3967A;
+  --ink: #2A1E1A;
+  --ink-soft: #5B4A40;
+  --wood: #8A5A33;
+  --success: #3F6B2C;
+  --error: #A4332B;
+
+  --font-head: 'Yatra One', 'Noto Serif Devanagari', Georgia, serif;
+  --font-body: 'Mukta', 'Segoe UI', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--cotton);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+button { font-family: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 3px solid var(--turmeric);
+  outline-offset: 2px;
+}
+
+/* ---- The cloth: natural cotton with a faint woven-ink grain ---- */
+.cloth {
+  height: 100dvh;
+  min-height: 660px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 44px auto minmax(0, 1fr) 36px;
+  background-color: var(--cotton);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url%28%23n%29' opacity='.05'/%3E%3C/svg%3E");
+}
+
+.band { display: block; width: 100%; max-width: 100%; }
+.band-top { height: 44px; }
+.band-bottom { height: 36px; }
+
+/* ---- Title row ---- */
+.cloth-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 28px 12px;
+}
+
+.cloth-title {
+  margin: 0;
+  font-family: var(--font-head);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.1;
+  color: var(--indigo);
+  /* mis-registered second pass of ink */
+  text-shadow: 2px 1.5px 0 rgba(224, 165, 38, 0.65);
+}
+
+.cloth-sub {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--madder);
+}
+
+.cloth-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; }
+
+/* ---- Main: panel + hanging swatches ---- */
+.main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 26px;
+  padding: 4px 28px 18px;
+  min-height: 0;
+}
+
+/* Fabric panel: the printed border is drawn on the panel itself, outside
+   the map window. */
+.panel {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  padding: 20px;
+  background-color: var(--indigo);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Crect width='20' height='20' fill='%232B3A67'/%3E%3Cpath d='M10 2L18 10L10 18L2 10Z' fill='%23F3EAD7'/%3E%3Cpath d='M10 6L14 10L10 14L6 10Z' fill='%23A4332B'/%3E%3Ccircle cx='10' cy='10' r='1.3' fill='%23E0A526'/%3E%3Ccircle cx='0' cy='0' r='1.8' fill='%23E0A526'/%3E%3Ccircle cx='20' cy='0' r='1.8' fill='%23E0A526'/%3E%3Ccircle cx='0' cy='20' r='1.8' fill='%23E0A526'/%3E%3Ccircle cx='20' cy='20' r='1.8' fill='%23E0A526'/%3E%3C/svg%3E");
+  background-size: 20px 20px;
+  border: 2px solid var(--ink);
+  box-shadow: 5px 5px 0 var(--turmeric), 6px 7px 0 1px var(--ink);
+}
+
+.map-well {
+  position: relative;
+  height: 100%;
+  min-height: 260px;
+  background: var(--cotton-deep);
+  border: 3px solid var(--cotton);
+  outline: 2px solid var(--ink);
+  outline-offset: 0;
+  overflow: hidden;
+}
+
+/* ---- Detail card ---- */
+.detail {
+  position: absolute;
+  top: 36px;
+  left: 36px;
+  z-index: 3;
+  width: min(272px, calc(100% - 72px));
+  padding: 16px 16px 14px;
+  background: var(--cotton);
+  border: 2px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--madder);
+}
+
+.detail::before {
+  content: '';
+  position: absolute;
+  left: -2px; right: -2px; top: -2px;
+  height: 8px;
+  background: repeating-linear-gradient(90deg, var(--indigo) 0 8px, var(--turmeric) 8px 12px, var(--madder) 12px 20px, var(--cotton) 20px 24px);
+  border: 2px solid var(--ink);
+  border-bottom: 0;
+}
+
+.detail-close {
+  position: absolute;
+  top: 12px; right: 8px;
+  width: 28px; height: 28px;
+  border: 2px solid var(--ink);
+  background: var(--cotton);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.detail-close:hover { background: var(--madder); color: var(--cotton); }
+
+.detail-icon { width: 34px; height: 34px; display: block; margin-bottom: 4px; }
+
+.detail-tag {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--madder);
+}
+
+.detail-title {
+  margin: 2px 0 0;
+  padding-right: 34px;
+  font-family: var(--font-head);
+  font-weight: 400;
+  font-size: 22px;
+  line-height: 1.15;
+  color: var(--indigo);
+  text-shadow: 1.5px 1px 0 rgba(224, 165, 38, 0.6);
+  overflow-wrap: anywhere;
+}
+
+.detail-place { margin: 2px 0 8px; font-size: 14px; font-weight: 600; color: var(--ink-soft); }
+.detail-text { margin: 0; font-size: 15px; line-height: 1.4; }
+
+/* ---- Hanging swatches ---- */
+.hang {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.rod {
+  position: relative;
+  height: 14px;
+  margin: 0 12px;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #B98756 0%, var(--wood) 55%, #5E3B1F 100%);
+  border: 2px solid var(--ink);
+  z-index: 2;
+}
+.rod::before, .rod::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  width: 10px; height: 24px;
+  background: repeating-linear-gradient(90deg, var(--madder) 0 2px, var(--turmeric) 2px 4px);
+  border: 2px solid var(--ink);
+  border-radius: 2px 2px 7px 7px;
+}
+.rod::before { left: -8px; }
+.rod::after { right: -8px; }
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 22px 18px;
+  padding: 18px 12px 14px;
+  min-height: 0;
+  list-style: none;
+  margin: 0;
+}
+
+.swatch {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px 10px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  text-align: left;
+  cursor: pointer;
+  border: 2px solid var(--ink);
+  border-bottom-width: 0;
+  background-color: var(--cotton);
+  box-shadow: 3px 3px 0 rgba(42, 30, 26, 0.25);
+  transform-origin: 50% 0;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+/* the little loop it hangs from */
+.swatch::before {
+  content: '';
+  position: absolute;
+  top: -17px; left: 50%;
+  width: 14px; height: 14px;
+  margin-left: -7px;
+  border: 3px solid var(--ink);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+}
+
+/* thread fringe along the bottom edge */
+.swatch::after {
+  content: '';
+  position: absolute;
+  left: -2px; right: -2px;
+  top: calc(100% + 0px);
+  height: 14px;
+  background: repeating-linear-gradient(90deg, var(--ink) 0 1.5px, var(--cotton-deep) 1.5px 3px, var(--cotton) 3px 4.5px, transparent 4.5px 6px);
+  -webkit-mask-image: linear-gradient(180deg, #000 55%, rgba(0, 0, 0, 0.35));
+  mask-image: linear-gradient(180deg, #000 55%, rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+}
+
+.sw-1 { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Crect width='56' height='56' fill='%232B3A67'/%3E%3Cg transform='translate%2814.5 7.2%29'%3E%3Cpath d='M18 0 C30 4 34 18 26 28 C21 34 11 32 10 25 C9 18 16 15 20 19 C23 22 19 25 16 23' fill='%23E0A526' opacity='.6'/%3E%3C/g%3E%3Cg transform='translate%2813 6%29'%3E%3Cpath d='M18 0 C30 4 34 18 26 28 C21 34 11 32 10 25 C9 18 16 15 20 19 C23 22 19 25 16 23' fill='%23F3EAD7'/%3E%3Ccircle cx='22' cy='11' r='3.4' fill='%23A4332B'/%3E%3Ccircle cx='16' cy='13' r='1.3' fill='%23E0A526'/%3E%3C/g%3E%3Ccircle cx='4' cy='48' r='2.2' fill='%23E0A526'/%3E%3Ccircle cx='50' cy='50' r='2.2' fill='%23E3967A'/%3E%3Ccircle cx='50' cy='4' r='1.8' fill='%23F3EAD7'/%3E%3C/svg%3E"); background-size: 56px 56px; }
+.sw-2 { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Crect width='56' height='56' fill='%23F3EAD7'/%3E%3Cg transform='translate%2829.5 29%29' fill='%23E0A526' opacity='.55'%3E%3Cellipse cx='0' cy='-11.0' rx='6.050000000000001' ry='9.9' transform='rotate%280%29'/%3E%3Cellipse cx='0' cy='-11.0' rx='6.050000000000001' ry='9.9' transform='rotate%2872%29'/%3E%3Cellipse cx='0' cy='-11.0' rx='6.050000000000001' ry='9.9' transform='rotate%28144%29'/%3E%3Cellipse cx='0' cy='-11.0' rx='6.050000000000001' ry='9.9' transform='rotate%28216%29'/%3E%3Cellipse cx='0' cy='-11.0' rx='6.050000000000001' ry='9.9' transform='rotate%28288%29'/%3E%3Ccircle r='3.5200000000000005' fill='%23E0A526'/%3E%3C/g%3E%3Cg transform='translate%2828 28%29' fill='%23A4332B'%3E%3Cellipse cx='0' cy='-11.0' rx='6.050000000000001' ry='9.9' transform='rotate%280%29'/%3E%3Cellipse cx='0' cy='-11.0' rx='6.050000000000001' ry='9.9' transform='rotate%2872%29'/%3E%3Cellipse cx='0' cy='-11.0' rx='6.050000000000001' ry='9.9' transform='rotate%28144%29'/%3E%3Cellipse cx='0' cy='-11.0' rx='6.050000000000001' ry='9.9' transform='rotate%28216%29'/%3E%3Cellipse cx='0' cy='-11.0' rx='6.050000000000001' ry='9.9' transform='rotate%28288%29'/%3E%3Ccircle r='3.5200000000000005' fill='%23E0A526'/%3E%3C/g%3E%3Cpath d='M2 2l4 4-4 4-4-4zM54 2l4 4-4 4-4-4zM2 46l4 4-4 4-4-4zM54 46l4 4-4 4-4-4z' fill='%232B3A67'/%3E%3Cellipse cx='10' cy='28' rx='3' ry='6' fill='%235E7A3A'/%3E%3Cellipse cx='46' cy='28' rx='3' ry='6' fill='%235E7A3A'/%3E%3C/svg%3E"); background-size: 56px 56px; }
+.sw-3 { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect width='40' height='40' fill='%23E3967A'/%3E%3Cpath d='M0 20L20 0L40 20L20 40Z' fill='none' stroke='%232A1E1A' stroke-width='2'/%3E%3Cpath d='M20 10L30 20L20 30L10 20Z' fill='%23F3EAD7' stroke='%232B3A67' stroke-width='1.5'/%3E%3Ccircle cx='20' cy='20' r='2.4' fill='%23A4332B'/%3E%3Ccircle cx='0' cy='0' r='3' fill='%232B3A67'/%3E%3Ccircle cx='40' cy='0' r='3' fill='%232B3A67'/%3E%3Ccircle cx='0' cy='40' r='3' fill='%232B3A67'/%3E%3Ccircle cx='40' cy='40' r='3' fill='%232B3A67'/%3E%3C/svg%3E"); background-size: 40px 40px; }
+.sw-4 { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='56'%3E%3Crect width='40' height='56' fill='%23E0A526'/%3E%3Crect width='7' height='56' fill='%232B3A67'/%3E%3Ccircle cx='3.5' cy='14' r='1.6' fill='%23F3EAD7'/%3E%3Ccircle cx='3.5' cy='42' r='1.6' fill='%23F3EAD7'/%3E%3Cpath d='M11 8L21 18L31 8M11 28L21 38L31 28M11 48L21 58L31 48' fill='none' stroke='%232B3A67' stroke-width='3' opacity='.35' transform='translate%281.5 1.2%29'/%3E%3Cpath d='M11 8L21 18L31 8M11 28L21 38L31 28M11 48L21 58L31 48' fill='none' stroke='%23A4332B' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='36' cy='28' r='2' fill='%23A4332B'/%3E%3C/svg%3E"); background-size: 40px 56px; }
+.sw-5 { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Crect width='48' height='48' fill='%23A4332B'/%3E%3Cg transform='translate%281.4 1.2%29' fill='%232A1E1A' opacity='.35'%3E%3Ccircle cx='34.0' cy='24.0' r='2' /%3E%3Ccircle cx='31.1' cy='31.1' r='2' /%3E%3Ccircle cx='24.0' cy='34.0' r='2' /%3E%3Ccircle cx='16.9' cy='31.1' r='2' /%3E%3Ccircle cx='14.0' cy='24.0' r='2' /%3E%3Ccircle cx='16.9' cy='16.9' r='2' /%3E%3Ccircle cx='24.0' cy='14.0' r='2' /%3E%3Ccircle cx='31.1' cy='16.9' r='2' /%3E%3C/g%3E%3Cg fill='%23F3EAD7'%3E%3Ccircle cx='34.0' cy='24.0' r='2' /%3E%3Ccircle cx='31.1' cy='31.1' r='2' /%3E%3Ccircle cx='24.0' cy='34.0' r='2' /%3E%3Ccircle cx='16.9' cy='31.1' r='2' /%3E%3Ccircle cx='14.0' cy='24.0' r='2' /%3E%3Ccircle cx='16.9' cy='16.9' r='2' /%3E%3Ccircle cx='24.0' cy='14.0' r='2' /%3E%3Ccircle cx='31.1' cy='16.9' r='2' /%3E%3C/g%3E%3Ccircle cx='24' cy='24' r='3.6' fill='%23E0A526'/%3E%3Ccircle cx='0' cy='0' r='3' fill='%232B3A67'/%3E%3Ccircle cx='48' cy='0' r='3' fill='%232B3A67'/%3E%3Ccircle cx='0' cy='48' r='3' fill='%232B3A67'/%3E%3Ccircle cx='48' cy='48' r='3' fill='%232B3A67'/%3E%3C/svg%3E"); background-size: 48px 48px; }
+.sw-6 { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Crect width='56' height='56' fill='%23F3EAD7'/%3E%3Cpath d='M28 52C28 40 28 30 28 16' stroke='%235E7A3A' stroke-width='2' fill='none'/%3E%3Cg fill='%235E7A3A'%3E%3Cellipse cx='21' cy='38' rx='4' ry='8' transform='rotate%28-45 21 38%29'/%3E%3Cellipse cx='35' cy='30' rx='4' ry='8' transform='rotate%2845 35 30%29'/%3E%3Cellipse cx='21' cy='25' rx='3.5' ry='7' transform='rotate%28-45 21 25%29'/%3E%3C/g%3E%3Ccircle cx='29.4' cy='11.2' r='5' fill='%23E0A526' opacity='.6'/%3E%3Ccircle cx='28' cy='10' r='5' fill='%23E0A526'/%3E%3Ccircle cx='28' cy='10' r='1.8' fill='%23A4332B'/%3E%3Ccircle cx='5' cy='6' r='2' fill='%23E3967A'/%3E%3Ccircle cx='51' cy='50' r='2' fill='%23E3967A'/%3E%3C/svg%3E"); background-size: 56px 56px; }
+
+.swatch:hover { transform: rotate(-1.2deg); }
+.swatch:nth-child(even):hover { transform: rotate(1.2deg); }
+.swatch.active {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 3px var(--turmeric), 4px 5px 0 3px var(--ink);
+}
+
+.sw-icon {
+  width: 34px; height: 34px;
+  padding: 3px;
+  background: var(--cotton);
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+}
+
+.sw-plate {
+  width: 100%;
+  padding: 6px 8px 7px;
+  background: var(--cotton);
+  border: 2px solid var(--ink);
+  outline: 2px dotted var(--indigo);
+  outline-offset: -6px;
+  box-shadow: 2px 2px 0 var(--madder);
+}
+.sw-plate > * { display: block; }
+.sw-no { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--madder); }
+.sw-name { font-family: var(--font-head); font-size: 16px; line-height: 1.15; color: var(--ink); overflow-wrap: anywhere; }
+.sw-kind { margin-top: 2px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+
+/* ---- Buttons: carved-block feel ---- */
+.btn {
+  display: inline-block;
+  padding: 9px 16px 8px;
+  border: 2px solid var(--ink);
+  background: var(--cotton);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--ink);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.btn:hover { transform: translate(1px, 1px); box-shadow: 2px 2px 0 var(--ink); }
+.btn:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--ink); }
+.btn-primary { background: var(--madder); color: var(--cotton); }
+.btn-secondary { background: var(--turmeric); }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+/* ---- Status ---- */
+.status-note { margin: 0; font-size: 14px; font-weight: 600; color: var(--ink-soft); }
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); }
+.status-note.loading::after { content: ' ...'; }
+
+/* ---- Map stamp markers (style the inner child only) ---- */
+.stamp {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 42px; height: 42px;
+  padding: 0;
+  border-radius: 50%;
+  border: 3px solid var(--cotton);
+  background: var(--madder);
+  color: var(--cotton);
+  box-shadow: 0 0 0 2px var(--ink), 2px 3px 0 2px rgba(42, 30, 26, 0.4);
+  cursor: pointer;
+}
+.stamp[data-tone="indigo"] { background: var(--indigo); }
+.stamp[data-tone="turmeric"] { background: var(--turmeric); color: var(--ink); }
+.stamp svg { width: 24px; height: 24px; fill: currentColor; stroke: none; pointer-events: none; }
+.stamp .num {
+  position: absolute;
+  top: -9px; right: -10px;
+  width: 18px; height: 18px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--cotton);
+  border: 2px solid var(--ink);
+  color: var(--ink);
+  font-size: 11px; font-weight: 700; line-height: 1;
+  pointer-events: none;
+}
+.stamp.active { box-shadow: 0 0 0 2px var(--ink), 0 0 0 6px var(--turmeric), 0 0 0 8px var(--ink); }
+
+/* ink-splash ring (hidden until a stamp lands) */
+.stamp::before, .stamp::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 46% 54% 50% 50% / 52% 46% 54% 48%;
+  opacity: 0;
+  pointer-events: none;
+}
+.stamp::before { border: 4px solid var(--madder); }
+.stamp::after { border: 3px dotted var(--turmeric); }
+.stamp.thunk { animation: bp-thunk 0.55s cubic-bezier(.3, .7, .3, 1); }
+.stamp.thunk::before { animation: bp-splash 0.7s ease-out; }
+.stamp.thunk::after { animation: bp-splash 0.9s 0.08s ease-out; }
+
+@keyframes bp-thunk {
+  0% { transform: scale(1.3); }
+  35% { transform: scale(0.78); }
+  60% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+@keyframes bp-splash {
+  0% { transform: scale(0.8); opacity: 0.9; }
+  100% { transform: scale(2.3); opacity: 0; }
+}
+
+.hidden { display: none !important; }
+
+/* ---- Phone ---- */
+@media (max-width: 760px) {
+  .cloth {
+    height: auto;
+    min-height: 100dvh;
+    grid-template-rows: 40px auto auto 36px;
+  }
+  .band-top { height: 40px; }
+  .cloth-head { flex-direction: column; align-items: flex-start; gap: 10px; padding: 12px 16px 10px; }
+  .cloth-title { font-size: 25px; }
+  .cloth-actions { justify-content: flex-start; }
+  .main { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 4px 16px 22px; }
+  .panel { padding: 14px; box-shadow: 4px 4px 0 var(--turmeric), 5px 6px 0 1px var(--ink); }
+  .map-well { height: 45dvh; min-height: 300px; }
+  .detail { position: relative; top: auto; left: auto; width: auto; margin-top: 16px; }
+  .swatches { gap: 22px 14px; padding: 18px 4px 14px; }
+  .swatch { min-height: 170px; padding: 8px 8px 10px; }
+  .sw-name { font-size: 15px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stamp.thunk, .stamp.thunk::before, .stamp.thunk::after { animation: none; }
+  .swatch, .btn { transition: none; }
+  .swatch:hover, .swatch:nth-child(even):hover { transform: none; }
+}

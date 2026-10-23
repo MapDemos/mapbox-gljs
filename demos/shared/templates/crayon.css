@@ -1,0 +1,588 @@
+/*
+  Crayon -- a new style pack, not extracted from an existing demo (built from
+  a fresh design brief: a child's wax-crayon drawing, "My trip to London!",
+  held to a steel fridge door by four round magnets, with alphabet magnets
+  below and a sheet of gold-star stickers), deliberately distinct from every
+  other pack in this folder: Academic Paper, Aero Gadgets, Amber Terminal,
+  Annual Report, Arena, Art Nouveau, Atomic Motel, Audio Guide, Aurora Command,
+  Blueprint, Board Game, Bottom Sheet, Broadcast, Brutalist Guide, Case Board,
+  Celestial Tarot, Chalkboard, Chat Concierge, Chronicle, Clinic Finder, Code
+  Editor, Comic Panel, Constructivist, Data Notebook, Deco Voyage, Dive Log,
+  Drop Culture, E-Ink, Editorial Paper, Estate Luxe, Event Invite, Field
+  Journal, Film Noir, Fleet Ops, Frontier Poster, Grand Hotel, Herbarium,
+  Highway Sign, Illuminated, Isotype, Line Diagram, Memphis, Moving Map,
+  Museum Label, Neon HUD, Nordic Cabin, Orienteering, Papel Picado, Papercraft,
+  Pastel Bento, Pixel Quest, Postcards, Rally Dash, Raw Web, Regatta, Retro OS,
+  Riso Zine, Ski Piste, Slate Console, Soft UI, Split Flap, Stage Profile,
+  Stained Glass, Sticker Book, Storefront, Story Scroll, Swiss Grid, Tarmac
+  Glass, Thermal Receipt, Tiki Lagoon, Trailhead, Treasure Hunt, Trip Kanban,
+  Truck Art, Ukiyo-e Coast, Vapor Sunset, Vintage Chart, Vinyl Crate, Washi
+  Seasons, Watercolor, Whiteboard, Zellige; and also distinct from the sibling
+  packs built alongside it: Kintsugi, Cyanotype, Crossword, Metal Tour,
+  Periodic Table, Cross Stitch, Card Catalog, Seed Packet, Trading Card,
+  Science Fair, Modular Synth, Recipe Card, LCD Watch, Clay Toy, Solarpunk,
+  De Stijl, Block Print, Copacabana, Amphora, Dancheong, Spreadsheet, Pinball,
+  Darkroom, Mission Patch.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/crayon.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Schoolbell for kid handwriting,
+  Sniglet for rounded labels, magnets and buttons):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Schoolbell&family=Sniglet:wght@400;800&display=swap" rel="stylesheet" />
+  The page also needs ONE hidden <svg class="svg-defs"> holding the shared
+  filters (#wax, #wax-s, #wax-xs) and the #gold-star symbol -- copy it from
+  crayon-template.html.
+
+  Signature touch: waxy scribble texture. SVG feTurbulence displaces the
+  decorative shapes (frame, doodles, title) so every outline wobbles, and a
+  second fine-grain turbulence knocks tiny paper-tooth holes into the colour
+  like real wax crayon on rough paper. Gold stickers pop onto the list and
+  the map markers as the child "collects" places.
+
+  Class/id contract (see crayon-template.html in this same folder):
+
+  - #map                      map container, demo-owned, positioned
+                               absolutely inside .map-box
+  - .svg-defs                 the zero-size hidden <svg> with shared filters
+  - .fridge                   page: steel fridge door background + sheen;
+                               on desktop exactly one viewport tall
+    .fridge-handle              decorative door handle (optional)
+  - .paper                    the big sheet of drawing paper
+    .magnet (+ .m1 .m2 .m3 .m4) round colourful magnets at the corners
+    .sun                        corner sun doodle (svg)
+  - .title-row                rainbow + title block
+    .rainbow                    rainbow doodle (svg)
+    .crayon-title (h1)          scribbly hand-lettered title; coloured <span>s
+    .subtitle                   small handwritten byline / status line
+  - .paper-body               two columns on desktop (map | side)
+  - .map-frame                wrapper with room for the scribble frame
+    .scribble-frame             svg of crayon-scribble frame lines, OUTSIDE
+                                 the map
+    .map-box                    clips the #map (logo/attribution stay inside)
+  - .side                     right column
+    .things-title (h2)          "Things I saw"
+    .things (ol)                list of places
+      .thing (button)             one place; .starred when it has a star
+      .thing-doodle               svg doodle of the place
+      .thing-num / .thing-name / .thing-note
+      .star-slot                  dashed ring that fills with a .sticker
+    .side-bottom                row holding sticker sheet + family
+    .sticker-sheet              sheet of gold stars + counter + peel button
+      .sheet-title, .sheet-grid, .sheet-star (.used when stuck elsewhere)
+      .star-counter               "Stars: 3/6"
+    .family                     stick-figure family doodle (svg)
+  - .sticker                  gold star svg with pop animation (.pop)
+  - .crayon-pin               inner child of the numbered map markers
+                               (wobbly circle); .starred adds the sticker
+    .pin-star                   sticker badge on a marker
+  - .letters / .letter        alphabet fridge magnets (decorative,
+                               pointer-events none)
+  - .btn, .btn-primary,       chunky rounded crayon buttons
+    .btn-secondary
+  - .status-note (+.loading/  handwritten status line
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --fridge: #F4F6F7;
+  --fridge-shade: #DDE3E7;
+  --paper: #FFFFFF;
+  --crayon-red: #E63946;
+  --crayon-blue: #2D6CDF;
+  --crayon-green: #3BB54A;
+  --crayon-yellow: #FFD60A;
+  --crayon-orange: #FF8C1A;
+  --crayon-purple: #8E44AD;
+  --crayon-brown: #8B5A2B;
+  --crayon-black: #222222;
+  --ink: #222222;
+  --ink-muted: #4B4F55;
+  --success: #2E8B3A;
+  --error: #C62828;
+  --star: #FFC800;
+  --star-edge: #D99A00;
+
+  --font-hand: 'Schoolbell', 'Comic Sans MS', 'Chalkboard SE', cursive;
+  --font-label: 'Sniglet', 'Trebuchet MS', 'Arial Rounded MT Bold', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+  background: var(--fridge);
+  color: var(--ink);
+  font-family: var(--font-hand);
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+button { font-family: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 3px dashed var(--crayon-purple);
+  outline-offset: 3px;
+}
+
+/* Hidden holder for shared SVG filters / symbols (must NOT be display:none) */
+.svg-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* ---------- Fridge door ---------- */
+.fridge {
+  position: relative;
+  min-height: 100dvh;
+  padding: 14px 10px 18px;
+  display: flex;
+  flex-direction: column;
+  background:
+    repeating-linear-gradient(90deg, rgba(120, 135, 145, 0.05) 0 1px, transparent 1px 4px),
+    linear-gradient(100deg, #E9EDF0 0%, #FAFBFC 16%, #EEF1F3 36%, #FFFFFF 50%, #E7ECEF 68%, #F8FAFB 84%, #E4E9EC 100%);
+  overflow-x: clip;
+}
+
+.fridge-handle {
+  display: none;
+  position: absolute;
+  top: 18%;
+  right: 34px;
+  width: 16px;
+  height: 36%;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #B9C2C9, #F7F9FA 45%, #9AA5AD);
+  box-shadow: 2px 3px 8px rgba(40, 50, 60, 0.25);
+  pointer-events: none;
+}
+
+/* ---------- Drawing paper ---------- */
+.paper {
+  position: relative;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 16px 20px;
+  background: var(--paper);
+  border-radius: 4px 7px 5px 8px / 8px 4px 7px 5px;
+  box-shadow: 0 1px 0 #E5E8EA, 0 10px 26px rgba(40, 55, 70, 0.28), 0 2px 5px rgba(40, 55, 70, 0.2);
+}
+
+/* Fridge magnets holding the paper (decorative) */
+.magnet {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  z-index: 5;
+  pointer-events: none;
+  box-shadow: inset -3px -4px 6px rgba(0, 0, 0, 0.22), inset 3px 3px 5px rgba(255, 255, 255, 0.55), 0 4px 6px rgba(30, 40, 50, 0.35);
+}
+.magnet.m1 { top: -9px; left: 12px;  background: radial-gradient(circle at 35% 30%, #FF7B86, var(--crayon-red) 60%); }
+.magnet.m2 { top: -9px; right: 12px; background: radial-gradient(circle at 35% 30%, #6FA0F5, var(--crayon-blue) 60%); }
+.magnet.m3 { bottom: -9px; left: 12px;  background: radial-gradient(circle at 35% 30%, #7FD98A, var(--crayon-green) 60%); }
+.magnet.m4 { bottom: -9px; right: 12px; background: radial-gradient(circle at 35% 30%, #FFE75E, var(--crayon-yellow) 60%); }
+
+.sun {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  width: 70px;
+  height: 70px;
+  pointer-events: none;
+  z-index: 1;
+}
+.sun .rays { transform-origin: 50px 50px; animation: sun-spin 40s linear infinite; }
+@keyframes sun-spin { to { transform: rotate(360deg); } }
+
+/* ---------- Title ---------- */
+.title-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-right: 76px;
+  margin-bottom: 10px;
+  z-index: 2;
+}
+
+.rainbow {
+  flex: none;
+  width: 84px;
+  height: 50px;
+  pointer-events: none;
+}
+
+.title-block { min-width: 0; }
+
+.crayon-title {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-weight: 400;
+  font-size: clamp(34px, 9vw, 64px);
+  line-height: 1;
+  letter-spacing: 0.01em;
+  filter: url(#wax-s);
+}
+.crayon-title span:nth-child(7n+1) { color: var(--crayon-red); }
+.crayon-title span:nth-child(7n+2) { color: var(--crayon-orange); }
+.crayon-title span:nth-child(7n+3) { color: #E0A800; }
+.crayon-title span:nth-child(7n+4) { color: var(--crayon-green); }
+.crayon-title span:nth-child(7n+5) { color: var(--crayon-blue); }
+.crayon-title span:nth-child(7n+6) { color: var(--crayon-purple); }
+.crayon-title span:nth-child(7n+7) { color: var(--crayon-brown); }
+
+.subtitle {
+  margin: 4px 0 0;
+  font-size: 18px;
+  color: var(--ink-muted);
+}
+
+/* ---------- Body: map + side ---------- */
+.paper-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.map-frame {
+  position: relative;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.scribble-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.map-box {
+  position: relative;
+  flex: 1 1 auto;
+  height: 46dvh;
+  min-height: 300px;
+  border-radius: 3px 6px 4px 7px;
+  overflow: hidden;
+  background: #EAF1E6;
+}
+
+/* ---------- Things I saw ---------- */
+.side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.things-title {
+  margin: 0 0 6px;
+  font-family: var(--font-hand);
+  font-weight: 400;
+  font-size: 32px;
+  line-height: 1.1;
+  color: var(--crayon-blue);
+  filter: url(#wax-s);
+}
+
+.things {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.thing {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 5px 10px 5px 6px;
+  text-align: left;
+  font-size: 18px;
+  line-height: 1.15;
+  background: #FFFDF5;
+  border: 2.5px solid var(--crayon-black);
+  border-radius: 12px 7px 13px 8px / 8px 13px 7px 12px;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+.thing:nth-child(even) { border-radius: 8px 13px 7px 12px / 12px 7px 13px 8px; }
+.thing:hover { background: #FFF6C9; transform: rotate(-0.8deg); }
+.thing.active { background: #FFF0A8; border-color: var(--crayon-red); }
+
+.thing-doodle {
+  flex: none;
+  width: 56px;
+  height: 42px;
+}
+
+.thing-text { flex: 1; min-width: 0; }
+.thing-name { display: block; font-size: 19px; color: var(--ink); }
+.thing-note { display: block; font-size: 15px; color: var(--ink-muted); }
+
+.thing-num {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 52% 48% 55% 45% / 48% 55% 45% 52%;
+  background: var(--crayon-red);
+  color: #fff;
+  font-family: var(--font-label);
+  font-weight: 800;
+  font-size: 14px;
+}
+.thing:nth-child(6n+2) .thing-num { background: var(--crayon-blue); }
+.thing:nth-child(6n+3) .thing-num { background: var(--crayon-green); }
+.thing:nth-child(6n+4) .thing-num { background: var(--crayon-orange); }
+.thing:nth-child(6n+5) .thing-num { background: var(--crayon-purple); }
+.thing:nth-child(6n+6) .thing-num { background: var(--crayon-brown); }
+
+.star-slot {
+  flex: none;
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border: 2.5px dashed #B7BEC5;
+  border-radius: 50%;
+}
+.star-slot .sticker { position: absolute; inset: -6px; width: 40px; height: 40px; display: none; }
+.thing.starred .star-slot { border-color: transparent; }
+.thing.starred .star-slot .sticker { display: block; }
+
+/* ---------- Stickers ---------- */
+.sticker {
+  display: block;
+  filter: drop-shadow(1px 2px 1px rgba(0, 0, 0, 0.3));
+}
+.sticker.pop { animation: sticker-pop 0.55s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes sticker-pop {
+  0%   { transform: scale(0) rotate(-40deg); }
+  60%  { transform: scale(1.45) rotate(12deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+.side-bottom {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.sticker-sheet {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 10px 10px;
+  background: linear-gradient(160deg, #FFFFFF, #E8F0F8);
+  border: 2px solid #C9D6E2;
+  border-radius: 8px 12px 9px 11px;
+  box-shadow: 2px 3px 0 rgba(60, 80, 100, 0.15);
+  transform: rotate(1.2deg);
+}
+
+.sheet-title {
+  margin: 0 0 4px;
+  font-family: var(--font-label);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+}
+.sheet-star { width: 100%; max-width: 30px; height: auto; aspect-ratio: 1; transition: opacity 0.2s; }
+.sheet-star.used { opacity: 0.18; filter: grayscale(1); }
+
+.star-counter {
+  display: block;
+  margin: 6px 0 8px;
+  font-family: var(--font-label);
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--ink);
+}
+
+.family {
+  flex: none;
+  width: 118px;
+  height: 78px;
+  pointer-events: none;
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-block;
+  padding: 7px 14px;
+  border: 2.5px solid var(--crayon-black);
+  border-radius: 14px 8px 13px 9px / 9px 13px 8px 14px;
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--font-label);
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+.btn:hover { transform: rotate(-1.5deg) scale(1.04); }
+.btn-primary { background: var(--crayon-yellow); }
+.btn-secondary { background: #fff; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+/* ---------- Status note ---------- */
+.status-note {
+  margin: 4px 0 0;
+  font-size: 18px;
+  color: var(--ink-muted);
+}
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); }
+.status-note.loading::after {
+  content: '...';
+  display: inline-block;
+  animation: dots 1.2s steps(4, end) infinite;
+  overflow: hidden;
+  vertical-align: bottom;
+  width: 1.2em;
+}
+@keyframes dots { from { width: 0; } to { width: 1.2em; } }
+
+/* ---------- Map markers (inner child of the Marker root) ---------- */
+.crayon-pin {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 3px solid var(--crayon-black);
+  border-radius: 52% 48% 55% 45% / 48% 55% 45% 52%;
+  background: var(--crayon-red);
+  color: #fff;
+  font-family: var(--font-label);
+  font-weight: 800;
+  font-size: 17px;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+.crayon-pin:hover { transform: scale(1.12) rotate(-5deg); }
+.crayon-pin.c2 { background: var(--crayon-blue); border-radius: 46% 54% 48% 52% / 55% 45% 55% 45%; }
+.crayon-pin.c3 { background: var(--crayon-green); }
+.crayon-pin.c4 { background: var(--crayon-orange); border-radius: 55% 45% 50% 50% / 45% 55% 45% 55%; }
+.crayon-pin.c5 { background: var(--crayon-purple); }
+.crayon-pin.c6 { background: var(--crayon-brown); border-radius: 48% 52% 45% 55% / 52% 48% 55% 45%; }
+.crayon-pin.active { transform: scale(1.18); box-shadow: 0 0 0 4px var(--crayon-yellow), 2px 3px 0 rgba(0, 0, 0, 0.25); }
+
+.pin-star {
+  position: absolute;
+  top: -15px;
+  right: -15px;
+  width: 26px;
+  height: 26px;
+  display: none;
+}
+.crayon-pin.starred .pin-star { display: block; }
+
+/* ---------- Alphabet fridge magnets ---------- */
+.letters {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 18px 0 2px;
+  pointer-events: none;
+}
+.letter {
+  display: inline-grid;
+  place-items: center;
+  width: 46px;
+  height: 52px;
+  border-radius: 9px 12px 8px 11px;
+  font-family: var(--font-label);
+  font-weight: 800;
+  font-size: 34px;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+  box-shadow: inset 2px 2px 3px rgba(255, 255, 255, 0.55), inset -3px -4px 5px rgba(0, 0, 0, 0.22), 0 4px 6px rgba(30, 40, 50, 0.32);
+  pointer-events: none;
+  user-select: none;
+}
+.letter:nth-child(1) { background: var(--crayon-red);    transform: rotate(-6deg); }
+.letter:nth-child(2) { background: var(--crayon-blue);   transform: rotate(4deg) translateY(3px); }
+.letter:nth-child(3) { background: #E0A800;              transform: rotate(-3deg); }
+.letter:nth-child(4) { background: var(--crayon-green);  transform: rotate(7deg) translateY(-2px); }
+.letter:nth-child(5) { background: var(--crayon-purple); transform: rotate(-5deg) translateY(2px); }
+.letter:nth-child(6) { background: var(--crayon-orange); transform: rotate(3deg); }
+
+.hidden { display: none !important; }
+
+/* ---------- Desktop: whole drawing fits in one viewport ---------- */
+@media (min-width: 900px) and (min-height: 700px) {
+  .fridge {
+    height: 100dvh;
+    min-height: 0;
+    padding: 20px 60px 12px;
+  }
+  .fridge-handle { display: block; }
+  .paper { padding: 22px 28px 22px; }
+  .sun { width: 104px; height: 104px; top: 12px; right: 22px; }
+  .title-row { padding-right: 120px; gap: 18px; }
+  .rainbow { width: 128px; height: 76px; }
+  .paper-body {
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 26px;
+  }
+  .map-box { height: auto; min-height: 0; }
+  .side { overflow-y: auto; padding: 2px 4px 4px 0; }
+  .letters { margin: 14px 0 0; flex: none; }
+  .letter { width: 50px; height: 56px; font-size: 36px; }
+}
+
+@media (max-width: 899px), (max-height: 699px) {
+  .paper { padding-bottom: 28px; }
+}
+
+@media (max-width: 520px) {
+  .title-row { padding-right: 56px; gap: 8px; }
+  .rainbow { width: 60px; height: 36px; }
+  .sun { width: 56px; height: 56px; top: 10px; right: 10px; }
+  .map-frame { padding: 12px; }
+  .map-box { height: 45dvh; min-height: 280px; }
+  .family { width: 92px; height: 62px; }
+  .letter { width: 40px; height: 46px; font-size: 28px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sun .rays { animation: none; }
+  .sticker.pop { animation: none; }
+  .status-note.loading::after { animation: none; width: 1.2em; }
+  .thing, .btn, .crayon-pin { transition: none; }
+  .thing:hover, .btn:hover { transform: none; }
+}

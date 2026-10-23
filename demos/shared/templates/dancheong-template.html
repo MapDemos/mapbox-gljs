@@ -1,0 +1,408 @@
+<!--
+  Working EXAMPLE of the Dancheong style pack (dancheong.css, in this same
+  folder). Open this file directly to see the pattern working with the Five
+  Grand Palaces of Seoul on Mapbox Standard (day preset, 3D buildings on,
+  pitched). A painted eave of lotus, cloud and banded motifs crowns the
+  page; a dark-wood pillar lists the palaces; click one (or its marker) and
+  the camera flies to the gate, the hyeonpan plaque fills in (built year,
+  main gate in Korean and English, a one-line note) and the top stripe of
+  the eave repaints in that palace's colour. The EN / Korean toggle
+  switches the UI text and the map labels with map.setLanguage(). The
+  "Palace walk" button draws a cinnabar dashed line between the gates and
+  steps through them (reduced motion: the line is drawn and the camera
+  jumps, no stepping). Esc returns to the overview. Copy the markup below
+  into your own demo and link dancheong.css from its <head> -- see the
+  class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (Korean palace eave painting: five-direction colours,
+  dark timber, roof-tile curves) at the user's request for something
+  distinct from every other pack in this folder. The palaces are real
+  public landmarks with approximate gate positions; the short notes are
+  illustrative copy -- swap in your own.
+
+  What's NOT included: search/geocoding, routing, popups, audio, or a
+  hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dancheong: The Five Grand Palaces of Seoul</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gothic+A1:wght@400;500;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="dancheong.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map (inside the hanji frame). */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<div class="hall">
+  <header class="eave">
+    <div class="eave-roof" aria-hidden="true"></div>
+    <div class="eave-band">
+      <svg viewBox="0 0 2400 76" preserveAspectRatio="xMidYMin slice" aria-hidden="true" focusable="false">
+        <defs>
+          <ellipse id="dc-petal" cx="0" cy="-10" rx="4.5" ry="8" fill="#F7F3EA" stroke="#1B1B1B" stroke-width="1" />
+          <pattern id="dc-tile" width="96" height="44" patternUnits="userSpaceOnUse" patternTransform="translate(0 16)">
+            <rect width="96" height="44" fill="#1E8C6E" />
+            <g transform="translate(24 22)">
+              <circle r="19" fill="#C8372D" stroke="#E8B23A" stroke-width="2" />
+              <use href="#dc-petal" />
+              <use href="#dc-petal" transform="rotate(45)" />
+              <use href="#dc-petal" transform="rotate(90)" />
+              <use href="#dc-petal" transform="rotate(135)" />
+              <use href="#dc-petal" transform="rotate(180)" />
+              <use href="#dc-petal" transform="rotate(225)" />
+              <use href="#dc-petal" transform="rotate(270)" />
+              <use href="#dc-petal" transform="rotate(315)" />
+              <circle r="5" fill="#E8B23A" stroke="#1B1B1B" stroke-width="1.2" />
+            </g>
+            <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M56 32 C56 21 66 19 70 25 C72 21 82 21 82 28 C82 34 74 34 74 29" stroke="#E8B23A" stroke-width="3.2" />
+              <path d="M58 38 H90" stroke="#F7F3EA" stroke-width="2.4" />
+              <path d="M62 10 C68 6 76 6 82 10" stroke="#2E5C9A" stroke-width="3" />
+            </g>
+            <circle cx="94" cy="22" r="2.6" fill="#2E5C9A" />
+          </pattern>
+          <pattern id="dc-stripe" width="32" height="6" patternUnits="userSpaceOnUse">
+            <rect width="32" height="6" fill="#1B1B1B" />
+            <rect width="12" height="6" fill="#C8372D" />
+            <rect x="16" width="12" height="6" fill="#F7F3EA" />
+          </pattern>
+          <pattern id="dc-teeth" width="28" height="14" patternUnits="userSpaceOnUse">
+            <rect width="28" height="14" fill="#1B1B1B" />
+            <path d="M0 0 L14 14 L28 0Z" fill="#E8B23A" />
+            <path d="M14 0 L21 7 L28 0Z M0 0 L7 7 L14 0Z" fill="#2E5C9A" opacity=".9" />
+          </pattern>
+        </defs>
+        <rect width="2400" height="76" fill="#1E8C6E" />
+        <rect class="hl-rect" width="2400" height="8" />
+        <rect y="8" width="2400" height="2" fill="#1B1B1B" />
+        <rect y="10" width="2400" height="6" fill="url(#dc-stripe)" />
+        <rect y="16" width="2400" height="44" fill="url(#dc-tile)" />
+        <rect y="60" width="2400" height="2" fill="#F7F3EA" />
+        <rect y="62" width="2400" height="14" fill="url(#dc-teeth)" />
+      </svg>
+      <div class="eave-bar">
+        <div class="eave-title">
+          <h1 id="ui-title">Dancheong &middot; Five Grand Palaces</h1>
+          <div class="sub" id="ui-sub">Painted gateways of Seoul</div>
+        </div>
+        <div class="lang-toggle" role="group" aria-label="Language">
+          <button class="lang-btn" id="lang-en" type="button" aria-pressed="true">EN</button>
+          <button class="lang-btn" id="lang-ko" type="button" aria-pressed="false" lang="ko">한국어</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="stage">
+    <nav class="pillar" aria-label="Palaces">
+      <h2 class="pillar-head" id="ui-head">The Five Palaces</h2>
+      <ul class="palace-list" id="palace-list"></ul>
+      <button class="btn btn-primary" id="walk-btn" type="button">Palace walk</button>
+      <p class="status-note loading" id="status-note">Raising the beams&hellip;</p>
+    </nav>
+
+    <main class="main">
+      <section class="frame" aria-label="Map of the palaces">
+        <div class="map-well"><div id="map"></div></div>
+      </section>
+
+      <aside class="plaque" id="plaque" aria-live="polite">
+        <div class="plaque-seal" aria-hidden="true" id="plaque-seal"></div>
+        <div class="plaque-title">
+          <h2 class="plaque-name" id="pl-name"></h2>
+          <p class="plaque-ko" id="pl-sub"></p>
+        </div>
+        <dl class="plaque-meta">
+          <div><dt id="pl-built-l"></dt><dd id="pl-built"></dd></div>
+          <div><dt id="pl-gate-l"></dt><dd id="pl-gate"></dd></div>
+        </dl>
+        <p class="plaque-note" id="pl-note"></p>
+      </aside>
+    </main>
+  </div>
+</div>
+
+<script>
+// Approximate main-gate positions [lng, lat]; bearing = camera heading that
+// looks along the palace's rough north-south axis.
+const PALACES = [
+  { id: 'gbg', color: '#C8372D', light: false, coord: [126.97685, 37.57595], bearing: 0, built: 1395,
+    en: 'Gyeongbokgung', ko: '경복궁', gateEn: 'Gwanghwamun', gateKo: '광화문',
+    noteEn: 'The first and grandest palace of the Joseon dynasty, with the Geunjeongjeon throne hall behind its southern gate.',
+    noteKo: '조선의 으뜸 궁궐. 광화문 너머로 근정전이 자리합니다.' },
+  { id: 'cdg', color: '#1E8C6E', light: false, coord: [126.99100, 37.57890], bearing: 0, built: 1405,
+    en: 'Changdeokgung', ko: '창덕궁', gateEn: 'Donhwamun', gateKo: '돈화문',
+    noteEn: 'A World Heritage palace whose halls follow the hillside and open onto the Secret Garden.',
+    noteKo: '유네스코 세계유산. 지형을 따라 전각이 놓이고 후원으로 이어집니다.' },
+  { id: 'cgg', color: '#E8B23A', light: true, coord: [126.99510, 37.57820], bearing: 0, built: 1483,
+    en: 'Changgyeonggung', ko: '창경궁', gateEn: 'Honghwamun', gateKo: '홍화문',
+    noteEn: 'Built for the elders of the royal family; its main gate faces east, unlike its neighbours.',
+    noteKo: '왕실 어른을 위해 지은 궁. 정문은 이웃 궁과 달리 동쪽을 향합니다.' },
+  { id: 'dsg', color: '#2E5C9A', light: false, coord: [126.97524, 37.56586], bearing: 0, built: 1593,
+    en: 'Deoksugung', ko: '덕수궁', gateEn: 'Daehanmun', gateKo: '대한문',
+    noteEn: 'Timber halls stand beside stone Western-style buildings, right across from City Hall.',
+    noteKo: '한옥 전각과 서양식 석조 건물이 나란히 선 궁. 시청 맞은편에 있습니다.' },
+  { id: 'ghg', color: '#F7F3EA', light: true, coord: [126.96970, 37.57110], bearing: 0, built: 1620,
+    en: 'Gyeonghuigung', ko: '경희궁', gateEn: 'Heunghwamun', gateKo: '흥화문',
+    noteEn: 'The quiet "western palace" of Joseon, with part of its halls rebuilt in recent decades.',
+    noteKo: '조선의 서쪽 궁궐. 근래에 일부 전각이 복원되었습니다.' },
+];
+
+const UI = {
+  en: { title: 'Dancheong · Five Grand Palaces', sub: 'Painted gateways of Seoul', head: 'The Five Palaces',
+        walk: 'Palace walk', stop: 'Stop walk', built: 'Built', gate: 'Main gate', hint: 'Choose a palace',
+        hintNote: 'Pick a palace from the pillar, or tap a lotus marker on the map.',
+        ready: 'Beams raised. Pick a palace.', walking: 'Walking the palaces…', done: 'Walk complete.',
+        drawn: 'Route drawn. Pick a palace to visit.', year: (y) => String(y) },
+  ko: { title: '단청 · 서울 5대 궁', sub: '서울의 단청 궁문', head: '다섯 궁궐',
+        walk: '궁궐 순례', stop: '순례 중지', built: '창건', gate: '정문', hint: '궁궐을 선택하세요',
+        hintNote: '왼쪽 기둥 목록이나 지도의 연꽃 표시를 눌러 보세요.',
+        ready: '준비되었습니다. 궁궐을 고르세요.', walking: '궁궐을 순례하는 중…', done: '순례를 마쳤습니다.',
+        drawn: '경로를 그렸습니다. 궁궐을 선택하세요.', year: (y) => y + '년' },
+};
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = () => window.matchMedia('(max-width: 760px)').matches;
+const $ = (id) => document.getElementById(id);
+let lang = 'en';
+let current = -1;           // -1 = overview
+let walking = false;
+let walkTimer = 0;
+let walkIndex = 0;
+
+const lotus = (fill) => `<svg viewBox="0 0 24 24" aria-hidden="true">` +
+  [-60, -30, 0, 30, 60].map((a) => `<ellipse cx="12" cy="10" rx="3" ry="7" fill="${fill}" transform="rotate(${a} 12 18)"/>`).join('') +
+  `<rect x="6" y="18" width="12" height="3" rx="1.5" fill="${fill}"/></svg>`;
+
+// Small painted bracket (gongpo) motif: stacked blocks in the palace colour.
+const bracket = (c) => `<svg class="bracket" viewBox="0 0 34 34" aria-hidden="true">
+  <rect x="2" y="2" width="30" height="7" fill="${c}" stroke="#1B1B1B" stroke-width="1.5"/>
+  <rect x="9" y="11" width="16" height="7" fill="#E8B23A" stroke="#1B1B1B" stroke-width="1.5"/>
+  <rect x="13" y="20" width="8" height="12" fill="#1B1B1B"/>
+  <path d="M2 12 q6 0 6 8 M32 12 q-6 0 -6 8" fill="none" stroke="#1B1B1B" stroke-width="2.2" stroke-linecap="round"/>
+</svg>`;
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: {
+    basemap: {
+      lightPreset: 'day',
+      show3dObjects: true,
+      showPointOfInterestLabels: false,
+    },
+  },
+  center: [126.9835, 37.5735],
+  zoom: 13,
+  pitch: 55,
+  bearing: 0,
+  attributionControl: true,
+});
+map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
+
+/* ---- Markers (style the inner .dc-pin, never the Marker root) ---- */
+const markers = PALACES.map((p, i) => {
+  const root = document.createElement('div');
+  const pin = document.createElement('button');
+  pin.type = 'button';
+  pin.className = 'dc-pin' + (p.light ? ' light' : '');
+  pin.style.setProperty('--c', p.color);
+  pin.innerHTML = lotus(p.light ? '#1B1B1B' : '#F7F3EA');
+  pin.addEventListener('click', () => { stopWalk(); select(i); });
+  root.appendChild(pin);
+  return new mapboxgl.Marker({ element: root, anchor: 'center' }).setLngLat(p.coord).addTo(map);
+});
+const pinOf = (i) => markers[i].getElement().querySelector('.dc-pin');
+
+/* ---- Palace list ---- */
+PALACES.forEach((p, i) => {
+  const li = document.createElement('li');
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'palace-item';
+  b.style.setProperty('--c', p.color === '#F7F3EA' ? '#1B1B1B' : p.color);
+  b.innerHTML = `${bracket(p.color)}<span><span class="pi-name"></span><span class="pi-sub"></span></span>`;
+  b.addEventListener('click', () => { stopWalk(); select(i); });
+  li.appendChild(b);
+  $('palace-list').appendChild(li);
+});
+const itemOf = (i) => $('palace-list').children[i].firstChild;
+
+/* ---- Text rendering (UI + plaque) ---- */
+function render() {
+  const t = UI[lang];
+  document.documentElement.lang = lang;
+  $('ui-title').textContent = t.title;
+  $('ui-sub').textContent = t.sub;
+  $('ui-head').textContent = t.head;
+  $('walk-btn').textContent = walking ? t.stop : t.walk;
+  $('pl-built-l').textContent = t.built;
+  $('pl-gate-l').textContent = t.gate;
+  PALACES.forEach((p, i) => {
+    const it = itemOf(i);
+    it.querySelector('.pi-name').textContent = lang === 'ko' ? p.ko : p.en;
+    it.querySelector('.pi-sub').textContent = lang === 'ko' ? p.en : p.ko;
+  });
+  const p = PALACES[current];
+  if (p) {
+    $('pl-name').textContent = lang === 'ko' ? p.ko : p.en;
+    $('pl-sub').textContent = lang === 'ko' ? p.en : p.ko;
+    $('pl-built').textContent = t.year(p.built);
+    $('pl-gate').textContent = lang === 'ko' ? `${p.gateKo} (${p.gateEn})` : `${p.gateEn} (${p.gateKo})`;
+    $('pl-note').textContent = lang === 'ko' ? p.noteKo : p.noteEn;
+  } else {
+    $('pl-name').textContent = t.hint;
+    $('pl-sub').textContent = '五大宮';
+    $('pl-built').textContent = '—';
+    $('pl-gate').textContent = '—';
+    $('pl-note').textContent = t.hintNote;
+  }
+}
+
+function setStatus(text, kind) {
+  const el = $('status-note');
+  el.className = 'status-note ' + (kind || 'success');
+  el.textContent = text;
+}
+
+function setLang(next) {
+  lang = next;
+  $('lang-en').setAttribute('aria-pressed', String(next === 'en'));
+  $('lang-ko').setAttribute('aria-pressed', String(next === 'ko'));
+  if (typeof map.setLanguage === 'function' && map.isStyleLoaded()) map.setLanguage(next);
+  render();
+  if (!$('status-note').classList.contains('loading')) setStatus(walking ? UI[lang].walking : UI[lang].ready);
+}
+$('lang-en').addEventListener('click', () => setLang('en'));
+$('lang-ko').addEventListener('click', () => setLang('ko'));
+
+/* ---- Camera ---- */
+function pad() {
+  return phone() ? { top: 30, bottom: 70, left: 40, right: 56 } : { top: 40, bottom: 76, left: 50, right: 50 };
+}
+
+function showOverview(instant) {
+  const b = PALACES.reduce((acc, p) => acc.extend(p.coord), new mapboxgl.LngLatBounds(PALACES[0].coord, PALACES[0].coord));
+  const opts = { padding: pad(), pitch: 55, bearing: 0, maxZoom: 14, duration: instant || reduce ? 0 : 1600 };
+  if (instant || reduce) {
+    const cam = map.cameraForBounds(b, { padding: pad(), maxZoom: 14 });
+    if (cam) map.jumpTo({ center: cam.center, zoom: cam.zoom + (phone() ? -0.15 : 0.3), pitch: 55, bearing: 0 });
+  } else {
+    map.fitBounds(b, opts);
+  }
+}
+
+function select(i) {
+  current = i;
+  const p = PALACES[i];
+  PALACES.forEach((_, k) => {
+    itemOf(k).classList.toggle('active', k === i);
+    pinOf(k).classList.toggle('active', k === i);
+  });
+  document.documentElement.style.setProperty('--hl', p.color);
+  $('plaque').style.setProperty('--c', p.color);
+  $('plaque-seal').style.setProperty('--c', p.color);
+  $('plaque-seal').innerHTML = lotus(p.light ? '#1B1B1B' : '#F7F3EA');
+  render();
+  // Aim a little north of the gate so the palace halls behind it fill the view.
+  const target = { center: [p.coord[0], p.coord[1] + 0.0011], zoom: 15.6, pitch: 58, bearing: p.bearing, padding: pad() };
+  if (reduce) map.jumpTo(target);
+  else map.flyTo({ ...target, duration: 2200, essential: true });
+}
+
+function overview() {
+  stopWalk();
+  current = -1;
+  PALACES.forEach((_, k) => { itemOf(k).classList.remove('active'); pinOf(k).classList.remove('active'); });
+  document.documentElement.style.setProperty('--hl', '#E8B23A');
+  $('plaque').style.setProperty('--c', '#E8B23A');
+  $('plaque-seal').style.setProperty('--c', '#E8B23A');
+  $('plaque-seal').innerHTML = lotus('#1B1B1B');
+  render();
+  showOverview(false);
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') overview(); });
+
+/* ---- Palace walk: dashed cinnabar line, stepped one gate at a time ---- */
+function setWalkLine(n) {
+  const src = map.getSource('walk');
+  if (!src) return;
+  const coords = PALACES.slice(0, n).map((p) => p.coord);
+  src.setData({ type: 'FeatureCollection', features: coords.length > 1
+    ? [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } }] : [] });
+}
+
+function stopWalk() {
+  clearTimeout(walkTimer);
+  walking = false;
+  $('walk-btn').textContent = UI[lang].walk;
+}
+
+function stepWalk() {
+  if (!walking) return;
+  select(walkIndex);
+  setWalkLine(walkIndex + 1);
+  walkIndex += 1;
+  if (walkIndex >= PALACES.length) {
+    walkTimer = setTimeout(() => { stopWalk(); setStatus(UI[lang].done); }, 4200);
+  } else {
+    walkTimer = setTimeout(stepWalk, 4200);
+  }
+}
+
+$('walk-btn').addEventListener('click', () => {
+  if (walking) { stopWalk(); setStatus(UI[lang].ready); return; }
+  if (reduce) {
+    setWalkLine(PALACES.length);
+    current = -1;
+    showOverview(true);
+    setStatus(UI[lang].drawn);
+    return;
+  }
+  walking = true;
+  walkIndex = 0;
+  setWalkLine(0);
+  $('walk-btn').textContent = UI[lang].stop;
+  setStatus(UI[lang].walking);
+  stepWalk();
+});
+
+/* ---- Map setup ---- */
+map.on('load', () => {
+  map.addSource('walk', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: 'walk-casing', type: 'line', source: 'walk', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#F7F3EA', 'line-width': 8, 'line-opacity': 0.9, 'line-emissive-strength': 1 },
+  });
+  map.addLayer({
+    id: 'walk-line', type: 'line', source: 'walk', slot: 'top',
+    layout: { 'line-join': 'round' },
+    paint: { 'line-color': '#C8372D', 'line-width': 4, 'line-dasharray': [2, 1.5], 'line-emissive-strength': 1 },
+  });
+  if (typeof map.setLanguage === 'function') map.setLanguage(lang);
+  setStatus(UI[lang].ready);
+  showOverview(true);
+});
+
+// The grid settles after load; keep the canvas in step with its container.
+new ResizeObserver(() => map.resize()).observe($('map').parentElement);
+
+render();
+$('plaque-seal').innerHTML = lotus('#1B1B1B');
+</script>
+</body>
+</html>

@@ -1,0 +1,496 @@
+/*
+  Science Fair -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a school science-fair tri-fold poster
+  board -- white foam board, bright construction-paper mats, glue-stick
+  printed labels stuck on slightly askew, a cut-out-letter title, marker-pen
+  arrows and a blue first-prize rosette -- sitting on a kraft-paper table),
+  deliberately distinct from every other pack in this folder: Academic Paper,
+  Aero Gadgets, Amber Terminal, Annual Report, Arena, Art Nouveau, Atomic
+  Motel, Audio Guide, Aurora Command, Blueprint, Board Game, Bottom Sheet,
+  Broadcast, Brutalist Guide, Case Board, Celestial Tarot, Chalkboard, Chat
+  Concierge, Chronicle, Clinic Finder, Code Editor, Comic Panel,
+  Constructivist, Data Notebook, Deco Voyage, Dive Log, Drop Culture, E-Ink,
+  Editorial Paper, Estate Luxe, Event Invite, Field Journal, Film Noir,
+  Fleet Ops, Frontier Poster, Grand Hotel, Herbarium, Highway Sign,
+  Illuminated, Isotype, Line Diagram, Memphis, Moving Map, Museum Label,
+  Neon HUD, Nordic Cabin, Orienteering, Papel Picado, Papercraft, Pastel
+  Bento, Pixel Quest, Postcards, Rally Dash, Raw Web, Regatta, Retro OS, Riso
+  Zine, Ski Piste, Slate Console, Soft UI, Split Flap, Stage Profile, Stained
+  Glass, Sticker Book, Storefront, Story Scroll, Swiss Grid, Tarmac Glass,
+  Thermal Receipt, Tiki Lagoon, Trailhead, Treasure Hunt, Trip Kanban, Truck
+  Art, Ukiyo-e Coast, Vapor Sunset, Vintage Chart, Vinyl Crate, Washi
+  Seasons, Watercolor, Weather Console, Whiteboard, Zellige; and also
+  distinct from the sibling packs built alongside it (Kintsugi, Cyanotype,
+  Crossword, Metal Tour, Periodic Table, Cross Stitch, Card Catalog, Seed
+  Packet, Trading Card, Modular Synth, Recipe Card, LCD Watch, Clay Toy,
+  Solarpunk, De Stijl, Block Print, Copacabana, Amphora, Dancheong,
+  Spreadsheet, Pinball, Crayon, Darkroom, Mission Patch).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/science-fair.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Gaegu for headings and hand-lettered
+  labels, Delius for body copy):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Delius&display=swap" rel="stylesheet" />
+
+  Signature touch: the poster's side wings are folded back with CSS
+  perspective (rotateY about +-12deg, desktop only) while the centre panel
+  that holds the map stays perfectly flat -- never put a transform on the map
+  or any of its ancestors, or mouse coordinates drift. Everything pasted on
+  the board is tilted a degree or two, like real glue-stick work.
+
+  Class/id contract (see science-fair-template.html in this same folder for a
+  full working example):
+
+  - #map                      map container (every demo defines its own
+                               positioning, per convention)
+  - .table                    page wrapper: the kraft-paper tabletop
+  - .board                    the three-panel grid (left / centre / right)
+  - .wing, .wing-left,        the two angled side panels (flat on phones);
+    .wing-right                 .foam is the white foam-board surface they
+  - .centre, .foam            and the centre panel all share
+  - .cutout-title             the cut-out-letter title (h1); JS wraps each
+    .cutout-word / .cutout-     word in .cutout-word and each letter in
+    letter                      .cutout-letter (coloured via nth-child)
+  - .byline                   glue-stick label under the title
+  - .rosette                  decorative first-prize rosette (pointer-events
+                               none) -- put an inline SVG inside
+  - .mat                      coloured construction-paper backing;
+    .mat-red/-blue/-yellow/      modifier picks the paper colour
+    -green/-orange
+  - .map-mat, .map-frame      the mat the map is mounted on / the window
+                               #map lives in
+  - .glue-label               white printed label, askew; .glue-label h2 is
+                               a section heading (Hypothesis, Results ...)
+  - .materials                small checklist inside the left wing
+  - .volcano-list, .volcano   numbered list of paper-mat buttons;
+    .volcano.active             .volcano-num is the numbered paper circle,
+                               .volcano-name / .volcano-meta the text
+  - .pin, .pin.active         the numbered paper-circle HTML marker (inner
+                               child of a mapboxgl.Marker element; never
+                               style the marker root)
+  - .chart, .chart .bar,      the hand-drawn SVG bar chart; .bar.selected
+    .bar.wiggle, .marker-       is highlighted, .wiggle plays the wobble,
+    arrow                       .marker-arrow is the pen arrow above the bar
+  - .btn, .btn-primary,       craft-paper buttons with a black marker outline
+    .btn-secondary
+  - .status-note (+.loading/  taped-on note for loading / error states
+    .success/.error)
+  - .mapboxgl-popup.sticky    yellow sticky-note popup (fun facts);
+                               .sticky-title, .sticky-body inside
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --foam: #FFFFFF;
+  --foam-edge: #E7E4DD;
+  --foam-shadow: rgba(60, 40, 20, 0.38);
+  --red: #E4473B;
+  --blue: #2F6FD6;
+  --yellow: #FFD23F;
+  --green: #3BB273;
+  --orange: #FF8C42;
+  --marker: #1D1D1D;
+  --marker-soft: #4A4640;
+  --kraft: #C9A27A;
+  --kraft-dark: #B38A62;
+  --sticky: #FFE680;
+
+  --font-hand: 'Gaegu', 'Comic Sans MS', 'Marker Felt', cursive;
+  --font-body: 'Delius', 'Comic Sans MS', 'Trebuchet MS', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  color: var(--marker);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.45;
+  background-color: var(--kraft);
+  /* Kraft paper: faint fibre noise + soft vignette */
+  background-image:
+    radial-gradient(ellipse at 50% 30%, rgba(255, 240, 210, 0.28), rgba(120, 80, 40, 0.18) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7 0.12' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.16'/%3E%3C/svg%3E");
+}
+
+button { font-family: inherit; color: inherit; }
+:focus-visible { outline: 3px dashed var(--marker); outline-offset: 2px; }
+
+.table {
+  width: 100%;
+  min-height: 100dvh;
+  padding: 18px 24px 24px;
+}
+
+/* ---- The tri-fold ---- */
+.board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.15fr) minmax(0, 1fr);
+  align-items: start;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+.foam {
+  position: relative;
+  background: var(--foam);
+  border: 1px solid var(--foam-edge);
+  border-radius: 3px;
+  padding: 18px 16px 20px;
+  /* foam board has a thick, slightly grey edge */
+  box-shadow:
+    0 0 0 3px #F4F2EC,
+    0 16px 30px var(--foam-shadow),
+    0 3px 6px rgba(60, 40, 20, 0.3);
+}
+
+/* Wings fold back. Transform lives on the wing itself -- never on an
+   ancestor of the map. */
+.wing-left  { transform: perspective(1300px) rotateY(12deg);  transform-origin: 100% 50%; }
+.wing-right { transform: perspective(1300px) rotateY(-12deg); transform-origin: 0% 50%; }
+.wing-left  { margin-right: -2px; }
+.wing-right { margin-left: -2px; }
+.centre { z-index: 2; padding: 16px 18px 16px; grid-column: 2; grid-row: 1; }
+.wing-left  { grid-column: 1; grid-row: 1; }
+.wing-right { grid-column: 3; grid-row: 1; }
+
+/* ---- Cut-out title ---- */
+.cutout-title {
+  margin: 0 96px 6px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-family: var(--font-hand);
+  font-weight: 700;
+}
+
+.cutout-word { display: inline-flex; gap: 2px; white-space: nowrap; }
+
+.cutout-letter {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 32px;
+  font-size: 25px;
+  line-height: 1;
+  color: var(--marker);
+  background: var(--red);
+  box-shadow: 1px 2px 0 rgba(0, 0, 0, 0.22);
+  border-radius: 1px;
+}
+.cutout-letter:nth-child(5n+1) { background: var(--red);    transform: rotate(-4deg); color: #fff; }
+.cutout-letter:nth-child(5n+2) { background: var(--yellow); transform: rotate(3deg); }
+.cutout-letter:nth-child(5n+3) { background: var(--blue);   transform: rotate(-2deg) translateY(2px); color: #fff; }
+.cutout-letter:nth-child(5n+4) { background: var(--green);  transform: rotate(4deg); color: #fff; }
+.cutout-letter:nth-child(5n+5) { background: var(--orange); transform: rotate(-3deg) translateY(-1px); }
+
+.byline {
+  display: inline-block;
+  margin: 8px 0 12px;
+  padding: 3px 10px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  background: #fff;
+  border: 1px solid #DDD8CC;
+  box-shadow: 1px 2px 3px rgba(0, 0, 0, 0.18);
+  transform: rotate(-1.2deg);
+}
+
+/* Blue first-prize rosette, decorative, in the top-right corner of the board
+   (above the map mat, so it never touches map controls, logo or attribution). */
+.rosette {
+  position: absolute;
+  top: 8px;
+  right: 14px;
+  width: 84px;
+  height: 108px;
+  pointer-events: none;
+  filter: drop-shadow(1px 3px 2px rgba(0, 0, 0, 0.3));
+  transform: rotate(6deg);
+}
+.rosette svg { width: 84px; height: 108px; display: block; }
+
+/* ---- Construction paper ---- */
+.mat {
+  position: relative;
+  padding: 10px;
+  background: var(--yellow);
+  border-radius: 2px;
+  box-shadow: 1px 3px 5px rgba(0, 0, 0, 0.25);
+}
+.mat-red    { background: var(--red); }
+.mat-blue   { background: var(--blue); }
+.mat-yellow { background: var(--yellow); }
+.mat-green  { background: var(--green); }
+.mat-orange { background: var(--orange); }
+
+.map-mat { padding: 12px; transform-origin: center; }
+.map-frame {
+  position: relative;
+  border: 2px solid var(--marker);
+  background: #cfd8dc;
+  overflow: hidden;
+}
+
+/* Glue-stick printed label with a glossy glue edge */
+.glue-label {
+  position: relative;
+  margin: 0 0 12px;
+  padding: 8px 12px 10px;
+  background: #FDFCF8;
+  border: 1px solid #E2DDD0;
+  border-radius: 2px;
+  box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.2), inset 0 0 0 3px rgba(190, 220, 255, 0.28);
+  transform: rotate(-0.8deg);
+}
+.glue-label:nth-of-type(even) { transform: rotate(0.9deg); }
+.glue-label h2 {
+  margin: 0 0 2px;
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 1.05;
+  color: var(--blue);
+  letter-spacing: 0.02em;
+}
+.glue-label p { margin: 0 0 6px; }
+.glue-label p:last-child { margin-bottom: 0; }
+
+.materials { margin: 0; padding: 0; list-style: none; }
+.materials li {
+  position: relative;
+  padding-left: 22px;
+  margin: 2px 0;
+}
+.materials li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 3px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--marker);
+  border-radius: 2px;
+  transform: rotate(-4deg);
+}
+.materials li::after {
+  content: '\2713';
+  position: absolute;
+  left: 4px;
+  top: -3px;
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 19px;
+  color: var(--green);
+}
+
+/* ---- Numbered volcano list ---- */
+.volcano-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 9px; }
+.volcano-list li:nth-child(odd) .volcano { transform: rotate(-1.2deg); }
+.volcano-list li:nth-child(even) .volcano { transform: rotate(1deg); }
+
+.volcano {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  text-align: left;
+  cursor: pointer;
+  border: 0;
+  border-radius: 2px;
+  background: var(--yellow);
+  box-shadow: 1px 3px 4px rgba(0, 0, 0, 0.28);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.volcano-list li:nth-child(1) .volcano { background: var(--orange); }
+.volcano-list li:nth-child(2) .volcano { background: var(--yellow); }
+.volcano-list li:nth-child(3) .volcano { background: var(--green); }
+.volcano-list li:nth-child(4) .volcano { background: var(--blue); color: #fff; }
+.volcano-list li:nth-child(5) .volcano { background: var(--red); color: #fff; }
+.volcano:hover { transform: rotate(0deg) scale(1.03) !important; box-shadow: 2px 6px 8px rgba(0, 0, 0, 0.32); }
+.volcano.active { outline: 3px solid var(--marker); outline-offset: 1px; transform: rotate(0deg) scale(1.03) !important; }
+
+.volcano-num, .pin {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 21px;
+  line-height: 1;
+  color: var(--marker);
+  background: #FFFDF5;
+  border: 2px solid var(--marker);
+  border-radius: 53% 47% 50% 50% / 48% 52% 48% 52%; /* hand-cut circle */
+}
+.volcano-text { min-width: 0; }
+.volcano-name {
+  display: block;
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 19px;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+.volcano-meta { display: block; font-size: 11px; opacity: 0.9; }
+
+/* ---- Map pins (inner child of the Marker element) ---- */
+.pin {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  font-size: 23px;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9), 1px 4px 6px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.pin[data-n="1"] { background: var(--orange); }
+.pin[data-n="2"] { background: var(--yellow); }
+.pin[data-n="3"] { background: var(--green); }
+.pin[data-n="4"] { background: var(--blue); color: #fff; }
+.pin[data-n="5"] { background: var(--red); color: #fff; }
+.pin:hover { transform: scale(1.12) rotate(-5deg); }
+.pin.active { transform: scale(1.3); box-shadow: 0 0 0 4px var(--marker), 1px 5px 8px rgba(0, 0, 0, 0.5); }
+
+/* ---- Chart ---- */
+.chart { display: block; width: 100%; height: 250px; overflow: visible; }
+.chart text { font-family: var(--font-hand); font-weight: 700; fill: var(--marker); }
+.chart .axis { fill: none; stroke: var(--marker); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.chart .grid { fill: none; stroke: #C9D6EA; stroke-width: 1; stroke-dasharray: 4 5; }
+.chart .bar { transform-box: fill-box; transform-origin: 50% 100%; opacity: 0.55; transition: opacity 0.2s ease; }
+.chart .bar path { stroke: var(--marker); stroke-width: 2; stroke-linejoin: round; }
+.chart .bar.selected { opacity: 1; }
+.chart .bar.selected path { stroke-width: 3.2; }
+.chart .bar.wiggle { animation: sf-wiggle 0.85s ease-in-out; }
+.chart .marker-arrow { fill: none; stroke: var(--red); stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.35s ease; }
+@keyframes sf-wiggle {
+  0%   { transform: rotate(0) scaleY(1); }
+  15%  { transform: rotate(-7deg) scaleY(1.06); }
+  35%  { transform: rotate(6deg) scaleY(0.97); }
+  55%  { transform: rotate(-4deg) scaleY(1.03); }
+  75%  { transform: rotate(2.5deg); }
+  100% { transform: rotate(0) scaleY(1); }
+}
+.chart-caption { margin: 2px 0 0; font-size: 11.5px; color: var(--marker-soft); }
+
+/* ---- Buttons ---- */
+.btn {
+  display: inline-block;
+  padding: 7px 16px 6px;
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 21px;
+  line-height: 1.1;
+  cursor: pointer;
+  color: var(--marker);
+  background: var(--yellow);
+  border: 2.5px solid var(--marker);
+  border-radius: 8px 12px 9px 11px / 11px 8px 12px 9px;
+  box-shadow: 2px 3px 0 var(--marker);
+  transform: rotate(-1deg);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.btn:hover { transform: rotate(0) translate(-1px, -1px); box-shadow: 3px 4px 0 var(--marker); }
+.btn:active { transform: translate(2px, 3px); box-shadow: 0 0 0 var(--marker); }
+.btn-primary { background: var(--green); color: #fff; }
+.btn-secondary { background: #fff; }
+.btn:disabled { opacity: 0.5; cursor: default; }
+
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 12px; }
+.toolbar .hint { font-size: 12px; color: var(--marker-soft); flex: 1 1 180px; }
+
+/* ---- Status note (taped on) ---- */
+.status-note {
+  position: relative;
+  margin: 8px 0 0;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  background: var(--sticky);
+  box-shadow: 1px 2px 3px rgba(0, 0, 0, 0.25);
+  transform: rotate(0.8deg);
+}
+.status-note.loading::before { content: '\270F\FE0E  '; }
+.status-note.success::before { content: '\2713  '; color: var(--green); font-weight: 700; }
+.status-note.error { background: #FFC9C2; }
+.status-note.error::before { content: '\2717  '; color: var(--red); font-weight: 700; }
+
+/* ---- Sticky-note popup ---- */
+.mapboxgl-popup.sticky { z-index: 3; }
+.mapboxgl-popup.sticky .mapboxgl-popup-tip { display: none; }
+.mapboxgl-popup.sticky .mapboxgl-popup-content {
+  position: relative;
+  width: 210px;
+  padding: 18px 14px 14px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--marker);
+  background: linear-gradient(180deg, #FFEB99 0, var(--sticky) 14%, var(--sticky) 100%);
+  border-radius: 0 0 14px 2px;
+  box-shadow: 2px 6px 10px rgba(0, 0, 0, 0.4);
+  transform: rotate(-2deg);
+}
+.mapboxgl-popup.sticky .mapboxgl-popup-content::before {   /* strip of tape */
+  content: '';
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  width: 64px;
+  height: 18px;
+  margin-left: -32px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  transform: rotate(3deg);
+}
+.mapboxgl-popup.sticky .mapboxgl-popup-close-button {
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--marker);
+  background: transparent;
+}
+.sticky-title {
+  margin: 0 22px 4px 0;      /* clears the close button */
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+.sticky-body { margin: 0; }
+.sticky-body b { font-family: var(--font-hand); font-size: 17px; }
+
+/* A raster-dem (terrain) source makes GL JS hide the Mapbox logo (the DEM
+   TileJSON has mapbox_logo:false). Force it back. */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) { display: block !important; }
+
+.hidden { display: none !important; }
+
+/* ---- Phone: no angled wings, stacked ---- */
+@media (max-width: 860px) {
+  .table { padding: 16px; }
+  .board { display: flex; flex-direction: column; gap: 18px; }
+  .wing-left, .wing-right { transform: none; margin: 0; }
+  .centre { padding: 14px 12px; }
+  .cutout-title { margin-right: 64px; gap: 3px 10px; }
+  .cutout-letter { width: 21px; height: 25px; font-size: 19px; }
+  .rosette, .rosette svg { width: 58px; height: 74px; }
+  .rosette { top: 6px; right: 8px; }
+  .chart { height: 240px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart .bar.wiggle { animation: none; }
+  .volcano, .pin, .btn, .chart .marker-arrow { transition: none; }
+}

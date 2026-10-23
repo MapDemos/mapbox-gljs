@@ -1,0 +1,304 @@
+<!--
+  Working EXAMPLE of the De Stijl style pack (de-stijl.css, in this same
+  folder). Open this file directly to see the pattern working with a
+  seven-site walk through modern art and architecture in The Hague,
+  Rotterdam and Utrecht on Mapbox Standard (monochrome theme, day preset).
+  The whole viewport is a neoplastic grid: the map in the big white
+  rectangle, the title in red, the list of sites in blue, the selected
+  site's detail in yellow. Click a list item or a numbered square marker,
+  or press the arrow keys: the grid re-composes (its track sizes
+  transition over 400 ms), the camera flies to the site and the yellow
+  block fills in. Esc returns to the overview composition. (Reduced
+  motion: no grid transition, the camera jumps.)
+  Copy the markup below into your own demo and link de-stijl.css from its
+  <head> -- see the class/id contract documented at the top of that CSS
+  file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (Dutch neoplasticism: white rectangles, thick black
+  lines, pure red / blue / yellow, no curves, no shadows) at the user's
+  request for something distinct from every other pack in this folder. The
+  places are real public landmarks with approximate positions; the
+  descriptive copy is a short illustrative summary -- swap in your own.
+
+  What's NOT included: search/geocoding, routing, popups, audio, or a
+  hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lijn &amp; Vlak</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Krona+One&family=Rethink+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="de-stijl.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map (inside .cell-map). */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<main class="composition" id="composition" data-comp="0">
+  <header class="cell cell-title">
+    <h1 class="title-name">Lijn &amp; Vlak</h1>
+    <p class="title-sub">Seven places where Dutch modern art and architecture drew with line and plane.</p>
+  </header>
+
+  <section class="cell cell-map" aria-label="Map of the seven sites">
+    <div id="map"></div>
+  </section>
+
+  <nav class="cell cell-list" aria-label="Sites">
+    <h2 class="block-label">Zeven plekken</h2>
+    <ol class="site-list" id="site-list"></ol>
+  </nav>
+
+  <aside class="cell cell-detail" id="detail" aria-live="polite">
+    <p class="detail-eyebrow" id="d-eyebrow"></p>
+    <h2 class="detail-name" id="d-name"></h2>
+    <p class="detail-meta" id="d-meta"></p>
+    <p class="detail-text" id="d-text"></p>
+    <ul class="detail-facts" id="d-facts"></ul>
+  </aside>
+
+  <div class="cell cell-blank">
+    <p class="hint">Arrow keys step through the sites. Esc returns to the overview.</p>
+    <p class="status-note loading" id="status-note">Loading map</p>
+  </div>
+
+  <div class="cell cell-grey" aria-hidden="true">
+    <p class="counter" id="counter">00 / 07</p>
+  </div>
+</main>
+
+<script>
+// Seven sites, approximate [lng, lat]. `group` marks sites that sit close
+// together: below zoom 13 their markers are fanned out into a tidy
+// orthogonal arrangement (see fanOut()).
+const STOPS = [
+  { name: 'Kunstmuseum Den Haag', town: 'The Hague', coord: [4.2806, 52.0904], color: 'red', offset: [0, 0],
+    meta: 'H. P. Berlage, 1935',
+    text: 'Berlage’s last building, in brick and calm horizontals. It keeps the largest Mondrian collection in the world, among it the unfinished Victory Boogie Woogie.',
+    facts: ['Largest Mondrian collection', 'Brick, strict rectangular plan', 'Berlage’s final work'] },
+  { name: 'Van Nelle Factory', town: 'Rotterdam', coord: [4.4335, 51.9232], color: 'blue', offset: [0, 0],
+    meta: 'Brinkman & Van der Vlugt, 1931',
+    text: 'A glass-and-steel factory built for coffee, tea and tobacco, its curtain walls laid out in a clean grid beside the canal. Light and order as industrial design.',
+    facts: ['Steel frame, glass curtain wall', 'UNESCO World Heritage, 2014', 'Now offices and studios'] },
+  { name: 'Café De Unie', town: 'Rotterdam', coord: [4.4690, 51.9170], color: 'yellow', offset: [0, 0],
+    meta: 'J. J. P. Oud, 1925 (rebuilt 1986)',
+    text: 'A facade of flat planes and primary colour that put the ideas of De Stijl on a street front. Destroyed in 1940, it was rebuilt in the 1980s, a little further along.',
+    facts: ['Primary-colour facade', 'Lettering as composition', 'A reconstruction of a lost original'] },
+  { name: 'Kunsthal Rotterdam', town: 'Rotterdam', coord: [4.4707, 51.9100], color: 'red', offset: [0, 0],
+    meta: 'OMA / Rem Koolhaas, 1992',
+    text: 'A hall for changing exhibitions, cut by a road ramp and a ramped garden. Seen from above it is still a box, broken into rectangles of concrete, steel and glass.',
+    facts: ['Opened 1992', 'Exhibitions, not a collection', 'Sits on the Museumpark dyke'] },
+  { name: 'Het Nieuwe Instituut', town: 'Rotterdam', coord: [4.4733, 51.9082], color: 'blue', offset: [0, 0],
+    meta: 'Jo Coenen, 1993',
+    text: 'The national home of Dutch architecture, design and digital culture, with an archive that includes the drawings of many modern masters. A long brick block on a pool.',
+    facts: ['Opened 1993', 'National architecture archive', 'Brick, steel, long reflecting pool'] },
+  { name: 'Rietveld Schröder House', town: 'Utrecht', coord: [5.1397, 52.0870], color: 'yellow', offset: [0, 0],
+    meta: 'Gerrit Rietveld with Truus Schröder, 1924',
+    text: 'The one house that is De Stijl all the way: sliding walls, planes that never touch, and posts and rails picked out in red, yellow, blue and black.',
+    facts: ['UNESCO World Heritage, 2000', 'Movable interior walls', 'Built for Truus Schröder-Schräder'] },
+  { name: 'Centraal Museum', town: 'Utrecht', coord: [5.1264, 52.0862], color: 'red', offset: [0, 0],
+    meta: 'Founded 1838, in a medieval convent',
+    text: 'The city museum of Utrecht holds the world’s largest collection of Rietveld furniture, including the Red and Blue Chair, a seat made of nothing but lines and planes.',
+    facts: ['Largest Rietveld collection', 'Red and Blue Chair, 1918', 'Medieval convent buildings'] },
+];
+
+const COLOR_HEX = { red: '#D52B1E', blue: '#1F3E8F', yellow: '#F7D117' };
+const INTRO = {
+  eyebrow: 'Overview',
+  name: 'Lijn & Vlak',
+  meta: 'Den Haag · Rotterdam · Utrecht',
+  text: 'From 1917 a handful of Dutch painters, architects and designers reduced art to straight lines and primary colour. Choose a site, or step through them with the arrow keys.',
+  facts: ['Seven sites, three cities', 'Lines link the sites in order'],
+};
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const phone = () => window.matchMedia('(max-width: 820px)').matches;
+const pad2 = (n) => String(n).padStart(2, '0');
+let current = -1;          // -1 = overview
+let fitTimer = 0;
+
+const comp = $('composition');
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: {
+    basemap: {
+      theme: 'monochrome',
+      lightPreset: 'day',
+      showPointOfInterestLabels: false,
+      showPlaceLabels: false,
+    },
+  },
+  center: [4.7, 52.0],
+  zoom: 8.6,
+  pitch: 0,
+  bearing: 0,
+});
+
+/* ---- Keep the canvas matched to its grid cell while the grid transitions ---- */
+let resizeQueued = false;
+new ResizeObserver(() => {
+  if (resizeQueued) return;
+  resizeQueued = true;
+  requestAnimationFrame(() => { resizeQueued = false; map.resize(); });
+}).observe($('map'));
+
+/* ---- Camera ---- */
+function overviewBounds() {
+  return STOPS.reduce((b, s) => b.extend(s.coord), new mapboxgl.LngLatBounds(STOPS[0].coord, STOPS[0].coord));
+}
+function fitOverview(instant) {
+  map.resize();
+  // bottom >= 64 keeps points clear of the logo / attribution row
+  const opts = { padding: { top: 50, bottom: 72, left: 40, right: 40 }, pitch: 0, bearing: 0, maxZoom: 12 };
+  if (instant || reduce) map.fitBounds(overviewBounds(), { ...opts, animate: false });
+  else map.fitBounds(overviewBounds(), { ...opts, duration: 1400 });
+}
+
+/* ---- Composition ---- */
+function setComposition(n) { comp.dataset.comp = String(n); }
+
+/* ---- Markers ---- */
+const markers = STOPS.map((s, i) => {
+  const root = document.createElement('div');
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = `stijl-marker c-${s.color}`;
+  btn.setAttribute('aria-label', `${i + 1}. ${s.name}`);
+  btn.innerHTML = `${i + 1}<span class="stijl-tag">${s.name}</span>`;
+  btn.addEventListener('click', () => select(i));
+  root.appendChild(btn);
+  const m = new mapboxgl.Marker({ element: root, offset: s.offset }).setLngLat(s.coord).addTo(map);
+  return { m, root, btn };
+});
+
+/* ---- Fan out close markers (below zoom 13) into tidy orthogonal squares ----
+   Rotterdam (sites 2-5) becomes a 2x2 block, Utrecht (6-7) a pair; pitch is
+   40px = 34px marker + 6px gap. Blended to zero between zoom 12 and 13. */
+const FAN_GROUPS = [
+  { ids: [1, 2, 3, 4], slots: [[-1, -1], [1, -1], [-1, 1], [1, 1]] },
+  { ids: [5, 6], slots: [[-1, 0], [1, 0]] },
+];
+function fanOut() {
+  const t = Math.max(0, Math.min(1, 13 - map.getZoom()));
+  FAN_GROUPS.forEach((g) => {
+    const pts = g.ids.map((id) => map.project(STOPS[id].coord));
+    const cx = pts.reduce((a, p) => a + p.x, 0) / pts.length;
+    const cy = pts.reduce((a, p) => a + p.y, 0) / pts.length;
+    g.ids.forEach((id, k) => {
+      const tx = cx + g.slots[k][0] * 20, ty = cy + g.slots[k][1] * 20;
+      markers[id].m.setOffset([t * (tx - pts[k].x), t * (ty - pts[k].y)]);
+    });
+  });
+}
+map.on('zoom', fanOut);
+map.on('resize', fanOut);
+map.on('load', fanOut);
+
+/* ---- List ---- */
+STOPS.forEach((s, i) => {
+  const li = document.createElement('li');
+  li.innerHTML = `<button type="button" class="site-item" data-i="${i}">
+    <span class="site-no c-${s.color}">${pad2(i + 1)}</span>
+    <span><span class="site-name">${s.name}</span><span class="site-town">${s.town}</span></span></button>`;
+  li.firstElementChild.addEventListener('click', () => select(i));
+  $('site-list').appendChild(li);
+});
+const items = [...document.querySelectorAll('.site-item')];
+
+/* ---- Detail ---- */
+function fillDetail(d) {
+  $('d-eyebrow').textContent = d.eyebrow;
+  $('d-name').textContent = d.name;
+  $('d-meta').textContent = d.meta;
+  $('d-text').textContent = d.text;
+  $('d-facts').innerHTML = d.facts.map((f) => `<li>${f}</li>`).join('');
+  $('detail').scrollTop = 0;
+}
+
+function select(i) {
+  clearTimeout(fitTimer);
+  if (i < 0) return overview();
+  i = (i + STOPS.length) % STOPS.length;
+  current = i;
+  const s = STOPS[i];
+
+  items.forEach((b, k) => { b.classList.toggle('on', k === i); if (k === i) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current'); });
+  markers.forEach((mk, k) => { mk.btn.classList.toggle('on', k === i); mk.root.style.zIndex = k === i ? 2 : 1; });
+  fillDetail({ eyebrow: `${pad2(i + 1)} / ${pad2(STOPS.length)} · ${s.town}`, name: s.name, meta: s.meta, text: s.text, facts: s.facts });
+  $('counter').textContent = `${pad2(i + 1)} / ${pad2(STOPS.length)}`;
+
+  setComposition(1 + (i % 2));   // alternate between the two "selected" compositions
+  if (phone()) $('map').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+
+  if (reduce) map.jumpTo({ center: s.coord, zoom: 16.3, pitch: 0, bearing: 0 });
+  else map.flyTo({ center: s.coord, zoom: 16.3, pitch: 0, bearing: 0, duration: 2200, essential: false });
+}
+
+function overview() {
+  current = -1;
+  items.forEach((b) => { b.classList.remove('on'); b.removeAttribute('aria-current'); });
+  markers.forEach((mk) => { mk.btn.classList.remove('on'); mk.root.style.zIndex = 1; });
+  fillDetail(INTRO);
+  $('counter').textContent = `00 / ${pad2(STOPS.length)}`;
+  setComposition(0);
+  // Fit once the grid has settled so the bounds are computed for the final cell size
+  clearTimeout(fitTimer);
+  fitTimer = setTimeout(() => fitOverview(false), reduce ? 0 : 420);
+}
+
+/* ---- Keyboard ---- */
+document.addEventListener('keydown', (e) => {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); select(current < 0 ? 0 : current + 1); }
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); select(current < 0 ? STOPS.length - 1 : current - 1); }
+  else if (e.key === 'Escape') overview();
+});
+
+/* ---- Map layers: thin black lines linking the sites in order ---- */
+map.on('style.load', () => {
+  map.addSource('links', {
+    type: 'geojson',
+    data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: STOPS.map((s) => s.coord) } },
+  });
+  map.addLayer({
+    id: 'links-line',
+    type: 'line',
+    source: 'links',
+    slot: 'top',
+    layout: { 'line-cap': 'butt', 'line-join': 'miter' },
+    paint: { 'line-color': '#111111', 'line-width': 2, 'line-emissive-strength': 1 },
+  });
+});
+
+map.on('load', () => {
+  const note = $('status-note');
+  note.classList.remove('loading');
+  note.classList.add('success');
+  note.textContent = 'Map ready';
+  fillDetail(INTRO);
+  fitOverview(true);
+});
+map.on('error', (e) => {
+  const note = $('status-note');
+  note.classList.remove('loading', 'success');
+  note.classList.add('error');
+  note.textContent = 'Map error';
+  console.error(e && e.error);
+});
+</script>
+</body>
+</html>

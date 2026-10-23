@@ -1,0 +1,489 @@
+/*
+  Amphora -- a new style pack, not extracted from an existing demo (built
+  from a fresh design brief: ancient Greek black-figure pottery -- terracotta
+  clay, glossy black silhouettes with incised cream detail, meander / Greek-key
+  borders), deliberately distinct from every other style pack in this folder:
+  Academic Paper, Aero Gadgets, Amber Terminal, Annual Report, Arena, Art
+  Nouveau, Atomic Motel, Audio Guide, Aurora Command, Blueprint, Board Game,
+  Bottom Sheet, Broadcast, Brutalist Guide, Case Board, Celestial Tarot,
+  Chalkboard, Chat Concierge, Chronicle, Clinic Finder, Code Editor, Comic
+  Panel, Constructivist, Data Notebook, Deco Voyage, Dive Log, Drop Culture,
+  E-Ink, Editorial Paper, Estate Luxe, Event Invite, Field Journal, Film Noir,
+  Fleet Ops, Frontier Poster, Grand Hotel, Herbarium, Highway Sign,
+  Illuminated, Isotype, Line Diagram, Memphis, Moving Map, Museum Label, Neon
+  HUD, Nordic Cabin, Orienteering, Papel Picado, Papercraft, Pastel Bento,
+  Pixel Quest, Postcards, Rally Dash, Raw Web, Regatta, Retro OS, Riso Zine,
+  Ski Piste, Slate Console, Soft UI, Split Flap, Stage Profile, Stained Glass,
+  Sticker Book, Storefront, Story Scroll, Swiss Grid, Tarmac Glass, Thermal
+  Receipt, Tiki Lagoon, Trailhead, Treasure Hunt, Trip Kanban, Truck Art,
+  Ukiyo-e Coast, Vapor Sunset, Vintage Chart, Vinyl Crate, Washi Seasons,
+  Watercolor, Weather Console, Whiteboard and Zellige; and also distinct from
+  the 24 sibling packs being built in parallel at the same time (Kintsugi,
+  Cyanotype, Crossword, Metal Tour, Periodic Table, Cross Stitch, Card
+  Catalog, Seed Packet, Trading Card, Science Fair, Modular Synth, Recipe
+  Card, LCD Watch, Clay Toy, Solarpunk, De Stijl, Block Print, Copacabana,
+  Dancheong, Spreadsheet, Pinball, Crayon, Darkroom, Mission Patch).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/amphora.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (GFS Didot for headings and Greek
+  numerals, Fira Sans for body copy):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=GFS+Didot&family=Fira+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  Signature touch: the map is the BODY OF A VASE -- a black-glaze frame with
+  rounded shoulders (top corners only; the square bottom keeps the Mapbox
+  logo and attribution clear) -- under a terracotta page ruled top and bottom
+  with a meander (Greek-key) band. Below the vase runs a FRIEZE of
+  black-figure vignettes that doubles as the era filter, and the details
+  live on a pottery SHARD (irregular clip-path) beside it. The red-figure
+  accent (#A5432A) is used only for the selected marker / selected era; olive
+  appears once, as the laurel tick on the active era.
+
+  Layout archetype: VASE FRIEZE. Desktop: page = meander band, title,
+  [vase (map) over frieze | shard], meander band; the page fills 100dvh.
+  Phone (<= 900px): map about 45dvh, frieze scrolls horizontally inside its
+  own container, shard below; the page scrolls.
+
+  Class/id contract (see amphora-template.html in this same folder for a full
+  working example):
+
+  - .vase-page                the page grid (band / header / content / band)
+  - .meander                  an inline <svg> meander band (explicit height
+                               28px); the SVG defines its own <pattern>
+  - .vase-head                title row
+    .vase-head h1              big GFS Didot title (caps, tracked)
+    .vase-sub                  small Fira Sans line under the title
+    .vase-head .owl            optional decorative owl <svg>
+  - .vase-main                two-column content grid (vase | shard)
+  - .vase                     left column: map frame over frieze
+    .vase-body                 black-glaze frame, rounded shoulders (top only)
+    .map-well                  the window holding the map; the demo owns #map
+                                inside it (position:absolute; inset:0)
+    .amph-marker               HTML marker inner button: black disc, cream
+                                incised ring, Greek numeral (+ .active, .dim)
+  - .frieze                   horizontal era timeline (scrolls on phones)
+    .era                       one vignette button (+ .active)
+      .era-fig                  the inline <svg> silhouette (explicit size)
+      .era-name / .era-date     label and date range
+    .fig / .fig-line / .inc     SVG classes: black fill, black stroke, cream
+                                 incised stroke (turns clay on the active era)
+  - .shard-wrap > .shard > .shard-face   pottery-shard detail panel
+    .shard-era / .shard-title / .shard-date / .shard-text
+    .shard-sites               list of buttons (.site-btn, + .active)
+  - .btn, .btn-primary,       black-glaze buttons: square, cream hairline
+    .btn-secondary
+  - .status-note (+.loading/  small italic line with a spinning dot
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --terracotta: #C8643B;
+  --clay: #E3A06E;
+  --glaze: #1A1411;
+  --glaze-soft: #3A2C25;
+  --incised: #F2E3C6;
+  --olive: #6B7A3A;
+  --red-figure: #A5432A;
+  --shadow: rgba(26, 20, 17, 0.35);
+  --success: #3F5A1F;
+  --error: #7A1F10;
+
+  --font-head: 'GFS Didot', 'Didot', 'Bodoni MT', Georgia, serif;
+  --font-body: 'Fira Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background-color: var(--terracotta);
+  /* Fired-clay mottling: two faint radial glazes, kept on the page only. */
+  background-image:
+    radial-gradient(ellipse 60% 40% at 15% 20%, rgba(227, 160, 110, 0.35), transparent 70%),
+    radial-gradient(ellipse 50% 50% at 85% 80%, rgba(165, 67, 42, 0.30), transparent 70%);
+  background-attachment: fixed;
+  color: var(--glaze);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font-family: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 3px solid var(--incised);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px var(--glaze);
+}
+
+/* ---------- page grid ---------- */
+.vase-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  height: 100dvh;
+  min-height: 560px;
+}
+
+.meander {
+  display: block;
+  width: 100%;
+  height: 28px;
+  border-top: 4px solid var(--glaze);
+  border-bottom: 4px solid var(--glaze);
+  background: var(--clay);
+}
+
+.vase-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 28px 10px;
+}
+
+.vase-head h1 {
+  margin: 0;
+  font-family: var(--font-head);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.vase-sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--glaze);
+}
+
+.vase-head .owl {
+  flex: none;
+  width: 36px;
+  height: 44px;
+}
+
+.vase-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 24px;
+  padding: 0 28px 16px;
+  min-height: 0;
+}
+
+.vase {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+}
+
+/* ---------- the vase body (map frame) ---------- */
+.vase-body {
+  position: relative;
+  min-height: 0;
+  padding: 10px 10px 0;
+  background: var(--glaze);
+  border-radius: 72px 72px 0 0;
+  box-shadow: 0 14px 30px var(--shadow);
+}
+
+/* incised cream hairline just inside the black frame */
+.vase-body::before {
+  content: '';
+  position: absolute;
+  inset: 4px 4px 0;
+  border: 1.5px solid rgba(242, 227, 198, 0.55);
+  border-bottom: 0;
+  border-radius: 68px 68px 0 0;
+  pointer-events: none;
+}
+
+.map-well {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 62px 62px 0 0;
+  background: var(--glaze-soft);
+}
+
+/* ---------- markers ---------- */
+.amph-marker {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 2px solid var(--incised);
+  border-radius: 50%;
+  background: var(--glaze);
+  color: var(--incised);
+  font-family: var(--font-head);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 0 0 3px var(--glaze), 0 0 0 5px rgba(200, 100, 59, 0.75), 0 4px 10px var(--shadow);
+  transition: transform 0.2s ease, opacity 0.2s ease, background 0.2s ease;
+}
+
+.amph-marker:hover { transform: scale(1.1); }
+
+.amph-marker.active {
+  background: var(--red-figure);
+  transform: scale(1.22);
+  box-shadow: 0 0 0 3px var(--glaze), 0 0 0 6px var(--incised), 0 6px 14px var(--shadow);
+}
+
+.amph-marker.dim {
+  opacity: 0.28;
+  transform: scale(0.8);
+}
+
+/* ---------- frieze ---------- */
+.frieze {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  background: var(--clay);
+  border: 4px solid var(--glaze);
+  border-top-width: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--glaze) var(--clay);
+}
+
+.era {
+  flex: 1 0 150px;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 8px 10px 8px;
+  background: transparent;
+  border: 0;
+  border-right: 2px solid var(--glaze);
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s ease;
+}
+
+.era:last-child { border-right: 0; }
+.era:hover { background: rgba(242, 227, 198, 0.45); }
+
+.era.active { background: var(--incised); box-shadow: inset 0 -5px 0 var(--red-figure); }
+
+.era-fig {
+  display: block;
+  width: 80px;
+  height: 56px;
+}
+
+.fig { fill: var(--glaze); }
+.fig-line { fill: none; stroke: var(--glaze); stroke-linecap: round; stroke-linejoin: round; }
+.inc { fill: none; stroke: var(--incised); stroke-width: 1.2; stroke-linecap: round; }
+.era.active .inc { stroke: var(--clay); }
+
+.era-name {
+  font-family: var(--font-head);
+  font-size: 16px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.era-date {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+
+.era.active .era-name::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  vertical-align: middle;
+  background: var(--olive);
+  border-radius: 80% 0 80% 0;
+  transform: rotate(-20deg);
+}
+
+/* ---------- pottery shard ---------- */
+.shard-wrap {
+  align-self: start;
+  max-height: 100%;
+  filter: drop-shadow(0 10px 14px var(--shadow));
+}
+
+.shard {
+  padding: 3px;
+  background: var(--glaze);
+  clip-path: polygon(0 6%, 9% 0, 38% 3%, 71% 0, 100% 5%, 97% 38%, 100% 66%, 94% 100%, 58% 97%, 24% 100%, 4% 94%, 2% 55%);
+}
+
+.shard-face {
+  position: relative;
+  padding: 34px 34px 36px;
+  background:
+    linear-gradient(170deg, rgba(227, 160, 110, 0.35), transparent 45%),
+    var(--incised);
+  clip-path: polygon(0 6%, 9% 0, 38% 3%, 71% 0, 100% 5%, 97% 38%, 100% 66%, 94% 100%, 58% 97%, 24% 100%, 4% 94%, 2% 55%);
+}
+
+/* a black glaze band across the top, like a vase rim fragment */
+.shard-face::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 14px;
+  background:
+    repeating-linear-gradient(90deg, var(--glaze) 0 10px, var(--terracotta) 10px 14px);
+  opacity: 0.9;
+}
+
+.shard-era {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--red-figure);
+}
+
+.shard-title {
+  margin: 4px 0 2px;
+  font-family: var(--font-head);
+  font-weight: 400;
+  font-size: 25px;
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+}
+
+.shard-date {
+  margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--glaze);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.shard-text {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--glaze-soft);
+}
+
+.shard-sites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px 4px 5px;
+  border: 1.5px solid var(--glaze);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.site-btn .num {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--glaze);
+  color: var(--incised);
+  font-family: var(--font-head);
+  font-size: 12px;
+}
+
+.site-btn:hover { background: var(--clay); }
+.site-btn.active { background: var(--glaze); color: var(--incised); }
+.site-btn.active .num { background: var(--red-figure); }
+
+/* ---------- buttons / status ---------- */
+.btn {
+  display: inline-block;
+  padding: 9px 16px;
+  border: 2px solid var(--incised);
+  background: var(--glaze);
+  color: var(--incised);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.btn:hover { background: var(--glaze-soft); }
+.btn-primary { background: var(--red-figure); }
+.btn-primary:hover { background: #8C3722; }
+.btn-secondary { background: transparent; color: var(--glaze); border-color: var(--glaze); }
+.btn-secondary:hover { background: var(--clay); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.status-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--glaze-soft);
+}
+.status-note.loading::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--glaze);
+  box-shadow: inset 0 0 0 2px var(--incised);
+  animation: amph-pulse 1s ease-in-out infinite;
+}
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); font-style: normal; font-weight: 500; }
+
+@keyframes amph-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.5); }
+}
+
+.hidden { display: none !important; }
+
+/* ---------- tablet / phone ---------- */
+@media (max-width: 900px) {
+  .vase-page { display: block; height: auto; min-height: 0; }
+  .vase-head { padding: 12px 16px 8px; }
+  .vase-head h1 { font-size: 22px; letter-spacing: 0.1em; }
+  .vase-main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; padding: 0 16px 18px; }
+  .vase { grid-template-rows: auto auto; }
+  .vase-body { border-radius: 40px 40px 0 0; padding: 8px 8px 0; }
+  .vase-body::before { border-radius: 37px 37px 0 0; inset: 3px 3px 0; }
+  .map-well { height: 45dvh; min-height: 280px; border-radius: 33px 33px 0 0; }
+  .era { flex-basis: 132px; }
+  .shard-wrap { align-self: stretch; }
+  .shard-face { padding: 32px 30px 34px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .amph-marker, .era { transition: none; }
+  .status-note.loading::before { animation: none; }
+}

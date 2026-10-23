@@ -1,0 +1,405 @@
+<!--
+  Working EXAMPLE of the Periodic Table style pack (periodic-table.css, in
+  this same folder). Open this file directly to see the pattern working with
+  "The Elements of Lisbon": 24 fictional places to eat and drink in six
+  neighbourhoods (Belem, Principe Real, Cais do Sodre, Chiado, Baixa,
+  Alfama) on Mapbox Standard (faded theme, day preset). The top of the page
+  is a periodic-table wall chart -- an irregular 18-column grid with the same
+  hole in the middle as the real table, filled by the title and the category
+  key. Hover or click a tile and its dot lights up on the map (and the other
+  way round); click a legend chip to filter one category; the card shows the
+  selected element as a big tile plus mono facts. Esc resets. Reduced motion:
+  the camera jumps instead of flying. On a phone the map comes first and the
+  table scrolls sideways inside its own container.
+  Copy the markup below into your own demo and link periodic-table.css from
+  its <head> -- see the class/id contract documented at the top of that CSS
+  file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (a classroom periodic-table wall chart where every tile
+  is a place) at the user's request for something distinct from every other
+  pack in this folder. Neighbourhoods and street names are real; every venue
+  name, price and description is a fictional placeholder -- swap in your own.
+  Atomic numbers simply count the places from west to east.
+
+  What's NOT included: search/geocoding, routing, popups, or a hard-coded
+  access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Elements of Lisbon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Gantari:wght@500;700;800&family=Ubuntu+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="periodic-table.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map inside .pt-map. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<main class="pt-app">
+  <div class="pt-stage" id="stage" aria-label="Periodic table of places">
+    <ol class="pt-grid" id="grid"></ol>
+  </div>
+
+  <header class="pt-head">
+    <h1 class="pt-title">The Elements of Lisbon</h1>
+    <p class="pt-sub">24 elements &middot; 6 families &middot; Z counts west to east</p>
+  </header>
+
+  <section class="pt-legend" aria-label="Category key and filter">
+    <p class="legend-title">Key &middot; click a family to filter, again to clear</p>
+    <div class="legend-chips" id="legend"></div>
+  </section>
+
+  <section class="pt-map" aria-label="Map of the elements">
+    <div id="map"></div>
+    <button type="button" class="map-chip hidden" id="belem-chip">Belém →</button>
+  </section>
+
+  <aside class="element-card" id="card" aria-live="polite">
+    <div class="big-tile" id="big-tile">
+      <div class="bt-top"><span id="bt-no">--</span><span id="bt-price"></span></div>
+      <div class="bt-sym" id="bt-sym">Lx</div>
+      <span class="bt-name" id="bt-name">Select</span>
+    </div>
+    <div class="card-body">
+      <p class="card-kicker" id="card-kicker">No element selected</p>
+      <h2 class="card-title" id="card-title">Pick a tile</h2>
+      <dl class="card-facts" id="card-facts"></dl>
+      <p class="card-note" id="card-note">Click a tile in the chart or a dot on the map. Esc resets.</p>
+      <p class="status-note loading" id="status-note">Loading the map</p>
+    </div>
+  </aside>
+</main>
+
+<script>
+const CATS = {
+  pastry:  { label: 'Pastry',  color: '#F28B6C', on: '#1E2328', unit: 'per treat' },
+  seafood: { label: 'Seafood', color: '#3BA6A0', on: '#1E2328', unit: 'per head' },
+  cafe:    { label: 'Café',    color: '#C98B3A', on: '#1E2328', unit: 'per cup' },
+  tasca:   { label: 'Tasca',   color: '#7DB462', on: '#1E2328', unit: 'per plate' },
+  wine:    { label: 'Wine',    color: '#8E5B9E', on: '#FFFFFF', unit: 'per glass' },
+  market:  { label: 'Market',  color: '#5B9BD5', on: '#1E2328', unit: 'per basket' },
+};
+
+// [symbol, name, category, price EUR, neighbourhood, street, signature, note, lng, lat]
+// Ordered west to east = atomic number. Coordinates sit on the named streets.
+const RAW = [
+  ['Mq', 'Marisqueira Caravela', 'seafood', 28, 'Belém', 'Rua Bartolomeu Dias', 'Carabineiros', 'Red prawns by the kilo, a window onto the river and a very patient waiter.', -9.21018, 38.69596],
+  ['Cm', 'Café Manuelino', 'cafe', 1.6, 'Belém', 'Rua dos Jerónimos', 'Bica', 'A stone-vaulted coffee counter in the shadow of the monastery.', -9.20555, 38.69959],
+  ['Pt', 'Pastelaria Tejo', 'pastry', 2.4, 'Belém', 'Rua de Belém', 'Pastel de nata', 'Custard tarts out of the oven every eight minutes, cinnamon on request.', -9.20335, 38.69745],
+  ['Tf', 'Tasca do Farol', 'tasca', 11, 'Belém', 'Rua Vieira Portuense', 'Bacalhau à brás', 'Four tables, one blackboard menu and a lighthouse painted on the wall.', -9.19980, 38.69720],
+  ['Vl', 'Vinhos do Lacre', 'wine', 6, 'Príncipe Real', 'Rua da Imprensa Nacional', 'Rosé do Alentejo', 'Wax-sealed bottles and a back garden under a mulberry tree.', -9.15360, 38.71596],
+  ['Mb', 'Mercearia Botânica', 'market', 4.5, 'Príncipe Real', 'Rua da Escola Politécnica', 'Tinned fish and herbs', 'A pantry of preserves, loose tea and seasonal fruit by the crate.', -9.14978, 38.71728],
+  ['Cc', 'Café Cedro', 'cafe', 1.8, 'Príncipe Real', 'Praça do Príncipe Real', 'Galão', 'Tables under the great cedar tree, newspaper rack included.', -9.14809, 38.71660],
+  ['Mk', 'Mercado do Cais', 'market', 8, 'Cais do Sodré', 'Avenida 24 de Julho', 'Food-hall sampler', 'A long hall of counters: oysters, cured ham and a wall of cheeses.', -9.14598, 38.70713],
+  ['Gp', 'Garrafeira Pombal', 'wine', 7, 'Príncipe Real', 'Rua Dom Pedro V', 'Douça white', 'A cellar bar that pours three open bottles a night, no more.', -9.14576, 38.71570],
+  ['Tr', 'Taberna Rosa', 'wine', 5.5, 'Cais do Sodré', 'Rua Nova do Carvalho', 'Vinho verde', 'Pink-lit, late and loud, with a vermouth tap behind the bar.', -9.14341, 38.70712],
+  ['Ta', 'Tasca Alecrim', 'tasca', 10, 'Cais do Sodré', 'Rua do Alecrim', 'Pica-pau', 'Marble tables, steaming casseroles, one house red in a jug.', -9.14314, 38.70903],
+  ['Pa', 'Pastelaria Amora', 'pastry', 2.2, 'Chiado', 'Rua da Rosa', 'Pastel de feijão', 'Blackberry tarts and almond cakes, boxed in blue paper and string.', -9.14580, 38.71270],
+  ['Sn', 'Sardinha Nua', 'seafood', 14, 'Chiado', 'Rua Nova da Trindade', 'Tinned sardines', 'A tinned-fish bar: pick a tin, get bread, butter and a lemon.', -9.14241, 38.71245],
+  ['Cb', 'Café Brasa', 'cafe', 1.5, 'Chiado', 'Largo do Chiado', 'Café pingado', 'Standing-room espresso for people who are late for the tram.', -9.14295, 38.70985],
+  ['Mc', 'Mercearia Carmo', 'market', 6, 'Chiado', 'Largo do Carmo', 'Cheese and quince', 'A tiny grocer under the ruined arches, jam jars in a pyramid.', -9.14000, 38.71280],
+  ['Bg', 'Bolos Garrett', 'pastry', 3, 'Chiado', 'Rua Garrett', 'Bolo de arroz', 'Gilded mirrors, glass cabinets and the best rice cake on the street.', -9.14060, 38.71083],
+  ['Pv', 'Polvo Verde', 'seafood', 18, 'Baixa', 'Rua Augusta', 'Octopus salad', 'Lunch-only octopus in six ways, finished by two in the afternoon.', -9.13778, 38.71092],
+  ['Mf', 'Mercado Figueira', 'market', 5, 'Baixa', 'Praça da Figueira', 'Seasonal fruit', 'Stalls on the square: figs in autumn, cherries in June.', -9.13776, 38.71401],
+  ['Tm', 'Tasca Mouraria', 'tasca', 9, 'Baixa', 'Rua dos Fanqueiros', 'Arroz de pato', 'Duck rice baked in a clay dish, served with a wedge of orange.', -9.13599, 38.71118],
+  ['Cl', 'Café Lua', 'cafe', 1.7, 'Baixa', 'Rua da Madalena', 'Meia de leite', 'A crescent-moon sign, a zinc counter and a very good almond cake.', -9.13516, 38.71012],
+  ['Vm', 'Vinhos Miradouro', 'wine', 6.5, 'Alfama', 'Largo das Portas do Sol', 'Port tonic', 'Sunset glasses on a terrace looking over a sea of orange roofs.', -9.13066, 38.71248],
+  ['Tc', 'Tasca do Chafariz', 'tasca', 10, 'Alfama', 'Largo do Chafariz de Dentro', 'Caldeirada', 'A fishermen’s stew from a one-pot kitchen beside the old fountain.', -9.12796, 38.71101],
+  ['Mm', 'Marisqueira Maré', 'seafood', 19, 'Alfama', 'Rua dos Remédios', 'Amêijoas à Bulhão Pato', 'Clams in garlic and coriander, mopped up with thick bread.', -9.12645, 38.71243],
+  ['Pf', 'Pastelaria da Feira', 'pastry', 2.2, 'Alfama', 'Campo de Santa Clara', 'Travesseiro', 'Flaky pillow pastries, handy after the Tuesday flea market.', -9.12496, 38.71440],
+];
+
+// Chart positions [column, row] on the 18-column grid, in atomic-number order:
+// two tall edges, a hole in the middle (title + key live in it).
+const POS = [
+  [1,1],[18,1],
+  [1,2],[2,2],[13,2],[14,2],[15,2],[16,2],[17,2],[18,2],
+  [1,3],[2,3],[13,3],[14,3],[15,3],[16,3],[17,3],[18,3],
+  [1,4],[2,4],[3,4],[16,4],[17,4],[18,4],
+];
+
+const HOODS = [
+  ['Belém', -9.2045, 38.7013], ['Príncipe Real', -9.1495, 38.7203], ['Chiado', -9.1475, 38.7105],
+  ['Cais do Sodré', -9.1440, 38.7060], ['Baixa', -9.1365, 38.7078], ['Alfama', -9.1275, 38.7088],
+];
+
+const EL = RAW.map((r, i) => ({
+  z: i + 1, sym: r[0], name: r[1], cat: r[2], price: r[3], hood: r[4], street: r[5],
+  dish: r[6], note: r[7], coord: [r[8], r[9]], col: POS[i][0], row: POS[i][1],
+}));
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const phone = () => window.matchMedia('(max-width: 1000px)').matches;
+const pad2 = (n) => String(n).padStart(2, '0');
+const eur = (p) => '€' + (p < 10 ? p.toFixed(1) : String(p));
+
+let selected = null;    // atomic number or null
+let hovered = null;
+let filterCat = null;
+const tiles = {};
+const chips = {};
+
+/* ---------- Table ---------- */
+EL.forEach((e) => {
+  const li = document.createElement('li');
+  li.style.cssText = `grid-column:${e.col};grid-row:${e.row};display:flex;min-width:0;min-height:0`;
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = `tile cat-${e.cat}`;
+  b.style.flex = '1';
+  b.setAttribute('aria-label', `Element ${e.z}, ${e.sym}, ${e.name}, ${CATS[e.cat].label}, ${eur(e.price)}`);
+  b.innerHTML = `<span class="t-row"><span class="t-no">${e.z}</span><span class="t-price">${eur(e.price)}</span></span>` +
+    `<span class="t-sym">${e.sym}</span><span class="t-name" title="${e.name}">${e.name}</span>`;
+  b.addEventListener('click', () => select(e.z, true));
+  b.addEventListener('mouseenter', () => setHover(e.z));
+  b.addEventListener('mouseleave', () => setHover(null));
+  b.addEventListener('focus', () => setHover(e.z));
+  b.addEventListener('blur', () => setHover(null));
+  li.appendChild(b);
+  $('grid').appendChild(li);
+  tiles[e.z] = b;
+});
+// li wrappers keep the grid placement; make them stretch the tile
+document.querySelectorAll('#grid > li').forEach((li) => { li.style.listStyle = 'none'; });
+
+/* ---------- Legend / filter ---------- */
+Object.entries(CATS).forEach(([key, c]) => {
+  const n = EL.filter((e) => e.cat === key).length;
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'legend-chip';
+  b.setAttribute('aria-pressed', 'false');
+  b.innerHTML = `<span class="chip-sw cat-${key}" style="background:${c.color}"></span><span class="chip-label">${c.label}</span><span class="chip-count">${n}</span>`;
+  b.addEventListener('click', () => setFilter(filterCat === key ? null : key));
+  $('legend').appendChild(b);
+  chips[key] = b;
+});
+
+function setFilter(cat) {
+  filterCat = cat;
+  Object.entries(chips).forEach(([k, b]) => b.setAttribute('aria-pressed', String(k === cat)));
+  EL.forEach((e) => {
+    const dim = !!cat && e.cat !== cat;
+    tiles[e.z].classList.toggle('is-dim', dim);
+    tiles[e.z].disabled = dim;
+  });
+  if (map.getLayer('el-circles')) {
+    const f = cat ? ['==', ['get', 'cat'], cat] : null;
+    map.setFilter('el-circles', f);
+    map.setFilter('el-symbols', f);
+  }
+  if (selected && cat && EL[selected - 1].cat !== cat) clearSelection();
+}
+
+/* ---------- Linking: tile <-> dot ---------- */
+function setState(z, state) {
+  if (z && map.getSource('elements')) map.setFeatureState({ source: 'elements', id: z }, state);
+}
+
+function setHover(z) {
+  if (hovered === z) return;
+  if (hovered) { tiles[hovered].classList.remove('is-hover'); setState(hovered, { hover: false }); }
+  hovered = z;
+  if (z) { tiles[z].classList.add('is-hover'); setState(z, { hover: true }); }
+}
+
+/* ---------- Card ---------- */
+function fillCard(e) {
+  const big = $('big-tile');
+  big.className = e ? `big-tile cat-${e.cat}` : 'big-tile';
+  $('bt-no').textContent = e ? pad2(e.z) : '--';
+  $('bt-price').textContent = e ? eur(e.price) : '';
+  $('bt-sym').textContent = e ? e.sym : 'Lx';
+  $('bt-name').textContent = e ? e.name : 'Select';
+  $('card-kicker').textContent = e ? `${CATS[e.cat].label} family · ${e.hood}` : 'No element selected';
+  $('card-title').textContent = e ? e.name : 'Pick a tile';
+  $('card-facts').innerHTML = e
+    ? `<dt>Atomic no.</dt><dd>${e.z} of ${EL.length}</dd><dt>Weight</dt><dd>${eur(e.price)} ${CATS[e.cat].unit}</dd><dt>Signature</dt><dd>${e.dish}</dd><dt>Orbit</dt><dd>${e.street}</dd>`
+    : '';
+  $('card-note').textContent = e ? e.note : 'Click a tile in the chart or a dot on the map. Esc resets.';
+}
+
+function clearSelection() {
+  if (selected) { tiles[selected].classList.remove('is-selected'); setState(selected, { selected: false }); }
+  selected = null;
+  fillCard(null);
+}
+
+function mapPadding() {
+  return phone() ? { top: 36, bottom: 64, left: 28, right: 28 } : { top: 28, bottom: 70, left: 372, right: 28 };
+}
+
+function select(z, fromTile) {
+  if (selected === z) return;
+  if (filterCat && EL[z - 1].cat !== filterCat) setFilter(null);
+  if (selected) { tiles[selected].classList.remove('is-selected'); setState(selected, { selected: false }); }
+  selected = z;
+  const e = EL[z - 1];
+  tiles[z].classList.add('is-selected');
+  setState(z, { selected: true });
+  fillCard(e);
+  // On the phone the table scrolls inside its own container: centre the tile.
+  const st = $('stage');
+  if (st.scrollWidth > st.clientWidth) {
+    const tr = tiles[z].getBoundingClientRect(), sr = st.getBoundingClientRect();
+    const left = st.scrollLeft + tr.left - sr.left - (st.clientWidth - tr.width) / 2;
+    st.scrollTo({ left, behavior: reduce ? 'auto' : 'smooth' });
+  }
+  const cam = { center: e.coord, zoom: Math.max(map.getZoom(), 15.4), padding: mapPadding() };
+  if (reduce) map.jumpTo(cam); else map.easeTo({ ...cam, duration: 1100 });
+}
+
+/* ---------- Map ---------- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: {
+    basemap: {
+      lightPreset: 'day',
+      theme: 'faded',
+      showPointOfInterestLabels: false,
+      showPlaceLabels: false,
+    },
+  },
+  center: [-9.15, 38.708],
+  zoom: 12.2,
+  attributionControl: true,
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+function overview(instant) {
+  // Desktop: all 24, padded clear of the card (left). Phone: central cluster only
+  // (Belem is reached with the chip), so the dots are readable.
+  const b = new mapboxgl.LngLatBounds();
+  EL.filter((e) => !phone() || e.hood !== 'Bel\u00e9m').forEach((e) => b.extend(e.coord));
+  const p = phone() ? { top: 36, bottom: 64, left: 28, right: 28 } : { top: 40, bottom: 64, left: 372, right: 60 };
+  map.fitBounds(b, { padding: p, bearing: 0, maxZoom: 16, duration: instant || reduce ? 0 : 1200 });
+  const chip = $('belem-chip');
+  chip.classList.toggle('hidden', !phone());
+  chip.textContent = 'Bel\u00e9m \u2192';
+  chip.dataset.mode = 'go';
+}
+
+$('belem-chip').addEventListener('click', (ev) => {
+  const chip = ev.currentTarget;
+  if (chip.dataset.mode === 'go') {
+    select(3, false);
+    chip.textContent = '\u2190 Overview';
+    chip.dataset.mode = 'back';
+  } else { clearSelection(); overview(); }
+});
+
+function colorMatch(prop) {
+  const m = ['match', ['get', 'cat']];
+  Object.entries(CATS).forEach(([k, c]) => m.push(k, c[prop]));
+  m.push('#1E2328');
+  return m;
+}
+
+function radiusAt(base, hov, sel) {
+  return ['case', ['boolean', ['feature-state', 'selected'], false], sel,
+    ['boolean', ['feature-state', 'hover'], false], hov, base];
+}
+
+map.on('load', () => {
+  $('status-note').classList.add('hidden');
+
+  map.addSource('elements', {
+    type: 'geojson',
+    data: {
+      type: 'FeatureCollection',
+      features: EL.map((e) => ({
+        type: 'Feature', id: e.z,
+        properties: { z: e.z, sym: e.sym, cat: e.cat, name: e.name },
+        geometry: { type: 'Point', coordinates: e.coord },
+      })),
+    },
+  });
+  map.addSource('hoods', {
+    type: 'geojson',
+    data: {
+      type: 'FeatureCollection',
+      features: HOODS.map((h) => ({ type: 'Feature', properties: { name: h[0].toUpperCase() }, geometry: { type: 'Point', coordinates: [h[1], h[2]] } })),
+    },
+  });
+
+  map.addLayer({
+    id: 'hood-labels', type: 'symbol', source: 'hoods', slot: 'top', maxzoom: 15.2,
+    layout: {
+      'text-field': ['get', 'name'], 'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+      'text-size': 12, 'text-letter-spacing': 0.14,
+    },
+    paint: { 'text-color': '#454D55', 'text-halo-color': '#F7F8F6', 'text-halo-width': 1.6, 'text-emissive-strength': 1 },
+  });
+
+  map.addLayer({
+    id: 'el-circles', type: 'circle', source: 'elements', slot: 'top',
+    paint: {
+      'circle-color': colorMatch('color'),
+      'circle-radius': ['interpolate', ['linear'], ['zoom'],
+        11, radiusAt(7, 9, 10), 13, radiusAt(9, 12, 14), 16, radiusAt(15, 18, 20)],
+      'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#1E2328', '#FFFFFF'],
+      'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 3.5,
+        ['boolean', ['feature-state', 'hover'], false], 3, 2],
+      'circle-emissive-strength': 1,
+    },
+  });
+
+  map.addLayer({
+    id: 'el-symbols', type: 'symbol', source: 'elements', slot: 'top',
+    layout: {
+      'text-field': ['get', 'sym'], 'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 11.9, 0, 12.6, 10, 16, 15],
+      'text-allow-overlap': true, 'text-ignore-placement': true,
+    },
+    paint: { 'text-color': colorMatch('on'), 'text-emissive-strength': 1 },
+  });
+
+  map.on('mousemove', 'el-circles', (ev) => {
+    map.getCanvas().style.cursor = 'pointer';
+    if (ev.features[0]) setHover(ev.features[0].properties.z);
+  });
+  map.on('mouseleave', 'el-circles', () => { map.getCanvas().style.cursor = ''; setHover(null); });
+  map.on('click', 'el-circles', (ev) => { if (ev.features[0]) select(ev.features[0].properties.z, false); });
+
+  if (filterCat) setFilter(filterCat);
+  if (selected) setState(selected, { selected: true });
+});
+
+map.on('error', (e) => {
+  const n = $('status-note');
+  n.classList.remove('hidden', 'loading');
+  n.classList.add('error');
+  n.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+// The map box is sized by the page grid, which settles after load.
+new ResizeObserver(() => map.resize()).observe($('map'));
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    clearSelection();
+    setFilter(null);
+    overview();
+  }
+});
+
+window.addEventListener('resize', () => { if (!selected) overview(true); });
+map.once('load', () => { if (!selected) overview(true); });
+
+fillCard(null);
+overview(true);
+</script>
+</body>
+</html>

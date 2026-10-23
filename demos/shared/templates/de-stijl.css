@@ -1,0 +1,448 @@
+/*
+  De Stijl -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: Dutch neoplasticism -- an asymmetric
+  composition of white rectangles divided by thick black lines, with a few
+  blocks of pure primary red, blue and yellow; strictly horizontal and
+  vertical, no curves, no shadows, no gradients), deliberately distinct
+  from every other style pack in this folder: Academic Paper, Aero Gadgets,
+  Amber Terminal, Annual Report, Arena, Art Nouveau, Atomic Motel, Audio
+  Guide, Aurora Command, Blueprint, Board Game, Bottom Sheet, Broadcast,
+  Brutalist Guide, Case Board, Celestial Tarot, Chalkboard, Chat Concierge,
+  Chronicle, Clinic Finder, Code Editor, Comic Panel, Constructivist, Data
+  Notebook, Deco Voyage, Dive Log, Drop Culture, E-Ink, Editorial Paper,
+  Estate Luxe, Event Invite, Field Journal, Film Noir, Fleet Ops, Frontier
+  Poster, Grand Hotel, Herbarium, Highway Sign, Illuminated, Isotype, Line
+  Diagram, Memphis, Moving Map, Museum Label, Neon HUD, Nordic Cabin,
+  Orienteering, Papel Picado, Papercraft, Pastel Bento, Pixel Quest,
+  Postcards, Rally Dash, Raw Web, Regatta, Retro OS, Riso Zine, Ski Piste,
+  Slate Console, Soft UI, Split Flap, Stage Profile, Stained Glass, Sticker
+  Book, Storefront, Story Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt,
+  Tiki Lagoon, Trailhead, Treasure Hunt, Trip Kanban, Truck Art, Ukiyo-e
+  Coast, Vapor Sunset, Vintage Chart, Vinyl Crate, Washi Seasons,
+  Watercolor, Weather Console, Whiteboard and Zellige; and also distinct
+  from the sibling packs being built in parallel at the same time (Kintsugi,
+  Cyanotype, Crossword, Metal Tour, Periodic Table, Cross Stitch, Card
+  Catalog, Seed Packet, Trading Card, Science Fair, Modular Synth, Recipe
+  Card, LCD Watch, Clay Toy, Solarpunk, Block Print, Copacabana, Amphora,
+  Dancheong, Spreadsheet, Pinball, Crayon, Darkroom and Mission Patch).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/de-stijl.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Krona One for headings and
+  numerals, Rethink Sans for body / label copy):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Krona+One&family=Rethink+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  Signature touch: the whole viewport IS the composition. A CSS grid whose
+  gap (and frame) is black -- the gutters are simply the grid container's
+  background showing through -- holds the map in the largest white
+  rectangle, with one red, one blue and one yellow block, plus a white and a
+  grey block left empty for balance. Selecting a site RE-COMPOSES the grid:
+  only the track sizes change (grid-template-columns / -rows transition,
+  400 ms), cycling through three named compositions, so every rectangle
+  slides and resizes but none is ever added or removed. Black lines are
+  10px on desktop, 6px on a phone. No border-radius, shadow or gradient
+  anywhere.
+
+  Layout archetype: NEOPLASTIC GRID. Desktop (> 820px): a 4 x 3 grid with
+  six named areas --
+      "title  map    map    grey"
+      "list   map    map    detail"
+      "list   blank  blank  detail"
+  composition 0 = overview, 1 and 2 = the two alternating "selected"
+  compositions (set with the data-comp attribute on .composition).
+  Phone (<= 820px): a single vertical column -- red title band, map
+  (45dvh), yellow detail, blue list -- the page scrolls and the black
+  gutters are kept; the empty blocks are dropped.
+
+  Class/id contract (see de-stijl-template.html in this same folder for a
+  full working example):
+
+  - .composition             the page: black grid container, fixed to the
+                              viewport on desktop. data-comp="0|1|2" picks
+                              the composition (0 = overview)
+  - .cell                    any rectangle of the grid (clips its content)
+    .cell-title               red block: the title
+    .cell-map                 the big white block; the demo owns #map in it
+                               (position:absolute; inset:0)
+    .cell-list                blue block: the list of sites (white text)
+    .cell-detail              yellow block: the selected site's detail
+    .cell-blank               white block left empty (holds the hint line)
+    .cell-grey                light-grey block left empty (holds .counter)
+  - .title-name              the title (h1, Krona One, sized to its block)
+    .title-sub                subtitle paragraph beneath it
+  - .block-label             small uppercase block heading
+  - .site-list               <ol> of sites in the blue block
+    .site-item                a <button>; .on marks the selected site
+    .site-no                  numbered square swatch (.c-red/.c-blue/
+                               .c-yellow)
+    .site-name / .site-town   name and town lines
+  - .detail-eyebrow          "03 / 07 - Rotterdam" line
+    .detail-name              site name (Krona One)
+    .detail-meta              architect / year line
+    .detail-text              body paragraph
+    .detail-facts             <ul> of short facts
+  - .counter                 big "03 / 07" numerals in the grey block
+  - .hint                    keyboard hint in the white block
+  - .stijl-marker            square map marker (an inner element of a
+                              mapboxgl.Marker; .c-red/.c-blue/.c-yellow,
+                              .on = selected); .stijl-tag is its name tag
+  - .btn, .btn-primary,      square-cornered buttons: black border, fill
+    .btn-secondary            swap on hover
+  - .status-note (+.loading/ plain one-line status text with a square
+    .success/.error)          pip
+  - .hidden                  utility: display: none !important
+*/
+
+:root {
+  --white: #F7F5EF;
+  --black: #111111;
+  --red: #D52B1E;
+  --blue: #1F3E8F;
+  --yellow: #F7D117;
+  --grey: #DADAD4;
+  --line: 10px;
+
+  --success: #1F3E8F;
+  --error: #D52B1E;
+
+  --font-heading: 'Krona One', 'Arial Black', Helvetica, sans-serif;
+  --font-body: 'Rethink Sans', Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--black);
+  color: var(--black);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: 4px solid var(--white);
+  outline-offset: -8px;
+}
+
+/* ---------- The composition: black gutters = the container's background */
+.composition {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  gap: var(--line);
+  padding: var(--line);
+  background: var(--black);
+  grid-template-areas:
+    "title  map    map    grey"
+    "list   map    map    detail"
+    "list   blank  blank  detail";
+  /* Plain fr tracks (no minmax) so Chrome / Safari / Firefox interpolate them */
+  grid-template-columns: 3fr 5fr 5fr 3fr;
+  grid-template-rows: 3fr 7fr 1fr;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .composition {
+    transition: grid-template-columns 400ms cubic-bezier(0.7, 0, 0.2, 1),
+                grid-template-rows 400ms cubic-bezier(0.7, 0, 0.2, 1);
+  }
+}
+
+/* Composition 0 is the overview (the defaults above); 1 and 2 alternate on
+   selection. Same four columns and three rows, only the proportions move. */
+.composition[data-comp="0"] { grid-template-columns: 3fr 5fr 5fr 3fr; grid-template-rows: 3fr 7fr 1fr; }
+.composition[data-comp="1"] { grid-template-columns: 3fr 2fr 5fr 5fr; grid-template-rows: 3fr 6fr 1fr; }
+.composition[data-comp="2"] { grid-template-columns: 4fr 6fr 3fr 3fr; grid-template-rows: 4fr 5fr 1fr; }
+
+.cell {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 18px;
+  background: var(--white);
+}
+
+.cell-title  { grid-area: title;  background: var(--red);    color: var(--white); container-type: inline-size; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; }
+.cell-map    { grid-area: map;    padding: 0; background: var(--white); }
+.cell-list   { grid-area: list;   background: var(--blue);   color: var(--white); padding: 0; display: flex; flex-direction: column; }
+.cell-detail { grid-area: detail; background: var(--yellow); color: var(--black); overflow-y: auto; container-type: inline-size; }
+.cell-blank  { grid-area: blank;  background: var(--white); padding: 10px 18px;  display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.cell-grey   { grid-area: grey; background: var(--grey); display: flex; align-items: flex-end; }
+
+/* ---------- Title block (red) */
+.title-name {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: clamp(20px, 14cqw, 54px);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.title-sub {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 500;
+  max-width: 34ch;
+}
+
+/* ---------- Blue list */
+.block-label {
+  margin: 0;
+  padding: 14px 18px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  border-bottom: 3px solid var(--black);
+  flex: none;
+}
+
+.site-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.site-list li { border-bottom: 3px solid var(--black); }
+.site-list li:last-child { border-bottom: 0; }
+
+.site-item {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: clamp(6px, 1.1vh, 12px) 18px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--white);
+  text-align: left;
+  cursor: pointer;
+}
+
+.site-item:hover { background: var(--white); color: var(--black); }
+.site-item.on { background: var(--yellow); color: var(--black); }
+
+.site-no {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 3px solid var(--black);
+  font-family: var(--font-heading);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.site-name { display: block; font-size: 15px; font-weight: 700; line-height: 1.2; }
+.site-town { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--grey); }
+.site-item:hover .site-town, .site-item.on .site-town { color: var(--black); }
+
+.c-red    { background: var(--red);    color: var(--white); }
+.c-blue   { background: var(--blue);   color: var(--white); }
+.c-yellow { background: var(--yellow); color: var(--black); }
+/* a blue swatch sits on a blue block: give it a white keyline inside the black one */
+.site-no.c-blue { box-shadow: none; outline: 2px solid var(--white); outline-offset: 0; }
+.site-item:hover .site-no.c-blue { outline-color: var(--black); }
+
+/* ---------- Yellow detail */
+.detail-eyebrow {
+  margin: 0 0 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.detail-name {
+  margin: 0 0 10px;
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: clamp(16px, 8cqw, 26px);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.detail-meta {
+  margin: 0 0 12px;
+  padding-bottom: 12px;
+  border-bottom: 3px solid var(--black);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.detail-text { margin: 0 0 12px; font-size: 14px; line-height: 1.5; }
+
+.detail-facts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.detail-facts li { padding: 5px 0 5px 16px; position: relative; }
+.detail-facts li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.8em;
+  width: 8px;
+  height: 8px;
+  background: var(--black);
+}
+
+/* ---------- Empty blocks */
+.cell-grey { container-type: inline-size; }
+.counter {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: clamp(20px, 15cqw, 44px);
+  line-height: 1;
+}
+
+.hint { margin: 0; font-size: 12px; font-weight: 500; line-height: 1.4; max-width: 46ch; }
+
+/* ---------- Map markers: squares only (inner element of a mapboxgl.Marker) */
+.stijl-marker {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 3px solid var(--black);
+  border-radius: 0;
+  font-family: var(--font-heading);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stijl-marker.on {
+  transform: scale(1.2);
+  outline: 3px solid var(--black);
+  outline-offset: 3px;
+}
+
+.stijl-tag {
+  display: none;
+  position: absolute;
+  left: -3px;
+  bottom: calc(100% + 12px);
+  padding: 4px 9px;
+  border: 3px solid var(--black);
+  background: var(--white);
+  color: var(--black);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.stijl-marker.on .stijl-tag { display: block; }
+
+/* ---------- Buttons: square, black border, fill swap */
+.btn {
+  display: inline-block;
+  padding: 10px 16px;
+  border: 3px solid var(--black);
+  border-radius: 0;
+  background: var(--white);
+  color: var(--black);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.btn:hover { background: var(--black); color: var(--white); }
+.btn-primary { background: var(--red); color: var(--white); }
+.btn-primary:hover { background: var(--black); }
+.btn-secondary { background: var(--yellow); }
+.btn-secondary:hover { background: var(--black); color: var(--yellow); }
+.btn:disabled { background: var(--grey); color: var(--black); cursor: not-allowed; }
+
+/* ---------- Status note */
+.status-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.status-note::before {
+  content: '';
+  flex: none;
+  width: 10px;
+  height: 10px;
+  background: var(--black);
+}
+.status-note.loading::before { background: var(--yellow); border: 2px solid var(--black); }
+.status-note.success::before { background: var(--blue); }
+.status-note.error { color: var(--error); }
+.status-note.error::before { background: var(--red); }
+
+.hidden { display: none !important; }
+
+/* ---------- Phone: a vertical composition, thinner black lines */
+@media (max-width: 820px) {
+  :root { --line: 6px; }
+
+  html, body { overflow: auto; height: auto; }
+
+  .composition {
+    position: static;
+    min-height: 100dvh;
+    grid-template-areas:
+      "title"
+      "map"
+      "detail"
+      "list";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 45dvh auto auto;
+    transition: none;
+  }
+  .composition[data-comp="0"],
+  .composition[data-comp="1"],
+  .composition[data-comp="2"] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 45dvh auto auto;
+  }
+
+  .cell { padding: 16px; }
+  .cell-map { padding: 0; }
+  .cell-list { padding: 0; }
+  .cell-blank, .cell-grey { display: none; }
+  .cell-title { min-height: 0; }
+  .cell-detail { overflow: visible; }
+  .title-name { font-size: clamp(28px, 11vw, 44px); }
+  .title-sub { max-width: none; }
+  .detail-name { font-size: 20px; }
+  .site-list { overflow: visible; }
+  .site-item { padding: 12px 16px; }
+  .block-label { padding: 14px 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composition { transition: none; }
+}

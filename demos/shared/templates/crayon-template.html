@@ -1,0 +1,424 @@
+<!--
+  Working EXAMPLE of the Crayon style pack (crayon.css, in this same folder).
+  Open this file directly to see the pattern working with a child's fridge
+  drawing, "My trip to London!", on Mapbox Standard (faded theme, day preset,
+  POI labels off): the map is framed by a crayon scribble, a wobbly red crayon
+  route links six London places, and beside it a "Things I saw" list carries
+  a little doodle for each place. Click a list item or a numbered marker: the
+  camera flies there and a gold-star sticker pops onto both the list item and
+  the marker; the counter reads "Stars: 3/6". "Peel off stars" resets
+  (reduced motion: no pop, instant jumps). Copy the markup below into your
+  own demo and link crayon.css from its <head> -- see the class/id contract
+  documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (a wax-crayon drawing held to a fridge by magnets) at
+  the user's request for something distinct from every other pack in this
+  folder. The places are real public landmarks with approximate positions;
+  the child, the notes and the route wobble are fictional/illustrative.
+
+  What's NOT included: search/geocoding, real routing, popups, audio, or a
+  hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>My trip to London!</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Schoolbell&family=Sniglet:wght@400;800&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="crayon.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map (inside .map-box). */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<!-- Shared waxy filters + gold star symbol (zero-size, NOT display:none) -->
+<svg class="svg-defs" aria-hidden="true" focusable="false">
+  <defs>
+    <!-- big shapes: wobble + paper-tooth holes -->
+    <filter id="wax" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="3" result="w"/>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="7" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="8" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -2.4 1.9" result="gm"/>
+      <feComposite in="d" in2="gm" operator="in"/>
+    </filter>
+    <!-- text / HTML elements (CSS px) -->
+    <filter id="wax-s" x="-3%" y="-8%" width="106%" height="116%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="5" result="w"/>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="3" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="2" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -2.2 1.95" result="gm"/>
+      <feComposite in="d" in2="gm" operator="in"/>
+    </filter>
+    <!-- tiny doodles in a 64x48 viewBox -->
+    <filter id="wax-xs" x="-8%" y="-8%" width="116%" height="116%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed="4" result="w"/>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="9" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.6 1.75" result="gm"/>
+      <feComposite in="d" in2="gm" operator="in"/>
+    </filter>
+    <symbol id="gold-star" viewBox="0 0 24 24">
+      <path d="M12 1.8l3 6.6 7.2.8-5.4 4.8 1.6 7.1L12 17.4 5.6 21.1l1.6-7.1L1.8 9.2 9 8.4z" fill="#FFC800" stroke="#D99A00" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M12 5l1.7 4 4.3.5" fill="none" stroke="#FFF3A0" stroke-width="1.5" stroke-linecap="round"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="fridge">
+  <div class="fridge-handle" aria-hidden="true"></div>
+
+  <main class="paper">
+    <i class="magnet m1" aria-hidden="true"></i><i class="magnet m2" aria-hidden="true"></i>
+    <i class="magnet m3" aria-hidden="true"></i><i class="magnet m4" aria-hidden="true"></i>
+
+    <!-- sun in the corner -->
+    <svg class="sun" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      <g filter="url(#wax)">
+        <g class="rays" stroke="#FF8C1A" stroke-width="5" stroke-linecap="round">
+          <path d="M50 4v14M50 82v14M4 50h14M82 50h14M17 17l10 10M73 73l10 10M83 17L73 27M27 73L17 83"/>
+        </g>
+        <circle cx="50" cy="50" r="22" fill="#FFD60A" stroke="#FF8C1A" stroke-width="3"/>
+        <circle cx="42" cy="45" r="2.5" fill="#222"/><circle cx="58" cy="45" r="2.5" fill="#222"/>
+        <path d="M40 55q10 10 20 0" fill="none" stroke="#222" stroke-width="3" stroke-linecap="round"/>
+      </g>
+    </svg>
+
+    <header class="title-row">
+      <svg class="rainbow" viewBox="0 0 120 70" aria-hidden="true" focusable="false">
+        <g filter="url(#wax)" fill="none" stroke-width="7" stroke-linecap="round">
+          <path d="M8 64A52 52 0 0 1 112 64" stroke="#E63946"/>
+          <path d="M15 64A45 45 0 0 1 105 64" stroke="#FF8C1A"/>
+          <path d="M22 64A38 38 0 0 1 98 64" stroke="#FFD60A"/>
+          <path d="M29 64A31 31 0 0 1 91 64" stroke="#3BB54A"/>
+          <path d="M36 64A24 24 0 0 1 84 64" stroke="#2D6CDF"/>
+          <path d="M43 64A17 17 0 0 1 77 64" stroke="#8E44AD"/>
+          <path d="M2 66q4-8 12-3 4-8 12 0" stroke="#9DB7D5" stroke-width="4"/>
+          <path d="M94 66q4-8 12-3 4-8 12 0" stroke="#9DB7D5" stroke-width="4"/>
+        </g>
+      </svg>
+      <div class="title-block">
+        <h1 class="crayon-title" aria-label="My trip to London!">
+          <span>M</span><span>y</span> <span>t</span><span>r</span><span>i</span><span>p</span> <span>t</span><span>o</span> <span>L</span><span>o</span><span>n</span><span>d</span><span>o</span><span>n</span><span>!</span>
+        </h1>
+        <p class="subtitle">by Mia, age 6 &middot; tap a place to get a gold star!</p>
+        <p class="status-note loading" id="status-note" role="status">Colouring in the map</p>
+      </div>
+    </header>
+
+    <div class="paper-body">
+      <section class="map-frame" aria-label="Map of my trip">
+        <svg class="scribble-frame" id="scribble-frame" aria-hidden="true" focusable="false"></svg>
+        <div class="map-box"><div id="map"></div></div>
+      </section>
+
+      <aside class="side">
+        <h2 class="things-title">Things I saw</h2>
+        <ol class="things" id="things"></ol>
+
+        <div class="side-bottom">
+          <section class="sticker-sheet" aria-label="Sticker sheet">
+            <h3 class="sheet-title">My sticker sheet</h3>
+            <div class="sheet-grid" id="sheet-grid"></div>
+            <span class="star-counter" id="star-counter" aria-live="polite">Stars: 0/6</span>
+            <button class="btn btn-secondary" id="peel-btn" type="button">Peel off stars</button>
+          </section>
+
+          <!-- stick-figure family -->
+          <svg class="family" viewBox="0 0 150 100" aria-hidden="true" focusable="false">
+            <g filter="url(#wax)" fill="none" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+              <g stroke="#E63946"><circle cx="24" cy="18" r="9"/><path d="M24 27v30M24 57l-9 28M24 57l9 28M24 36l-14 12M24 36l24 18"/><path d="M20 20h.1M28 20h.1M20 23q4 4 8 0" stroke-width="2.5"/></g>
+              <g stroke="#2D6CDF"><circle cx="74" cy="12" r="9"/><path d="M74 21v34M74 55l-9 31M74 55l9 31M74 32l-26 22M74 32l22 22"/><path d="M70 14h.1M78 14h.1M70 17q4 4 8 0" stroke-width="2.5"/></g>
+              <g stroke="#3BB54A"><circle cx="110" cy="42" r="8"/><path d="M110 50v22M110 72l-7 14M110 72l7 14M110 58l-14-4M110 58l14 4"/><path d="M106 44h.1M114 44h.1M106 47q4 3 8 0" stroke-width="2.5"/></g>
+              <g stroke="#8E44AD"><circle cx="136" cy="62" r="6.5"/><path d="M136 68.5v14M136 82.5l-5 8M136 82.5l5 8M136 72l-12-18M136 72l6 6"/></g>
+              <path d="M2 94q12-3 24 0t24 0 24 0 24 0 24 0 24 0" stroke="#3BB54A" stroke-width="3"/>
+            </g>
+          </svg>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <!-- alphabet fridge magnets (decorative) -->
+  <div class="letters" aria-hidden="true">
+    <span class="letter">L</span><span class="letter">O</span><span class="letter">N</span><span class="letter">D</span><span class="letter">O</span><span class="letter">N</span>
+  </div>
+</div>
+
+<script>
+// Six places, in the order of the trip. Coordinates are approximate
+// [lng, lat] on public land / landmarks. A screen-space pass (spreadPins) separates bunched markers.
+const STOPS = [
+  { name: 'Tower Bridge', note: 'It goes UP for big boats!', coord: [-0.07538, 51.50554] },
+  { name: 'London Eye', note: 'A giant wheel. I got dizzy.', coord: [-0.11957, 51.50329] },
+  { name: 'Trafalgar Square', note: 'Red buses everywhere!', coord: [-0.12795, 51.50807] },
+  { name: 'Hyde Park', note: 'I saw a squirrel with an acorn.', coord: [-0.1747, 51.5046] },
+  { name: 'Natural History Museum', note: 'A real dinosaur. ROAR.', coord: [-0.17635, 51.49671] },
+  { name: 'Science Museum', note: 'Rockets! I want to be an astronaut.', coord: [-0.17436, 51.49781] },
+];
+
+// Little crayon doodles, one per place (viewBox 0 0 64 48)
+const DOODLES = [
+  // Tower Bridge
+  `<g stroke="#222" stroke-width="2" stroke-linejoin="round"><path d="M10 38V16l5-7 5 7v22z" fill="#2D6CDF"/><path d="M44 38V16l5-7 5 7v22z" fill="#2D6CDF"/><path d="M20 18h24" stroke-width="3.5"/></g><path d="M2 36Q8 30 15 17M20 24Q32 38 44 24M54 17Q58 30 63 36" fill="none" stroke="#E63946" stroke-width="2.5"/><path d="M0 44q4-4 8 0t8 0 8 0 8 0 8 0 8 0 8 0 8 0" fill="none" stroke="#2D6CDF" stroke-width="2.5"/>`,
+  // London Eye
+  `<g fill="none" stroke-linecap="round"><path d="M32 22L20 46M32 22L44 46" stroke="#8B5A2B" stroke-width="3"/><circle cx="32" cy="22" r="16" stroke="#8E44AD" stroke-width="3"/><path d="M32 6v32M16 22h32M21 11l22 22M43 11L21 33" stroke="#8E44AD" stroke-width="1.5"/></g><g fill="#FFD60A" stroke="#222" stroke-width="1"><circle cx="32" cy="6" r="2.5"/><circle cx="48" cy="22" r="2.5"/><circle cx="32" cy="38" r="2.5"/><circle cx="16" cy="22" r="2.5"/><circle cx="43" cy="11" r="2.5"/><circle cx="21" cy="33" r="2.5"/></g>`,
+  // Red bus
+  `<g stroke="#222" stroke-width="2" stroke-linejoin="round"><rect x="6" y="8" width="52" height="28" rx="5" fill="#E63946"/><path d="M6 22h52" fill="none"/></g><g fill="#CFE6FF" stroke="#222" stroke-width="1.5"><rect x="10" y="12" width="9" height="7"/><rect x="23" y="12" width="9" height="7"/><rect x="36" y="12" width="9" height="7"/><rect x="10" y="26" width="9" height="7"/><rect x="23" y="26" width="9" height="7"/><rect x="47" y="26" width="8" height="7"/></g><g fill="#222"><circle cx="18" cy="38" r="5"/><circle cx="46" cy="38" r="5"/></g><g fill="#FFD60A"><circle cx="18" cy="38" r="2"/><circle cx="46" cy="38" r="2"/></g>`,
+  // Squirrel
+  `<path d="M22 38C2 40 2 8 16 12 12 18 22 22 30 30z" fill="#FF8C1A" stroke="#8B5A2B" stroke-width="2" stroke-linejoin="round"/><ellipse cx="34" cy="31" rx="10" ry="9" fill="#8B5A2B" stroke="#222" stroke-width="2"/><circle cx="46" cy="21" r="7" fill="#8B5A2B" stroke="#222" stroke-width="2"/><path d="M42 16l1-8 5 6z" fill="#8B5A2B" stroke="#222" stroke-width="2" stroke-linejoin="round"/><circle cx="48" cy="20" r="1.6" fill="#222"/><circle cx="52.5" cy="23" r="1.6" fill="#222"/><ellipse cx="47" cy="36" rx="5" ry="4" fill="#C98A3E" stroke="#222" stroke-width="1.5"/><path d="M44 33q3-4 6 0" fill="#8B5A2B" stroke="#222" stroke-width="1.5"/><path d="M0 44q8-4 16 0t16 0 16 0 16 0" fill="none" stroke="#3BB54A" stroke-width="3"/>`,
+  // Dinosaur
+  `<g stroke="#222" stroke-width="2" stroke-linejoin="round"><path d="M14 30Q6 36 1 30L12 24z" fill="#3BB54A"/><ellipse cx="30" cy="30" rx="16" ry="9" fill="#3BB54A"/><path d="M42 26Q50 24 48 12l8 0Q58 26 46 34z" fill="#3BB54A"/><ellipse cx="53" cy="10" rx="8" ry="5.5" fill="#3BB54A"/><rect x="21" y="35" width="6" height="10" rx="2" fill="#3BB54A"/><rect x="35" y="35" width="6" height="10" rx="2" fill="#3BB54A"/></g><path d="M20 22l3-6 3 6M28 21l3-6 3 6M36 22l3-6 3 6" fill="#FFD60A" stroke="#222" stroke-width="1.5" stroke-linejoin="round"/><circle cx="55" cy="9" r="1.6" fill="#222"/>`,
+  // Rocket
+  `<g stroke="#222" stroke-width="2" stroke-linejoin="round"><path d="M32 2Q44 14 42 34H22Q20 14 32 2z" fill="#fff"/><path d="M22 26L12 38l10-2zM42 26l10 12-10-2z" fill="#E63946"/><path d="M26 34h12l-3 5h-6z" fill="#2D6CDF"/></g><circle cx="32" cy="18" r="5" fill="#9ED0FF" stroke="#222" stroke-width="2"/><path d="M28 40q4 8 8 0 0 6-4 8-4-2-4-8z" fill="#FF8C1A" stroke="#FFD60A" stroke-width="1.5"/><path d="M6 8l2 3 3 1-3 1-2 3-1-3-3-1 3-1zM56 6l1.5 2 2 .6-2 .6-1.5 2-.6-2-2-.6 2-.6z" fill="#FFD60A"/>`,
+];
+
+// Star order on the sheet; the pack never needs another library.
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const starSvg = (cls) => `<svg class="sticker ${cls || ''}" viewBox="0 0 24 24" aria-hidden="true"><use href="#gold-star"/></svg>`;
+const starred = new Set();
+let current = -1;
+let touched = false;   // once the user has moved the camera, stop auto re-fitting
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: {
+    basemap: {
+      lightPreset: 'day',
+      theme: 'faded',
+      showPointOfInterestLabels: false,
+    },
+  },
+  center: [-0.125, 51.503],
+  zoom: 12,
+  attributionControl: true,
+});
+
+/* ---- Camera ---- */
+const bounds = STOPS.reduce((b, s) => b.extend(s.coord), new mapboxgl.LngLatBounds(STOPS[0].coord, STOPS[0].coord));
+function fitAll(duration) {
+  map.fitBounds(bounds, { padding: { top: 60, bottom: 70, left: 50, right: 50 }, duration: duration || 0, maxZoom: 14 });
+}
+
+function flyToStop(s) {
+  const opts = { center: s.coord, zoom: 15.2, pitch: 0, bearing: 0 };
+  if (reduce) map.jumpTo(opts);
+  else map.flyTo({ ...opts, duration: 2200, essential: false });
+}
+
+/* ---- Wobbly crayon route ---- */
+// Deterministic pseudo-random so the wobble is the same on every load.
+function rng(seed) { let t = seed >>> 0; return () => { t = (t * 1664525 + 1013904223) >>> 0; return t / 4294967296 - 0.5; }; }
+
+function wobble(seed, amp) {
+  const r = rng(seed);
+  const out = [STOPS[0].coord];
+  for (let i = 0; i < STOPS.length - 1; i++) {
+    const [ax, ay] = STOPS[i].coord, [bx, by] = STOPS[i + 1].coord;
+    const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy);
+    const px = -dy / len, py = dx / len;           // perpendicular unit vector
+    const n = 9;
+    for (let k = 1; k < n; k++) {
+      const t = k / n, off = r() * amp * 2;
+      out.push([ax + dx * t + px * off + r() * amp * 0.4, ay + dy * t + py * off + r() * amp * 0.4]);
+    }
+    out.push(STOPS[i + 1].coord);
+  }
+  return out;
+}
+
+function addRoute() {
+  map.addSource('crayon-route', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [
+      { type: 'Feature', properties: { pass: 'under' }, geometry: { type: 'LineString', coordinates: wobble(11, 0.0007) } },
+      { type: 'Feature', properties: { pass: 'main' }, geometry: { type: 'LineString', coordinates: wobble(5, 0.0006) } },
+    ] },
+  });
+  // Under-stroke: thinner, orange, a second pass of the crayon.
+  map.addLayer({
+    id: 'crayon-route-under', type: 'line', source: 'crayon-route', slot: 'top',
+    filter: ['==', ['get', 'pass'], 'under'],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': '#FF8C1A', 'line-opacity': 0.55, 'line-emissive-strength': 1,
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 4, 14, 7, 17, 12],
+    },
+  });
+  map.addLayer({
+    id: 'crayon-route-main', type: 'line', source: 'crayon-route', slot: 'top',
+    filter: ['==', ['get', 'pass'], 'main'],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': '#E63946', 'line-opacity': 0.8, 'line-emissive-strength': 1,
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 5, 14, 9, 17, 15],
+    },
+  });
+}
+
+/* ---- Scribble frame drawn OUTSIDE the map ---- */
+function scribbleRect(w, h, inset, seed, amp) {
+  const r = rng(seed);
+  const pts = [];
+  const side = (x0, y0, x1, y1) => {
+    const n = Math.max(3, Math.round(Math.hypot(x1 - x0, y1 - y0) / 60));
+    for (let i = 0; i < n; i++) pts.push([x0 + (x1 - x0) * i / n + r() * amp, y0 + (y1 - y0) * i / n + r() * amp]);
+  };
+  const a = inset, b = w - inset, c = inset, d = h - inset;
+  side(a, c, b, c); side(b, c, b, d); side(b, d, a, d); side(a, d, a, c);
+  pts.push([a + r() * amp, c + r() * amp], [a + 14, c + r() * amp]);   // overshoot like a child
+  return 'M' + pts.map((p) => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('L');
+}
+
+function drawFrame() {
+  const box = document.querySelector('.map-frame');
+  const w = box.clientWidth, h = box.clientHeight;
+  const svg = $('scribble-frame');
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.innerHTML = `<g filter="url(#wax)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="${scribbleRect(w, h, 8, 1, 3)}" stroke="#E63946" stroke-width="7"/>
+    <path d="${scribbleRect(w, h, 8, 2, 5)}" stroke="#2D6CDF" stroke-width="5" opacity=".85"/>
+    <path d="${scribbleRect(w, h, 6, 3, 5)}" stroke="#FFD60A" stroke-width="6" opacity=".9"/>
+    <path d="${scribbleRect(w, h, 10, 4, 4)}" stroke="#3BB54A" stroke-width="3" opacity=".9"/>
+  </g>`;
+}
+
+/* ---- List + markers ---- */
+const items = [], pins = [], markers = [];
+
+STOPS.forEach((s, i) => {
+  const li = document.createElement('li');
+  li.innerHTML = `<button class="thing" type="button" aria-label="${s.name}: ${s.note}">
+      <svg class="thing-doodle" viewBox="0 0 64 48" aria-hidden="true" focusable="false"><g filter="url(#wax-xs)">${DOODLES[i]}</g></svg>
+      <span class="thing-text"><span class="thing-name">${s.name}</span><span class="thing-note">${s.note}</span></span>
+      <span class="star-slot">${starSvg()}</span>
+    </button>`;
+  const btn = li.firstElementChild;
+  btn.addEventListener('click', () => pick(i));
+  $('things').appendChild(li);
+  items.push(btn);
+
+  // Marker root is left untouched; only the inner child is styled.
+  const root = document.createElement('div');
+  root.innerHTML = `<button class="crayon-pin c${i + 1}" type="button" aria-label="${i + 1}: ${s.name}">${i + 1}<svg class="pin-star sticker" viewBox="0 0 24 24" aria-hidden="true"><use href="#gold-star"/></svg></button>`;
+  const pin = root.firstElementChild;
+  pin.addEventListener('click', () => pick(i));
+  pins.push(pin);
+  markers.push(new mapboxgl.Marker({ element: root }).setLngLat(s.coord).addTo(map));
+});
+
+// sticker sheet: six gold stars waiting to be stuck
+for (let i = 0; i < STOPS.length; i++) $('sheet-grid').insertAdjacentHTML('beforeend', `<svg class="sheet-star sticker" viewBox="0 0 24 24" aria-hidden="true"><use href="#gold-star"/></svg>`);
+const sheetStars = [...document.querySelectorAll('.sheet-star')];
+
+function updateCounter() {
+  const n = starred.size;
+  $('star-counter').textContent = n === STOPS.length ? `Stars: ${n}/${STOPS.length} - Hooray!` : `Stars: ${n}/${STOPS.length}`;
+  sheetStars.forEach((el, i) => el.classList.toggle('used', i < n));
+  $('peel-btn').disabled = n === 0;
+}
+
+function popIn(el) {
+  if (reduce || !el) return;
+  el.classList.remove('pop');
+  void el.getBoundingClientRect();   // restart the animation
+  el.classList.add('pop');
+}
+
+function pick(i) {
+  touched = true;
+  current = i;
+  const fresh = !starred.has(i);
+  starred.add(i);
+  items.forEach((b, k) => b.classList.toggle('active', k === i));
+  pins.forEach((p, k) => p.classList.toggle('active', k === i));
+  items[i].classList.add('starred');
+  pins[i].classList.add('starred');
+  if (fresh) {
+    popIn(items[i].querySelector('.star-slot .sticker'));
+    popIn(pins[i].querySelector('.pin-star'));
+  }
+  updateCounter();
+  flyToStop(STOPS[i]);
+}
+
+$('peel-btn').addEventListener('click', () => {
+  starred.clear();
+  current = -1;
+  items.forEach((b) => b.classList.remove('starred', 'active'));
+  pins.forEach((p) => p.classList.remove('starred', 'active'));
+  updateCounter();
+  touched = false;
+  if (reduce) fitAll(0); else fitAll(1600);
+});
+
+/* ---- Pin collision pass: push bunched markers apart in screen space ---- */
+const MIN_GAP = 34, MAX_PUSH = 46;
+function spreadPins() {
+  const base = STOPS.map((s) => map.project(s.coord));
+  const off = STOPS.map(() => ({ x: 0, y: 0 }));
+  for (let it = 0; it < 24; it++) {
+    let moved = false;
+    for (let a = 0; a < STOPS.length; a++) {
+      for (let b = a + 1; b < STOPS.length; b++) {
+        let dx = base[b].x + off[b].x - base[a].x - off[a].x;
+        let dy = base[b].y + off[b].y - base[a].y - off[a].y;
+        let d = Math.hypot(dx, dy);
+        if (d >= MIN_GAP) continue;
+        if (d < 0.01) { const ang = (a * 2 + b) * 1.3; dx = Math.cos(ang); dy = Math.sin(ang); d = 1; }
+        const push = (MIN_GAP - d) / 2 + 0.5, ux = dx / d, uy = dy / d;
+        off[a].x -= ux * push; off[a].y -= uy * push;
+        off[b].x += ux * push; off[b].y += uy * push;
+        moved = true;
+      }
+    }
+    // keep each pin tethered near its true location
+    off.forEach((o) => { const m = Math.hypot(o.x, o.y); if (m > MAX_PUSH) { o.x *= MAX_PUSH / m; o.y *= MAX_PUSH / m; } });
+    if (!moved) break;
+  }
+  markers.forEach((m, i) => m.setOffset([Math.round(off[i].x), Math.round(off[i].y)]));
+}
+map.on('move', spreadPins);
+map.on('resize', spreadPins);
+map.on('load', spreadPins);
+
+/* ---- Map lifecycle ---- */
+map.on('style.load', () => {
+  addRoute();
+  $('status-note').classList.add('hidden');
+});
+
+map.on('error', (e) => {
+  const n = $('status-note');
+  n.classList.remove('hidden', 'loading');
+  n.classList.add('error');
+  n.textContent = 'Oh no, the map ran away: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+// The map box is sized by flex/grid after layout settles: keep canvas + frame in sync.
+new ResizeObserver(() => {
+  drawFrame();
+  map.resize();
+  if (!touched) fitAll(0);
+}).observe(document.querySelector('.map-frame'));
+
+updateCounter();
+drawFrame();
+fitAll(0);
+spreadPins();
+</script>
+</body>
+</html>

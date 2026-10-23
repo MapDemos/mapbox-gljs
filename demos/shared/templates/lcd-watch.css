@@ -1,0 +1,542 @@
+/*
+  LCD Watch -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a chunky 1980s digital sports watch --
+  black resin case with an angular bezel, printed colour legends around the
+  screen, four side push-buttons, a grey-green reflective LCD with faint
+  "ghost" unlit segments and an electroluminescent blue-green backlight),
+  deliberately distinct from every other pack in this folder: Academic
+  Paper, Aero Gadgets, Amber Terminal, Annual Report, Arena, Art Nouveau,
+  Atomic Motel, Audio Guide, Aurora Command, Blueprint, Board Game, Bottom
+  Sheet, Broadcast, Brutalist Guide, Case Board, Celestial Tarot,
+  Chalkboard, Chat Concierge, Chronicle, Clinic Finder, Code Editor, Comic
+  Panel, Constructivist, Data Notebook, Deco Voyage, Dive Log, Drop
+  Culture, E-Ink, Editorial Paper, Estate Luxe, Event Invite, Field
+  Journal, Film Noir, Fleet Ops, Frontier Poster, Grand Hotel, Herbarium,
+  Highway Sign, Illuminated, Isotype, Line Diagram, Memphis, Moving Map,
+  Museum Label, Neon HUD, Nordic Cabin, Orienteering, Papel Picado,
+  Papercraft, Pastel Bento, Pixel Quest, Postcards, Rally Dash, Raw Web,
+  Regatta, Retro OS, Riso Zine, Ski Piste, Slate Console, Soft UI, Split
+  Flap, Stage Profile, Stained Glass, Sticker Book, Storefront, Story
+  Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt, Tiki Lagoon, Trailhead,
+  Treasure Hunt, Trip Kanban, Truck Art, Ukiyo-e Coast, Vapor Sunset,
+  Vintage Chart, Vinyl Crate, Washi Seasons, Watercolor, Whiteboard, Zellige;
+  and also distinct from the 24 sibling packs built alongside it (Kintsugi,
+  Cyanotype, Crossword, Metal Tour, Periodic Table, Cross Stitch, Card
+  Catalog, Seed Packet, Trading Card, Science Fair, Modular Synth, Recipe
+  Card, Clay Toy, Solarpunk, De Stijl, Block Print, Copacabana, Amphora,
+  Dancheong, Spreadsheet, Pinball, Crayon, Darkroom, Mission Patch).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/lcd-watch.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Doto for the dot-matrix LCD
+  numerals, Barlow Semi Condensed for the printed case legends):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Doto:wght@400;700;900&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet" />
+
+  Signature touch: "ghost" segments. Every LCD readout is a <span class="seg">
+  with a faint always-on "88:88.8" ghost layer under the live digits, exactly
+  like an unlit LCD, and the LIGHT button floods the glass with an
+  electroluminescent blue-green glow (.watch.is-lit).
+
+  Everything inside .watch is sized in em, so the whole watch scales by
+  changing its font-size (the pack does this for short and narrow screens).
+
+  Class/id contract (see lcd-watch-template.html in this same folder for a
+  full working example):
+
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .plate                    small resin caption plate floating on the map
+    .plate h1 / .sub / .hint     title, sub-line, key hint; .status-note
+                                 (+.loading/.success/.error) is a one-line
+                                 live status (aria-live)
+  - .watch-wrap               desktop: fixed right-centre column (bottom
+                               margin keeps clear of the attribution);
+                               phone: static block below the map
+  - .watch                    the watch (add .is-lit for the backlight)
+    .strap.top / .strap.bottom   straps that fade off (.bottom has holes)
+    .case                     chamfered bezel + resin face
+      .print                    printed legends layer
+        .brand, .stripe           brand wordmark and the 3-colour stripe
+        .legend(.orange|.yellow|.blue)  small printed legend text
+      .side-btn.left|.right     wrapper for one push-button
+        .cap-wrap > button.cap    the resin button itself
+        .legend                   its printed label
+      .lcd-frame > .lcd         recessed window and the glass
+        .lcd-status               top row: .mode tag, lap, .rec dot
+        .seg > .ghost + .live     ghost/live segment readout
+        .seg-time / .seg-num      big time / medium numerals
+        .readouts > .readout      DIST and PACE cells (.cap-label, .unit)
+        .dotmap (canvas)          1-row dot-matrix route sparkline
+        .screen                   one LCD page (RUN / LAPS / STAT)
+        .lap-row, .stat-row       rows for the LAPS and STAT pages
+  - .runner                   inner element of the runner marker
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --resin: #121314;
+  --bezel: #2E3135;
+  --legend-orange: #FF7A1A;
+  --legend-yellow: #F5D000;
+  --legend-blue: #4AA3FF;
+  --lcd: #9DA88A;
+  --lcd-ink: #1E2418;
+  --lcd-ghost: rgba(30, 36, 24, 0.12);
+  --el: #4FE3C1;
+  --print-grey: #C3C7CB;
+  --success: #4FE3C1;
+  --error: #FF7A1A;
+
+  --font-dot: 'Doto', 'Courier New', monospace;
+  --font-print: 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #0d0e0f;
+  color: var(--print-grey);
+  font-family: var(--font-print);
+}
+
+button { font-family: inherit; }
+
+.hidden { display: none !important; }
+
+/* ---------- caption plate on the map ---------- */
+.plate {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 2;
+  max-width: 300px;
+  box-sizing: border-box;
+  padding: 12px 16px 12px;
+  background: var(--resin);
+  border: 2px solid var(--bezel);
+  border-left: 6px solid var(--legend-orange);
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  pointer-events: none;
+  color: var(--print-grey);
+}
+.plate h1 {
+  margin: 0;
+  font-family: var(--font-print);
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1.05;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+}
+.plate .sub {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--legend-yellow);
+}
+.plate .hint {
+  margin-top: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0.04em;
+  color: var(--print-grey);
+}
+.plate .hint b { color: var(--legend-orange); font-weight: 700; }
+.status-note {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px dashed var(--bezel);
+  font-family: var(--font-dot);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--el);
+}
+.status-note.loading { color: var(--legend-yellow); }
+.status-note.error { color: var(--error); }
+
+/* ---------- watch placement ---------- */
+.watch-wrap {
+  position: absolute;
+  top: 0;
+  right: 24px;
+  bottom: 64px;            /* keep clear of the attribution (bottom-right) */
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.watch {
+  /* whole watch scales with font-size: shrink on short viewports */
+  font-size: min(16px, calc((100dvh - 150px) / 38));
+  width: 25em;
+  position: relative;
+  pointer-events: none;
+}
+
+/* ---------- straps ---------- */
+.strap {
+  position: relative;
+  width: 11em;
+  margin: 0 auto;
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 0.5em),
+    linear-gradient(90deg, #0a0b0c, #1e2124 30%, #1e2124 70%, #0a0b0c);
+  border-left: 0.2em solid #07080a;
+  border-right: 0.2em solid #07080a;
+  box-sizing: border-box;
+}
+.strap.top {
+  height: 6em;
+  margin-bottom: -0.6em;
+  clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%);
+  -webkit-mask-image: linear-gradient(to top, #000 25%, transparent);
+          mask-image: linear-gradient(to top, #000 25%, transparent);
+}
+.strap.bottom {
+  height: 7em;
+  margin-top: -0.6em;
+  clip-path: polygon(0 0, 100% 0, 92% 100%, 8% 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 25%, transparent);
+          mask-image: linear-gradient(to bottom, #000 25%, transparent);
+}
+.strap.bottom::before {
+  /* adjustment holes */
+  content: '';
+  position: absolute;
+  inset: 0.8em 0 0;
+  background: radial-gradient(circle at 50% 50%, #000 0 0.28em, rgba(255,255,255,0.12) 0.3em 0.4em, transparent 0.42em) 0 0 / 100% 1.7em;
+}
+
+/* ---------- case ---------- */
+.case {
+  position: relative;
+  z-index: 1;
+  width: 21em;
+  height: 24.5em;
+  margin: 0 auto;
+  filter: drop-shadow(0 0.6em 0.9em rgba(0, 0, 0, 0.55));
+  pointer-events: none;
+}
+.case::before,
+.case::after {
+  content: '';
+  position: absolute;
+  clip-path: polygon(9% 0, 91% 0, 100% 6%, 100% 94%, 91% 100%, 9% 100%, 0 94%, 0 6%);
+}
+.case::before {
+  inset: 0;
+  background: linear-gradient(160deg, #4a4f55 0%, var(--bezel) 28%, #1b1d20 70%, #3a3e43 100%);
+}
+.case::after {
+  inset: 0.55em;
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 4px),
+    var(--resin);
+}
+
+.print { position: absolute; inset: 0; z-index: 1; }
+
+.brand {
+  position: absolute;
+  top: 1.15em;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1em;
+  letter-spacing: 0.34em;
+  text-indent: 0.34em;
+  text-transform: uppercase;
+  color: #E8EAEC;
+  line-height: 1;
+}
+.brand small {
+  font-weight: 600;
+  font-size: 0.62em;
+  letter-spacing: 0.22em;
+  color: var(--legend-orange);
+  margin-left: 0.6em;
+}
+.stripe {
+  position: absolute;
+  top: 2.5em;
+  left: 50%;
+  width: 9em;
+  height: 0.3em;
+  margin-left: -4.5em;
+  background: linear-gradient(90deg, var(--legend-orange) 0 33.3%, var(--legend-yellow) 33.3% 66.6%, var(--legend-blue) 66.6%);
+}
+
+.legend {
+  position: absolute;
+  font-size: 0.7em;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.legend.orange { color: var(--legend-orange); }
+.legend.yellow { color: var(--legend-yellow); }
+.legend.blue { color: var(--legend-blue); }
+.legend.foot.upper { bottom: 3.05em; }
+.legend.foot {
+  left: 0; right: 0; bottom: 1.45em;
+  text-align: center;
+  font-size: 0.6em;
+  letter-spacing: 0.22em;
+  font-weight: 600;
+}
+
+/* ---------- side push-buttons ---------- */
+.side-btn {
+  position: absolute;
+  width: 2.2em;
+  height: 2.7em;
+  z-index: 2;
+  pointer-events: none;
+}
+.side-btn.left { left: -1.8em; }
+.side-btn.right { right: -1.8em; }
+.side-btn.top { top: 2.7em; }
+.side-btn.bottom { top: 18.4em; }
+
+.cap-wrap { position: absolute; inset: 0; }
+.side-btn:has(:focus-visible) .cap-wrap {
+  filter: drop-shadow(0 0 0.12em var(--legend-yellow)) drop-shadow(0 0 0.12em var(--legend-yellow));
+}
+.cap {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.10) 0 1px, transparent 1px 0.3em),
+    linear-gradient(90deg, #4a4f55, #1b1d20 60%, #0c0d0e);
+  transition: transform 0.06s steps(2);
+}
+.side-btn.left .cap {
+  clip-path: polygon(0 14%, 100% 0, 100% 100%, 0 86%);
+}
+.side-btn.right .cap {
+  clip-path: polygon(0 0, 100% 14%, 100% 86%, 0 100%);
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.10) 0 1px, transparent 1px 0.3em),
+    linear-gradient(270deg, #4a4f55, #1b1d20 60%, #0c0d0e);
+}
+.side-btn.left .cap:active, .side-btn.left .cap.is-down { transform: translateX(0.3em); }
+.side-btn.right .cap:active, .side-btn.right .cap.is-down { transform: translateX(-0.3em); }
+.cap:focus-visible { outline: none; }
+.cap[aria-pressed="true"] { background-color: #000; }
+
+/* the legend rides beside its button, inside the case */
+.side-btn .legend { top: 50%; margin-top: -0.5em; }
+.side-btn.left .legend { left: 3.3em; }
+.side-btn.right .legend { right: 3.3em; }
+.side-btn.left .legend::before,
+.side-btn.right .legend::after {
+  content: '';
+  display: inline-block;
+  width: 0.7em;
+  height: 0.16em;
+  vertical-align: middle;
+  background: currentColor;
+}
+.side-btn.left .legend::before { margin-right: 0.5em; }
+.side-btn.right .legend::after { margin-left: 0.5em; }
+
+/* ---------- LCD ---------- */
+.lcd-frame {
+  position: absolute;
+  z-index: 1;
+  left: 2.3em;
+  top: 5.7em;
+  width: 16.4em;
+  height: 12.8em;
+  box-sizing: border-box;
+  padding: 0.35em;
+  background: linear-gradient(160deg, #000, #25282c 45%, #050606);
+  clip-path: polygon(0 0, calc(100% - 0.8em) 0, 100% 0.8em, 100% 100%, 0.8em 100%, 0 calc(100% - 0.8em));
+  pointer-events: none;
+}
+.lcd {
+  position: relative;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 0.5em 0.75em 0.45em;
+  background: linear-gradient(180deg, #A5B092, var(--lcd) 40%, #939E81);
+  color: var(--lcd-ink);
+  box-shadow: inset 0 0.25em 0.45em rgba(0,0,0,0.38), inset 0 0 0.12em 0.04em rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 0.28em;
+  transition: background 0.2s steps(3), color 0.2s;
+}
+.lcd::after {
+  /* glass reflection */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, rgba(255,255,255,0.20) 0 34%, transparent 34.3%);
+  pointer-events: none;
+}
+
+.lcd-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5em;
+  font-weight: 700;
+  font-size: 0.72em;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.lcd-status .mode { background: var(--lcd-ink); color: var(--lcd); padding: 0.22em 0.5em 0.18em; }
+.lcd-status .lapno { font-family: var(--font-dot); font-size: 1.35em; letter-spacing: 0.06em; }
+.lcd-status .rec { display: inline-flex; align-items: center; gap: 0.4em; }
+.lcd-status .rec::before {
+  content: '';
+  width: 0.6em; height: 0.6em;
+  background: var(--lcd-ghost);
+}
+.lcd-status .rec.on::before { background: var(--lcd-ink); animation: lcd-blink 1s steps(1) infinite; }
+@keyframes lcd-blink { 50% { opacity: 0.1; } }
+
+.screen { display: flex; flex-direction: column; gap: 0.3em; flex: 1; min-height: 0; }
+
+/* ghost + live segments */
+.seg {
+  position: relative;
+  display: inline-block;
+  font-family: var(--font-dot);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.seg .ghost { color: var(--lcd-ghost); }
+.seg .live { position: absolute; right: 0; top: 0; color: var(--lcd-ink); }
+.seg-time { font-size: 2.7em; align-self: center; }
+.seg-num { font-size: 1.9em; }
+
+.readouts { display: flex; justify-content: space-between; gap: 0.5em; margin-top: 0.1em; }
+.readout { display: flex; flex-direction: column; align-items: flex-end; gap: 0.2em; }
+.readout .cap-label {
+  align-self: flex-start;
+  font-size: 0.66em;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.readout .row { display: flex; align-items: flex-end; gap: 0.3em; }
+.unit { font-size: 0.68em; font-weight: 700; letter-spacing: 0.06em; line-height: 1; padding-bottom: 0.2em; }
+
+.dotmap {
+  display: block;
+  width: 100%;
+  height: 1.9em;
+  margin-top: auto;
+}
+
+/* LAPS and STAT pages */
+.lap-row, .stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font-dot);
+  font-weight: 700;
+  font-size: 1.12em;
+  line-height: 1.25;
+  white-space: nowrap;
+  border-bottom: 1px dotted rgba(30, 36, 24, 0.4);
+}
+.stat-row > span:first-child {
+  font-family: var(--font-print);
+  font-size: 0.62em;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.lap-empty {
+  margin: auto;
+  font-family: var(--font-dot);
+  font-weight: 700;
+  font-size: 1.3em;
+  letter-spacing: 0.1em;
+  opacity: 0.8;
+}
+
+/* ---------- backlight (LIGHT) ---------- */
+.watch.is-lit .lcd {
+  --lcd-ink: #062a24;
+  --lcd-ghost: rgba(6, 42, 36, 0.14);
+  --lcd: #6FEBD0;
+  background: radial-gradient(120% 100% at 50% 40%, #8CF5DE, var(--el) 70%, #35BFA0);
+  box-shadow: inset 0 0 0.9em rgba(255,255,255,0.35), inset 0 0 0.12em 0.04em rgba(0,0,0,0.5);
+}
+.watch.is-lit .print::before {
+  /* EL glow bleeding past the (clip-pathed) window frame */
+  content: '';
+  position: absolute;
+  left: 2.3em; top: 5.7em; width: 16.4em; height: 12.8em;
+  box-shadow: 0 0 2.4em 0.7em rgba(79, 227, 193, 0.5);
+}
+
+/* ---------- runner marker (inner element only) ---------- */
+.runner {
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--legend-orange);
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 2px var(--lcd-ink), 0 0 12px rgba(255, 122, 26, 0.9);
+  animation: runner-pulse 1.4s ease-out infinite;
+}
+@keyframes runner-pulse {
+  0% { box-shadow: 0 0 0 2px var(--lcd-ink), 0 0 0 0 rgba(255, 122, 26, 0.7); }
+  100% { box-shadow: 0 0 0 2px var(--lcd-ink), 0 0 0 16px rgba(255, 122, 26, 0); }
+}
+
+/* ---------- phone: map on top, watch below, page scrolls ---------- */
+@media (max-width: 760px) {
+  .watch-wrap {
+    position: static;
+    display: block;
+    padding: 4px 16px 24px;
+    box-sizing: border-box;
+    pointer-events: auto;
+    overflow: hidden;
+  }
+  .watch {
+    font-size: min(16px, calc((100vw - 32px) / 25));
+    margin: 0 auto;
+    pointer-events: auto;
+  }
+  .strap.top { height: 3em; }
+  .strap.bottom { height: 5em; }
+  .plate { top: 10px; left: 10px; max-width: calc(100vw - 80px); padding: 8px 12px; }
+  .plate h1 { font-size: 17px; }
+  .plate .hint { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .runner, .lcd-status .rec.on::before { animation: none; }
+  .cap, .lcd { transition: none; }
+}

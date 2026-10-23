@@ -1,0 +1,218 @@
+<!--
+  Working EXAMPLE of the Card Catalog style pack (card-catalog.css, in this
+  same folder). Open this file directly to see the pattern working with
+  eight Dublin book places (five real public institutions, three fictional
+  bookshops on real streets) on Mapbox Standard (faded theme, dusk preset).
+  A 420px golden-oak cabinet holds three closed drawers (Libraries /
+  Bookshops / Archives -- brass-labelled category filters) above an open
+  drawer of index cards with lettered tabs. Click a card tab or a map
+  marker: that card slides up out of the drawer, the map flies there and a
+  purple DATE DUE stamp thunks on. Reduced motion: no slide or stamp
+  animation, the camera jumps. On phones the filter row comes first, the
+  map sits at 45dvh and the cards scroll beneath it.
+
+  What's NOT included: real catalogue data or opening hours (the entries
+  are illustrative placeholders; the three bookshops and every call number
+  and due date are fictional), search, or a backend -- swap in your own.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Card Catalog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Syne+Mono&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="card-catalog.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned layout: cabinet left, map right. */
+  html, body { height: 100%; }
+  body.cc-page { display: grid; grid-template-columns: 420px minmax(0, 1fr); overflow: hidden; }
+  #map { grid-column: 2; height: 100dvh; width: 100%; min-width: 0; }
+  @media (max-width: 760px) {
+    html, body { height: auto; }
+    /* must override the desktop 420px grid above (this <style> loads after the pack css) */
+    body.cc-page { display: flex; flex-direction: column; grid-template-columns: none; min-height: 100dvh; }
+    #map { position: relative; order: 3; flex: none; width: 100%; max-width: 100%; height: 45dvh; grid-column: auto; }
+  }
+</style>
+</head>
+<body class="cc-page">
+<aside class="cabinet">
+  <header class="cabinet-head">
+    <h1>The Dublin Card Catalogue</h1>
+    <div class="sub">Drawer D &middot; Books &amp; Records</div>
+  </header>
+
+  <nav class="drawer-fronts" id="fronts" aria-label="Filter by category">
+    <button class="drawer-front" data-cat="library" aria-pressed="true"><span class="label-holder"><span>Libraries</span></span><span class="count" id="n-library"></span><span class="pull"></span></button>
+    <button class="drawer-front" data-cat="bookshop" aria-pressed="true"><span class="label-holder"><span>Bookshops</span></span><span class="count" id="n-bookshop"></span><span class="pull"></span></button>
+    <button class="drawer-front" data-cat="archive" aria-pressed="true"><span class="label-holder"><span>Archives</span></span><span class="count" id="n-archive"></span><span class="pull"></span></button>
+  </nav>
+
+  <div class="drawer-wrap">
+    <section class="drawer" aria-label="Card drawer">
+      <div class="card-stack" id="stack"></div>
+      <div class="drawer-lip"><span class="label-holder"><span id="lip-label">A &ndash; Z</span></span><span class="pull-ring"></span></div>
+    </section>
+  </div>
+</aside>
+
+<div id="map"></div>
+
+<script>
+// Entries are filed alphabetically by title. Call numbers are illustrative.
+const PLACES = [
+  { id: 'chester', cat: 'library', title: 'Chester Beatty Library', call: '069.5 CBL', short: 'CBL', coord: [-6.2672, 53.3427],
+    addr: 'Dublin Castle, Dame St', est: '1950 (opened to the public)', held: 'Illuminated manuscripts, papyri, miniature books', note: 'Free to enter; the roof garden is a quiet place to read.', due: '14 NOV 1974' },
+  { id: 'citylib', cat: 'archive', title: 'Dublin City Library & Archive', call: '027.4 DCL', short: 'DCL', coord: [-6.2480, 53.3437],
+    addr: 'Pearse Street', est: '1909 (Carnegie building)', held: 'Local history, council records, photographs', note: 'Ask at the desk for the Dublin and Irish collections.', due: '02 MAR 1981' },
+  { id: 'dawson', cat: 'bookshop', title: 'Dawson Street Folio', call: '381.45 DSF', short: 'DSF', coord: [-6.2587, 53.3420],
+    addr: 'Dawson Street (fictional shop)', est: 'Est. 1962', held: 'Second-hand poetry, maps and prints', note: 'A creaking stair leads to the cartography room.', due: '19 JUN 1966' },
+  { id: 'fownes', cat: 'bookshop', title: 'Fownes & Quill Antiquarian', call: '381.45 FQA', short: 'FQA', coord: [-6.2644, 53.3450],
+    addr: 'Fownes Street Upper (fictional shop)', est: 'Est. 1978', held: 'Rare editions, almanacs, ephemera', note: 'Browsing by lamplight; cash and conversation welcome.', due: '07 OCT 1983' },
+  { id: 'longroom', cat: 'library', title: 'Trinity College, The Long Room', call: '027.7 TCD', short: 'TCD', coord: [-6.2560, 53.3439],
+    addr: 'Trinity College, College Green', est: '1712 (Old Library)', held: 'About 200,000 of the oldest books, marble busts', note: 'A barrel-vaulted hall; the Book of Kells is displayed nearby.', due: '25 MAY 1970' },
+  { id: 'marsh', cat: 'library', title: "Marsh's Library", call: '027.5 MAR', short: 'MAR', coord: [-6.2722, 53.3395],
+    addr: "St Patrick's Close", est: '1707', held: 'Oak bookcases, wire reading cages, 25,000 early volumes', note: 'Ireland\'s first public library, little changed.', due: '11 AUG 1959' },
+  { id: 'nli', cat: 'archive', title: 'National Library of Ireland', call: '027.5 NLI', short: 'NLI', coord: [-6.2549, 53.3407],
+    addr: 'Kildare Street', est: '1890 (present building)', held: 'Manuscripts, newspapers, photographic archive', note: 'Domed reading room; bring a reader\'s ticket.', due: '30 JAN 1977' },
+  { id: 'ormond', cat: 'bookshop', title: 'Ormond Quay Second Folio', call: '381.45 OQS', short: 'OQS', coord: [-6.2688, 53.3464],
+    addr: 'Ormond Quay Upper (fictional shop)', est: 'Est. 1991', held: 'Riverside bargain boxes, fiction, small-press zines', note: 'Boxes spill onto the quay on dry days.', due: '16 APR 1995' },
+];
+PLACES.sort((a, b) => a.title.localeCompare(b.title));
+const CAT_LABEL = { library: 'Libraries', bookshop: 'Bookshops', archive: 'Archives' };
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = () => window.matchMedia('(max-width: 760px)').matches;
+
+const stackEl = document.getElementById('stack');
+const markers = {};
+const cards = {};
+let activeId = null;
+const on = { library: true, bookshop: true, archive: true };
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [-6.262, 53.3425],
+  zoom: 13.6,
+  attributionControl: true,
+  config: { basemap: { lightPreset: 'dusk', theme: 'faded', showPointOfInterestLabels: false } },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+new ResizeObserver(() => map.resize()).observe(document.getElementById('map'));
+
+function pad() { return phone() ? { top: 40, bottom: 64, left: 36, right: 36 } : { top: 60, bottom: 72, left: 60, right: 60 }; }
+function fitAll() {
+  const vis = PLACES.filter((p) => on[p.cat]);
+  if (!vis.length) return;
+  const b = vis.reduce((acc, p) => acc.extend(p.coord), new mapboxgl.LngLatBounds(vis[0].coord, vis[0].coord));
+  map.fitBounds(b, { padding: pad(), maxZoom: 15.5, duration: reduce ? 0 : 900 });
+}
+
+// ---- build cards (alphabetical) and markers ----
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+PLACES.forEach((p) => {
+  const el = document.createElement('article');
+  el.className = 'index-card';
+  el.dataset.id = p.id;
+  el.innerHTML =
+    `<button class="card-head" aria-expanded="false"><span class="tab">${esc(p.title.replace(/^The /, '')[0])}</span><span class="call-short">${esc(p.short)}</span><span class="card-title">${esc(p.title)}</span></button>` +
+    `<div class="card-body"><div class="call-no">${esc(p.call)}</div>` +
+    `<h2 class="card-title-big">${esc(p.title)}</h2>` +
+    `<dl class="typed"><div><dt>Class:</dt><dd>${esc(CAT_LABEL[p.cat])}</dd></div><div><dt>Place:</dt><dd>${esc(p.addr)}</dd></div><div><dt>Est.:</dt><dd>${esc(p.est)}</dd></div><div><dt>Holds:</dt><dd>${esc(p.held)}</dd></div><div><dt>Note:</dt><dd>${esc(p.note)}</dd></div></dl>` +
+    `<div class="due-rows"><span>DATE DUE</span><span></span><div class="date-due">DATE DUE<b>${esc(p.due)}</b></div></div></div>`;
+  el.querySelector('.card-head').addEventListener('click', () => select(p.id));
+  stackEl.appendChild(el);
+  cards[p.id] = el;
+
+  const wrap = document.createElement('div');
+  const inner = document.createElement('button');
+  inner.className = 'cc-marker';
+  inner.type = 'button';
+  inner.textContent = p.short;
+  inner.setAttribute('aria-label', p.title);
+  wrap.appendChild(inner);
+  inner.addEventListener('click', (e) => { e.stopPropagation(); select(p.id); });
+  markers[p.id] = new mapboxgl.Marker({ element: wrap }).setLngLat(p.coord).addTo(map);
+});
+Object.keys(CAT_LABEL).forEach((c) => {
+  document.getElementById('n-' + c).textContent = PLACES.filter((p) => p.cat === c).length + ' cards';
+});
+
+function select(id, opts = {}) {
+  const p = PLACES.find((x) => x.id === id);
+  if (!p) return;
+  activeId = id;
+  PLACES.forEach((q) => {
+    const act = q.id === id;
+    cards[q.id].classList.toggle('active', act);
+    cards[q.id].querySelector('.card-head').setAttribute('aria-expanded', act);
+    markers[q.id].getElement().firstChild.classList.toggle('is-active', act);
+  });
+  // restart the stamp animation each time a card is pulled
+  const stamp = cards[id].querySelector('.date-due');
+  stamp.style.animation = 'none'; void stamp.offsetWidth; stamp.style.animation = '';
+  // Only scroll the stack's own container (desktop); never the page (phone).
+  if (!phone() && !opts.noFly) {
+    const c = cards[id];
+    const top = stackEl.scrollTop + c.getBoundingClientRect().top - stackEl.getBoundingClientRect().top;
+    stackEl.scrollTo({ top: Math.max(0, top - 24), behavior: reduce ? 'auto' : 'smooth' });
+  }
+  setHalo(p);
+  if (opts.noFly) return;
+  const cam = { center: p.coord, zoom: 15.4, padding: pad() };
+  if (reduce) map.jumpTo(cam); else map.flyTo({ ...cam, duration: 1700, essential: false });
+}
+
+// ---- category filters (closed drawers) ----
+function applyFilters() {
+  let slot = 0;
+  PLACES.forEach((p) => {
+    const show = on[p.cat];
+    cards[p.id].classList.toggle('hidden', !show);
+    markers[p.id].getElement().style.display = show ? '' : 'none';
+    if (show) cards[p.id].style.setProperty('--slot', slot++ % 5);
+  });
+  const act = PLACES.find((p) => p.id === activeId);
+  if (act && !on[act.cat]) {
+    activeId = null;
+    cards[act.id].classList.remove('active');
+    markers[act.id].getElement().firstChild.classList.remove('is-active');
+    setHalo(null);
+  }
+  const n = PLACES.filter((p) => on[p.cat]).length;
+  document.getElementById('lip-label').textContent = n ? `A – Z · ${n} cards` : 'Drawer empty';
+}
+document.querySelectorAll('.drawer-front').forEach((b) => b.addEventListener('click', () => {
+  const c = b.dataset.cat;
+  on[c] = !on[c];
+  b.setAttribute('aria-pressed', on[c]);
+  applyFilters();
+  fitAll();
+}));
+
+// ---- active halo (a layer, so it is emissive on the dusk preset) ----
+function setHalo(p) {
+  const s = map.getSource('halo');
+  if (s) s.setData({ type: 'FeatureCollection', features: p ? [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: p.coord } }] : [] });
+}
+map.on('style.load', () => {
+  map.addSource('halo', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: 'halo', type: 'circle', source: 'halo', slot: 'top',
+    paint: { 'circle-radius': 34, 'circle-color': '#C9A45C', 'circle-opacity': 0.35,
+      'circle-stroke-color': '#EBCF8B', 'circle-stroke-width': 2, 'circle-emissive-strength': 1 },
+  });
+  applyFilters();
+  fitAll();
+  select('longroom', { noFly: true });
+  setTimeout(() => { if (activeId === 'longroom') setHalo(PLACES.find((p) => p.id === 'longroom')); }, 0);
+});
+</script>
+</body>
+</html>

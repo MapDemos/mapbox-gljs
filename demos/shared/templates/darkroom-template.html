@@ -1,0 +1,279 @@
+<!--
+  Working EXAMPLE of the Darkroom style pack (darkroom.css, in this same
+  folder). Open this file directly to see the pattern working with a
+  seven-frame street-photography walk through Paris on Mapbox Standard
+  (monochrome theme, night light, so the map reads like a print under a
+  red safelight). A 35mm negative strip runs across the top, the map sits
+  in a steel developer tray, and a drying line with an amber timer is on
+  the right. Click a negative frame to "develop" it: a 3-second timer
+  counts, the map flies there while a white flash fades off the TRAY FRAME
+  only, then a print pegs onto the drying line, going from negative to
+  positive. Click a numbered grease-pencil marker to select its frame.
+  Copy the markup below into your own demo and link darkroom.css from its
+  <head> -- see the class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (analogue darkroom under a safelight) at the user's
+  request for something distinct from every other pack in this folder. The
+  places are real public landmarks; the frames are abstract hand-written
+  SVG compositions (no photographs) and the captions are illustrative
+  placeholders -- swap in your own. The walking route is a simplified
+  Mapbox Directions (walking) result embedded as coordinates.
+
+  What's NOT included: real photo loading, search/geocoding, live routing,
+  popups, or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Darkroom</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Major+Mono+Display&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="darkroom.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<div class="bench">
+  <header class="bench-head">
+    <h1>Paris Contact Sheet</h1>
+    <p>Seven frames, one walk. Click a negative to develop it.</p>
+  </header>
+
+  <div class="negative" id="negative" aria-label="Negative strip, seven frames">
+    <div class="film" id="film">
+      <div class="film-edge top"></div>
+      <div class="film-frames" id="frames"></div>
+      <span class="edge-text">Safety film 400 &#9656; 12A &#9656; 13 &#9656; 13A &#9656; 14 &#9656; 14A &#9656; 15 &#9656; 15A &#9656; Walk no. 7</span>
+      <div class="film-edge bottom"></div>
+    </div>
+  </div>
+
+  <main class="bench-main">
+    <section class="tray" aria-label="Developer tray">
+      <div class="tray-map"><div id="map"></div></div>
+      <div class="tray-fade" id="fade"></div>
+      <div class="tray-label"><span>Developer</span><span id="tray-place">Paris, 1 print = 1 stop</span></div>
+    </section>
+
+    <aside class="rack">
+      <div class="timer" id="timer">
+        <div class="timer-label">Developing time</div>
+        <div class="timer-digits" id="digits">DEV 01:30</div>
+      </div>
+      <div class="status-note" id="status-note"><span class="status-icon" id="status-icon">&#9679;</span><span id="status-text">Lights are low. Pick a frame.</span></div>
+      <div class="section-label">Drying line</div>
+      <div class="drying-line" id="line"><div class="drying-empty" id="empty">Nothing hanging yet. Developed prints are pegged here.</div></div>
+    </aside>
+  </main>
+</div>
+
+<script>
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SKY = '#E6E1D6', INK = '#14100F', MID = '#8C877D';
+
+/* Abstract compositions (positive). Negatives are made by CSS inversion. */
+const ART = {
+  eiffel: `<rect width="60" height="40" fill="${SKY}"/><rect y="34" width="60" height="6" fill="${MID}"/>
+    <path fill="${INK}" d="M30 2 L31.2 11 L33 19 L39 36 L35 36 L32.5 27 L27.5 27 L25 36 L21 36 L27 19 L28.8 11Z"/>
+    <rect x="26" y="19" width="8" height="1.6" fill="${INK}"/><rect x="28" y="11" width="4" height="1.4" fill="${INK}"/>
+    <path fill="${SKY}" d="M27.5 36 Q30 27 32.5 36Z"/>`,
+  obelisk: `<rect width="60" height="40" fill="${SKY}"/><rect y="33" width="60" height="7" fill="${MID}"/>
+    <path fill="${INK}" d="M30 3 L31.6 9 L32.4 32 L27.6 32 L28.4 9Z"/><rect x="26" y="30" width="8" height="4" fill="${INK}"/>
+    <ellipse cx="30" cy="36" rx="22" ry="3" fill="${INK}"/><ellipse cx="30" cy="35.3" rx="18" ry="2" fill="${SKY}"/>
+    <rect x="6" y="14" width="1.4" height="22" fill="${INK}"/><circle cx="6.7" cy="13" r="2" fill="${INK}"/>
+    <rect x="52.6" y="14" width="1.4" height="22" fill="${INK}"/><circle cx="53.3" cy="13" r="2" fill="${INK}"/>`,
+  arches: `<rect width="60" height="40" fill="${SKY}"/><rect y="31" width="60" height="9" fill="${MID}"/>
+    <path fill="${INK}" fill-rule="evenodd" d="M0 16H60V32H0Z M3 32V25A6.5 6.5 0 0 1 16 25V32Z M23.5 32V25A6.5 6.5 0 0 1 36.5 25V32Z M44 32V25A6.5 6.5 0 0 1 57 25V32Z"/>
+    <rect x="9" y="8" width="1.2" height="8" fill="${INK}"/><rect x="29.4" y="8" width="1.2" height="8" fill="${INK}"/><rect x="49.8" y="8" width="1.2" height="8" fill="${INK}"/>
+    <rect x="5" y="12" width="50" height="1" fill="${INK}"/>`,
+  quai: `<rect width="60" height="40" fill="${SKY}"/><rect y="23" width="60" height="17" fill="${INK}"/>
+    <path d="M0 31H60M0 35H60" stroke="${SKY}" stroke-width=".6" stroke-dasharray="4 3"/>
+    <circle cx="14" cy="13" r="8" fill="${MID}"/><rect x="13.4" y="16" width="1.2" height="9" fill="${INK}"/>
+    <circle cx="44" cy="12" r="9" fill="${MID}"/><rect x="43.4" y="16" width="1.2" height="9" fill="${INK}"/>
+    <rect x="28.6" y="9" width="1" height="15" fill="${INK}"/><rect x="27.2" y="8" width="3.8" height="2.6" fill="${INK}"/>`,
+  cafe: `<rect width="60" height="40" fill="${SKY}"/><path fill="${MID}" d="M0 9L30 2L60 9Z"/>
+    <path fill="${INK}" fill-rule="evenodd" d="M0 10H60V32H0Z M3 32V22A5 5 0 0 1 13 22V32Z M17 32V22A5 5 0 0 1 27 22V32Z M33 32V22A5 5 0 0 1 43 22V32Z M47 32V22A5 5 0 0 1 57 22V32Z"/>
+    <rect x="0" y="32" width="60" height="8" fill="${MID}"/>
+    <g fill="${INK}"><ellipse cx="30" cy="31" rx="6" ry="1.2"/><rect x="29.5" y="31" width="1" height="6"/>
+    <rect x="16" y="28" width="1" height="9"/><rect x="16" y="28" width="7" height="1"/><rect x="22" y="31" width="1" height="6"/><rect x="16" y="31" width="7" height="1"/>
+    <rect x="38" y="28" width="1" height="9"/><rect x="32" y="28" width="7" height="1"/><rect x="38" y="31" width="1" height="6"/><rect x="32" y="31" width="7" height="1"/></g>`,
+  footbridge: `<rect width="60" height="40" fill="${SKY}"/><rect y="28" width="60" height="12" fill="${INK}"/>
+    <path d="M0 30H60" stroke="${SKY}" stroke-width=".5" stroke-dasharray="5 3"/>
+    <path fill="none" stroke="${INK}" stroke-width="2.4" d="M2 28Q30 2 58 28"/>
+    <path fill="none" stroke="${INK}" stroke-width=".9" d="M10 22V28M17 16V28M24 12V28M30 11V28M36 12V28M43 16V28M50 22V28"/>
+    <rect x="1" y="27" width="58" height="1.8" fill="${INK}"/>
+    <circle cx="8" cy="12" r="5" fill="${MID}"/>`,
+  stairs: `<rect width="60" height="40" fill="${SKY}"/>
+    <path fill="${INK}" d="M0 40V34H8V30H16V26H24V22H32V18H40V14H48V10H60V40Z"/>
+    <path d="M2 28L50 4" stroke="${INK}" stroke-width="1.2"/><path d="M8 28V22M20 22V16M32 16V10M44 10V6" stroke="${INK}" stroke-width=".9"/>
+    <rect x="53" y="-2" width="1.4" height="14" fill="${INK}"/><circle cx="53.7" cy="-1" r="2.4" fill="${INK}"/>
+    <path fill="${MID}" d="M0 40V37H8V34H16V30H24V26H32V22H40V18H48V14H60V16H49V20H41V24H33V28H25V32H17V36H9V40Z" opacity=".5"/>`
+};
+const art = (k) => `<svg viewBox="0 0 60 40" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${ART[k]}</svg>`;
+
+const STOPS = [
+  { no: '12A', name: 'Trocadéro',        art: 'eiffel',     c: [2.2877, 48.8616], note: 'Tower through morning haze, tourists in silhouette.' },
+  { no: '13',  name: 'Concorde',         art: 'obelisk',    c: [2.3212, 48.8656], note: 'The obelisk and its fountain, lamps in a row.' },
+  { no: '13A', name: 'Pont des Arts',    art: 'arches',     c: [2.3375, 48.8583], note: 'Three arches, a deck of padlocks, a long exposure.' },
+  { no: '14',  name: 'Quai, Île St-Louis', art: 'quai',     c: [2.3555, 48.8520], note: 'Plane trees leaning over the quai wall.' },
+  { no: '14A', name: 'Place des Vosges', art: 'cafe',       c: [2.3656, 48.8555], note: 'Arcades and café chairs waiting for noon.' },
+  { no: '15',  name: 'Canal footbridge', art: 'footbridge', c: [2.3640, 48.8712], note: 'An iron arc over still canal water.' },
+  { no: '15A', name: 'Rue Foyatier',     art: 'stairs',     c: [2.3430, 48.8861], note: 'Montmartre steps climbing into the light.' }
+];
+
+const ROUTE = [[2.28776,48.86156],[2.28854,48.86208],[2.28771,48.86263],[2.28823,48.86299],[2.29091,48.86377],[2.29058,48.86403],[2.29323,48.86473],[2.29332,48.86497],[2.2935,48.86501],[2.2937,48.86498],[2.29405,48.86513],[2.29434,48.8651],[2.2945,48.86494],[2.29947,48.86522],[2.30024,48.86533],[2.30047,48.8651],[2.30105,48.86486],[2.30171,48.86495],[2.30239,48.86482],[2.30316,48.86519],[2.30328,48.86507],[2.30652,48.86592],[2.30658,48.86582],[2.30752,48.86607],[2.30776,48.86597],[2.30802,48.866],[2.30816,48.86611],[2.30815,48.86628],[2.31215,48.86733],[2.31315,48.86732],[2.31404,48.86713],[2.31441,48.86738],[2.31477,48.86726],[2.31503,48.86765],[2.32207,48.86551],[2.32231,48.86588],[2.32305,48.86588],[2.32329,48.8662],[2.32357,48.86629],[2.32413,48.86622],[2.33655,48.86221],[2.33611,48.86145],[2.33761,48.86107],[2.33758,48.86088],[2.33738,48.86064],[2.33833,48.86042],[2.33847,48.86023],[2.33793,48.85915],[2.33773,48.85916],[2.3379,48.85911],[2.33722,48.85776],[2.33831,48.85749],[2.34066,48.85614],[2.3425,48.85474],[2.3442,48.8539],[2.34469,48.85434],[2.34497,48.85422],[2.34504,48.8543],[2.34711,48.85359],[2.34748,48.85423],[2.34756,48.85421],[2.34752,48.85411],[2.35199,48.85275],[2.35234,48.85272],[2.35323,48.85295],[2.35353,48.85292],[2.3558,48.85207],[2.3557,48.85193],[2.3558,48.85206],[2.35658,48.85177],[2.35809,48.85339],[2.35898,48.85305],[2.35915,48.85326],[2.35952,48.85337],[2.36019,48.85295],[2.36116,48.854],[2.36196,48.85386],[2.36217,48.85411],[2.36321,48.8538],[2.36323,48.85389],[2.36343,48.85386],[2.3639,48.85431],[2.36489,48.85401],[2.36531,48.85501],[2.36524,48.85502],[2.36528,48.85513],[2.36535,48.85512],[2.36549,48.85548],[2.36566,48.85549],[2.36577,48.85562],[2.36561,48.85576],[2.36574,48.85612],[2.36502,48.85622],[2.36479,48.85632],[2.36482,48.85638],[2.36428,48.85655],[2.36451,48.86126],[2.36459,48.86125],[2.36469,48.86364],[2.36575,48.86455],[2.3658,48.86467],[2.36599,48.86473],[2.36541,48.86584],[2.36527,48.8659],[2.36497,48.86637],[2.36545,48.86669],[2.36573,48.86706],[2.36302,48.86873],[2.36327,48.86938],[2.36362,48.86994],[2.36358,48.87005],[2.36376,48.8701],[2.36369,48.87024],[2.36432,48.87174],[2.36444,48.87184],[2.36432,48.87199],[2.36321,48.8725],[2.36341,48.87266],[2.3633,48.87274],[2.36341,48.87308],[2.36335,48.87314],[2.35903,48.87319],[2.35723,48.87521],[2.35692,48.87508],[2.34979,48.88305],[2.34994,48.8831],[2.34951,48.88361],[2.34948,48.88397],[2.34929,48.88397],[2.34932,48.88456],[2.34736,48.88507],[2.34748,48.88565],[2.34651,48.88574],[2.34663,48.88667],[2.34522,48.88638],[2.34514,48.88662],[2.34503,48.88664],[2.34507,48.88759],[2.34461,48.8875],[2.34455,48.88696],[2.34401,48.88612],[2.34361,48.88623],[2.34299,48.88618]];
+
+const GREASE_FRAME = 'M50 4C82 0 98 16 94 36C90 58 40 66 14 54C-2 44 2 14 30 7C42 4 56 4 68 8';
+const GREASE_MARK = 'M20 3C32 1 39 12 36 24C33 35 14 39 7 29C0 19 6 5 20 4C26 4 30 6 32 8';
+
+const $ = (id) => document.getElementById(id);
+const framesEl = $('frames'), lineEl = $('line'), fadeEl = $('fade'), timerEl = $('timer'), digitsEl = $('digits');
+let current = -1, busy = false, tick = null, hangTimer = null;
+const pegged = new Set();
+
+function setStatus(kind, icon, text) {
+  const n = $('status-note');
+  n.classList.remove('loading', 'success', 'error');
+  if (kind) n.classList.add(kind);
+  $('status-icon').textContent = icon;
+  $('status-text').textContent = text;
+}
+
+/* --- negative strip --- */
+const frameEls = STOPS.map((s, i) => {
+  const b = document.createElement('button');
+  b.className = 'neg-frame';
+  b.type = 'button';
+  b.setAttribute('aria-label', `Develop frame ${s.no}: ${s.name}`);
+  b.innerHTML = `<span class="neg-art">${art(s.art)}</span>
+    <span class="frame-no"><span>${s.no}</span><span class="frame-place">${s.name}</span></span>
+    <svg class="grease" viewBox="0 0 100 66" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="${GREASE_FRAME}"/></svg>`;
+  b.addEventListener('click', () => develop(i));
+  framesEl.appendChild(b);
+  return b;
+});
+
+/* --- map --- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: { basemap: { theme: 'monochrome', lightPreset: 'night', showPointOfInterestLabels: false } },
+  center: [2.33, 48.865],
+  zoom: 11.5,
+  attributionControl: true
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+new ResizeObserver(() => map.resize()).observe(document.getElementById('map'));
+
+const markers = STOPS.map((s, i) => {
+  const el = document.createElement('div');
+  el.innerHTML = `<div class="gp-marker" role="button" aria-label="${s.name}"><svg viewBox="0 0 40 40" aria-hidden="true"><path pathLength="1" d="${GREASE_MARK}"/></svg>${i + 1}</div>`;
+  const inner = el.firstChild;
+  inner.addEventListener('click', (e) => { e.stopPropagation(); select(i); fly(i); });
+  new mapboxgl.Marker({ element: el }).setLngLat(s.c).addTo(map);
+  return inner;
+});
+
+function pad() {
+  const small = window.innerWidth < 820;
+  return { top: 50, bottom: 70, left: small ? 36 : 60, right: small ? 36 : 70 };
+}
+function fitAll() {
+  const b = new mapboxgl.LngLatBounds();
+  ROUTE.forEach((p) => b.extend(p));
+  STOPS.forEach((s) => b.extend(s.c));
+  map.fitBounds(b, { padding: pad(), duration: 0 });
+}
+
+map.on('load', () => {
+  map.addSource('walk', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE } } });
+  map.addLayer({ id: 'walk-glow', type: 'line', source: 'walk', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#B3121B', 'line-width': 7, 'line-blur': 4, 'line-opacity': 0.55, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'walk-line', type: 'line', source: 'walk', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#F2EEE6', 'line-width': 1.8, 'line-opacity': 0.95, 'line-emissive-strength': 1 } });
+  fitAll();
+});
+
+function fly(i) {
+  const opts = { center: STOPS[i].c, zoom: 15.4, pitch: 35, bearing: -10, padding: { top: 30, bottom: 70, left: 30, right: 30 } };
+  if (reduce) map.jumpTo(opts); else map.flyTo({ ...opts, duration: 2800, essential: true });
+}
+
+/* --- selection + development --- */
+function restart(el) { el.classList.remove('draw'); void el.offsetWidth; el.classList.add('draw'); }
+
+function select(i) {
+  current = i;
+  frameEls.forEach((f, k) => f.classList.toggle('sel', k === i));
+  markers.forEach((m, k) => m.classList.toggle('sel', k === i));
+  restart(frameEls[i]); restart(markers[i]);
+  const f = frameEls[i], strip = $('negative');
+  strip.scrollTo({ left: f.offsetLeft - (strip.clientWidth - f.offsetWidth) / 2, behavior: reduce ? 'auto' : 'smooth' });
+  $('tray-place').textContent = `${STOPS[i].no} ${STOPS[i].name}`;
+}
+
+const fmt = (s) => `DEV 00:0${Math.max(0, Math.ceil(s))}`;
+
+function develop(i) {
+  if (busy) return;
+  busy = true;
+  select(i);
+  const s = STOPS[i];
+  fly(i);
+  if (reduce) {
+    digitsEl.textContent = 'DEV 00:00';
+    peg(i, false);
+    setStatus('success', '✓', `Frame ${s.no} fixed: ${s.name}.`);
+    hangTimer = setTimeout(() => { digitsEl.textContent = 'DEV 01:30'; busy = false; }, 600);
+    return;
+  }
+  setStatus('loading', '◌', `Developing ${s.no}: ${s.name}...`);
+  timerEl.classList.add('running');
+  fadeEl.classList.add('flash');
+  requestAnimationFrame(() => requestAnimationFrame(() => fadeEl.classList.remove('flash')));
+  const t0 = performance.now();
+  digitsEl.textContent = fmt(3);
+  tick = setInterval(() => {
+    const left = 3 - (performance.now() - t0) / 1000;
+    digitsEl.textContent = fmt(left);
+    if (left <= 0) {
+      clearInterval(tick);
+      timerEl.classList.remove('running');
+      peg(i, true);
+      setStatus('success', '✓', `Frame ${s.no} fixed: ${s.name}.`);
+      hangTimer = setTimeout(() => { digitsEl.textContent = 'DEV 01:30'; busy = false; }, 900);
+    }
+  }, 100);
+}
+
+function peg(i, animate) {
+  frameEls[i].classList.add('done');
+  if (pegged.has(i)) return;
+  pegged.add(i);
+  const s = STOPS[i];
+  $('empty').classList.add('hidden');
+  const p = document.createElement('figure');
+  p.className = 'print';
+  p.style.margin = '0';
+  p.innerHTML = `<span class="peg"></span><div class="print-art${animate ? ' neg' : ''}">${art(s.art)}</div>
+    <figcaption class="print-cap"><b>${s.no}</b>${s.name}</figcaption>`;
+  lineEl.insertBefore(p, lineEl.firstChild);
+  if (animate) {
+    const a = p.querySelector('.print-art');
+    requestAnimationFrame(() => requestAnimationFrame(() => a.classList.remove('neg')));
+  }
+}
+</script>
+</body>
+</html>

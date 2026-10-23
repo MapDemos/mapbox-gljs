@@ -1,0 +1,346 @@
+<!--
+  Working EXAMPLE of the Kintsugi style pack (kintsugi.css, in this same
+  folder). Open this file directly to see the pattern working with six
+  fictional kilns placed at real public spots around Jingdezhen, China (the
+  porcelain capital) on Mapbox Standard (monochrome theme, dusk preset). The
+  viewport is a broken vessel: a map shard, a list shard and a detail shard
+  joined by gold seams. A gold seam also links the six spots on the map;
+  pick a kiln (list, marker, or the Left / Right arrow keys) and the seam
+  segment leading to it is traced in bright gold, the camera flies there and
+  the bowl in the detail shard draws in its crack lines (reduced motion:
+  instant jump, no drawing). Esc returns to the overview. Copy the markup
+  below into your own demo and link kintsugi.css from its <head> -- see the
+  class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (kintsugi: black lacquer, crackled ash glaze, gold
+  seams) at the user's request for something distinct from every other pack
+  in this folder. The locations are real public places with approximate
+  positions; the kiln names, firing figures and notes are fictional
+  placeholders -- swap in your own.
+
+  What's NOT included: search/geocoding, routing, popups, audio, or a
+  hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kintsugi Atlas - Jingdezhen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Readex+Pro:wght@300;400;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="kintsugi.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map inside the map shard. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<main class="kiln">
+
+  <section class="shard shard-map" aria-label="Map of Jingdezhen">
+    <div id="map"></div>
+    <p class="status-note loading" id="status-note">Mending the map</p>
+  </section>
+
+  <div class="seam-h" aria-hidden="true"></div>
+
+  <section class="shard shard-list" aria-label="Kilns and workshops">
+    <header class="brand">
+      <span class="brand-seal" aria-hidden="true">&#37329;</span>
+      <h1 class="brand-title">Kintsugi Atlas</h1>
+      <p class="brand-sub">Six kilns &middot; Jingdezhen</p>
+    </header>
+    <ol class="workshops" id="workshops" aria-label="Kilns"></ol>
+  </section>
+
+  <div class="seam-h" aria-hidden="true"></div>
+
+  <section class="shard shard-detail" aria-live="polite" aria-label="Kiln details">
+    <div class="detail" id="detail">
+      <div class="detail-head">
+        <p class="detail-no" id="d-no"></p>
+        <h2 class="detail-name"><span id="d-name"></span> <span class="detail-han" id="d-han"></span></h2>
+        <p class="detail-place" id="d-place"></p>
+      </div>
+      <div class="detail-col">
+        <ul class="detail-notes" id="d-notes"></ul>
+        <div class="detail-temp">
+          <div class="temp-label">Firing temperature</div>
+          <div class="temp-val" id="d-temp"></div>
+          <div class="temp-bar"><div class="temp-fill" id="d-fill"></div></div>
+        </div>
+      </div>
+      <svg class="bowl" id="bowl" viewBox="0 0 220 140" role="img" aria-label="A bowl mended with gold seams">
+        <defs>
+          <linearGradient id="kn-gold-v" gradientUnits="userSpaceOnUse" x1="20" y1="40" x2="200" y2="130">
+            <stop offset="0" stop-color="#C9A24A" /><stop offset="0.5" stop-color="#F2D07A" /><stop offset="1" stop-color="#B08433" />
+          </linearGradient>
+          <clipPath id="bowl-clip"><path d="M20 50 C20 100 60 128 110 128 C160 128 200 100 200 50 Z" /></clipPath>
+        </defs>
+        <rect class="bowl-foot" x="82" y="126" width="56" height="8" rx="2" />
+        <path class="bowl-body" d="M20 50 C20 100 60 128 110 128 C160 128 200 100 200 50 Z" />
+        <g clip-path="url(#bowl-clip)">
+          <path class="bowl-shade" d="M150 50 C196 60 190 108 150 124 C170 100 172 76 150 50 Z" />
+          <path class="crack" pathLength="1" d="M70 50 L78 72 L66 90 L80 112 L88 124" />
+          <path class="crack" pathLength="1" d="M78 72 L104 80 L112 100 L108 126" />
+          <path class="crack" pathLength="1" d="M152 50 L142 70 L158 88 L150 112" />
+          <path class="crack" pathLength="1" d="M112 50 L118 66 L104 80" />
+          <path class="crack" pathLength="1" d="M142 70 L124 76 L118 66" />
+          <path class="crack" pathLength="1" d="M42 54 L50 72 L66 90" />
+        </g>
+        <ellipse class="bowl-rim" cx="110" cy="50" rx="90" ry="9" />
+      </svg>
+    </div>
+  </section>
+
+  <!-- Seams between shards. Shares percentage coordinates with the shard
+       clip-paths in kintsugi.css; hidden on phones (.seam-h takes over). -->
+  <svg class="seams" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <defs>
+      <linearGradient id="kn-gold" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#C9A24A" /><stop offset="0.5" stop-color="#F2D07A" /><stop offset="1" stop-color="#B08433" />
+      </linearGradient>
+    </defs>
+    <path class="seam-halo" d="M58 0 L62 18 L57 44 L61 68 L62 100" />
+    <path class="seam-halo" d="M57 44 L70 41 L82 48 L100 43" />
+    <path class="seam-core" d="M58 0 L62 18 L57 44 L61 68 L62 100" />
+    <path class="seam-core" d="M57 44 L70 41 L82 48 L100 43" />
+  </svg>
+</main>
+
+<script>
+// Six fictional kilns at real public places (approximate [lng, lat]).
+// glaze = bowl colour, cracks = how many gold seams the bowl shows.
+const KILNS = [
+  { name: 'Hollow Moon Kiln', han: '空月窑', place: 'Ancient Kiln Folk Custom Museum', short: 'Ancient Kiln Folk Custom Museum',
+    coord: [117.1705, 29.3030], temp: 1320, cracks: 4, glaze: '#E9E4DA',
+    notes: ['Moon-white qingbai glaze, thin as breath', 'Wood-fired in a traditional egg-shaped kiln', 'Seams follow the old firing cracks'] },
+  { name: 'Quiet Ember Studio', han: '静烬坊', place: 'Jingdezhen Ceramic Museum', short: 'Jingdezhen Ceramic Museum',
+    coord: [117.1890, 29.2800], temp: 1280, cracks: 3, glaze: '#B7C6C4',
+    notes: ['Pale blue-green glaze over carved lotus petals', 'Slow cooling for a fine crackle', 'One gold seam per mended generation'] },
+  { name: 'Pavilion Ash Works', han: '阁灰作', place: 'Longzhu Pavilion, Zhushan', short: 'Longzhu Pavilion area',
+    coord: [117.2015, 29.2700], temp: 1300, cracks: 5, glaze: '#D9CDB4',
+    notes: ['Warm ivory glaze from local wood ash', 'Rims dipped twice for a soft edge', 'Gold laid with lacquer, polished by hand'] },
+  { name: 'Imperial Mend House', han: '御修轩', place: 'Imperial Kiln Museum', short: 'Imperial Kiln Museum',
+    coord: [117.1995, 29.2655], temp: 1340, cracks: 6, glaze: '#A9C2B0',
+    notes: ['Celadon glaze in the court tradition', 'Shards from the old kiln site are mended here', 'Each seam is traced once and never retouched'] },
+  { name: 'Brook Glaze Atelier', han: '溪釉所', place: 'Taoxichuan ceramic art district', short: 'Taoxichuan ceramic art district',
+    coord: [117.2085, 29.2590], temp: 1250, cracks: 3, glaze: '#3A2A22',
+    notes: ['Dark tenmoku glaze that lets gold glow', 'Small-batch bowls from converted factory halls', 'Seams pressed into the break while warm'] },
+  { name: 'Village Gold Kiln', han: '村金窑', place: 'Sanbao village', short: 'Sanbao village',
+    coord: [117.2660, 29.3090], temp: 1290, cracks: 4, glaze: '#C98D7A',
+    notes: ['Soft persimmon glaze from hillside clay', 'Studios open onto a quiet mountain lane', 'Every bowl keeps its flaw, and a seam to honour it'] },
+];
+
+const INTRO = {
+  no: 'Six pieces',
+  name: 'Every break, mended in gold', han: '',
+  place: 'Jingdezhen, Jiangxi',
+  notes: ['Choose a kiln to trace its seam on the map', 'Arrow keys step through; Esc returns here'],
+  temp: 1300, cracks: 6, glaze: '#E9E4DA',
+};
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const phone = () => window.matchMedia('(max-width: 720px)').matches;
+const COORDS = KILNS.map((k) => k.coord);
+let current = -1;       // -1 = overview
+let fadeTimer = 0;
+let animId = 0;
+const btns = [];
+const dots = [];
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: {
+    basemap: {
+      theme: 'monochrome',
+      lightPreset: 'dusk',
+      showPointOfInterestLabels: false,
+    },
+  },
+  center: [117.2, 29.28],
+  zoom: 12,
+  attributionControl: true,
+});
+
+// Keep the canvas matched to its shard as the grid settles / viewport changes.
+new ResizeObserver(() => map.resize()).observe($('map'));
+
+/* ---- Camera: padding clears the jagged right edge and the logo corner ---- */
+function pad() {
+  return phone() ? { top: 50, bottom: 70, left: 40, right: 40 } : { top: 80, bottom: 90, left: 70, right: 130 };
+}
+
+function showOverview(instant) {
+  const b = COORDS.reduce((acc, c) => acc.extend(c), new mapboxgl.LngLatBounds(COORDS[0], COORDS[0]));
+  const o = { padding: pad(), bearing: 0, pitch: 0, maxZoom: 14 };
+  if (instant || reduce) map.fitBounds(b, { ...o, duration: 0 });
+  else map.fitBounds(b, { ...o, duration: 2200 });
+}
+
+function flyToKiln(k) {
+  const o = { center: k.coord, zoom: 14.8, bearing: 0, pitch: 40, padding: pad() };
+  if (reduce) map.jumpTo(o);
+  else map.flyTo({ ...o, duration: 2600, curve: 1.4, essential: false });
+}
+
+/* ---- Gold seam on the map ---- */
+const emptyLine = { type: 'Feature', geometry: { type: 'LineString', coordinates: [COORDS[0], COORDS[0]] } };
+const GOLD = ['interpolate', ['linear'], ['line-progress'], 0, '#C9A24A', 0.5, '#F2D07A', 1, '#B08433'];
+
+function addSeam() {
+  map.addSource('seam', { type: 'geojson', lineMetrics: true, data: { type: 'Feature', geometry: { type: 'LineString', coordinates: COORDS } } });
+  map.addSource('seg', { type: 'geojson', lineMetrics: true, data: emptyLine });
+  // Soft halo, then the quiet gold seam, then the bright traced segment.
+  map.addLayer({ id: 'seam-halo', type: 'line', source: 'seam', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#F2D07A', 'line-width': 10, 'line-blur': 8, 'line-opacity': 0.28, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'seam-base', type: 'line', source: 'seam', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-width': 3, 'line-gradient': GOLD, 'line-opacity': 0.85, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'seam-hi', type: 'line', source: 'seg', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-width': 6, 'line-gradient': ['interpolate', ['linear'], ['line-progress'], 0, '#F2D07A', 1, '#FFF3C4'],
+      'line-trim-offset': [1, 1], 'line-emissive-strength': 1 } });
+}
+
+function traceSegment(i) {
+  cancelAnimationFrame(animId);
+  if (!map.getLayer('seam-hi')) return;
+  const a = COORDS[i > 0 ? i - 1 : 0];
+  const b = COORDS[i > 0 ? i : 1];
+  map.getSource('seg').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: [a, b] } });
+  if (reduce) { map.setPaintProperty('seam-hi', 'line-trim-offset', [1, 1]); return; }
+  const t0 = performance.now();
+  const dur = 1600;
+  const step = (now) => {
+    const t = Math.min(1, (now - t0) / dur);
+    const e = 1 - Math.pow(1 - t, 3);
+    if (!map.getLayer('seam-hi')) return;
+    // Visible part grows from the start; the trimmed tail [e,1] is transparent.
+    map.setPaintProperty('seam-hi', 'line-trim-offset', [e, 1]);
+    if (t < 1) animId = requestAnimationFrame(step);
+  };
+  map.setPaintProperty('seam-hi', 'line-trim-offset', [0, 1]);
+  animId = requestAnimationFrame(step);
+}
+
+function clearSegment() {
+  cancelAnimationFrame(animId);
+  if (map.getLayer('seam-hi')) map.setPaintProperty('seam-hi', 'line-trim-offset', [1, 1]);
+}
+
+/* ---- Detail shard ---- */
+function drawBowl(n) {
+  const cracks = document.querySelectorAll('#bowl .crack');
+  cracks.forEach((c, i) => {
+    c.classList.remove('drawn');
+    c.classList.toggle('off', i >= n);
+    c.style.transitionDelay = reduce ? '0s' : (i * 0.18) + 's';
+  });
+  void document.getElementById('bowl').getBoundingClientRect(); // restart the transition
+  cracks.forEach((c) => c.classList.add('drawn'));
+}
+
+function fillDetail(d, label) {
+  $('d-no').textContent = label;
+  $('d-name').textContent = d.name;
+  $('d-han').textContent = d.han;
+  $('d-place').textContent = d.place;
+  $('d-notes').innerHTML = d.notes.map((t) => `<li>${t}</li>`).join('');
+  $('d-temp').textContent = d.temp.toLocaleString('en-US') + ' °C';
+  $('d-fill').style.width = Math.round(((d.temp - 1100) / 300) * 100) + '%';
+  $('bowl').style.setProperty('--glaze', d.glaze);
+  drawBowl(d.cracks);
+}
+
+function setDetail(d, label) {
+  clearTimeout(fadeTimer);
+  const el = $('detail');
+  if (reduce) { fillDetail(d, label); return; }
+  el.classList.add('fading');
+  fadeTimer = setTimeout(() => { fillDetail(d, label); el.classList.remove('fading'); }, 300);
+}
+
+/* ---- Selection ---- */
+function goTo(i) {
+  if (i < 0 || i >= KILNS.length) return;
+  current = i;
+  const k = KILNS[i];
+  setDetail(k, `Piece ${String(i + 1).padStart(2, '0')} / ${String(KILNS.length).padStart(2, '0')}`);
+  syncActive();
+  traceSegment(i);
+  flyToKiln(k);
+}
+
+function goOverview() {
+  current = -1;
+  setDetail(INTRO, INTRO.no);
+  syncActive();
+  clearSegment();
+  showOverview();
+}
+
+function syncActive() {
+  btns.forEach((b, i) => {
+    b.classList.toggle('active', i === current);
+    if (i === current) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
+  });
+  dots.forEach((d, i) => d.classList.toggle('active', i === current));
+}
+
+/* ---- List + markers ---- */
+KILNS.forEach((k, i) => {
+  const li = document.createElement('li');
+  const btn = document.createElement('button');
+  btn.className = 'workshop';
+  btn.type = 'button';
+  btn.innerHTML = `<span class="ws-no">${i + 1}</span><span class="ws-name">${k.name}</span><span class="ws-place">${k.short}</span>`;
+  btn.addEventListener('click', () => goTo(i));
+  li.appendChild(btn);
+  $('workshops').appendChild(li);
+  btns.push(btn);
+
+  // Marker root stays untouched; only the inner child is styled.
+  const root = document.createElement('div');
+  root.innerHTML = `<button class="kn-dot" type="button" aria-label="Kiln ${i + 1}: ${k.name}">${i + 1}</button>`;
+  const dot = root.firstElementChild;
+  dot.addEventListener('click', () => goTo(i));
+  dots.push(dot);
+  new mapboxgl.Marker({ element: root }).setLngLat(k.coord).addTo(map);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); goTo(current < 0 ? 0 : Math.min(KILNS.length - 1, current + 1)); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); if (current > 0) goTo(current - 1); else goOverview(); }
+  else if (e.key === 'Escape') goOverview();
+});
+
+/* ---- Map lifecycle ---- */
+map.on('style.load', () => {
+  addSeam();
+  $('status-note').classList.add('hidden');
+});
+
+map.on('error', (e) => {
+  const n = $('status-note');
+  n.classList.remove('hidden', 'loading');
+  n.classList.add('error');
+  n.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+fillDetail(INTRO, INTRO.no);
+map.once('load', () => showOverview(true));
+window.addEventListener('resize', () => { if (current < 0) showOverview(true); });
+</script>
+</body>
+</html>

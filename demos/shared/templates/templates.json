@@ -907,5 +907,280 @@
       "tone": "light",
       "layout": "split"
     }
+  },
+  {
+    "name": "kintsugi",
+    "description": {
+      "en": "Lacquer-black shards joined by gold seams — mended-ceramic luxury",
+      "ja": "漆黒の破片を金の継ぎ目でつなぐ — 金継ぎの上質な佇まい"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "split"
+    }
+  },
+  {
+    "name": "cyanotype",
+    "description": {
+      "en": "Prussian-blue sun prints with white botanical photograms",
+      "ja": "プルシアンブルーの日光写真と白い植物フォトグラム"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "sidebar"
+    }
+  },
+  {
+    "name": "crossword",
+    "description": {
+      "en": "Weekend newspaper puzzle — playable grid, clues and numbered map squares",
+      "ja": "週末新聞のクロスワード — 遊べるマス目、ヒント、番号付きの地図マーカー"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
+    }
+  },
+  {
+    "name": "metal-tour",
+    "description": {
+      "en": "Black-metal tour poster — spiky logo, blood-red route, SOLD OUT stamps",
+      "ja": "ブラックメタルのツアーポスター — 尖ったロゴ、血の赤のルート、SOLD OUTスタンプ"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "sidebar"
+    }
+  },
+  {
+    "name": "periodic-table",
+    "description": {
+      "en": "Classroom periodic-table chart where every element is a place",
+      "ja": "教室の周期表チャート — すべての元素がひとつの場所"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
+    }
+  },
+  {
+    "name": "cross-stitch",
+    "description": {
+      "en": "Needlework sampler on Aida cloth — X-stitch motifs and a running-stitch route",
+      "ja": "アイーダ布の刺繍サンプラー — クロスステッチの図柄となみ縫いのルート"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "sidebar"
+    }
+  },
+  {
+    "name": "card-catalog",
+    "description": {
+      "en": "Oak library card catalogue — typed index cards and DATE DUE stamps",
+      "ja": "オーク材の図書目録カード — タイプ打ちの索引カードと返却日スタンプ"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "sidebar"
+    }
+  },
+  {
+    "name": "seed-packet",
+    "description": {
+      "en": "Vintage seed packets on a kraft store rack with planting calendars",
+      "ja": "クラフト紙の棚に並ぶヴィンテージの種袋と栽培カレンダー"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
+    }
+  },
+  {
+    "name": "trading-card",
+    "description": {
+      "en": "Holographic trading-card binder — foil shimmer, rarity stars, stat bars",
+      "ja": "ホログラムのトレーディングカード・バインダー — 箔のきらめき、レア度の星、ステータスバー"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "split"
+    }
+  },
+  {
+    "name": "science-fair",
+    "description": {
+      "en": "School science-fair tri-fold board — paper cut-out letters and a bar chart",
+      "ja": "学校の自由研究の三つ折りボード — 切り抜き文字と棒グラフ"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
+    }
+  },
+  {
+    "name": "modular-synth",
+    "description": {
+      "en": "Eurorack modular synth — knobs drive the camera, a sequencer steps the stops",
+      "ja": "ユーロラックのモジュラーシンセ — ノブでカメラ操作、シーケンサーで地点を巡回"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "device"
+    }
+  },
+  {
+    "name": "recipe-card",
+    "description": {
+      "en": "Handwritten recipe card on gingham — ingredients become stops on a food walk",
+      "ja": "ギンガムの上の手書きレシピカード — 材料が食べ歩きの立ち寄り先に"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
+    }
+  },
+  {
+    "name": "lcd-watch",
+    "description": {
+      "en": "1980s digital sports watch — ghost LCD segments, backlight and lap timer",
+      "ja": "1980年代のデジタルスポーツウォッチ — 消え残るLCDセグメント、バックライト、ラップタイマー"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "device"
+    }
+  },
+  {
+    "name": "clay-toy",
+    "description": {
+      "en": "Squishy plasticine playset — clay blobs, a toy tray and press-to-squish",
+      "ja": "ぷにぷにの粘土おもちゃセット — 粘土の塊、おもちゃトレイ、押すとむにゅっ"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "overlay"
+    }
+  },
+  {
+    "name": "solarpunk",
+    "description": {
+      "en": "Sunlit greenhouse arches, vines and a time-of-day solar dashboard",
+      "ja": "陽だまりの温室アーチ、つる植物、時間帯で変わるソーラーダッシュボード"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
+    }
+  },
+  {
+    "name": "de-stijl",
+    "description": {
+      "en": "Neoplastic grid — primary blocks and black lines that recompose on select",
+      "ja": "新造形主義のグリッド — 原色ブロックと黒線が選択ごとに組み替わる"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
+    }
+  },
+  {
+    "name": "block-print",
+    "description": {
+      "en": "Hand-carved block-printed textiles — indigo and madder bands, fringed swatches",
+      "ja": "手彫り木版のテキスタイル — 藍と茜のボーダー、房付きの布見本"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "sidebar"
+    }
+  },
+  {
+    "name": "copacabana",
+    "description": {
+      "en": "Rio wave-mosaic promenade with a scrolling boardwalk of beach kiosks",
+      "ja": "リオの波模様の遊歩道と、スクロールするビーチキオスク"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
+    }
+  },
+  {
+    "name": "amphora",
+    "description": {
+      "en": "Greek black-figure pottery — meander bands and an era frieze timeline",
+      "ja": "古代ギリシャの黒絵式陶器 — 雷文の帯と時代別のフリーズ年表"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
+    }
+  },
+  {
+    "name": "dancheong",
+    "description": {
+      "en": "Korean palace eave painting — five-colour bands and a painted plaque",
+      "ja": "韓国宮殿の丹青 — 五方色の文様帯と扁額風プレート"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "sidebar"
+    }
+  },
+  {
+    "name": "spreadsheet",
+    "description": {
+      "en": "Office spreadsheet with a floating map chart object, formula bar and sheet tabs",
+      "ja": "表計算ソフト風 — 浮かぶ地図グラフ、数式バー、シートタブ"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "page"
+    }
+  },
+  {
+    "name": "pinball",
+    "description": {
+      "en": "1980s pinball cabinet — backglass art, dot-matrix score and pop-bumper markers",
+      "ja": "1980年代のピンボール筐体 — バックグラスのアート、ドットマトリクスの得点、バンパー型マーカー"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "device"
+    }
+  },
+  {
+    "name": "crayon",
+    "description": {
+      "en": "Child's crayon drawing on the fridge — waxy doodles and gold-star stickers",
+      "ja": "冷蔵庫に貼った子どものクレヨン画 — ろうっぽい落書きと金の星シール"
+    },
+    "tags": {
+      "tone": "light",
+      "layout": "split"
+    }
+  },
+  {
+    "name": "darkroom",
+    "description": {
+      "en": "Red-safelight darkroom — negative strip, developer tray and drying line",
+      "ja": "赤いセーフライトの暗室 — ネガフィルム、現像バット、乾燥ロープ"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "page"
+    }
+  },
+  {
+    "name": "mission-patch",
+    "description": {
+      "en": "Embroidered mission patches on a Velcro board beside a satellite globe",
+      "ja": "ベルクロボードの刺繍ミッションパッチと衛星画像の地球儀"
+    },
+    "tags": {
+      "tone": "dark",
+      "layout": "split"
+    }
   }
 ]

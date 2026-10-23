@@ -1,0 +1,615 @@
+<!--
+  Working EXAMPLE of the Spreadsheet style pack (spreadsheet.css, in this
+  same folder). Open this file directly to see the pattern working as a
+  fictional workbook, "Lakeshore Bikes - Q3 store performance", with 12
+  rental stores across Chicago. Copy the markup and script into your own
+  demo and link spreadsheet.css from its <head> -- see the class/id contract
+  documented at the top of that CSS file for what to build.
+
+  This is a brand-new, brand-neutral style, not extracted from an existing
+  demo. The company, addresses and every figure are invented placeholders;
+  the neighbourhoods are real.
+
+  Notes: three sheet tabs (Stores, Routes, Summary) swap both the grid
+  dataset and the map layers. Click a row or cell (or press the arrow keys)
+  to select it and fly to the store; click a map circle to select its row
+  (scrolled into view inside the grid only). Click a column letter to sort.
+  The chart object can be dragged by its title bar and resized from any of
+  its 8 handles; a ResizeObserver keeps the map canvas in step. Reduced
+  motion: camera moves become jumps.
+
+  What's NOT included: real formulas (the formula bar shows the text of the
+  aggregate each total cell stands for), editing, persistence, a backend or
+  a build step.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Lakeshore Bikes - Store performance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Arimo:wght@400;500;600;700&family=Noto+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="spreadsheet.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="titlebar">
+    <h1 class="doc-title">
+      <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2" y="2" width="14" height="14" rx="1.5"/><path d="M2 7h14M2 12h14M7 2v14"/></svg>
+      <span>Lakeshore Bikes &ndash; Q3 store performance</span>
+    </h1>
+    <nav class="menus" aria-hidden="true"><span>File</span><span>Edit</span><span>View</span><span>Insert</span><span>Format</span><span>Data</span></nav>
+    <span class="doc-state">All changes saved</span>
+  </header>
+
+  <div class="toolbar" role="toolbar" aria-label="Formatting">
+    <button class="tb-btn" id="tb-undo" type="button" title="Undo" aria-label="Undo" disabled><svg viewBox="0 0 16 16"><path d="M6 3L3 6l3 3"/><path d="M3 6h6.5a3.5 3.5 0 010 7H7"/></svg></button>
+    <button class="tb-btn" id="tb-redo" type="button" title="Redo" aria-label="Redo" disabled><svg viewBox="0 0 16 16"><path d="M10 3l3 3-3 3"/><path d="M13 6H6.5a3.5 3.5 0 000 7H9"/></svg></button>
+    <span class="tb-sep"></span>
+    <button class="tb-btn" id="tb-bold" type="button" title="Bold" aria-label="Bold" aria-pressed="false"><b>B</b></button>
+    <button class="tb-btn tb-desktop" id="tb-pct" type="button" title="Show as % of total" aria-label="Show as percent of total" aria-pressed="false">%</button>
+    <span class="tb-sep"></span>
+    <button class="tb-btn" id="tb-sort" type="button" title="Sort selected column A to Z" aria-label="Sort A to Z"><svg viewBox="0 0 16 16"><path d="M2 4h7M2 8h5M2 12h3"/><path d="M12 3v10m-2.5-2.5L12 13l2.5-2.5"/></svg></button>
+    <button class="tb-btn" id="tb-filter" type="button" title="Filter: above-average rows" aria-label="Filter above average" aria-pressed="false"><svg viewBox="0 0 16 16"><path d="M2 3h12l-4.5 5.5V13l-3 1.5V8.5z"/></svg></button>
+    <span class="tb-sep"></span>
+    <button class="tb-btn" id="tb-chart" type="button" title="Show or hide chart" aria-label="Show or hide map chart" aria-pressed="true"><svg viewBox="0 0 16 16"><path d="M3 13V8M8 13V3M13 13V6" stroke-width="2.2"/></svg></button>
+    <span class="tb-spacer"></span>
+  </div>
+
+  <div class="formula-bar">
+    <div class="name-box" id="name-box" aria-label="Selected cell">D2</div>
+    <div class="fx" aria-hidden="true">fx</div>
+    <input class="formula-input" id="formula" type="text" readonly aria-label="Cell value or formula" />
+  </div>
+
+  <main class="sheet-area" id="sheet-area">
+    <div class="grid-scroll" id="grid-scroll" tabindex="0" aria-label="Spreadsheet grid. Use arrow keys to move between cells.">
+      <table class="grid" id="grid"></table>
+    </div>
+
+    <section class="chart-object" id="chart" aria-label="Map chart">
+      <div class="chart-title" id="chart-title-bar">
+        <svg class="chart-icon" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 12V7M7 12V2M12 12V5"/></svg>
+        <span id="chart-title">Map &ndash; Revenue by store</span>
+      </div>
+      <div class="chart-map"><div id="map"></div></div>
+      <div class="chart-legend" id="legend"></div>
+      <i class="handle" data-dir="nw"></i><i class="handle" data-dir="n"></i><i class="handle" data-dir="ne"></i>
+      <i class="handle" data-dir="e"></i><i class="handle" data-dir="se"></i><i class="handle" data-dir="s"></i>
+      <i class="handle" data-dir="sw"></i><i class="handle" data-dir="w"></i>
+    </section>
+  </main>
+
+  <footer class="statusbar">
+    <div class="tabs" role="tablist" aria-label="Sheets">
+      <button class="tab" type="button" role="tab" data-sheet="stores" aria-selected="true">Stores</button>
+      <button class="tab" type="button" role="tab" data-sheet="routes" aria-selected="false">Routes</button>
+      <button class="tab" type="button" role="tab" data-sheet="summary" aria-selected="false">Summary</button>
+    </div>
+    <div class="status-note loading" id="status-note" role="status">Loading map</div>
+  </footer>
+</div>
+
+<script>
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = window.matchMedia('(max-width: 700px)');
+const $ = (id) => document.getElementById(id);
+const fmt0 = (n) => Math.round(n).toLocaleString('en-US');
+const LET = 'ABCDEFGH';
+
+/* ---------- data (fictional figures, real neighbourhoods) ---------- */
+// id, name, neighbourhood, address, revenue $k, rentals, rating, lat, lng, region
+const STORES = [
+  [1, 'Loop Flagship', 'Loop', '118 W Adams St', 962, 5240, 4.7, 41.8795, -87.6350, 'Central'],
+  [2, 'Wicker Park', 'Wicker Park', '1620 N Milwaukee Ave', 811, 4410, 4.6, 41.9088, -87.6796, 'West'],
+  [3, 'Lincoln Park', 'Lincoln Park', '2210 N Clark St', 874, 4720, 4.8, 41.9214, -87.6513, 'North'],
+  [4, 'Hyde Park', 'Hyde Park', '1330 E 55th St', 642, 3560, 4.5, 41.7943, -87.5907, 'South'],
+  [5, 'Pilsen', 'Pilsen', '1812 S Blue Island Ave', 455, 2680, 4.3, 41.8563, -87.6600, 'West'],
+  [6, 'Logan Square', 'Logan Square', '2540 N Milwaukee Ave', 579, 3140, 4.4, 41.9298, -87.7079, 'West'],
+  [7, 'River North', 'River North', '420 N Clark St', 918, 4980, 4.6, 41.8913, -87.6310, 'Central'],
+  [8, 'Lakeview', 'Lakeview', '3115 N Clark St', 703, 3820, 4.5, 41.9398, -87.6556, 'North'],
+  [9, 'Bronzeville', 'Bronzeville', '3510 S King Dr', 238, 1420, 4.1, 41.8312, -87.6168, 'South'],
+  [10, 'Andersonville', 'Andersonville', '5240 N Clark St', 392, 2210, 4.4, 41.9760, -87.6683, 'North'],
+  [11, 'Bridgeport', 'Bridgeport', '3150 S Halsted St', 184, 1105, 4.0, 41.8383, -87.6463, 'South'],
+  [12, 'South Loop', 'South Loop', '1500 S Prairie Ave', 526, 2990, 4.4, 41.8610, -87.6265, 'Central'],
+].map(([id, name, hood, addr, rev, rent, rate, lat, lng, region]) =>
+  ({ id, name: '#' + String(id).padStart(2, '0') + ' ' + name, hood, addr, rev, rent, rate, lat, lng, region }));
+const byId = (id) => STORES.find((s) => s.id === id);
+const REV_MIN = Math.min(...STORES.map((s) => s.rev));
+const REV_MAX = Math.max(...STORES.map((s) => s.rev));
+
+// Delivery routes: straight LineStrings through store ids
+const ROUTE_DEFS = [
+  ['R1', 'North Loop Run', [1, 7, 3, 8, 10], 3, 'On time'],
+  ['R2', 'Westside Express', [1, 2, 6], 2, 'On time'],
+  ['R3', 'Southwest Link', [1, 5, 11], 2, 'Delayed'],
+  ['R4', 'Lakefront South', [12, 9, 4], 2, 'On time'],
+  ['R5', 'Cross-town', [5, 2, 3], 1, 'Scheduled'],
+];
+function km(a, b) {
+  const R = 6371, rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+const ROUTES = ROUTE_DEFS.map(([id, name, ids, vans, status]) => {
+  const pts = ids.map(byId);
+  let dist = 0;
+  for (let i = 1; i < pts.length; i++) dist += km(pts[i - 1], pts[i]);
+  return { id, name: id + ' ' + name, ids, origin: pts[0].hood, dest: pts[pts.length - 1].hood,
+           dist, stops: pts.length, vans, mins: Math.round(dist * 3.4 + pts.length * 8), status };
+});
+
+const REGIONS = ['Central', 'North', 'South', 'West'].map((region) => {
+  const ss = STORES.filter((s) => s.region === region);
+  const rev = ss.reduce((a, s) => a + s.rev, 0);
+  const top = ss.reduce((a, s) => (s.rev > a.rev ? s : a), ss[0]);
+  return { id: region, region, stores: ss.length, rev, rent: ss.reduce((a, s) => a + s.rent, 0),
+           rate: ss.reduce((a, s) => a + s.rate, 0) / ss.length,
+           share: rev / STORES.reduce((a, s) => a + s.rev, 0), top: top.hood, rps: rev / ss.length };
+});
+
+/* ---------- sheet definitions ---------- */
+const SHEETS = {
+  stores: {
+    title: 'Map – Revenue by store', recs: () => STORES, key: (r) => 's' + r.id, heat: 'rev',
+    cols: [
+      { k: 'name', h: 'Store', w: 170 }, { k: 'hood', h: 'Neighbourhood', w: 130 }, { k: 'addr', h: 'Address', w: 170 },
+      { k: 'rev', h: 'Revenue $k', w: 98, num: 1, pct: 1, fmt: fmt0 }, { k: 'rent', h: 'Rentals', w: 80, num: 1, fmt: fmt0 },
+      { k: 'rate', h: 'Rating', w: 72, num: 1, fmt: (v) => v.toFixed(1) },
+      { k: 'lat', h: 'Lat', w: 86, num: 1, fmt: (v) => v.toFixed(4) }, { k: 'lng', h: 'Lng', w: 92, num: 1, fmt: (v) => v.toFixed(4) },
+    ],
+    totals: { 0: 'Total', 3: ['SUM'], 4: ['SUM'], 5: ['AVERAGE'] },
+  },
+  routes: {
+    title: 'Map – Delivery routes', recs: () => ROUTES, key: (r) => r.id, heat: 'mins',
+    cols: [
+      { k: 'name', h: 'Route', w: 170 }, { k: 'origin', h: 'Origin', w: 130 }, { k: 'dest', h: 'Destination', w: 170 },
+      { k: 'dist', h: 'Distance km', w: 98, num: 1, fmt: (v) => v.toFixed(1) }, { k: 'stops', h: 'Stops', w: 80, num: 1, fmt: fmt0 },
+      { k: 'vans', h: 'Vans', w: 72, num: 1, fmt: fmt0 }, { k: 'mins', h: 'Minutes', w: 86, num: 1, pct: 1, fmt: fmt0 },
+      { k: 'status', h: 'Status', w: 92 },
+    ],
+    totals: { 0: 'Total', 3: ['SUM'], 4: ['SUM'], 5: ['SUM'], 6: ['SUM'] },
+  },
+  summary: {
+    title: 'Map – Region share', recs: () => REGIONS, key: (r) => r.id, heat: 'rev',
+    cols: [
+      { k: 'region', h: 'Region', w: 170 }, { k: 'stores', h: 'Stores', w: 80, num: 1, fmt: fmt0 },
+      { k: 'rev', h: 'Revenue $k', w: 98, num: 1, pct: 1, fmt: fmt0 }, { k: 'rent', h: 'Rentals', w: 90, num: 1, fmt: fmt0 },
+      { k: 'rate', h: 'Avg rating', w: 88, num: 1, fmt: (v) => v.toFixed(2) },
+      { k: 'share', h: 'Share of revenue', w: 170, num: 1, fmt: (v) => Math.round(v * 100) + '%', bar: 1 },
+      { k: 'top', h: 'Top store', w: 130 }, { k: 'rps', h: 'Rev / store', w: 92, num: 1, fmt: fmt0 },
+    ],
+    totals: { 0: 'Total', 1: ['SUM'], 2: ['SUM'], 3: ['SUM'], 4: ['AVERAGE'], 5: ['SUM'] },
+  },
+};
+
+/* ---------- state ---------- */
+let cur = 'stores';
+let st = { sorts: {}, filter: false, pct: false };      // undoable
+let undoStack = [], redoStack = [];
+const boldSet = new Set();
+let sel = { r: 1, c: 3 };
+let model = [];                                         // rendered rows: head / data / total
+let mapReady = false;
+
+/* ---------- heat colours (same scale paints grid + map) ---------- */
+const HEAT = ['#FDECEA', '#F8B4A6', '#E4572E'];
+const hex = (h) => [1, 3, 5].map((i) => parseInt(h.substr(i, 2), 16));
+function heatColor(t) {
+  t = Math.max(0, Math.min(1, t));
+  const x = t * 2, i = Math.min(1, Math.floor(x)), f = x - i;
+  const a = hex(HEAT[i]), b = hex(HEAT[i + 1]);
+  return 'rgb(' + a.map((v, k) => Math.round(v + (b[k] - v) * f)).join(',') + ')';
+}
+
+/* ---------- model + rendering ---------- */
+function allSum(sh, col) { return sh.recs().reduce((a, r) => a + r[col.k], 0); }
+function fmtv(sh, col, v) {
+  return st.pct && col.pct ? (v / allSum(sh, col) * 100).toFixed(1) + '%' : col.fmt ? col.fmt(v) : String(v);
+}
+
+function visibleRecs() {
+  const sh = SHEETS[cur];
+  let recs = sh.recs().slice();
+  if (st.filter) {
+    const hc = sh.cols.find((c) => c.k === sh.heat);
+    const mean = allSum(sh, hc) / recs.length;
+    recs = recs.filter((r) => r[sh.heat] >= mean);
+  }
+  const s = st.sorts[cur];
+  if (s) {
+    const col = sh.cols.find((c) => c.k === s.k);
+    recs.sort((a, b) => (col.num ? a[s.k] - b[s.k] : String(a[s.k]).localeCompare(String(b[s.k]), 'en', { numeric: true })) * s.dir);
+  }
+  return recs;
+}
+
+function buildModel() {
+  const recs = visibleRecs();
+  model = [{ kind: 'head' }, ...recs.map((rec) => ({ kind: 'data', rec })), { kind: 'total', recs }];
+}
+
+function cellOf(row, c) {
+  const sh = SHEETS[cur], col = sh.cols[c];
+  const base = col.num ? 'num' : '';
+  const rk = row.kind === 'data' ? sh.key(row.rec) : row.kind;
+  const bold = boldSet.has(cur + '|' + rk + '|' + c) ? ' bold' : '';
+  if (row.kind === 'head') return { html: col.h, raw: col.h, cls: base + bold };
+  if (row.kind === 'total') {
+    const spec = sh.totals[c];
+    if (!spec) return { html: '', raw: '', cls: bold };
+    if (typeof spec === 'string') return { html: spec, raw: spec, cls: bold };
+    const n = row.recs.length, L = LET[c];
+    const vals = row.recs.map((r) => r[col.k]);
+    const sum = vals.reduce((a, b) => a + b, 0);
+    const v = spec[0] === 'AVERAGE' ? sum / (n || 1) : sum;
+    const f = st.filter ? '=SUBTOTAL(' + (spec[0] === 'SUM' ? 109 : 101) + ',' + L + '2:' + L + (n + 1) + ')'
+                        : '=' + spec[0] + '(' + L + '2:' + L + (n + 1) + ')';
+    const text = fmtv(sh, col, v);
+    return { html: text, raw: text, formula: f, cls: base + bold };
+  }
+  const v = row.rec[col.k];
+  const text = fmtv(sh, col, v);
+  if (col.bar) {
+    const w = Math.round(v * 70 * 1.6);
+    return { html: '<span class="bar-cell"><svg viewBox="0 0 70 10" aria-hidden="true"><rect width="70" height="10" fill="#EEF0F2"/><rect width="' + Math.min(70, w) + '" height="10" fill="#0F766E"/></svg><span class="mono">' + text + '</span></span>',
+             raw: (v * 100).toFixed(1) + '%', cls: base + bold };
+  }
+  if (col.k === sh.heat) {
+    const vals = sh.recs().map((r) => r[col.k]), lo = Math.min(...vals), hi = Math.max(...vals);
+    return { html: text, raw: text, cls: base + ' heat' + bold, style: ' style="background-color:' + heatColor((v - lo) / (hi - lo || 1)) + '"' };
+  }
+  return { html: text, raw: typeof v === 'number' ? String(v) : v, cls: base + bold };
+}
+
+function render() {
+  const sh = SHEETS[cur];
+  buildModel();
+  sel.r = Math.min(sel.r, model.length - 1);
+  const total = 44 + sh.cols.reduce((a, c) => a + c.w, 0) + 40;
+  let h = '<colgroup><col style="width:44px">' + sh.cols.map((c) => '<col style="width:' + c.w + 'px">').join('') + '<col></colgroup>';
+  h += '<thead><tr><th class="corner"></th>' + sh.cols.map((c, i) => '<th class="col-h" scope="col" data-c="' + i + '">' + LET[i] + '<i class="sort-arrow"></i></th>').join('') + '<th class="fill"></th></tr></thead><tbody>';
+  model.forEach((row, r) => {
+    h += '<tr class="' + row.kind + '" data-r="' + r + '"><th class="row-h" scope="row">' + (r + 1) + '</th>';
+    sh.cols.forEach((col, c) => {
+      const x = cellOf(row, c);
+      h += '<td data-c="' + c + '" class="' + x.cls + '"' + (x.style || '') + '>' + x.html + '</td>';
+    });
+    h += '<td class="fill"></td></tr>';
+  });
+  for (let i = model.length + 1; i <= model.length + 30; i++) {
+    h += '<tr class="blank"><th class="row-h">' + i + '</th>' + '<td></td>'.repeat(sh.cols.length + 1) + '</tr>';
+  }
+  const grid = $('grid');
+  grid.style.minWidth = total + 'px';
+  grid.innerHTML = h + '</tbody>';
+  const s = st.sorts[cur];
+  grid.querySelectorAll('th.col-h[data-c]').forEach((th) => {
+    const col = sh.cols[+th.dataset.c];
+    th.classList.toggle('sorted-asc', !!s && s.k === col.k && s.dir === 1);
+    th.classList.toggle('sorted-desc', !!s && s.k === col.k && s.dir === -1);
+  });
+  $('chart-title').textContent = sh.title;
+  $('tb-filter').setAttribute('aria-pressed', st.filter);
+  $('tb-pct').setAttribute('aria-pressed', st.pct);
+  $('tb-undo').disabled = !undoStack.length;
+  $('tb-redo').disabled = !redoStack.length;
+  paintSel();
+  applyMap();
+}
+
+/* ---------- selection ---------- */
+function paintSel(scroll) {
+  const grid = $('grid'), rows = grid.tBodies[0].rows;
+  grid.querySelectorAll('.sel, .active, .hl').forEach((e) => e.classList.remove('sel', 'active', 'hl'));
+  const tr = rows[sel.r];
+  if (!tr) return;
+  tr.classList.add('sel');
+  tr.cells[0].classList.add('hl');
+  const td = tr.cells[sel.c + 1];
+  td.classList.add('active');
+  const colTh = grid.tHead.rows[0].cells[sel.c + 1];
+  colTh.classList.add('hl');
+  const x = cellOf(model[sel.r], sel.c);
+  $('name-box').textContent = LET[sel.c] + (sel.r + 1);
+  $('formula').value = x.formula || x.raw;
+  updateStats();
+  const sh = SHEETS[cur], row = model[sel.r];
+  $('tb-bold').setAttribute('aria-pressed', boldSet.has(cur + '|' + (row.kind === 'data' ? sh.key(row.rec) : row.kind) + '|' + sel.c));
+  if (scroll) ensureVisible(td);
+}
+
+// Scroll the GRID container only (never the page): keep the cell clear of the sticky headers
+function ensureVisible(td) {
+  const sc = $('grid-scroll'), cr = sc.getBoundingClientRect(), t = td.getBoundingClientRect();
+  const topLim = cr.top + 22, leftLim = cr.left + 44;
+  if (t.top < topLim) sc.scrollTop -= topLim - t.top;
+  else if (t.bottom > cr.bottom - 14) sc.scrollTop += t.bottom - cr.bottom + 14;
+  if (t.left < leftLim) sc.scrollLeft -= leftLim - t.left;
+  else if (t.right > cr.right - 14) sc.scrollLeft += t.right - cr.right + 14;
+}
+
+function updateStats() {
+  if (!mapReady) return;
+  const el = $('status-note');
+  el.className = 'status-note';
+  const sh = SHEETS[cur], col = sh.cols[sel.c], recs = model[model.length - 1].recs;
+  if (!col.num || !recs.length) { el.textContent = 'Ready'; return; }
+  const vals = recs.map((r) => r[col.k]), sum = vals.reduce((a, b) => a + b, 0);
+  const f = (v) => (col.k === 'lat' || col.k === 'lng' ? v.toFixed(4) : col.k === 'rate' || col.k === 'dist' ? v.toFixed(2) : fmt0(v));
+  el.textContent = col.h + ': Count ' + vals.length + ' · Sum ' + f(sum) + ' · Average ' + f(sum / vals.length);
+}
+
+function select(r, c, camera = true, scroll = true) {
+  sel = { r: Math.max(0, Math.min(model.length - 1, r)), c: Math.max(0, Math.min(SHEETS[cur].cols.length - 1, c)) };
+  paintSel(scroll);
+  mapFocus(model[sel.r], camera);
+}
+
+$('grid').addEventListener('click', (e) => {
+  const th = e.target.closest('th.col-h[data-c]');
+  if (th) { sortBy(+th.dataset.c); return; }
+  const td = e.target.closest('td[data-c]');
+  if (td) { select(+td.parentNode.dataset.r, +td.dataset.c); $('grid-scroll').focus({ preventScroll: true }); return; }
+  const rh = e.target.closest('th.row-h');
+  if (rh && rh.parentNode.dataset.r) select(+rh.parentNode.dataset.r, sel.c);
+});
+
+$('grid-scroll').addEventListener('keydown', (e) => {
+  const d = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[e.key];
+  if (d) { e.preventDefault(); select(sel.r + d[0], sel.c + d[1]); }
+  else if (e.key === 'Home') { e.preventDefault(); select(sel.r, 0); }
+  else if (e.key === 'End') { e.preventDefault(); select(sel.r, SHEETS[cur].cols.length - 1); }
+});
+
+/* ---------- toolbar: sort / filter / % / bold / undo / chart ---------- */
+function pushHistory() { undoStack.push(JSON.stringify(st)); redoStack = []; }
+function restore(json) { st = JSON.parse(json); render(); }
+function sortBy(c, forceAsc) {
+  const k = SHEETS[cur].cols[c].k, s = st.sorts[cur];
+  pushHistory();
+  st.sorts = { ...st.sorts, [cur]: { k, dir: !forceAsc && s && s.k === k && s.dir === 1 ? -1 : 1 } };
+  const prev = model[sel.r], sh = SHEETS[cur];
+  sel.c = c;
+  render();
+  if (prev && prev.kind === 'data') {          // keep the selection on the same record
+    const r = model.findIndex((m) => m.kind === 'data' && sh.key(m.rec) === sh.key(prev.rec));
+    if (r > 0) { sel.r = r; paintSel(true); mapFocus(model[r], false); }
+  }
+}
+$('tb-sort').onclick = () => sortBy(sel.c, true);
+$('tb-filter').onclick = () => { pushHistory(); st.filter = !st.filter; render(); };
+$('tb-pct').onclick = () => { pushHistory(); st.pct = !st.pct; render(); };
+$('tb-undo').onclick = () => { if (!undoStack.length) return; redoStack.push(JSON.stringify(st)); restore(undoStack.pop()); };
+$('tb-redo').onclick = () => { if (!redoStack.length) return; undoStack.push(JSON.stringify(st)); restore(redoStack.pop()); };
+$('tb-bold').onclick = () => {
+  const row = model[sel.r], sh = SHEETS[cur];
+  const k = cur + '|' + (row.kind === 'data' ? sh.key(row.rec) : row.kind) + '|' + sel.c;
+  boldSet.has(k) ? boldSet.delete(k) : boldSet.add(k);
+  const keep = sel; render(); sel = keep; paintSel();
+  $('tb-bold').setAttribute('aria-pressed', boldSet.has(k));
+};
+$('tb-chart').onclick = () => {
+  const on = $('chart').classList.toggle('hidden') === false;
+  $('tb-chart').setAttribute('aria-pressed', on);
+  if (on) map.resize();
+};
+
+/* ---------- sheet tabs ---------- */
+document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => {
+  if (tab.dataset.sheet === cur) return;
+  cur = tab.dataset.sheet;
+  document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', t === tab));
+  sel = { r: 1, c: cur === 'stores' ? 3 : 0 };
+  $('grid-scroll').scrollTo(0, 0);
+  render();
+  fitAll();
+}));
+
+/* ---------- map ---------- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  center: [-87.65, 41.89],
+  zoom: 10,
+  config: { basemap: { lightPreset: 'day', theme: 'faded', showPointOfInterestLabels: false, showPlaceLabels: false } },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+new ResizeObserver(() => map.resize()).observe($('map'));
+map.on('error', () => { if (!mapReady) { const el = $('status-note'); el.className = 'status-note error'; el.textContent = 'Map failed to load'; } });
+
+const move = (opts) => (reduce ? map.jumpTo(opts) : map.flyTo({ ...opts, duration: 1100 }));
+function fitPts(ids, pad) {
+  const b = new mapboxgl.LngLatBounds();
+  ids.forEach((id) => b.extend([byId(id).lng, byId(id).lat]));
+  map.fitBounds(b, { padding: pad || { top: 40, left: 44, right: 44, bottom: 64 }, maxZoom: 13, duration: reduce ? 0 : 900 });
+}
+function fitAll() { if (mapReady) { fitPts(STORES.map((s) => s.id)); } }
+
+// Screen-space collision pass: circles that would overlap are nudged apart (display positions only;
+// the grid, flyTo and the data keep the true coordinates). Re-run after every zoom/resize.
+function circleRadius(rev, z) {
+  const t = Math.max(0, Math.min(1, (z - 9) / 5)), k = (rev - REV_MIN) / (REV_MAX - REV_MIN || 1);
+  const lo = 8 + 6 * t, hi = 12 + 12 * t;
+  return lo + (hi - lo) * k;
+}
+function displayCoords() {
+  const z = map.getZoom();
+  const P = STORES.map((s) => { const p = map.project([s.lng, s.lat]); return { s, x: p.x, y: p.y, r: circleRadius(s.rev, z) + 3 }; });
+  for (let it = 0; it < 60; it++) {
+    let moved = false;
+    for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+      const a = P[i], b = P[j];
+      let dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+      const need = a.r + b.r;
+      if (d >= need) continue;
+      if (d < 0.01) { dx = 1; dy = 0; d = 1; }
+      const push = (need - d) / 2 + 0.25;
+      a.x -= dx / d * push; a.y -= dy / d * push; b.x += dx / d * push; b.y += dy / d * push;
+      moved = true;
+    }
+    if (!moved) break;
+  }
+  const out = {};
+  P.forEach((p) => { const ll = map.unproject([p.x, p.y]); out[p.s.id] = [ll.lng, ll.lat]; });
+  return out;
+}
+function storeData() {
+  const pos = mapReady || map.loaded() || map.isStyleLoaded() ? displayCoords() : {};
+  return { type: 'FeatureCollection', features: STORES.map((s) => ({
+    type: 'Feature', geometry: { type: 'Point', coordinates: pos[s.id] || [s.lng, s.lat] },
+    properties: { id: s.id, num: s.id, hood: s.hood, rev: s.rev, region: s.region } })) };
+}
+function refreshStores() { const src = map.getSource('stores'); if (src) src.setData(storeData()); }
+
+const HEAT_EXPR = ['interpolate', ['linear'], ['get', 'rev'], REV_MIN, HEAT[0], (REV_MIN + REV_MAX) / 2, HEAT[1], REV_MAX, HEAT[2]];
+const radius = (add) => ['interpolate', ['linear'], ['zoom'],
+  9, ['+', add, ['interpolate', ['linear'], ['get', 'rev'], REV_MIN, 8, REV_MAX, 12]],
+  14, ['+', add, ['interpolate', ['linear'], ['get', 'rev'], REV_MIN, 14, REV_MAX, 24]]];
+const FONT = ['DIN Pro Medium', 'Arial Unicode MS Regular'];
+
+map.on('load', () => {
+  map.addSource('stores', { type: 'geojson', data: storeData() });
+  map.addSource('routes', { type: 'geojson', data: { type: 'FeatureCollection', features: ROUTES.map((r) => ({
+    type: 'Feature', geometry: { type: 'LineString', coordinates: r.ids.map((id) => [byId(id).lng, byId(id).lat]) },
+    properties: { id: r.id } })) } });
+
+  map.addLayer({ id: 'routes-casing', type: 'line', source: 'routes', slot: 'top',
+    layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#FFFFFF', 'line-width': 7, 'line-opacity': 0.9, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'routes-line', type: 'line', source: 'routes', slot: 'top',
+    layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#0F766E', 'line-width': 3.5, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'routes-sel', type: 'line', source: 'routes', slot: 'top', filter: ['==', ['get', 'id'], ''],
+    layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#0B4F4A', 'line-width': 6, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'stores-circle', type: 'circle', source: 'stores', slot: 'top',
+    paint: { 'circle-color': HEAT_EXPR, 'circle-radius': radius(0), 'circle-stroke-color': '#FFFFFF', 'circle-stroke-width': 2,
+             'circle-emissive-strength': 1 } });
+  map.addLayer({ id: 'stores-sel', type: 'circle', source: 'stores', slot: 'top', filter: ['==', ['get', 'id'], -1],
+    paint: { 'circle-color': 'rgba(0,0,0,0)', 'circle-radius': radius(5), 'circle-stroke-color': '#0F766E', 'circle-stroke-width': 3,
+             'circle-emissive-strength': 1 } });
+  map.addLayer({ id: 'stores-num', type: 'symbol', source: 'stores', slot: 'top',
+    layout: { 'text-field': ['to-string', ['get', 'num']], 'text-font': FONT, 'text-size': 11, 'text-allow-overlap': true, 'text-ignore-placement': true },
+    paint: { 'text-color': '#111111', 'text-emissive-strength': 1 } });
+  map.addLayer({ id: 'stores-name', type: 'symbol', source: 'stores', slot: 'top', minzoom: 10.5,
+    layout: { 'text-field': ['get', 'hood'], 'text-font': FONT, 'text-size': 11, 'text-variable-anchor': ['top', 'bottom', 'right', 'left'],
+              'text-radial-offset': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 14, 2.5] },
+    paint: { 'text-color': '#3C4043', 'text-halo-color': '#FFFFFF', 'text-halo-width': 1.5, 'text-emissive-strength': 1 } });
+
+  map.on('click', 'stores-circle', (e) => selectByStore(e.features[0].properties.id));
+  map.on('mouseenter', 'stores-circle', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'stores-circle', () => { map.getCanvas().style.cursor = ''; });
+
+  mapReady = true;
+  map.on('moveend', refreshStores);
+  map.on('resize', refreshStores);
+  fitAll();
+  applyMap();
+  select(sel.r, sel.c, false, false);
+  setLegend();
+});
+
+function selectByStore(id) {
+  let r = -1;
+  if (cur === 'stores') r = model.findIndex((m) => m.kind === 'data' && m.rec.id === id);
+  else if (cur === 'routes') r = model.findIndex((m) => m.kind === 'data' && m.rec.ids.includes(id));
+  else r = model.findIndex((m) => m.kind === 'data' && m.rec.region === byId(id).region);
+  if (r > 0) select(r, sel.c, false);
+}
+
+const setLayer = (id, fn) => { try { if (map.getLayer(id)) fn(); } catch (e) { /* layer not ready */ } };
+
+function applyMap() {
+  if (!mapReady) return;
+  const isRoutes = cur === 'routes';
+  ['routes-casing', 'routes-line', 'routes-sel'].forEach((id) => setLayer(id, () => map.setLayoutProperty(id, 'visibility', isRoutes ? 'visible' : 'none')));
+  const recs = model[model.length - 1].recs;
+  const ids = cur === 'stores' ? recs.map((r) => r.id) : cur === 'summary' ? STORES.filter((s) => recs.some((r) => r.region === s.region)).map((s) => s.id) : STORES.map((s) => s.id);
+  ['stores-circle', 'stores-num', 'stores-name'].forEach((id) => setLayer(id, () => map.setFilter(id, ['in', ['get', 'id'], ['literal', ids]])));
+  if (isRoutes) {
+    const rids = recs.map((r) => r.id);
+    ['routes-casing', 'routes-line'].forEach((id) => setLayer(id, () => map.setFilter(id, ['in', ['get', 'id'], ['literal', rids]])));
+  }
+  setLegend();
+  mapFocus(model[sel.r], false);
+}
+
+function setDim(region) {
+  const op = region ? ['case', ['==', ['get', 'region'], region], 1, 0.22] : 1;
+  setLayer('stores-circle', () => { map.setPaintProperty('stores-circle', 'circle-opacity', op); map.setPaintProperty('stores-circle', 'circle-stroke-opacity', op); });
+  setLayer('stores-num', () => map.setPaintProperty('stores-num', 'text-opacity', op));
+}
+
+function mapFocus(row, camera) {
+  if (!mapReady) return;
+  const data = row && row.kind === 'data' ? row.rec : null;
+  setLayer('stores-sel', () => map.setFilter('stores-sel', ['==', ['get', 'id'], cur === 'stores' && data ? data.id : -1]));
+  setLayer('routes-sel', () => map.setFilter('routes-sel', ['==', ['get', 'id'], cur === 'routes' && data ? data.id : '']));
+  setDim(cur === 'summary' && data ? data.region : null);
+  if (!data || !camera) return;
+  if (cur === 'stores') move({ center: [data.lng, data.lat], zoom: 13 });
+  else if (cur === 'routes') fitPts(data.ids);
+  else fitPts(STORES.filter((s) => s.region === data.region).map((s) => s.id));
+}
+
+function setLegend() {
+  const lg = $('legend');
+  if (cur === 'routes') lg.innerHTML = '<span class="legend-swatch"></span><span>Delivery route</span><span>&middot;</span><span>circles: revenue $k</span>';
+  else lg.innerHTML = '<span>Revenue $k</span><span class="mono">' + REV_MIN + '</span><span class="legend-bar"></span><span class="mono">' + REV_MAX + '</span>' +
+    (cur === 'summary' ? '<span>&middot; other regions dimmed</span>' : '<span>&middot; size = revenue</span>');
+}
+
+/* ---------- chart object: drag by title bar, resize from any handle ---------- */
+const area = $('sheet-area'), chart = $('chart');
+function pin() {                       // switch from right-anchored CSS to explicit left/top
+  const a = area.getBoundingClientRect(), c = chart.getBoundingClientRect();
+  chart.style.left = (c.left - a.left) + 'px'; chart.style.top = (c.top - a.top) + 'px';
+  chart.style.right = 'auto'; chart.style.width = c.width + 'px'; chart.style.height = c.height + 'px';
+  return { a, c };
+}
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+function track(e, onMove) {
+  e.preventDefault();
+  const t = e.currentTarget;
+  t.setPointerCapture(e.pointerId);
+  const up = () => { t.removeEventListener('pointermove', onMove); t.removeEventListener('pointerup', up); t.removeEventListener('pointercancel', up); };
+  t.addEventListener('pointermove', onMove); t.addEventListener('pointerup', up); t.addEventListener('pointercancel', up);
+}
+$('chart-title-bar').addEventListener('pointerdown', (e) => {
+  if (phone.matches || e.button !== 0) return;
+  const { a, c } = pin(), ox = e.clientX - c.left, oy = e.clientY - c.top;
+  track(e, (ev) => {
+    chart.style.left = clamp(ev.clientX - ox - a.left, 0, a.width - c.width) + 'px';
+    chart.style.top = clamp(ev.clientY - oy - a.top, 0, a.height - c.height) + 'px';
+  });
+});
+chart.querySelectorAll('.handle').forEach((hd) => hd.addEventListener('pointerdown', (e) => {
+  if (phone.matches) return;
+  const dir = hd.dataset.dir, { a, c } = pin(), x0 = e.clientX, y0 = e.clientY;
+  const L0 = c.left - a.left, T0 = c.top - a.top, MINW = 300, MINH = 240;
+  track(e, (ev) => {
+    const dx = ev.clientX - x0, dy = ev.clientY - y0;
+    let L = L0, T = T0, W = c.width, H = c.height;
+    if (dir.includes('e')) W = clamp(c.width + dx, MINW, a.width - L0);
+    if (dir.includes('s')) H = clamp(c.height + dy, MINH, a.height - T0);
+    if (dir.includes('w')) { W = clamp(c.width - dx, MINW, L0 + c.width); L = L0 + c.width - W; }
+    if (dir.includes('n')) { H = clamp(c.height - dy, MINH, T0 + c.height); T = T0 + c.height - H; }
+    Object.assign(chart.style, { left: L + 'px', top: T + 'px', width: W + 'px', height: H + 'px' });
+  });
+}));
+phone.addEventListener('change', () => { ['left', 'top', 'right', 'width', 'height'].forEach((p) => { chart.style[p] = ''; }); map.resize(); });
+
+render();
+</script>
+</body>
+</html>

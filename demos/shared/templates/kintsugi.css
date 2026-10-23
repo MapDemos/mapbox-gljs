@@ -1,0 +1,576 @@
+/*
+  Kintsugi -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: the art of mending broken ceramics with
+  gold -- black lacquer, an ash-white crackled glaze, celadon, one cinnabar
+  seal, and luminous gold seams that celebrate the breaks; the screen is
+  literally a vessel broken into three shards and joined again), deliberately
+  distinct from every other style pack in this folder: Academic Paper, Aero
+  Gadgets, Amber Terminal, Annual Report, Arena, Art Nouveau, Atomic Motel,
+  Audio Guide, Aurora Command, Blueprint, Board Game, Bottom Sheet,
+  Broadcast, Brutalist Guide, Case Board, Celestial Tarot, Chalkboard,
+  Chat Concierge, Chronicle, Clinic Finder, Code Editor, Comic Panel,
+  Constructivist, Data Notebook, Deco Voyage, Dive Log, Drop Culture, E-Ink,
+  Editorial Paper, Estate Luxe, Event Invite, Field Journal, Film Noir,
+  Fleet Ops, Frontier Poster, Grand Hotel, Herbarium, Highway Sign,
+  Illuminated, Isotype, Line Diagram, Memphis, Moving Map, Museum Label, Neon
+  HUD, Nordic Cabin, Orienteering, Papel Picado, Papercraft, Pastel Bento,
+  Pixel Quest, Postcards, Rally Dash, Raw Web, Regatta, Retro OS, Riso Zine,
+  Ski Piste, Slate Console, Soft UI, Split Flap, Stage Profile, Stained
+  Glass, Sticker Book, Storefront, Story Scroll, Swiss Grid, Tarmac Glass,
+  Thermal Receipt, Tiki Lagoon, Trailhead, Treasure Hunt, Trip Kanban, Truck
+  Art, Ukiyo-e Coast, Vapor Sunset, Vintage Chart, Vinyl Crate, Washi
+  Seasons, Watercolor, Weather Console, Whiteboard and Zellige; and also
+  distinct from the 25 sibling packs being built in parallel at the same
+  time (Cyanotype, Crossword, Metal Tour, Periodic Table, Cross Stitch, Card
+  Catalog, Seed Packet, Trading Card, Science Fair, Modular Synth, Recipe
+  Card, LCD Watch, Clay Toy, Solarpunk, De Stijl, Block Print, Copacabana,
+  Amphora, Dancheong, Spreadsheet, Pinball, Crayon, Darkroom, Mission Patch).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/kintsugi.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Noto Serif SC for headings and
+  Chinese names, Readex Pro for body / label copy):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Readex+Pro:wght@300;400;600&display=swap" rel="stylesheet" />
+
+  Signature touch: the viewport is a broken vessel. On desktop three
+  irregular SHARDS (clip-path polygons on the panels only -- the map's
+  bottom corners stay square so the logo and attribution are never cut) are
+  joined by gold SEAMS drawn in one absolutely positioned inline SVG that
+  shares the panels' percentage coordinates. Selecting a piece draws crack
+  lines into a small SVG bowl (stroke-dashoffset) while the matching seam
+  segment is traced in gold on the map. Cinnabar appears only as the single
+  seal chop and the active piece number.
+
+  Layout archetype: BROKEN SHARDS. Desktop: large map shard (left), list
+  shard (top right), detail shard (bottom right). Phone (<= 720px): shards
+  stacked vertically with no clip-paths; the seams become jagged horizontal
+  gold dividers (.seam-h); the page scrolls.
+
+  Class/id contract (see kintsugi-template.html in this same folder for a
+  full working example):
+
+  - .kiln                     the page: lacquer ground, positioning context
+  - .shard                    one panel; .shard-map / .shard-list /
+                               .shard-detail pick the polygon + colours
+    .shard-map                  holds the demo-owned #map (position:absolute;
+                                 inset:0) and the .status-note
+    .shard-list                 ash-glaze shard: .brand + .workshops
+    .shard-detail               lacquer shard: .detail content
+  - .seams                    the inline SVG of gold seams (pointer-events
+                               none; viewBox 0 0 100 100, preserveAspectRatio
+                               none, non-scaling strokes). Desktop only.
+    .seam-core / .seam-halo     main seam line + soft glow; .seam-hair = fine
+                                 side cracks
+  - .seam-h                   phone-only jagged gold divider between shards
+  - .brand                    title block (.brand-seal cinnabar chop,
+                               .brand-title, .brand-sub)
+  - .workshops                ol of six pieces; .workshop is a button with
+                               .ws-no (numeral), .ws-name, .ws-place, and
+                               .workshop.active (gold ring, cinnabar numeral)
+  - .detail                   detail content (+ .fading cross-fade)
+    .detail-no / .detail-name / .detail-han / .detail-place
+    .detail-notes               glaze notes list (li)
+    .detail-temp                firing temperature: .temp-val + .temp-bar >
+                                 .temp-fill (width set inline)
+    .bowl                       SVG bowl; fill via --glaze; .crack paths
+                                 (pathLength=1) get .drawn to trace in
+  - .kn-dot                   map marker inner child (gold-ringed numeral);
+                               .kn-dot.active (style the inner child, never
+                               the Marker root)
+  - .status-note              quiet status line (+ .loading / .error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --lacquer: #14110F;
+  --lacquer-2: #1E1916;
+  --ash: #E9E4DA;
+  --ash-deep: #D8D1C2;
+  --celadon: #A9C2B0;
+  --cinnabar: #B23A2A;
+  --gold-1: #C9A24A;
+  --gold-2: #F2D07A;
+  --gold-3: #B08433;
+  --gold-grad: linear-gradient(100deg, #C9A24A 0%, #F2D07A 48%, #B08433 100%);
+  --ink-soft: rgba(233, 228, 218, 0.68);
+  --ink-faint: rgba(233, 228, 218, 0.38);
+  --ash-ink: #231E1A;
+  --ash-ink-soft: rgba(35, 30, 26, 0.64);
+  --error: #E8806E;
+
+  --font-head: 'Noto Serif SC', 'Songti SC', 'Noto Serif', Georgia, serif;
+  --font-body: 'Readex Pro', 'Helvetica Neue', Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--lacquer);
+  color: var(--ash);
+  font-family: var(--font-body);
+  font-weight: 300;
+}
+
+button { font-family: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--gold-2);
+  outline-offset: 2px;
+}
+
+/* ---- The vessel: three shards on black lacquer ---- */
+.kiln {
+  position: relative;
+  height: 100dvh;
+  min-height: 620px;
+  overflow: hidden;
+  background: var(--lacquer);
+}
+
+.shard {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  min-width: 0;
+}
+
+/* Shard polygons share one coordinate system with the .seams SVG
+   (viewport units; the two right-hand boxes start at 56vw). The map's
+   bottom corners are square: the right edge returns to 62vw at the bottom. */
+.shard-map {
+  left: 0;
+  width: 62vw;
+  background: #2a2622;
+  clip-path: polygon(0 0, 58vw 0, 62vw 18%, 57vw 44%, 61vw 68%, 62vw 100%, 0 100%);
+}
+
+.shard-list {
+  left: 56vw;
+  width: 44vw;
+  padding: 5vh 3.2vw 0 8vw;
+  background:
+    radial-gradient(ellipse 80% 60% at 30% 20%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 70%),
+    var(--ash);
+  color: var(--ash-ink);
+  clip-path: polygon(2vw 0, 44vw 0, 44vw 43%, 26vw 48%, 14vw 41%, 1vw 44%, 6vw 18%);
+}
+
+.shard-detail {
+  left: 56vw;
+  width: 44vw;
+  padding: max(51dvh, 316px) 2.4vw 3vh 9.2vw;
+  background:
+    radial-gradient(ellipse 70% 60% at 80% 85%, rgba(201, 162, 74, 0.10), rgba(201, 162, 74, 0) 70%),
+    var(--lacquer-2);
+  clip-path: polygon(1vw 44%, 14vw 41%, 26vw 48%, 44vw 43%, 44vw 100%, 6vw 100%, 5vw 68%);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-3) transparent;
+}
+
+/* ---- Gold seams (inline SVG overlay) ---- */
+.seams {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+  pointer-events: none;
+  overflow: visible;
+  filter: drop-shadow(0 0 5px rgba(242, 208, 122, 0.55));
+}
+
+.seams path { fill: none; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
+.seam-halo { stroke: rgba(242, 208, 122, 0.35); stroke-width: 9; }
+.seam-core { stroke: url(#kn-gold); stroke-width: 3.2; }
+.seam-hair { stroke: url(#kn-gold); stroke-width: 1.2; opacity: 0.8; }
+
+.seam-h { display: none; }
+
+/* ---- Brand ---- */
+.brand {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 14px;
+  align-items: center;
+  margin-bottom: 2.2vh;
+}
+
+.brand-seal {
+  grid-row: 1 / span 2;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  background: var(--cinnabar);
+  color: var(--ash);
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1;
+  border-radius: 3px;
+  transform: rotate(-3deg);
+  box-shadow: inset 0 0 0 1.5px rgba(233, 228, 218, 0.35);
+}
+
+.brand-title {
+  margin: 0;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: clamp(20px, 1.9vw, 27px);
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+}
+
+.brand-sub {
+  margin: 2px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ash-ink-soft);
+}
+
+/* ---- Workshop list ---- */
+.workshops {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+}
+
+.workshop {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: start;
+  padding: 8px 10px 8px 8px;
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(35, 30, 26, 0.16);
+  border-radius: 2px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.workshop:hover { background: rgba(255, 255, 255, 0.7); }
+
+.ws-no {
+  grid-row: 1 / span 2;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(35, 30, 26, 0.4);
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--ash-ink);
+  transition: color 0.25s ease, border-color 0.25s ease;
+}
+
+.ws-name {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.ws-place {
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--ash-ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.workshop.active {
+  background: #FBF8F1;
+  border-color: var(--gold-3);
+  box-shadow: inset 0 0 0 1px var(--gold-1), 0 0 0 1px rgba(201, 162, 74, 0.35), 0 6px 14px -8px rgba(176, 132, 51, 0.7);
+}
+
+.workshop.active .ws-no { color: var(--cinnabar); border-color: var(--cinnabar); }
+
+/* ---- Detail ---- */
+.detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 168px);
+  column-gap: 16px;
+  row-gap: 10px;
+  transition: opacity 0.3s ease;
+}
+
+.detail.fading { opacity: 0; }
+
+.detail-head { grid-column: 1 / -1; min-width: 0; }
+
+.detail-no {
+  margin: 0 0 6px;
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold-1);
+}
+
+.detail-name {
+  margin: 0;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: clamp(22px, 2vw, 30px);
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+}
+
+.detail-han {
+  font-family: var(--font-head);
+  font-weight: 400;
+  font-size: 0.55em;
+  letter-spacing: 0.12em;
+  color: var(--celadon);
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.detail-place {
+  margin: 5px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.detail-col { min-width: 0; }
+
+.detail-notes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ash);
+}
+
+.detail-notes li {
+  position: relative;
+  padding-left: 16px;
+  margin-bottom: 5px;
+}
+
+.detail-notes li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 8px;
+  height: 1.5px;
+  background: var(--gold-grad);
+  transform: rotate(-24deg);
+}
+
+.detail-temp { margin-top: 12px; }
+
+.temp-label {
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.temp-val {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 26px;
+  line-height: 1.1;
+  background: var(--gold-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.temp-bar {
+  height: 3px;
+  margin-top: 6px;
+  background: rgba(233, 228, 218, 0.14);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.temp-fill {
+  height: 100%;
+  width: 0;
+  background: var(--gold-grad);
+  transition: width 0.9s ease;
+}
+
+.bowl {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 150px;
+  align-self: center;
+}
+
+.bowl-body { fill: var(--glaze, #E9E4DA); transition: fill 0.6s ease; }
+.bowl-shade { fill: rgba(20, 17, 15, 0.18); }
+.bowl-rim { fill: none; stroke: rgba(255, 255, 255, 0.35); stroke-width: 1.2; }
+.bowl-foot { fill: #3a312b; }
+
+.crack {
+  fill: none;
+  stroke: url(#kn-gold-v);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  filter: drop-shadow(0 0 2px rgba(242, 208, 122, 0.8));
+}
+
+.crack.drawn {
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1s ease;
+}
+
+.crack.off { display: none; }
+
+/* ---- Map marker inner child (never style the Marker root) ---- */
+.kn-dot {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2.5px solid transparent;
+  background:
+    linear-gradient(var(--lacquer), var(--lacquer)) padding-box,
+    var(--gold-grad) border-box;
+  color: var(--gold-2);
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 0 0 1.5px rgba(20, 17, 15, 0.75), 0 0 10px rgba(242, 208, 122, 0.6);
+  transition: transform 0.25s ease, color 0.25s ease, background 0.25s ease;
+}
+
+.kn-dot:hover { transform: scale(1.12); }
+
+.kn-dot.active {
+  transform: scale(1.3);
+  background:
+    linear-gradient(var(--cinnabar), var(--cinnabar)) padding-box,
+    var(--gold-grad) border-box;
+  color: var(--ash);
+}
+
+/* ---- Status ---- */
+.status-note {
+  position: absolute;
+  left: 16px;
+  top: 14px;
+  z-index: 3;
+  margin: 0;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: rgba(20, 17, 15, 0.78);
+  color: var(--ash);
+  border: 1px solid var(--gold-3);
+  pointer-events: none;
+}
+
+.status-note.error { color: var(--error); }
+
+.status-note.loading::after {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-left: 7px;
+  border-radius: 50%;
+  background: var(--gold-2);
+  animation: kn-glint 1.2s ease-in-out infinite;
+}
+
+@keyframes kn-glint {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+
+.hidden { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .detail, .workshop, .kn-dot, .temp-fill, .bowl-body { transition: none; }
+  .crack.drawn { transition: none; }
+  .status-note.loading::after { animation: none; }
+}
+
+/* ---- Phone: stacked shards, jagged horizontal gold dividers ---- */
+@media (max-width: 720px) {
+  .kiln {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .seams { display: none; }
+
+  .shard {
+    position: relative;
+    left: auto;
+    top: auto;
+    width: auto;
+    height: auto;
+    clip-path: none;
+  }
+
+  .shard-map { height: 58dvh; min-height: 340px; }
+
+  .shard-list { padding: 22px 16px 26px; }
+
+  .shard-detail {
+    padding: 26px 16px 34px;
+    overflow: visible;
+  }
+
+  .brand { margin-bottom: 16px; }
+  .brand-title { font-size: 22px; }
+
+  .workshops { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+
+  .detail { grid-template-columns: minmax(0, 1fr); }
+  .bowl { max-width: 240px; margin: 4px auto 0; max-height: none; }
+  .detail-name { font-size: 24px; }
+
+  .seam-h {
+    display: block;
+    position: relative;
+    height: 22px;
+    background: var(--lacquer);
+    z-index: 4;
+  }
+
+  .seam-h::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 4px;
+    height: 14px;
+    background: var(--gold-grad);
+    filter: drop-shadow(0 0 4px rgba(242, 208, 122, 0.6));
+    clip-path: polygon(
+      0 30%, 7% 0, 14% 55%, 23% 8%, 31% 70%, 40% 15%, 49% 60%, 58% 5%, 67% 65%, 76% 12%, 85% 58%, 93% 6%, 100% 40%,
+      100% 80%, 93% 100%, 85% 50%, 76% 95%, 67% 45%, 58% 100%, 49% 42%, 40% 98%, 31% 48%, 23% 100%, 14% 38%, 7% 92%, 0 70%
+    );
+  }
+}

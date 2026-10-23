@@ -1,0 +1,313 @@
+<!--
+  Working EXAMPLE of the Cross Stitch style pack (cross-stitch.css, in this
+  same folder). Open this file directly to see the pattern working with a
+  six-shop yarn walk through Edinburgh (Stockbridge, Castlehill, Lawnmarket,
+  Victoria Street, Grassmarket, Anchor Close) on Mapbox Standard (faded
+  theme, day preset). The page is a framed sampler: a Jacquard 24 title over
+  an X-stitched alphabet strip, the map inside a border of X stitches, six
+  shop patches with pixel motifs, and a wooden hoop that holds the motif of
+  the selected shop. The walking route is a running stitch (dashed line);
+  "Stitch the route" re-sews it progressively. Click a patch or a pin to fly
+  there (reduced motion: instant jump, no sewing animation). Esc shows the
+  whole trail. Copy the markup below into your own demo and link
+  cross-stitch.css from its <head> -- see the class/id contract documented
+  at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (needlework sampler: Aida cloth hole grid, floss
+  colours, X-stitched motifs, wooden hoop) at the user's request for
+  something distinct from every other pack in this folder. The streets are
+  real; the shop names, blurbs and the trail are fictional placeholders.
+  The walking route is a simplified Mapbox Directions (walking) geometry,
+  embedded as coordinates.
+
+  What's NOT included: live routing, search/geocoding, popups, or a
+  hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Edinburgh Yarn Trail</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Jacquard+24&family=Livvic:wght@400;600;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="cross-stitch.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map (inside .map-well). */
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+</head>
+<body>
+<main class="sampler">
+  <header class="sampler-head">
+    <h1 class="title">Edinburgh Yarn Trail</h1>
+    <p class="tagline">Six little shops, one running stitch</p>
+    <svg class="alphabet-strip" id="alphabet" role="img" aria-label="Cross-stitched lettering: YARN TRAIL"></svg>
+  </header>
+
+  <section class="map-frame" aria-label="Map of the yarn trail">
+    <div class="map-well"><div id="map"></div></div>
+  </section>
+
+  <aside class="side-panel">
+    <div class="controls">
+      <button class="btn btn-primary" id="stitch-btn" type="button">Stitch the route</button>
+      <button class="btn btn-secondary" id="all-btn" type="button">Whole trail</button>
+      <p class="status-note loading" id="status-note">Threading the needle</p>
+    </div>
+    <ol class="patches" id="patches" aria-label="Shops"></ol>
+  </aside>
+
+  <section class="hoop-card" aria-live="polite">
+    <div class="hoop"><div class="hoop-cloth" id="hoop-cloth"></div></div>
+    <div>
+      <div class="hoop-name" id="hoop-name"></div>
+      <div class="hoop-floss" id="hoop-floss"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+// Embroidery floss palette; each motif cell uses one of these keys.
+const FLOSS = { r: '#C0392B', n: '#2C3E70', g: '#7FA36B', m: '#D9A441', p: '#E58FA0', w: '#C79A5B', b: '#8FA8C8' };
+
+// Pixel motifs: one char per stitch, '.' = no stitch.
+const MOTIFS = {
+  thistle: ['...p.p.p...', '..ppppppp..', '..ppppppp..', '...ggggg...', '....ggg....', '.g..ggg..g.', '.gg.ggg.gg.', '..ggggggg..', '....ggg....', '....ggg....', '....ggg....'],
+  castle: ['....r......', '....wrr....', '....w......', 'n.n.n.n.n.n', 'nnnnnnnnnnn', 'nnmnnnnnmnn', 'nnnnnnnnnnn', 'nnnnrrrnnnn', 'nnnnrrrnnnn', 'nnnnrrrnnnn'],
+  teacup: ['...p...p...', '....p...p..', '...........', '.mmmmmmm...', '.mrrrrrmmm.', '.mrrrrrm.m.', '.mrrrrrm.m.', '.mrrrrrmmm.', '..mrrrrm...', '...mmmm....', '.wwwwwwwww.'],
+  needle: ['.........nn', '........n.n', '.......n..g', '......n..g.', '.....n..gg.', '....n..g...', '...n..g....', '..n..gg....', '.n..g......', 'n..gg......', '...g.......'],
+  sheep: ['...bb.bb...', '..bbbbbbb..', '.bbbbbbbbnn', '.bbbbbbbnnn', '.bbbbbbbbnn', '..bbbbbbb..', '...n...n...', '...n...n...'],
+  heart: ['.rrr...rrr.', 'rpprr.rrrrr', 'rrrrrrrrrrr', 'rrrrrrrrrrr', '.rrrrrrrrr.', '..rrrrrrr..', '...rrrrr...', '....rrr....', '.....r.....'],
+};
+
+// 5x7 letters for the alphabet strip.
+const GLYPHS = {
+  Y: ['#...#', '#...#', '.#.#.', '..#..', '..#..', '..#..', '..#..'],
+  A: ['.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+  R: ['####.', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#'],
+  N: ['#...#', '##..#', '##..#', '#.#.#', '#..##', '#..##', '#...#'],
+  T: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..'],
+  I: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '#####'],
+  L: ['#....', '#....', '#....', '#....', '#....', '#....', '#####'],
+  ' ': ['..', '..', '..', '..', '..', '..', '..'],
+};
+
+// Shops: real streets, fictional names. coord = [lng, lat] on the route.
+const SHOPS = [
+  { name: 'Thistle & Thread', meta: 'Haugh Street, Stockbridge', coord: [-3.20945, 55.95844], motif: 'thistle', floss: 'Heather rose', col: FLOSS.p, ink: '#2C3E70' },
+  { name: 'Esplanade Stitchery', meta: 'Castle Esplanade', coord: [-3.1999, 55.94867], motif: 'castle', floss: 'Midnight navy', col: FLOSS.n, ink: '#FFF8EC' },
+  { name: 'Lawnmarket Tea & Tapestry', meta: 'Lawnmarket, Royal Mile', coord: [-3.19372, 55.94936], motif: 'teacup', floss: 'Barley gold', nudge: [-17, -13], col: FLOSS.m, ink: '#2C3E70' },
+  { name: 'The Gilded Bodkin', meta: 'Victoria Street', coord: [-3.19404, 55.94893], motif: 'needle', floss: 'Sage green', nudge: [17, 13], col: FLOSS.g, ink: '#FFF8EC' },
+  { name: 'Grassmarket Fleece', meta: 'Grassmarket', coord: [-3.19653, 55.94732], motif: 'sheep', floss: 'Loch blue', col: FLOSS.b, ink: '#2C3E70' },
+  { name: 'Anchor Close Hearts', meta: 'Anchor Close, Royal Mile', coord: [-3.18945, 55.95035], motif: 'heart', floss: 'Poppy red', col: FLOSS.r, ink: '#FFF8EC' },
+];
+
+// Simplified walking route through all six shops (Mapbox Directions, walking).
+const ROUTE = [[-3.20945,55.95844],[-3.20954,55.95842],[-3.209,55.95803],[-3.20751,55.95741],[-3.20508,55.95699],[-3.20388,55.95699],[-3.20257,55.95682],[-3.20121,55.95431],[-3.20104,55.95434],[-3.20035,55.95315],[-3.20016,55.95314],[-3.20004,55.95293],[-3.20015,55.95287],[-3.19941,55.95165],[-3.19851,55.9518],[-3.19846,55.9517],[-3.19831,55.95173],[-3.19825,55.95162],[-3.1973,55.95179],[-3.19678,55.95173],[-3.19592,55.95026],[-3.19569,55.95019],[-3.1951,55.95019],[-3.19478,55.95009],[-3.19483,55.94997],[-3.19581,55.94977],[-3.19606,55.94964],[-3.19608,55.9495],[-3.19575,55.94887],[-3.1988,55.94854],[-3.19906,55.94867],[-3.19951,55.94876],[-3.2,55.94898],[-3.19975,55.94875],[-3.19982,55.94872],[-3.19963,55.94862],[-3.1999,55.94866],[-3.19963,55.94862],[-3.19982,55.94872],[-3.19975,55.94875],[-3.2,55.94898],[-3.19951,55.94876],[-3.19906,55.94867],[-3.1988,55.94854],[-3.19542,55.9489],[-3.19443,55.94905],[-3.19371,55.94926],[-3.19377,55.94935],[-3.19372,55.94936],[-3.19377,55.94935],[-3.1939,55.94955],[-3.19373,55.94958],[-3.19359,55.94955],[-3.19337,55.94928],[-3.19311,55.94881],[-3.19382,55.94873],[-3.19386,55.94881],[-3.19405,55.94893],[-3.19386,55.94881],[-3.19382,55.94873],[-3.1933,55.94881],[-3.19261,55.94873],[-3.1923,55.94879],[-3.19113,55.94686],[-3.19131,55.94685],[-3.19187,55.94732],[-3.19338,55.94784],[-3.19422,55.94782],[-3.19646,55.94724],[-3.19653,55.94732],[-3.19646,55.94724],[-3.19422,55.94782],[-3.19338,55.94784],[-3.19187,55.94732],[-3.19131,55.94685],[-3.19113,55.94686],[-3.19268,55.94943],[-3.19098,55.94973],[-3.18928,55.94994],[-3.18945,55.95035]];
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const phone = () => window.matchMedia('(max-width: 760px)').matches;
+
+/* ---- X-stitch SVG builder: two diagonal strokes per cell, plus a soft thread shadow ---- */
+function stitchSVG(rows, attrs) {
+  const w = Math.max(...rows.map((r) => r.length)), h = rows.length;
+  const byCol = {};
+  rows.forEach((row, y) => [...row].forEach((c, x) => {
+    if (c === '.' || c === ' ') return;
+    (byCol[c] = byCol[c] || []).push(`M${x + 0.16} ${y + 0.16}l0.68 0.68M${x + 0.84} ${y + 0.16}l-0.68 0.68`);
+  }));
+  const colored = Object.entries(byCol).map(([c, d]) => `<path stroke="${FLOSS[c]}" d="${d.join('')}"/>`).join('');
+  const shadow = Object.values(byCol).map((d) => `<path d="${d.join('')}"/>`).join('');
+  return `<svg ${attrs} viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" fill="none" stroke-linecap="round" stroke-width="0.27" aria-hidden="true">` +
+    `<g stroke="rgba(60,40,20,0.22)" transform="translate(0.07 0.09)">${shadow}</g>${colored}</svg>`;
+}
+
+/* ---- Alphabet strip: "YARN TRAIL" in rotating floss colours ---- */
+(function buildAlphabet() {
+  const cycle = ['r', 'n', 'g', 'm', 'p'];
+  const rows = Array(7).fill('');
+  [...'YARN TRAIL'].forEach((ch, i) => {
+    const col = cycle[i % cycle.length];
+    GLYPHS[ch].forEach((r, y) => { rows[y] += r.replace(/#/g, col) + '.'; });
+  });
+  const cell = 5, w = rows[0].length;
+  const strip = $('alphabet');
+  const tmp = document.createElement('div');
+  tmp.innerHTML = stitchSVG(rows, `width="${w * cell}" height="${7 * cell}"`);
+  const svg = tmp.firstElementChild;
+  strip.setAttribute('viewBox', svg.getAttribute('viewBox'));
+  strip.setAttribute('width', w * cell);
+  strip.setAttribute('height', 7 * cell);
+  strip.setAttribute('fill', 'none');
+  strip.setAttribute('stroke-linecap', 'round');
+  strip.setAttribute('stroke-width', '0.27');
+  strip.innerHTML = svg.innerHTML;
+})();
+
+/* ---- Map ---- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: {
+    basemap: {
+      lightPreset: 'day',
+      theme: 'faded',
+      showPointOfInterestLabels: false,
+    },
+  },
+  center: [-3.199, 55.953],
+  zoom: 14,
+  attributionControl: true,
+});
+
+const bounds = ROUTE.reduce((b, c) => b.extend(c), new mapboxgl.LngLatBounds(ROUTE[0], ROUTE[0]));
+const fitPad = () => (phone() ? { top: 30, bottom: 64, left: 30, right: 30 } : { top: 40, bottom: 72, left: 40, right: 40 });
+let overview = true;
+
+function showOverview(instant) {
+  overview = true;
+  const o = { padding: fitPad(), bearing: 0, pitch: 0 };
+  if (instant || reduce) map.fitBounds(bounds, { ...o, duration: 0 });
+  else map.fitBounds(bounds, { ...o, duration: 1800 });
+}
+
+/* ---- Patches, pins, hoop ---- */
+const patchEls = [], pinEls = [], markers = [];
+let current = 0;
+
+SHOPS.forEach((s, i) => {
+  const li = document.createElement('li');
+  li.innerHTML = `<button class="patch" type="button" style="--chip:${s.col}">
+    <span class="patch-motif">${stitchSVG(MOTIFS[s.motif], '')}</span>
+    <span class="patch-name">${s.name}</span>
+    <span class="patch-meta">${s.meta}</span>
+    <span class="floss-chip">${s.floss}</span></button>`;
+  const btn = li.firstElementChild;
+  btn.addEventListener('click', () => select(i, true));
+  $('patches').appendChild(li);
+  patchEls.push(btn);
+
+  // Marker root is left alone; only the inner button is styled.
+  const root = document.createElement('div');
+  root.innerHTML = `<button class="stitch-pin" type="button" aria-label="${s.name}" style="--pin:${s.col};color:${s.ink}">${i + 1}</button>`;
+  const pin = root.firstElementChild;
+  pin.addEventListener('click', () => select(i, true));
+  pinEls.push(pin);
+  markers.push(new mapboxgl.Marker({ element: root }).setLngLat(s.coord).addTo(map));
+});
+
+// Pins 3 and 4 are ~50 m apart: fan them out at overview zoom, centre them when zoomed in.
+function fanPins() {
+  const wide = map.getZoom() < 16;
+  markers.forEach((m, k) => m.setOffset(wide && SHOPS[k].nudge ? SHOPS[k].nudge : [0, 0]));
+}
+map.on('zoom', fanPins);
+fanPins();
+
+function select(i, fly) {
+  current = i;
+  const s = SHOPS[i];
+  patchEls.forEach((b, k) => { b.classList.toggle('active', k === i); k === i ? b.setAttribute('aria-current', 'true') : b.removeAttribute('aria-current'); });
+  pinEls.forEach((p, k) => p.classList.toggle('active', k === i));
+  $('hoop-cloth').innerHTML = stitchSVG(MOTIFS[s.motif], 'class="hoop-motif"');
+  $('hoop-name').textContent = s.name;
+  $('hoop-floss').textContent = 'Floss: ' + s.floss;
+  if (!fly) return;
+  overview = false;
+  const o = { center: s.coord, zoom: 16.2, bearing: 0, pitch: 0, padding: { top: 30, bottom: 64, left: 30, right: 30 } };
+  if (reduce) map.jumpTo(o); else map.flyTo({ ...o, duration: 1800, essential: false });
+}
+
+/* ---- Running stitch: route drawn as a dashed line, sewn progressively ---- */
+const cum = [0];
+for (let i = 1; i < ROUTE.length; i++) {
+  const dx = (ROUTE[i][0] - ROUTE[i - 1][0]) * Math.cos(ROUTE[i][1] * Math.PI / 180), dy = ROUTE[i][1] - ROUTE[i - 1][1];
+  cum.push(cum[i - 1] + Math.hypot(dx, dy));
+}
+const TOTAL = cum[cum.length - 1];
+
+function partial(frac) {
+  const target = TOTAL * frac;
+  const out = [ROUTE[0]];
+  for (let i = 1; i < ROUTE.length; i++) {
+    if (cum[i] <= target) { out.push(ROUTE[i]); continue; }
+    const t = (target - cum[i - 1]) / (cum[i] - cum[i - 1]);
+    out.push([ROUTE[i - 1][0] + (ROUTE[i][0] - ROUTE[i - 1][0]) * t, ROUTE[i - 1][1] + (ROUTE[i][1] - ROUTE[i - 1][1]) * t]);
+    break;
+  }
+  return { type: 'Feature', geometry: { type: 'LineString', coordinates: out.length > 1 ? out : [ROUTE[0], ROUTE[0]] } };
+}
+
+let raf = 0;
+function stitchRoute() {
+  const src = map.getSource('stitched');
+  if (!src) return;
+  cancelAnimationFrame(raf);
+  if (reduce) { src.setData(partial(1)); return; }
+  $('stitch-btn').disabled = true;
+  const DURATION = 6500;
+  let t0 = 0;
+  const step = (now) => {
+    if (!t0) t0 = now;
+    const f = Math.min(1, (now - t0) / DURATION);
+    src.setData(partial(f));
+    if (f < 1) raf = requestAnimationFrame(step); else $('stitch-btn').disabled = false;
+  };
+  raf = requestAnimationFrame(step);
+}
+
+$('stitch-btn').addEventListener('click', () => { showOverview(); stitchRoute(); });
+$('all-btn').addEventListener('click', () => showOverview());
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') showOverview(); });
+
+/* ---- Map lifecycle ---- */
+map.on('style.load', () => {
+  $('status-note').classList.add('hidden');
+  const line = { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE } };
+  map.addSource('route', { type: 'geojson', data: line });
+  map.addSource('stitched', { type: 'geojson', data: line });
+  // Pencilled guide: the full route as a faint dotted line.
+  map.addLayer({ id: 'route-guide', type: 'line', source: 'route', slot: 'top',
+    layout: { 'line-cap': 'round' },
+    paint: { 'line-color': '#2C3E70', 'line-width': 2, 'line-opacity': 0.4, 'line-dasharray': [0.5, 2.5], 'line-emissive-strength': 1 } });
+  // Thread shadow, then the red running stitch on top.
+  map.addLayer({ id: 'route-shadow', type: 'line', source: 'stitched', slot: 'top',
+    layout: { 'line-cap': 'butt', 'line-join': 'round' },
+    paint: { 'line-color': '#3C2814', 'line-opacity': 0.28, 'line-width': 4.5, 'line-translate': [1.5, 2], 'line-dasharray': [2, 1.2], 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'route-stitch', type: 'line', source: 'stitched', slot: 'top',
+    layout: { 'line-cap': 'butt', 'line-join': 'round' },
+    paint: { 'line-color': '#C0392B', 'line-width': 4.5, 'line-dasharray': [2, 1.2], 'line-emissive-strength': 1 } });
+});
+
+map.on('error', (e) => {
+  const n = $('status-note');
+  n.classList.remove('hidden', 'loading');
+  n.classList.add('error');
+  n.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+// The grid settles after load: keep the canvas in step with its box.
+let lastW = 0, lastH = 0;
+new ResizeObserver(() => {
+  const el = $('map');
+  if (el.clientWidth === lastW && el.clientHeight === lastH) return;
+  lastW = el.clientWidth; lastH = el.clientHeight;
+  map.resize();
+  if (overview) map.fitBounds(bounds, { padding: fitPad(), bearing: 0, pitch: 0, duration: 0 });
+}).observe($('map'));
+
+select(0, false);
+showOverview(true);
+</script>
+</body>
+</html>

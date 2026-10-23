@@ -1,0 +1,589 @@
+/*
+  Metal Tour -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a black-metal / heavy-metal tour poster
+  -- pitch black, bone white, blood red, a scratchy spiky logo, xeroxed grit
+  and "SOLD OUT" stamps -- deliberately distinct from every other pack in
+  this folder: Academic Paper, Aero Gadgets, Amber Terminal, Annual Report,
+  Arena, Art Nouveau, Atomic Motel, Audio Guide, Aurora Command, Blueprint,
+  Board Game, Bottom Sheet, Broadcast, Brutalist Guide, Case Board,
+  Celestial Tarot, Chalkboard, Chat Concierge, Chronicle, Clinic Finder,
+  Code Editor, Comic Panel, Constructivist, Data Notebook, Deco Voyage,
+  Dive Log, Drop Culture, E-Ink, Editorial Paper, Estate Luxe, Event
+  Invite, Field Journal, Film Noir, Fleet Ops, Frontier Poster, Grand Hotel,
+  Herbarium, Highway Sign, Illuminated, Isotype, Line Diagram, Memphis,
+  Moving Map, Museum Label, Neon HUD, Nordic Cabin, Orienteering, Papel
+  Picado, Papercraft, Pastel Bento, Pixel Quest, Postcards, Rally Dash,
+  Raw Web, Regatta, Retro OS, Riso Zine, Ski Piste, Slate Console, Soft UI,
+  Split Flap, Stage Profile, Stained Glass, Sticker Book, Storefront, Story
+  Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt, Tiki Lagoon, Trailhead,
+  Treasure Hunt, Trip Kanban, Truck Art, Ukiyo-e Coast, Vapor Sunset,
+  Vintage Chart, Vinyl Crate, Washi Seasons, Watercolor, Weather Console,
+  Whiteboard, Zellige; and also distinct from the sibling packs built in the
+  same batch: Kintsugi, Cyanotype, Crossword, Periodic Table, Cross Stitch,
+  Card Catalog, Seed Packet, Trading Card, Science Fair, Modular Synth,
+  Recipe Card, LCD Watch, Clay Toy, Solarpunk, De Stijl, Block Print,
+  Copacabana, Amphora, Dancheong, Spreadsheet, Pinball, Crayon, Darkroom,
+  Mission Patch).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/metal-tour.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Metal Mania for the logo and
+  headings, Saira Extra Condensed for body copy and dates):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Metal+Mania&family=Saira+Extra+Condensed:wght@400;600;800&display=swap" rel="stylesheet" />
+
+  Signature touch: a xeroxed-grit overlay (tiled feTurbulence speckle plus
+  faint diagonal scratches, as stacked background images) on the poster
+  panel ONLY -- never over the map -- and a red rubber "SOLD OUT" stamp
+  slashed across struck-through tour rows.
+
+  Class/id contract (see metal-tour-template.html in this same folder for a
+  full working example):
+
+  - .tour                     page shell: desktop = 380px poster column +
+                               full-height map; phone = stacked, scrolling
+  - .poster                   left poster column (desktop; scrolls inside)
+    .logo-block                 black header: ornament + logo + tour name
+    .logo-orn                   hand-drawn spiky SVG ornament (give it an
+                                 explicit height)
+    .logo                       the band logo, Metal Mania, bone with red
+                                 shadow
+    .tour-name / .tour-meta     tour title (red slash bar) / small caps line
+    .list-block                 the date list + controls (own grit)
+  - .map-wrap                 map frame; #map (demo-owned) fills it
+  - .section-label            red-slashed caps sub-header with a rule
+  - .tour-list                <ol> of .date-row buttons
+    .date-row (+.active, .sold-out)   date | city+venue | status
+    .date-row .d / .c / .v      date, city, venue
+    .stamp                      red rotated SOLD OUT stamp
+  - .btn, .btn-primary,       blunt slab buttons, bone outline; primary =
+    .btn-secondary              solid blood red
+  - .status-note (+.loading/  condensed caps status line
+    .success/.error)
+  - .mk                       inner element of a mapboxgl.Marker (never style
+                               the marker root): .mk .star (spiky SVG),
+                               .mk .pulse (ring), .mk.active
+  - .stub-popup               popup class: ticket stub with perforation --
+                               .stub-main (.stub-city, .stub-venue,
+                               .stub-row) and .stub-side (.stub-doors)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --black: #0A0A0A;
+  --black-2: #141414;
+  --bone: #E8E2D4;
+  --bone-dim: #B9B3A5;
+  --blood: #B3001B;
+  --blood-hot: #D4132D;
+  --steel: #6E6E73;
+  --frost: #8FB8D8;
+  --success: #8FB8D8;
+  --error: #D4132D;
+
+  --font-logo: 'Metal Mania', 'Impact', fantasy;
+  --font-body: 'Saira Extra Condensed', 'Arial Narrow', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--black);
+  color: var(--bone);
+  font-family: var(--font-body);
+  font-size: 17px;
+}
+
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--frost);
+  outline-offset: 2px;
+}
+
+/* ---------- Shell ---------- */
+.tour {
+  display: grid;
+  grid-template-columns: 380px minmax(0, 1fr);
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.poster {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-y: auto;
+  border-right: 3px solid var(--blood);
+  scrollbar-width: thin;
+  scrollbar-color: var(--blood) var(--black);
+}
+
+.map-wrap {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: #1a1a1c;
+}
+
+/* Xeroxed grit: speckle noise + faint scratches. Only on poster parts. */
+.poster,
+.logo-block,
+.list-block {
+  background-color: var(--black);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.91  0 0 0 0 0.89  0 0 0 0 0.83  0 0 0 9 -5.6'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E"),
+    repeating-linear-gradient(103deg, transparent 0 41px, rgba(232, 226, 212, 0.035) 41px 42px, transparent 42px 97px),
+    radial-gradient(ellipse at 20% 0%, rgba(179, 0, 27, 0.22), transparent 60%);
+}
+
+/* On desktop the grit lives on .poster only (children transparent) so it
+   does not tile twice. */
+@media (min-width: 761px) {
+  .logo-block, .list-block { background: none; }
+}
+
+/* ---------- Logo block ---------- */
+.logo-block {
+  padding: 22px 20px 16px;
+  text-align: center;
+  position: relative;
+}
+
+.logo-orn {
+  display: block;
+  width: 100%;
+  height: 72px;
+  margin: 0 auto 4px;
+}
+
+.logo {
+  margin: 0;
+  font-family: var(--font-logo);
+  font-weight: 400;
+  font-size: 50px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: var(--bone);
+  text-transform: uppercase;
+  text-shadow: 3px 3px 0 var(--blood), -1px 0 0 var(--black);
+  word-break: keep-all;
+}
+
+.tour-name {
+  display: inline-block;
+  margin: 14px 0 0;
+  padding: 3px 14px 2px;
+  background: var(--blood);
+  color: var(--bone);
+  font-family: var(--font-logo);
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transform: rotate(-1.5deg);
+  clip-path: polygon(0 12%, 4% 0, 100% 6%, 97% 100%, 3% 92%);
+}
+
+.tour-meta {
+  margin: 10px 0 0;
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--bone);
+  text-shadow: 0 0 4px var(--black), 0 0 8px var(--black), 1px 1px 0 var(--black);
+}
+
+/* ---------- List block ---------- */
+.list-block {
+  padding: 8px 20px 26px;
+}
+
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 8px;
+  font-family: var(--font-logo);
+  font-size: 20px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #F0384D;
+  text-shadow: 0 0 4px var(--black), 1px 1px 0 var(--black);
+}
+
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  background: repeating-linear-gradient(90deg, var(--bone-dim) 0 6px, transparent 6px 10px);
+}
+
+.tour-list {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  border-top: 1px solid var(--steel);
+}
+
+.tour-list li { margin: 0; }
+
+.date-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 8px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--steel);
+  background: transparent;
+  color: var(--bone);
+  text-align: left;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+.date-row .d {
+  font-weight: 800;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--bone);
+}
+
+.date-row .c {
+  display: block;
+  font-weight: 800;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+}
+
+.date-row .v {
+  display: block;
+  margin-top: 3px;
+  font-weight: 400;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--bone);
+  opacity: 0.88;
+}
+
+.date-row:hover { background: rgba(179, 0, 27, 0.22); }
+
+.date-row.active {
+  background: var(--blood);
+  box-shadow: inset 5px 0 0 var(--bone);
+}
+
+.date-row.active .v { color: var(--bone); }
+
+/* Sold out: red slash through the city, rubber stamp on the right */
+.date-row.sold-out .c {
+  text-decoration: line-through;
+  text-decoration-color: var(--blood-hot);
+  text-decoration-thickness: 3px;
+  color: var(--bone-dim);
+}
+
+.date-row.sold-out.active .c { text-decoration-color: var(--bone); color: var(--bone); }
+
+.stamp {
+  display: inline-block;
+  padding: 1px 6px 0;
+  border: 2px solid var(--blood-hot);
+  color: var(--blood-hot);
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1.15;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  transform: rotate(-6deg);
+  background: rgba(10, 10, 10, 0.6);
+}
+
+.date-row.active .stamp {
+  border-color: var(--bone);
+  color: var(--bone);
+  background: transparent;
+}
+
+.date-row .go {
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  color: var(--frost);
+}
+
+.date-row.active .go { color: var(--bone); }
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-block;
+  padding: 10px 18px 9px;
+  border: 2px solid var(--bone);
+  background: transparent;
+  color: var(--bone);
+  font-family: var(--font-logo);
+  font-size: 20px;
+  line-height: 1.1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.btn:hover { background: var(--bone); color: var(--black); }
+
+.btn-primary { background: var(--blood); border-color: var(--blood); }
+.btn-primary:hover { background: var(--blood-hot); border-color: var(--blood-hot); color: var(--bone); }
+
+.btn-secondary { border-color: var(--steel); color: var(--bone-dim); }
+.btn-secondary:hover { background: var(--steel); border-color: var(--steel); color: var(--black); }
+
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-row { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* ---------- Status ---------- */
+.status-note {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 14px 0 0;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--steel);
+}
+
+.status-note .status-icon { flex: none; }
+
+.status-note.loading .status-icon {
+  display: inline-block;
+  animation: metal-spin 1s linear infinite;
+}
+
+@keyframes metal-spin { to { transform: rotate(360deg); } }
+
+.status-note.success { color: var(--frost); }
+.status-note.error { color: var(--error); }
+
+/* ---------- Map markers (style the inner child, never the root) ---------- */
+.mk {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+}
+
+.mk .star {
+  position: absolute;
+  inset: 0;
+  width: 30px;
+  height: 30px;
+  filter: drop-shadow(0 0 4px rgba(179, 0, 27, 0.9));
+  transition: transform 0.15s ease;
+}
+
+.mk:hover .star { transform: scale(1.18); }
+.mk.active .star { transform: scale(1.3); }
+
+.mk .pulse {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  border: 2px solid var(--bone);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mk.active .pulse {
+  animation: metal-pulse 1.1s ease-out 4;
+}
+
+@keyframes metal-pulse {
+  from { transform: scale(0.8); opacity: 0.95; }
+  to { transform: scale(3); opacity: 0; }
+}
+
+/* ---------- Ticket-stub popup ---------- */
+.mapboxgl-popup.stub-popup .mapboxgl-popup-content {
+  padding: 0;
+  border-radius: 0;
+  background: var(--bone);
+  color: var(--black);
+  font-family: var(--font-body);
+  box-shadow: 0 0 0 2px var(--black), 0 0 0 4px var(--blood), 0 10px 24px rgba(0, 0, 0, 0.6);
+}
+
+.stub-popup.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip { border-top-color: var(--bone); }
+.stub-popup.mapboxgl-popup-anchor-top .mapboxgl-popup-tip { border-bottom-color: var(--bone); }
+.stub-popup.mapboxgl-popup-anchor-left .mapboxgl-popup-tip { border-right-color: var(--bone); }
+.stub-popup.mapboxgl-popup-anchor-right .mapboxgl-popup-tip { border-left-color: var(--bone); }
+
+.stub-popup .mapboxgl-popup-close-button {
+  top: 2px;
+  right: 2px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 22px;
+  color: var(--black);
+  background: transparent;
+  border-radius: 0;
+}
+
+.stub-popup .mapboxgl-popup-close-button:hover { background: var(--blood); color: var(--bone); }
+
+.stub {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 78px;
+  min-width: 250px;
+  max-width: 290px;
+  position: relative;
+}
+
+.stub::before, .stub::after {
+  content: '';
+  position: absolute;
+  right: 66px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--black);
+}
+
+.stub::before { top: -8px; }
+.stub::after { bottom: -8px; }
+
+.stub-main { padding: 12px 10px 12px 14px; min-width: 0; }
+
+.stub-kicker {
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  color: var(--blood);
+  text-transform: uppercase;
+}
+
+.stub-city {
+  margin: 2px 0 0;
+  padding-right: 6px;
+  font-family: var(--font-logo);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.stub-venue {
+  margin: 4px 0 8px;
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stub-row {
+  display: flex;
+  gap: 6px;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-top: 1px solid var(--black);
+  padding-top: 5px;
+}
+
+.stub-row b { font-weight: 800; color: var(--blood); }
+
+.stub-sold {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 0 6px;
+  border: 2px solid var(--blood);
+  color: var(--blood);
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.14em;
+  transform: rotate(-4deg);
+}
+
+.stub-side {
+  border-left: 2px dashed var(--black);
+  padding: 26px 6px 10px;
+  text-align: center;
+  background: #dcd5c4;
+}
+
+.stub-doors small {
+  display: block;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+}
+
+.stub-doors strong {
+  display: block;
+  font-family: var(--font-logo);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.stub-admit {
+  margin-top: 8px;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--blood);
+}
+
+.hidden { display: none !important; }
+
+/* ---------- Phone: logo header, map ~50dvh, tour list below ---------- */
+@media (max-width: 760px) {
+  html, body { overflow-x: hidden; }
+
+  .tour {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    overflow: visible;
+  }
+
+  .poster {
+    display: contents;
+  }
+
+  .logo-block { order: 1; padding: 18px 16px 14px; border-bottom: 3px solid var(--blood); }
+  .logo { font-size: clamp(36px, 13vw, 56px); }
+  .logo-orn { height: 56px; }
+
+  .map-wrap { order: 2; height: 50vh; height: 50dvh; min-height: 300px; flex: none; }
+
+  .list-block { order: 3; padding: 8px 16px 30px; border-top: 3px solid var(--blood); }
+
+  .date-row { grid-template-columns: 56px minmax(0, 1fr) auto; }
+  .date-row .c, .date-row .d { font-size: 21px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk.active .pulse { animation: none; opacity: 0.8; transform: scale(1.8); }
+  .mk .star, .btn { transition: none; }
+  .status-note.loading .status-icon { animation: none; }
+}

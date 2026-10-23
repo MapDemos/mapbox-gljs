@@ -1,0 +1,734 @@
+/*
+  Modular Synth -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a Eurorack modular synthesizer -- a
+  two-row case of brushed-aluminium and black-anodised module faceplates in
+  different HP widths, screws, knurled knobs, 3.5 mm jacks, LEDs and
+  coloured patch cables draped between jacks), deliberately distinct from
+  every other pack in this folder: Academic Paper, Aero Gadgets, Amber
+  Terminal, Annual Report, Arena, Art Nouveau, Atomic Motel, Audio Guide,
+  Aurora Command, Blueprint, Board Game, Bottom Sheet, Broadcast, Brutalist
+  Guide, Case Board, Celestial Tarot, Chalkboard, Chat Concierge, Chronicle,
+  Clinic Finder, Code Editor, Comic Panel, Constructivist, Data Notebook,
+  Deco Voyage, Dive Log, Drop Culture, E-Ink, Editorial Paper, Estate Luxe,
+  Event Invite, Field Journal, Film Noir, Fleet Ops, Frontier Poster, Grand
+  Hotel, Herbarium, Highway Sign, Illuminated, Isotype, Line Diagram,
+  Memphis, Moving Map, Museum Label, Neon HUD, Nordic Cabin, Orienteering,
+  Papel Picado, Papercraft, Pastel Bento, Pixel Quest, Postcards, Raw Web,
+  Regatta, Retro OS, Riso Zine, Ski Piste, Slate Console, Soft UI, Split
+  Flap, Stage Profile, Stained Glass, Sticker Book, Storefront, Story
+  Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt, Tiki Lagoon, Trailhead,
+  Treasure Hunt, Trip Kanban, Truck Art, Ukiyo-e Coast, Vapor Sunset,
+  Vintage Chart, Vinyl Crate, Washi Seasons, Watercolor, Weather Console,
+  Whiteboard and Zellige; and also distinct from the 24 sibling packs being
+  built in parallel right now: Kintsugi, Cyanotype, Crossword, Metal Tour,
+  Periodic Table, Cross Stitch, Card Catalog, Seed Packet, Trading Card,
+  Science Fair, Recipe Card, LCD Watch, Clay Toy, Solarpunk, De Stijl, Block
+  Print, Copacabana, Amphora, Dancheong, Spreadsheet, Pinball, Crayon,
+  Darkroom and Mission Patch.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/modular-synth.css" rel="stylesheet" />
+  plus the Google Fonts it expects (Tomorrow for panel legends and module
+  names; Reddit Mono for values and small print):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Tomorrow:wght@400;500;600;700&family=Reddit+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  Signature touch: real rotary knobs (pointer drag up/down, arrow keys)
+  with knurled rims and printed tick scales, LED step buttons that chase
+  across a sequencer, and coloured patch cables (inline SVG, drawn by the
+  demo from jack to jack, pointer-events none) that light up with the
+  active step.
+
+  Layout: RACK. .case is a page-sized grid (100dvh, min 600px): a rail,
+  the top row (.scope with the map | .camera knobs | .light switch), a
+  rail, the bottom row (.seq 8-step sequencer), a rail. The map lives in
+  .scope-screen, an inset bezel INSIDE the scope faceplate, with the jack
+  row and LCD readout underneath it, so the Mapbox logo and attribution are
+  never covered and cables never reach the map. Phone (<= 900px): the
+  modules stack vertically (scope ~50dvh first, then camera with its knobs
+  in a row, the light switch as a horizontal 3-way, then the sequencer with
+  its steps in a 4 x 2 grid), the cables are hidden and the page scrolls.
+
+  Class/id contract (see modular-synth-template.html in this same folder
+  for a full working example):
+
+  - .case                     the rack, position:relative; 100dvh on desktop
+    .rail                       horizontal mounting rail with slots;
+                                 .rail-text is a label sitting on it
+    .row, .row-top, .row-bottom module rows (.row-top is the flexible one)
+  - .mod                      a faceplate with four corner screws;
+                               add .mod-alu (brushed aluminium, dark
+                               legends) or .mod-blk (black anodised, white
+                               legends)
+    .mod-head                   header strip: .mod-name (module name) and
+                                 .mod-hp (width label, e.g. "28HP")
+    .mod-foot                   bottom strip
+  - .scope                    the map module: .mod-head, .scope-screen
+                               (holds #map, defined by the demo), .mod-foot
+                               with .jack-row and .lcd readout
+  - .jack                     3.5 mm socket <span> with data-j="scope-0" /
+                               "seq-0" ...; .jack-label sits below it
+  - .lcd (+ .lcd-line)        green monospace readout
+  - .led                      indicator; colour via --c; add .on to light
+  - .camera                   knob module; .knob-unit > .knob-label +
+                               .dial + .knob-readout
+    .dial                       wraps svg.ticks (scale, demo-generated) and
+                                 .knob (role=slider, tabindex=0); .knob >
+                                 .knob-body (rotates via --a) > .knob-cap
+  - .light                    3-way switch module: .sw (role=radiogroup,
+                               --i = selected index 0..2) with .sw-slot,
+                               .sw-lever and button.sw-opt (role=radio,
+                               aria-checked) each holding .led + a label
+  - .seq                      sequencer module; .seq-left (.seq-top with
+                               title + jacks, .seq-ctl with .btn-run and a
+                               TEMPO .dial) and .steps with button.step
+                               (+.on current, +.trail previous); a step
+                               holds .led, .step-no, .step-name,
+                               .step-area, .step-time; --c = venue colour
+  - .btn, .btn-primary,       keycap buttons; .btn-run is the RUN/STOP key
+    .btn-secondary,             (aria-pressed, .is-running adds the LED)
+    .btn-run
+  - .cables                   absolutely positioned inline <svg> over the
+                               case, pointer-events none; each cable is a
+                               <g class="cable"> (+.on glow) containing
+                               paths and plug circles
+  - .status-note (+.loading/  small status line
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --rail: #2A2C30;
+  --rail-hi: #34363b;
+  --case: #17181b;
+  --alu-1: #C9CDD2;
+  --alu-2: #9EA3A9;
+  --black: #141518;
+  --black-hi: #1f2126;
+  --legend: #EDEFF2;
+  --legend-dim: #9aa0a8;
+  --ink: #1b1d21;
+  --ink-dim: #4a4f57;
+  --led-red: #FF3B30;
+  --led-green: #34C759;
+  --cable-yellow: #FFD60A;
+  --cable-cyan: #32D2F5;
+  --cable-magenta: #FF4FA3;
+  --cable-orange: #FF9F0A;
+  --success: #34C759;
+  --error: #FF3B30;
+
+  --font-display: 'Tomorrow', 'Eurostile', 'Arial Narrow', system-ui, sans-serif;
+  --font-mono: 'Reddit Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --brushed:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.16) 0 1px, rgba(0, 0, 0, 0.05) 1px 2px, transparent 2px 4px),
+    linear-gradient(180deg, #C9CDD2 0%, #B4B9BF 50%, #9EA3A9 100%);
+  --anodised:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #1b1c20, #141518 60%, #101114);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--case);
+  color: var(--legend);
+  font-family: var(--font-display);
+}
+
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--cable-cyan);
+  outline-offset: 2px;
+}
+
+/* ---------- Case + rails ---------- */
+.case {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  height: 100dvh;
+  min-height: 600px;
+  overflow: hidden;
+  background: var(--case);
+}
+
+.rail {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 22px;
+  padding: 0 14px;
+  background: linear-gradient(180deg, var(--rail-hi), var(--rail));
+  border-top: 1px solid #44474d;
+  border-bottom: 1px solid #0d0e10;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--legend-dim);
+}
+/* mounting slots running along the rail */
+.rail::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 7px;
+  height: 6px;
+  background: repeating-linear-gradient(90deg, transparent 0 40px, #08090a 40px 66px, transparent 66px 106px);
+  border-radius: 3px;
+  pointer-events: none;
+}
+.rail-text {
+  position: relative;
+  padding: 0 10px;
+  background: var(--rail);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.row {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px 12px;
+}
+.row-top { grid-template-columns: minmax(0, 1fr) 196px 138px; }
+.row-bottom { grid-template-columns: minmax(0, 1fr); }
+
+/* ---------- Faceplates ---------- */
+.mod {
+  --scr:
+    radial-gradient(circle at 35% 30%, #eceef1 0 16%, #9097a0 58%, #50545b 100%);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px;
+  border-radius: 3px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.mod-alu { background: var(--brushed); color: var(--ink); }
+.mod-blk { background: var(--anodised); color: var(--legend); box-shadow: 0 6px 14px rgba(0, 0, 0, 0.55), 0 0 0 1px #000, inset 0 1px 0 rgba(255, 255, 255, 0.1); }
+
+/* four slotted corner screws */
+.mod::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    linear-gradient(35deg, transparent 43%, rgba(0, 0, 0, 0.75) 43% 57%, transparent 57%) left 6px top 6px / 12px 12px no-repeat,
+    linear-gradient(120deg, transparent 43%, rgba(0, 0, 0, 0.75) 43% 57%, transparent 57%) right 6px top 6px / 12px 12px no-repeat,
+    linear-gradient(80deg, transparent 43%, rgba(0, 0, 0, 0.75) 43% 57%, transparent 57%) left 6px bottom 6px / 12px 12px no-repeat,
+    linear-gradient(160deg, transparent 43%, rgba(0, 0, 0, 0.75) 43% 57%, transparent 57%) right 6px bottom 6px / 12px 12px no-repeat,
+    var(--scr) left 6px top 6px / 12px 12px no-repeat,
+    var(--scr) right 6px top 6px / 12px 12px no-repeat,
+    var(--scr) left 6px bottom 6px / 12px 12px no-repeat,
+    var(--scr) right 6px bottom 6px / 12px 12px no-repeat;
+}
+
+.mod-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 16px;
+  min-width: 0;
+}
+.mod-name {
+  margin: 0;
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.1;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+}
+.mod-hp {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+.mod-foot { padding: 0 16px; min-width: 0; }
+
+.mod-blk .mod-name { text-shadow: 0 0 8px rgba(237, 239, 242, 0.25); }
+
+/* ---------- Scope (map) ---------- */
+.scope { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.scope-screen {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  margin: 0 6px;
+  border-radius: 4px;
+  background: #050607;
+  box-shadow: 0 0 0 3px #000, 0 0 0 4px #3a3d44, inset 0 0 0 1px #000, 0 0 26px rgba(52, 199, 89, 0.1);
+}
+
+.scope .mod-foot {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 0 16px 0 22px;
+}
+.jack-row { display: flex; gap: 18px; flex: none; }
+.jack-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+
+/* 3.5 mm socket: hex nut + dark bore */
+.jack {
+  position: relative;
+  display: block;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, #000 0 30%, #2a2c30 32% 46%, transparent 48%),
+    conic-gradient(from 30deg, #e9ebee, #9aa0a7, #e9ebee, #8a9098, #e9ebee, #9aa0a7, #e9ebee);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.6), 0 0 0 1px #000;
+  clip-path: none;
+}
+.jack-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.lcd {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding: 5px 9px;
+  border-radius: 3px;
+  background: #06120a;
+  box-shadow: inset 0 2px 5px #000, 0 0 0 1px #000, 0 0 0 2px #3a3d44;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--led-green);
+  text-shadow: 0 0 6px rgba(52, 199, 89, 0.7);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.lcd-line { overflow: hidden; text-overflow: ellipsis; }
+.lcd-line.dim { opacity: 0.6; font-size: 10px; }
+
+/* ---------- LEDs ---------- */
+.led {
+  --c: var(--led-red);
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c) 18%, #17181b);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.7);
+  transition: background 0.12s, box-shadow 0.12s;
+}
+.led.on {
+  background: radial-gradient(circle at 40% 35%, #fff 0 12%, var(--c) 45%);
+  box-shadow: 0 0 6px var(--c), 0 0 14px var(--c), 0 0 0 1px rgba(0, 0, 0, 0.7);
+}
+.led.half {
+  background: color-mix(in srgb, var(--c) 55%, #17181b);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--c) 60%, transparent), 0 0 0 1px rgba(0, 0, 0, 0.7);
+}
+
+/* ---------- Knobs ---------- */
+.camera .cam-knobs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+}
+.knob-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.knob-label {
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding-left: 0.22em;
+}
+.knob-readout {
+  min-width: 62px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  background: #0b0c0e;
+  box-shadow: inset 0 1px 3px #000, 0 0 0 1px rgba(0, 0, 0, 0.5);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: center;
+  color: var(--led-green);
+  text-shadow: 0 0 5px rgba(52, 199, 89, 0.6);
+}
+
+.dial {
+  --k: clamp(50px, 9.2dvh, 70px);
+  position: relative;
+  width: var(--k);
+  height: var(--k);
+  margin: 10px;
+}
+.dial .ticks {
+  position: absolute;
+  left: -11px;
+  top: -11px;
+  width: calc(var(--k) + 22px);
+  height: calc(var(--k) + 22px);
+  pointer-events: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+.knob {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  background: radial-gradient(circle at 50% 30%, #3b3e45, #141518 72%);
+  box-shadow: 0 5px 9px rgba(0, 0, 0, 0.6), 0 0 0 2px #0a0b0d, inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.knob:focus-visible { outline: 2px solid var(--cable-cyan); outline-offset: 5px; }
+.knob.dragging { box-shadow: 0 5px 9px rgba(0, 0, 0, 0.6), 0 0 0 2px #0a0b0d, 0 0 16px rgba(50, 210, 245, 0.55); }
+.knob-body {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  transform: rotate(var(--a, 0deg));
+  /* knurled rim */
+  background: repeating-conic-gradient(rgba(255, 255, 255, 0.16) 0 2.5deg, rgba(0, 0, 0, 0.3) 2.5deg 5deg);
+}
+.knob-cap {
+  position: absolute;
+  inset: 13%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 30%, #4a4d55, #1a1b1f 70%);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.3), 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+.knob-body::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 6%;
+  width: 3px;
+  height: 28%;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--legend);
+  box-shadow: 0 0 6px rgba(237, 239, 242, 0.8);
+}
+
+/* ---------- Light switch ---------- */
+.light .mod-name { letter-spacing: 0.2em; }
+.sw {
+  --i: 2;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: minmax(40px, 1fr);
+  max-height: 190px;
+  margin: 0 4px;
+}
+.sw-slot {
+  position: absolute;
+  left: 21px;
+  top: 14px;
+  bottom: 14px;
+  width: 10px;
+  border-radius: 5px;
+  background: #050506;
+  box-shadow: inset 0 1px 3px #000, 0 0 0 1px #3a3d44;
+}
+.sw-lever {
+  position: absolute;
+  left: 12px;
+  top: calc(var(--i) * (100% / 3) + (100% / 6) - 14px);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 30%, #f3f4f6, #9aa0a7 60%, #5b6068);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.7), 0 0 0 1px #000;
+  transition: top 0.18s cubic-bezier(0.3, 1.4, 0.5, 1);
+  pointer-events: none;
+}
+.sw-opt {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 4px 0 52px;
+  border: 0;
+  background: transparent;
+  color: var(--legend);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.sw-opt:hover { color: #fff; }
+.sw-opt[aria-checked="true"] { color: #fff; text-shadow: 0 0 8px rgba(237, 239, 242, 0.5); }
+.light .mod-foot {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  text-align: center;
+  padding: 0;
+}
+
+/* ---------- Sequencer ---------- */
+.seq {
+  display: grid;
+  grid-template-columns: 262px minmax(0, 1fr);
+  gap: 0 16px;
+  padding: 12px 12px 14px;
+}
+.seq-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  padding-left: 16px;
+}
+.seq-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.seq-top .mod-name { padding-top: 2px; }
+.seq-top .sub {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  font-weight: 400;
+  color: var(--ink-dim);
+}
+.seq .jack-row { gap: 10px; }
+.seq .jack-cell .jack-label { color: var(--ink); }
+
+.seq-ctl { display: flex; align-items: center; gap: 12px; }
+.seq-ctl .knob-unit { gap: 2px; }
+.seq-ctl .dial { --k: 46px; margin: 8px; }
+.seq-ctl .knob-readout { min-width: 58px; }
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+  padding: 2px 16px 2px 0;
+}
+
+.step {
+  --c: var(--led-green);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+  min-height: 132px;
+  padding: 9px 8px 8px;
+  border: 1px solid #3a3d44;
+  border-bottom-width: 4px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #26282d, #141518);
+  color: var(--legend);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition: transform 0.08s, border-color 0.12s, box-shadow 0.12s;
+}
+.step:hover { border-color: color-mix(in srgb, var(--c) 60%, #3a3d44); }
+.step:active { transform: translateY(2px); border-bottom-width: 2px; }
+.step.on {
+  border-color: var(--c);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--c) 55%, transparent), 0 3px 5px rgba(0, 0, 0, 0.4), inset 0 0 12px color-mix(in srgb, var(--c) 18%, transparent);
+}
+.step .led { width: 12px; height: 12px; margin-bottom: 2px; }
+.step-no {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--legend-dim);
+}
+.step-name {
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+.step-area {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--legend-dim);
+}
+.step-time {
+  margin-top: auto;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--c);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--c) 60%, transparent);
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border: 1px solid #3a3d44;
+  border-bottom-width: 4px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #26282d, #141518);
+  color: var(--legend);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.btn:active { transform: translateY(2px); border-bottom-width: 2px; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { border-color: var(--led-green); }
+.btn-secondary { border-color: #5b6068; }
+.btn-run { min-width: 108px; justify-content: flex-start; }
+.btn-run .led { --c: var(--led-red); }
+.btn-run.is-running .led { background: radial-gradient(circle at 40% 35%, #fff 0 12%, var(--led-green) 45%); box-shadow: 0 0 6px var(--led-green), 0 0 14px var(--led-green), 0 0 0 1px rgba(0, 0, 0, 0.7); }
+
+.status-note {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--legend-dim);
+}
+.status-note.loading::before { content: '\25CF\00a0'; animation: synth-blink 1s steps(2, end) infinite; }
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); }
+@keyframes synth-blink { 50% { opacity: 0.2; } }
+
+/* ---------- Patch cables ---------- */
+.cables {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 6;
+  pointer-events: none;
+  overflow: visible;
+}
+.cable path { fill: none; stroke-linecap: round; transition: filter 0.2s, opacity 0.2s; }
+.cable .c-out { stroke: #07080a; stroke-width: 8; opacity: 0.85; }
+.cable .c-core { stroke-width: 5; }
+.cable .c-hi { stroke: #fff; stroke-width: 1.3; opacity: 0.4; }
+.cable { opacity: 0.78; transition: opacity 0.2s, filter 0.2s; }
+.cable.on { opacity: 1; filter: drop-shadow(0 0 7px var(--cc, #fff)); }
+.cable .plug-sleeve { fill: #0b0c0e; stroke: #5b6068; stroke-width: 1; }
+
+/* keep the Mapbox logo visible even if a terrain DEM source hides it */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl:has(> .mapboxgl-ctrl-logo) { display: block !important; }
+
+.hidden { display: none !important; }
+
+/* ---------- Narrow desktop ---------- */
+@media (max-width: 1180px) {
+  .row-top { grid-template-columns: minmax(0, 1fr) 176px 124px; }
+  .seq { grid-template-columns: 236px minmax(0, 1fr); }
+  .step-name { font-size: 11px; }
+}
+
+/* ---------- Phone / tablet: modules stack, page scrolls ---------- */
+@media (max-width: 900px) {
+  .case {
+    display: block;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+  .rail { height: 16px; padding: 0 16px; font-size: 8px; }
+  .rail::before { top: 4px; height: 5px; }
+  .rail .rail-text:last-child { display: none; }
+  .rail-mid { display: none; }
+
+  .row { grid-template-columns: minmax(0, 1fr) !important; gap: 14px; padding: 14px 16px; }
+  .row-bottom { padding-top: 0; }
+
+  .scope-screen { height: max(300px, 42dvh); }
+  .scope { display: flex; }
+  .scope-screen { flex: none; }
+
+  .camera .cam-knobs { flex-direction: row; justify-content: space-between; align-items: flex-start; gap: 4px; padding: 4px 8px 0; }
+  .dial { --k: 54px; margin: 12px 10px; }
+  .knob-readout { min-width: 56px; }
+
+  .sw {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    max-height: none;
+    margin: 0 8px;
+    min-height: 74px;
+  }
+  .sw-slot { left: 20px; right: 20px; top: 12px; bottom: auto; width: auto; height: 10px; }
+  .sw-lever { top: 3px; left: calc(var(--i) * (100% / 3) + (100% / 6) - 14px); transition: left 0.18s cubic-bezier(0.3, 1.4, 0.5, 1); }
+  .sw-opt { flex-direction: row-reverse; justify-content: center; align-items: flex-end; padding: 36px 2px 6px; gap: 6px; }
+
+  .seq { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .seq-left { padding-left: 16px; padding-right: 16px; gap: 12px; }
+  .steps { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 0 0 0 0; }
+  .step { min-height: 112px; padding: 7px 5px 6px; }
+  .step-name { font-size: 11px; letter-spacing: 0.02em; }
+  .step-area { font-size: 8px; }
+  .step-time { font-size: 11px; }
+
+  .cables { display: none; }
+
+  .scope .mod-foot { flex-wrap: wrap; gap: 10px; padding: 0 16px; }
+  .jack-row { gap: 12px; }
+  .lcd { flex: 1 1 140px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-note.loading::before { animation: none; }
+  .sw-lever, .step, .led, .cable { transition: none; }
+}

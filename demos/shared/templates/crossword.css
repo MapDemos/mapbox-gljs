@@ -1,0 +1,388 @@
+/*
+  Crossword -- a new style pack, not extracted from an existing demo (built
+  from a fresh design brief: a weekend newspaper puzzle page -- newsprint,
+  crisp black squares, numbered cells, Across / Down clue columns, pencil-
+  grey fills and a yellow active word), deliberately distinct from every
+  other pack in this folder: Academic Paper, Aero Gadgets, Amber Terminal,
+  Annual Report, Arena, Art Nouveau, Atomic Motel, Audio Guide, Aurora
+  Command, Blueprint, Board Game, Bottom Sheet, Broadcast, Brutalist Guide,
+  Case Board, Celestial Tarot, Chalkboard, Chat Concierge, Chronicle, Clinic
+  Finder, Code Editor, Comic Panel, Constructivist, Data Notebook, Deco
+  Voyage, Dive Log, Drop Culture, E-Ink, Editorial Paper, Estate Luxe, Event
+  Invite, Field Journal, Film Noir, Fleet Ops, Frontier Poster, Grand Hotel,
+  Herbarium, Highway Sign, Illuminated, Isotype, Line Diagram, Memphis,
+  Moving Map, Museum Label, Neon HUD, Nordic Cabin, Orienteering, Papel
+  Picado, Papercraft, Pastel Bento, Pixel Quest, Postcards, Rally Dash,
+  Raw Web, Regatta, Retro OS, Riso Zine, Ski Piste, Slate Console, Soft UI,
+  Split Flap, Stage Profile, Stained Glass, Sticker Book, Storefront, Story
+  Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt, Tiki Lagoon, Trailhead,
+  Treasure Hunt, Trip Kanban, Truck Art, Ukiyo-e Coast, Vapor Sunset,
+  Vintage Chart, Vinyl Crate, Washi Seasons, Watercolor, Weather Console,
+  Whiteboard, Zellige -- and also from the 24 sibling packs built alongside
+  it (Kintsugi, Cyanotype, Metal Tour, Periodic Table, Cross Stitch, Card
+  Catalog, Seed Packet, Trading Card, Science Fair, Modular Synth, Recipe
+  Card, LCD Watch, Clay Toy, Solarpunk, De Stijl, Block Print, Copacabana,
+  Amphora, Dancheong, Spreadsheet, Pinball, Crayon, Darkroom, Mission
+  Patch).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/crossword.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Domine for headings and clues,
+  Overpass Mono for grid letters and numbers):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Domine:wght@400;500;700&family=Overpass+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  Signature touch: the grid is a real, playable crossword -- black squares
+  with a heavy ink frame, tiny corner numbers, a yellow active word with a
+  ruled-in cursor cell, and typed letters that turn pencil grey when they
+  are revealed, green when checked right, and get a diagonal ink strike
+  when checked wrong.
+
+  Layout: the page is a puzzle page. Desktop (> 1040px): masthead strip on
+  top, then grid | clue columns | map in a thin ruled box, filling 100dvh.
+  Phone: the map comes first (45dvh), then the grid (cells scale to the
+  width, no horizontal scroll), then the clues; the page scrolls.
+
+  Class/id contract (see crossword-template.html in this same folder for a
+  full working example):
+
+  - #map                      map container (every demo defines its own,
+                               per convention -- not included here)
+  - .masthead                 top strip with a ruled double border
+    .paper-name                 newspaper nameplate (Domine, large)
+    .edition                    small mono dateline / puzzle number
+    .progress                   mono "n / total" solved counter
+  - .puzzle                   the three-column page body
+  - .grid-col                 left column holding the grid + toolbar
+    .xgrid                      the board; set --cols (default 9) inline;
+                                 cell size comes from --cell
+    .cell                       one square (div); modifiers:
+      .block                      black square
+      .word                       part of the active word (yellow)
+      .active                     the cursor cell (ruled in)
+      .ok / .bad / .rev           checked right / checked wrong / revealed
+      .num                        child: corner clue number
+      .ltr                        child: the letter
+    .toolbar                    row of buttons under the grid
+    .btn, .btn-primary,         ink-outlined rectangular buttons
+    .btn-secondary
+  - .clues                    middle column (scrolls on desktop)
+    .clue-col                   one list block (Across / Down)
+    .clue-col h2                heading (Domine, ruled underneath)
+    .clue-list                  <ol> of clues
+      .clue                     a <button> row: .clue-no + .clue-text;
+                                 modifiers .active (yellow) and .done
+  - .map-box                  right column: thin ruled box that sizes #map
+  - .xmarker                  map marker child: black numbered square;
+                               modifiers .on (yellow) and .done (green)
+  - .clue-card                class given to the mapboxgl.Popup; inner
+                               .cc-meta (mono caps), .cc-clue, .cc-answer
+  - .status-note (+.loading/  a small italic status line
+    .success/.error)
+  - .howto                   boxed 'How to play' panel (h2 + .hint + .status-note)
+  - .sr-input                 offscreen text input that receives mobile
+                               keyboard input
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --newsprint: #F4F1EA;
+  --newsprint-deep: #EAE5D8;
+  --ink: #111111;
+  --rule: #9A968C;
+  --highlight: #FFE86A;
+  --highlight-deep: #FFD23F;
+  --pencil: #5B5B5B;
+  --correct: #2E7D32;
+  --wrong: #B3261E;
+
+  --font-head: 'Domine', Georgia, 'Times New Roman', serif;
+  --font-mono: 'Overpass Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --cell: 44px;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--newsprint);
+  color: var(--ink);
+  font-family: var(--font-head);
+  /* faint newsprint tooth */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+button, input { font-family: inherit; }
+
+.page {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  height: 100dvh;
+}
+
+/* ---- Masthead ---- */
+.masthead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 24px 8px;
+  border-top: 5px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+  box-shadow: 0 3px 0 var(--newsprint), 0 4px 0 var(--ink);
+  margin-bottom: 6px;
+}
+.paper-name {
+  margin: 0;
+  font: 700 clamp(22px, 3.2vw, 34px)/1.1 var(--font-head);
+  letter-spacing: 0.01em;
+}
+.edition, .progress {
+  font: 600 11px/1.4 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pencil);
+}
+.masthead .meta { display: flex; gap: 18px; align-items: baseline; text-align: right; }
+.progress b { color: var(--ink); font-weight: 700; }
+
+/* ---- Page body ---- */
+.puzzle {
+  display: grid;
+  grid-template-columns: minmax(410px, 430px) minmax(230px, 320px) minmax(0, 1fr);
+  gap: 24px;
+  padding: 14px 24px 22px;
+  min-height: 0;
+}
+.grid-col { min-width: 0; }
+.clues { min-width: 0; min-height: 0; overflow-y: auto; padding-right: 6px; }
+.map-box {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--ink);
+  outline: 1px solid var(--rule);
+  outline-offset: 3px;
+  background: var(--newsprint-deep);
+}
+
+/* ---- Grid ---- */
+.xgrid {
+  --cols: 9;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), var(--cell));
+  grid-auto-rows: var(--cell);
+  width: max-content;
+  border: 3px solid var(--ink);
+  background: var(--ink);
+  gap: 1px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cell {
+  position: relative;
+  background: #FFFEFB;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.cell.block { background: var(--ink); cursor: default; }
+.cell.word { background: var(--highlight); }
+.cell.active {
+  background: var(--highlight-deep);
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+.num {
+  position: absolute;
+  top: 1px;
+  left: 3px;
+  font: 600 calc(var(--cell) * 0.23)/1 var(--font-mono);
+  color: var(--ink);
+  pointer-events: none;
+}
+.ltr {
+  font: 700 calc(var(--cell) * 0.5)/1 var(--font-mono);
+  color: var(--ink);
+  margin-top: calc(var(--cell) * 0.1);
+  pointer-events: none;
+}
+.cell.rev .ltr { color: var(--pencil); font-weight: 400; }
+.cell.ok .ltr { color: var(--correct); }
+.cell.bad .ltr { color: var(--wrong); }
+.cell.bad::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top right, transparent calc(50% - 1px), var(--wrong) calc(50% - 1px), var(--wrong) calc(50% + 1px), transparent calc(50% + 1px));
+  pointer-events: none;
+}
+
+/* ---- Toolbar & buttons ---- */
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.btn {
+  appearance: none;
+  padding: 7px 12px;
+  border: 1.5px solid var(--ink);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 600 11px/1 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.btn:hover { background: var(--ink); color: var(--newsprint); }
+.btn:focus-visible, .clue:focus-visible, .xmarker:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.btn-primary { background: var(--ink); color: var(--newsprint); }
+.btn-primary:hover { background: var(--pencil); border-color: var(--pencil); }
+.btn-secondary { border-color: var(--rule); color: var(--pencil); }
+.howto {
+  margin-top: 16px;
+  padding: 10px 14px 12px;
+  border: 1px solid var(--ink);
+  outline: 1px solid var(--rule);
+  outline-offset: 3px;
+  background: var(--newsprint-deep);
+}
+.howto h2 {
+  margin: 0 0 4px;
+  font: 700 11px/1.2 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.howto .hint, .howto .status-note { margin: 6px 0 0; }
+.howto .status-note { padding-top: 6px; border-top: 1px dotted var(--rule); }
+.hint {
+  margin: 12px 0 0;
+  font: italic 400 13px/1.45 var(--font-head);
+  color: var(--pencil);
+}
+
+/* ---- Clues ---- */
+.clue-col { margin-bottom: 18px; }
+.clue-col h2 {
+  margin: 0 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid var(--ink);
+  font: 700 15px/1.2 var(--font-head);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.clue-list { list-style: none; margin: 0; padding: 0; }
+.clue-list li { border-bottom: 1px solid var(--rule); }
+.clue {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.clue:hover { background: var(--newsprint-deep); }
+.clue-no { flex: 0 0 22px; font: 700 13px/1.5 var(--font-mono); }
+.clue-text { font: 400 14px/1.4 var(--font-head); }
+.clue-text i { font-style: normal; font: 400 11px/1 var(--font-mono); color: var(--pencil); white-space: nowrap; }
+.clue.active { background: var(--highlight); }
+.clue.done .clue-no { color: var(--correct); }
+.clue.done .clue-text { color: var(--pencil); text-decoration: line-through; text-decoration-color: var(--rule); }
+
+/* ---- Map markers & popup ---- */
+.xmarker {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 1px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 4px;
+  border: 2px solid #FFFEFB;
+  border-radius: 0;
+  background: var(--ink);
+  color: #FFFEFB;
+  font: 700 12px/20px var(--font-mono);
+  cursor: pointer;
+  box-shadow: 0 0 0 1px var(--ink), 2px 2px 0 rgba(17,17,17,0.35);
+}
+.xmarker small { font-size: 8px; font-weight: 600; opacity: 0.85; }
+.xmarker.on { background: var(--highlight); color: var(--ink); border-color: var(--ink); }
+.xmarker.done { background: var(--correct); }
+
+.mapboxgl-popup.clue-card { max-width: 240px !important; }
+.clue-card .mapboxgl-popup-content {
+  padding: 10px 28px 10px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  background: #FFFEFB;
+  color: var(--ink);
+  font-family: var(--font-head);
+  box-shadow: 3px 3px 0 rgba(17,17,17,0.3);
+}
+.clue-card .mapboxgl-popup-tip { border-top-color: var(--ink); border-bottom-color: var(--ink); }
+.clue-card .mapboxgl-popup-close-button { font-size: 18px; width: 26px; height: 26px; color: var(--ink); }
+.cc-meta { font: 600 10px/1.3 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--pencil); }
+.cc-clue { margin: 4px 0 0; font: 500 13px/1.4 var(--font-head); }
+.cc-answer { margin: 6px 0 0; padding-top: 5px; border-top: 1px solid var(--rule); font: italic 400 12px/1.4 var(--font-head); color: var(--pencil); }
+.cc-answer b { font: 700 12px/1.4 var(--font-mono); font-style: normal; color: var(--ink); }
+
+/* ---- Status & utilities ---- */
+.status-note {
+  margin: 10px 0 0;
+  font: italic 400 13px/1.4 var(--font-head);
+  color: var(--pencil);
+}
+.status-note.success { color: var(--correct); }
+.status-note.error { color: var(--wrong); }
+.status-note.loading::before { content: '\2026  '; }
+
+.sr-input {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  border: 0;
+  padding: 0;
+  font-size: 16px;
+  pointer-events: none;
+}
+.hidden { display: none !important; }
+
+/* ---- Phone / narrow: map first, grid, clues; page scrolls ---- */
+@media (max-width: 1040px) {
+  .page { display: block; height: auto; }
+  .masthead { padding: 8px 16px 6px; flex-wrap: wrap; }
+  .masthead .meta { gap: 12px; }
+  .puzzle {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 10px 16px 28px;
+  }
+  .map-box { order: 1; height: 45dvh; min-height: 260px; }
+  .grid-col { order: 2; }
+  .clues { order: 3; overflow: visible; padding-right: 0; }
+  .xgrid { --cell: calc((100vw - 32px - 6px - 8px) / 9); }
+  .clue-col { margin-bottom: 14px; }
+}
+
+@media (max-width: 1040px) and (min-width: 600px) {
+  .xgrid { --cell: 48px; }
+  .clues { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

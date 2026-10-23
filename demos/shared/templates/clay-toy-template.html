@@ -1,0 +1,277 @@
+<!--
+  Working EXAMPLE of the Clay Toy style pack (clay-toy.css, in this same
+  folder). Open this file directly to see the pattern working with seven
+  family playgrounds in Copenhagen on Mapbox Standard (day light, bright
+  toy-colour config). The map sits in a thick clay frame; along the bottom
+  a toy tray holds seven chunky clay figures (swing, slide, tower, sandpit,
+  boat, seesaw, climbing net), one per playground. Press a figure or a clay
+  pin on the map: it squishes, the map flies there and a details blob shows
+  age range, shade, toilets and cafe as clay chips. The age blobs (0-3,
+  4-8, 9+) dim non-matching figures and hide their pins. Copy the markup
+  below into your own demo and link clay-toy.css from its <head> -- see the
+  class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (a claymation playset) at the user's request for
+  something distinct from every other pack in this folder. The parks are
+  real public places (positions approximate), but the app name, playground
+  names, ages and facility details are fictional placeholders -- swap in
+  your own. All figures are hand-written inline SVG.
+
+  What's NOT included: search/geocoding, routing, real facility data, or a
+  hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Klump &amp; Leg</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Chewy&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="clay-toy.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+
+<!-- Hand-drawn rolled-clay glyphs, reused by the tray figures and the map pins -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="g-swing" viewBox="0 0 64 64">
+    <path d="M12 56 L32 10 L52 56 M23 30 H41 M25 32 V45 M39 32 V45 M19 48 H31 M33 48 H45"/>
+  </symbol>
+  <symbol id="g-slide" viewBox="0 0 64 64">
+    <path d="M12 10 V56 M26 10 V56 M12 24 H26 M12 38 H26 M12 52 H26 M10 10 H32 M32 14 Q44 40 58 52"/>
+  </symbol>
+  <symbol id="g-tower" viewBox="0 0 64 64">
+    <path d="M18 28 L32 8 L46 28 Z M20 28 V56 M44 28 V56 M20 56 H44 M20 44 H44 M32 44 V56"/>
+  </symbol>
+  <symbol id="g-sandpit" viewBox="0 0 64 64">
+    <path d="M16 24 H40 L36 46 H20 Z M19 24 Q28 8 38 24 M6 56 H58 M46 56 Q52 40 60 56"/>
+  </symbol>
+  <symbol id="g-boat" viewBox="0 0 64 64">
+    <path d="M6 40 H58 L49 56 H15 Z M32 36 V6 M32 10 L50 32 H32"/>
+  </symbol>
+  <symbol id="g-seesaw" viewBox="0 0 64 64">
+    <path d="M8 22 L56 42 M22 56 L32 34 L42 56 Z"/>
+    <circle cx="12" cy="12" r="3"/><circle cx="52" cy="32" r="3"/>
+  </symbol>
+  <symbol id="g-net" viewBox="0 0 64 64">
+    <path d="M8 56 L32 8 L56 56 Z M32 8 V56 M32 8 L20 56 M32 8 L44 56 M16 44 H48 M22 32 H42 M27 20 H37"/>
+  </symbol>
+</svg>
+
+<div class="app">
+  <div class="hud">
+    <header class="title-blob">
+      <h1>Klump &amp; Leg</h1>
+      <p class="tagline">Copenhagen playgrounds for families. Press a toy and give it a squish!</p>
+    </header>
+
+    <div class="filters" role="group" aria-label="Filter by age">
+      <span class="filters-label">Ages</span>
+      <button class="age-blob" style="--c: var(--blue)" data-age="0" aria-pressed="false">0&ndash;3</button>
+      <button class="age-blob" style="--c: var(--green)" data-age="1" aria-pressed="false">4&ndash;8</button>
+      <button class="age-blob" style="--c: var(--purple)" data-age="2" aria-pressed="false">9+</button>
+    </div>
+
+    <section class="details-blob" id="details" aria-live="polite">
+      <p class="status-note"><span class="status-icon">&#128073;</span><span>Pick a toy from the tray or a pin on the map to see the playground.</span></p>
+    </section>
+  </div>
+
+  <div class="stage">
+    <div class="mat-window">
+      <div class="map-clip"><div id="map"></div></div>
+    </div>
+  </div>
+
+  <nav class="tray" aria-label="Playgrounds">
+    <div class="toys" id="toys"></div>
+  </nav>
+</div>
+
+<script>
+// Age bins used by the filter blobs: 0-3, 4-8, 9+
+const BINS = [[0, 3], [4, 8], [9, 99]];
+
+// Seven playgrounds (real parks, approximate positions; names/details fictional)
+const PLAYS = [
+  { id: 'swing', kind: 'Swing', glyph: 'g-swing', clay: '#E8503A', name: 'Swing Garden', where: 'Frederiksberg Have',
+    coord: [12.5245, 55.6762], ages: [0, 8], shade: 'Lots of shade', toilets: true, cafe: true,
+    text: 'Baby swings and big-kid swings under old trees, with benches in the shade for tired grown-ups.' },
+  { id: 'slide', kind: 'Slide', glyph: 'g-slide', clay: '#FFC93C', name: 'Superkilen Slide Spot', where: 'Superkilen, Nørrebro',
+    coord: [12.5430, 55.7003], ages: [4, 12], shade: 'Little shade', toilets: false, cafe: true,
+    text: 'A long slide in a colourful urban park. Good for older kids who like to explore and climb.' },
+  { id: 'tower', kind: 'Tower', glyph: 'g-tower', clay: '#3E8EDE', name: 'Tower Playground', where: 'Fælledparken',
+    coord: [12.5683, 55.6992], ages: [6, 14], shade: 'Some shade', toilets: true, cafe: false,
+    text: 'A big climbing tower with bridges and tunnels in the middle of Copenhagen’s largest park.' },
+  { id: 'sandpit', kind: 'Sandpit', glyph: 'g-sandpit', clay: '#FF8FB1', name: 'Sandpit Meadow', where: 'Enghaveparken',
+    coord: [12.5462, 55.6650], ages: [0, 6], shade: 'Some shade', toilets: true, cafe: false,
+    text: 'A soft, wide sandpit with low edges, ideal for toddlers with buckets and spades.' },
+  { id: 'boat', kind: 'Boat', glyph: 'g-boat', clay: '#5BBF6A', name: 'Boat Pond Playground', where: 'Ørstedsparken',
+    coord: [12.5612, 55.6866], ages: [3, 10], shade: 'Lots of shade', toilets: false, cafe: true,
+    text: 'A wooden pirate boat to climb aboard, right beside the pond and a small kiosk.' },
+  { id: 'seesaw', kind: 'Seesaw', glyph: 'g-seesaw', clay: '#8E6CE0', name: 'Kongens Have Playground', where: 'Kongens Have',
+    coord: [12.5768, 55.6856], ages: [0, 5], shade: 'Some shade', toilets: true, cafe: true,
+    text: 'Seesaws, springy animals and a gentle garden setting just outside the royal castle.' },
+  { id: 'net', kind: 'Climbing Net', glyph: 'g-net', clay: '#E8503A', name: 'Søndermarken Net Hill', where: 'Søndermarken',
+    coord: [12.5236, 55.6686], ages: [8, 15], shade: 'Little shade', toilets: false, cafe: false,
+    text: 'A hillside rope-net pyramid for brave climbers, with big lawns around it for picnics.' },
+];
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const desktop = () => window.matchMedia('(min-width: 821px)').matches;
+
+// Padding clears the floating HUD (desktop) and keeps points off the logo corners
+const pad = () => desktop()
+  ? { top: 90, right: 60, bottom: 70, left: 400 }
+  : { top: 50, right: 36, bottom: 80, left: 36 };
+
+const bounds = new mapboxgl.LngLatBounds();
+PLAYS.forEach((p) => bounds.extend(p.coord));
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  bounds,
+  fitBoundsOptions: { padding: pad() },
+  config: {
+    basemap: {
+      lightPreset: 'day',
+      showPointOfInterestLabels: false,
+      showTransitLabels: false,
+      // Toy-bright colours (config keys from the Standard style docs)
+      colorGreenspace: '#62D074',
+      colorWater: '#5AA9F0',
+      colorLand: '#FFF1D6',
+      colorBuildings: '#F6C9A2',
+      colorRoads: '#FFFFFF',
+      colorMotorways: '#FFC93C',
+      colorTrunks: '#FFC93C',
+    },
+  },
+});
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+// The grid settles after load: refit the overview on load and on every resize
+// until the visitor picks a playground or moves the map themselves.
+let overview = true;
+const refit = () => { if (overview) map.fitBounds(bounds, { padding: pad(), duration: 0 }); };
+map.on('load', refit);
+map.on('dragstart', () => { overview = false; });
+map.on('zoomstart', (e) => { if (e.originalEvent) overview = false; });
+new ResizeObserver(() => { map.resize(); refit(); }).observe(document.getElementById('map'));
+
+const toysEl = document.getElementById('toys');
+const detailsEl = document.getElementById('details');
+const ageBtns = [...document.querySelectorAll('.age-blob')];
+const activeBins = new Set();
+let selectedId = null;
+
+function squish(el) {
+  if (reduce || !el) return;
+  el.classList.remove('squish');
+  void el.offsetWidth; // restart the animation
+  el.classList.add('squish');
+  el.addEventListener('animationend', () => el.classList.remove('squish'), { once: true });
+}
+
+// Build tray figures and map pins
+PLAYS.forEach((p) => {
+  const toy = document.createElement('button');
+  toy.className = 'toy';
+  toy.style.setProperty('--clay', p.clay);
+  toy.innerHTML = `<span class="toy-lump"><svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><use href="#${p.glyph}"/></svg></span>
+    <span class="toy-name">${p.kind}</span><span class="toy-where">${p.where}</span>`;
+  toy.addEventListener('click', () => select(p.id));
+  toysEl.appendChild(toy);
+  p.toy = toy;
+
+  // Marker root stays untouched; the clay blob is an inner child
+  const root = document.createElement('div');
+  const pin = document.createElement('button');
+  pin.className = 'pin';
+  pin.style.setProperty('--clay', p.clay);
+  pin.setAttribute('aria-label', `${p.name}, ${p.where}`);
+  pin.innerHTML = `<svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><use href="#${p.glyph}"/></svg>`;
+  pin.addEventListener('click', () => select(p.id));
+  root.appendChild(pin);
+  p.pin = pin;
+  p.root = root;
+  p.marker = new mapboxgl.Marker({ element: root }).setLngLat(p.coord).addTo(map);
+});
+
+const matches = (p) => activeBins.size === 0 ||
+  [...activeBins].some((i) => p.ages[0] <= BINS[i][1] && p.ages[1] >= BINS[i][0]);
+
+function applyFilter() {
+  PLAYS.forEach((p) => {
+    const ok = matches(p);
+    p.toy.classList.toggle('is-dim', !ok);
+    p.toy.disabled = !ok;
+    p.root.style.display = ok ? '' : 'none';
+  });
+  if (selectedId && !matches(PLAYS.find((p) => p.id === selectedId))) clearSelection();
+}
+
+ageBtns.forEach((b) => b.addEventListener('click', () => {
+  const i = Number(b.dataset.age);
+  if (activeBins.has(i)) activeBins.delete(i); else activeBins.add(i);
+  b.classList.toggle('is-on', activeBins.has(i));
+  b.setAttribute('aria-pressed', activeBins.has(i));
+  squish(b);
+  applyFilter();
+}));
+
+function chip(cls, text) { return `<span class="chip ${cls}">${text}</span>`; }
+
+function showDetails(p) {
+  const ages = p.ages[1] >= 14 ? `Ages ${p.ages[0]}+` : `Ages ${p.ages[0]}–${p.ages[1]}`;
+  detailsEl.innerHTML = `<p class="d-kicker">${p.kind} playground</p>
+    <h2 class="d-name">${p.name}</h2>
+    <p class="d-where">${p.where}, Copenhagen</p>
+    <p class="d-text">${p.text}</p>
+    <div class="chips">${chip('age', ages)}${chip('shade', p.shade)}
+      ${chip(p.toilets ? 'yes' : 'no', 'Toilets')}${chip(p.cafe ? 'yes' : 'no', 'Café')}</div>
+    <button class="btn btn-secondary" id="show-all">Show all toys</button>`;
+  document.getElementById('show-all').addEventListener('click', clearSelection);
+}
+
+function setCamera(opts) {
+  if (reduce) map.jumpTo(opts); else map.flyTo({ ...opts, duration: 1600, essential: false });
+}
+
+function clearSelection() {
+  selectedId = null;
+  overview = true;
+  PLAYS.forEach((p) => { p.toy.classList.remove('is-active'); p.pin.classList.remove('is-active'); p.root.style.zIndex = ''; });
+  detailsEl.innerHTML = '<p class="status-note"><span class="status-icon">&#128073;</span><span>Pick a toy from the tray or a pin on the map to see the playground.</span></p>';
+  map.fitBounds(bounds, { padding: pad(), duration: reduce ? 0 : 1400 });
+}
+
+function select(id) {
+  const p = PLAYS.find((x) => x.id === id);
+  if (!p || !matches(p)) return;
+  selectedId = id;
+  overview = false;
+  PLAYS.forEach((q) => {
+    q.toy.classList.toggle('is-active', q === p);
+    q.pin.classList.toggle('is-active', q === p);
+    q.root.style.zIndex = q === p ? '2' : '';
+  });
+  squish(p.toy.querySelector('.toy-lump'));
+  squish(p.pin);
+  showDetails(p);
+  setCamera({ center: p.coord, zoom: 15.2, padding: pad() });
+  p.toy.scrollIntoView({ block: 'nearest', inline: 'center', behavior: reduce ? 'auto' : 'smooth' });
+  if (!desktop()) detailsEl.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+}
+</script>
+</body>
+</html>

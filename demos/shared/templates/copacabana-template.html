@@ -1,0 +1,312 @@
+<!--
+  Working EXAMPLE of the Copacabana style pack (copacabana.css, in this
+  same folder). Open this file directly to see the pattern working with
+  eight fictional beach kiosks strung along Rio de Janeiro's shore -- Leme,
+  Copacabana, Arpoador, Ipanema and Leblon -- on Mapbox Standard (day light,
+  pitched, Sugarloaf in view). The map fills the top of the page; a
+  black-and-white wave-mosaic band separates it from a "boardwalk" of kiosk
+  cards that scrolls sideways. Pick a card (or an umbrella marker on the
+  map): the card hops up, the umbrella bounces once and the camera flies
+  along the shore with the bearing lined up on the beach. A sun badge in
+  the corner shows Rio time and a "Sunset" toggle that flips the light
+  preset to dusk and swings the view west from Arpoador. Arrow keys scroll
+  the boardwalk. Copy the markup below into your own demo and link
+  copacabana.css from its <head> -- see the class/id contract documented at
+  the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built
+  from a design brief (Rio beach culture) at the user's request for
+  something distinct from every other pack in this folder. The beaches are
+  real public places; the kiosk names, menus, water-quality flags and wave
+  heights are fictional placeholders -- swap in your own. All art is
+  hand-written inline SVG / CSS.
+
+  What's NOT included: live surf or water-quality data, search/geocoding,
+  routing, popups, or a hard-coded access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Copacabana</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=Be+Vietnam+Pro:wght@400;600;800&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="copacabana.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map. */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="sun-badge">
+      <svg class="sun-svg" viewBox="0 0 52 52" aria-hidden="true">
+        <g class="rays" stroke="#141414" stroke-width="3" stroke-linecap="round">
+          <path d="M26 2v6M26 44v6M2 26h6M44 26h6M9 9l4 4M39 39l4 4M43 9l-4 4M13 39l-4 4"/>
+        </g>
+        <circle cx="26" cy="26" r="12" fill="#FF7B39" stroke="#141414" stroke-width="3"/>
+      </svg>
+      <div class="sun-text">
+        <span class="sun-time" id="sun-time">--:--</span>
+        <span class="sun-place" id="sun-place">Rio &middot; local time</span>
+      </div>
+      <button class="btn sun-toggle" id="sunset-toggle" type="button" aria-pressed="false">Sunset</button>
+    </div>
+    <div class="status-note hidden" id="status-note"><span id="status-text"></span></div>
+  </div>
+
+  <div class="wave-band" role="presentation"></div>
+
+  <div class="boardwalk" id="boardwalk" role="list" tabindex="0" aria-label="Beach kiosks along the shore. Use the left and right arrow keys to scroll."></div>
+</div>
+
+<script>
+// Real beaches, fictional kiosks. Coordinates sit on the sand edge of the
+// promenade (checked against the basemap water layer); `bearing` lines the
+// camera up with the beach.
+const KIOSKS = [
+  { no: 1,  name: 'Maré Mansa',   where: 'Leme',        coord: [-43.16906, -22.96403], bearing: 218, k: '#FF5A79',
+    drink: 'Coconut water', snack: 'Cheese pastel',     flag: ['Good', '#2F7D4F'],   wave: '0.8 m' },
+  { no: 2,  name: 'Tucano Azul',  where: 'Copacabana',  coord: [-43.17289, -22.96582], bearing: 220, k: '#0FA3B1',
+    drink: 'Iced mate',     snack: 'Cassava chips',      flag: ['Good', '#2F7D4F'],   wave: '1.0 m' },
+  { no: 5,  name: 'Sol de Ouro',  where: 'Copacabana',  coord: [-43.18337, -22.97186], bearing: 215, k: '#FFC300',
+    drink: 'Açaí bowl',     snack: 'Chicken coxinha',    flag: ['Fair', '#FFC300'],   wave: '1.2 m' },
+  { no: 6,  name: 'Fortaleza Bar', where: 'Copacabana', coord: [-43.18915, -22.9791],  bearing: 205, k: '#FF7B39',
+    drink: 'Cashew juice',  snack: 'Cod fritters',       flag: ['Good', '#2F7D4F'],   wave: '1.3 m' },
+  { no: 7,  name: 'Pedra do Pôr', where: 'Arpoador',    coord: [-43.19102, -22.99043], bearing: 262, k: '#2F7D4F',
+    drink: 'Passion caipirinha', snack: 'Grilled cheese', flag: ['Fair', '#FFC300'],  wave: '1.8 m' },
+  { no: 8,  name: 'Brisa 8',      where: 'Ipanema',     coord: [-43.20051, -22.98707], bearing: 268, k: '#FF5A79',
+    drink: 'Guaraná',       snack: 'Shrimp skewer',      flag: ['Good', '#2F7D4F'],   wave: '1.5 m' },
+  { no: 9,  name: 'Coqueiro Ipa', where: 'Ipanema',     coord: [-43.21, -22.98665],    bearing: 270, k: '#0FA3B1',
+    drink: 'Fresh coconut', snack: 'Sand-dollar cookie', flag: ['Good', '#2F7D4F'],   wave: '1.4 m' },
+  { no: 11, name: 'Leblon Sol',   where: 'Leblon',      coord: [-43.222, -22.98705],   bearing: 272, k: '#FFC300',
+    drink: 'Lime soda',     snack: 'Tapioca crepe',      flag: ['Swim with care', '#FF7B39'], wave: '1.7 m' },
+];
+const SUGARLOAF = [-43.1566, -22.9499];
+const ARPOADOR_SUNSET = { center: [-43.195, -22.9885], zoom: 14.8, pitch: 66, bearing: 262 };
+
+const $ = (id) => document.getElementById(id);
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = () => window.matchMedia('(max-width: 760px)').matches;
+const board = $('boardwalk');
+let current = -1;
+let sunset = false;
+
+/* ---- Small SVG builders ---- */
+function umbrellaSVG(color, uid, size) {
+  // striped canopy + pole; clipPath keeps the stripes inside the dome
+  let stripes = '';
+  for (let x = 2, n = 0; x < 36; x += 8.5, n++) {
+    stripes += `<rect x="${x}" y="0" width="8.5" height="24" fill="${n % 2 ? '#FAFAFA' : color}"/>`;
+  }
+  return `<defs><clipPath id="cp${uid}"><path d="M2 22 Q19 -8 36 22 Q31 18 27.5 22 Q23.5 18 19 22 Q14.5 18 10.5 22 Q7 18 2 22Z"/></clipPath></defs>
+    <ellipse cx="19" cy="44" rx="9" ry="2.4" fill="#141414" opacity=".3"/>
+    <path d="M19 12V43" stroke="#141414" stroke-width="3" stroke-linecap="round"/>
+    <g clip-path="url(#cp${uid})">${stripes}</g>
+    <path d="M2 22 Q19 -8 36 22 Q31 18 27.5 22 Q23.5 18 19 22 Q14.5 18 10.5 22 Q7 18 2 22Z" fill="none" stroke="#141414" stroke-width="2.5" stroke-linejoin="round"/>
+    <circle cx="19" cy="4.5" r="2.5" fill="#141414"/>`;
+}
+const flagSVG = (c) => `<svg viewBox="0 0 16 14" aria-hidden="true"><path d="M2 1v12" stroke="#141414" stroke-width="2" stroke-linecap="round"/><path d="M3 2h10l-3 3.2 3 3.2H3Z" fill="${c}" stroke="#141414" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+const waveSVG = `<svg viewBox="0 0 16 14" aria-hidden="true"><path d="M1 5q3-4 7 0t7 0M1 10q3-4 7 0t7 0" fill="none" stroke="#141414" stroke-width="2" stroke-linecap="round"/></svg>`;
+
+/* ---- Map ---- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: { basemap: { lightPreset: 'day', showPointOfInterestLabels: false } },
+  center: [-43.19, -22.975],
+  zoom: 12.4,
+  pitch: 45,
+  attributionControl: true,
+});
+new ResizeObserver(() => map.resize()).observe($('map'));
+
+const cards = [];
+const markerEls = [];
+const markers = [];
+
+KIOSKS.forEach((s, i) => {
+  // boardwalk card
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'kiosk';
+  b.style.setProperty('--k', s.k);
+  b.setAttribute('role', 'listitem');
+  b.setAttribute('aria-label', `Posto ${s.no}, ${s.name}, ${s.where}`);
+  b.innerHTML = `<span class="roof"></span><span class="k-card">
+      <span class="k-head"><span class="posto">Posto ${s.no}</span>
+        <svg class="umbrella" viewBox="0 0 38 46" aria-hidden="true">${umbrellaSVG(s.k, 'c' + i)}</svg></span>
+      <span class="k-name">${s.name}</span>
+      <span class="k-where">${s.where}</span>
+      <span class="k-row"><span class="k-key">Drink</span><span class="k-val">${s.drink}</span></span>
+      <span class="k-row"><span class="k-key">Bite</span><span class="k-val">${s.snack}</span></span>
+      <span class="k-meta"><span class="flag">${flagSVG(s.flag[1])}${s.flag[0]}</span>
+        <span class="wave">${waveSVG}${s.wave}</span></span></span>`;
+  b.addEventListener('click', () => select(i));
+  board.appendChild(b);
+  cards.push(b);
+
+  // umbrella marker (style the inner child, never the Marker root)
+  const root = document.createElement('div');
+  root.innerHTML = `<div class="um" title="Posto ${s.no} - ${s.name}">
+    <svg viewBox="0 0 38 46" aria-hidden="true">${umbrellaSVG(s.k, 'm' + i)}
+      <circle cx="30" cy="35" r="7.5" fill="#141414" stroke="#FAFAFA" stroke-width="1.5"/>
+      <text x="30" y="38" text-anchor="middle" font-family="'Be Vietnam Pro', sans-serif" font-weight="800" font-size="9" fill="#FAFAFA">${s.no}</text>
+    </svg></div>`;
+  root.addEventListener('click', () => select(i));
+  markerEls.push(root.firstElementChild);
+  markers.push(new mapboxgl.Marker({ element: root, anchor: 'bottom' }).setLngLat(s.coord).addTo(map));
+});
+
+// Phone, zoomed out: fan the two bunched Leme/Copacabana umbrellas apart
+const FAN = { 0: [-16, 0], 1: [16, 0] };
+function applyFan() {
+  const on = phone() && map.getZoom() < 13.5;
+  markers.forEach((m, i) => m.setOffset(on && FAN[i] ? FAN[i] : [0, 0]));
+}
+map.on('zoom', applyFan);
+map.on('resize', applyFan);
+
+// Sugarloaf label (non-interactive)
+const chipRoot = document.createElement('div');
+chipRoot.innerHTML = '<span class="map-chip">Sugarloaf</span>';
+new mapboxgl.Marker({ element: chipRoot, anchor: 'bottom' }).setLngLat(SUGARLOAF).addTo(map);
+
+/* ---- Camera ---- */
+function fitAll(instant) {
+  // on phones Sugarloaf stays out of the bounds (its chip still shows)
+  const b = phone() ? new mapboxgl.LngLatBounds(KIOSKS[0].coord, KIOSKS[0].coord) : new mapboxgl.LngLatBounds(SUGARLOAF, SUGARLOAF);
+  KIOSKS.forEach((s) => b.extend(s.coord));
+  const padding = phone() ? { top: 80, bottom: 70, left: 40, right: 40 } : { top: 90, bottom: 70, left: 60, right: 60 };
+  const cam = map.cameraForBounds(b, { padding, maxZoom: 13.5, bearing: 0, pitch: 45 });
+  if (!cam) return;
+  const o = { ...cam, zoom: cam.zoom + 0.2, bearing: 0, pitch: 45 };
+  if (instant || reduce) map.jumpTo(o); else map.flyTo({ ...o, duration: 2200 });
+}
+
+function flyAlongShore(s) {
+  const o = {
+    center: s.coord, zoom: 15.6, pitch: 58, bearing: s.bearing,
+    padding: phone() ? { top: 70, bottom: 70, left: 20, right: 20 } : { top: 70, bottom: 70, left: 40, right: 40 },
+  };
+  if (reduce) map.jumpTo(o); else map.flyTo({ ...o, duration: 2400, essential: false });
+}
+
+/* ---- Selection ---- */
+function centerCard(i) {
+  const el = cards[i];
+  board.scrollTo({ left: el.offsetLeft - (board.clientWidth - el.offsetWidth) / 2, behavior: reduce ? 'auto' : 'smooth' });
+}
+
+function select(i) {
+  current = i;
+  cards.forEach((el, k) => {
+    el.classList.toggle('is-active', k === i);
+    el.setAttribute('aria-pressed', k === i ? 'true' : 'false');
+  });
+  markerEls.forEach((el, k) => el.classList.toggle('is-active', k === i));
+  centerCard(i);
+
+  const m = markerEls[i];
+  m.classList.remove('bounce');
+  if (!reduce) {
+    void m.offsetWidth;
+    m.classList.add('bounce');
+    m.addEventListener('animationend', () => m.classList.remove('bounce'), { once: true });
+  }
+  updateHalo();
+  if (sunset) setSunset(false, true);
+  flyAlongShore(KIOSKS[i]);
+}
+
+/* ---- Keyboard: arrows walk the boardwalk ---- */
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.closest('.mapboxgl-canvas-container'))) return;
+  const dir = e.key === 'ArrowRight' ? 1 : -1;
+  const idx = cards.indexOf(document.activeElement);
+  if (idx >= 0) {
+    const n = Math.max(0, Math.min(cards.length - 1, idx + dir));
+    cards[n].focus({ preventScroll: true });
+    centerCard(n);
+  } else {
+    board.scrollBy({ left: dir * 240, behavior: reduce ? 'auto' : 'smooth' });
+  }
+  e.preventDefault();
+});
+
+/* ---- Sun badge: Rio time + Sunset toggle ---- */
+const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hour12: false });
+function tick() {
+  if (sunset) return;
+  $('sun-time').textContent = fmt.format(new Date());
+}
+tick();
+setInterval(tick, 30000);
+
+function setLight(preset) {
+  try { map.setConfigProperty('basemap', 'lightPreset', preset); } catch (err) { /* style not ready */ }
+}
+
+function setSunset(on, quiet) {
+  sunset = on;
+  document.body.classList.toggle('is-sunset', on);
+  const btn = $('sunset-toggle');
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  setLight(on ? 'dusk' : 'day');
+  $('sun-place').innerHTML = on ? 'Arpoador &middot; golden hour' : 'Rio &middot; local time';
+  if (on) $('sun-time').textContent = '17:40'; else tick();
+  if (quiet) return;
+  if (on) {
+    if (reduce) map.jumpTo(ARPOADOR_SUNSET); else map.flyTo({ ...ARPOADOR_SUNSET, duration: 3000 });
+  } else if (current >= 0) {
+    flyAlongShore(KIOSKS[current]);
+  } else {
+    fitAll(false);
+  }
+}
+$('sunset-toggle').addEventListener('click', () => setSunset(!sunset));
+
+/* ---- Map layers: shore line + a sun halo under the picked kiosk ---- */
+function updateHalo() {
+  const src = map.getSource('cop-halo');
+  if (!src) return;
+  src.setData({ type: 'FeatureCollection', features: current < 0 ? [] : [
+    { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: KIOSKS[current].coord } }] });
+}
+
+map.on('style.load', () => {
+  map.addSource('cop-shore', { type: 'geojson', data: { type: 'Feature', properties: {},
+    geometry: { type: 'LineString', coordinates: KIOSKS.map((s) => s.coord) } } });
+  map.addLayer({
+    id: 'cop-shore', type: 'line', source: 'cop-shore', slot: 'top',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#FF5A79', 'line-width': 4, 'line-dasharray': [0.1, 2.2], 'line-emissive-strength': 1 },
+  });
+  map.addSource('cop-halo', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: 'cop-halo', type: 'circle', source: 'cop-halo', slot: 'top',
+    paint: { 'circle-radius': 34, 'circle-color': '#FFC300', 'circle-opacity': 0.45, 'circle-blur': 0.8,
+      'circle-pitch-alignment': 'map', 'circle-emissive-strength': 1 },
+  });
+  updateHalo();
+  setLight(sunset ? 'dusk' : 'day');
+  fitAll(true);
+});
+
+map.on('error', (e) => {
+  const n = $('status-note');
+  n.className = 'status-note error';
+  $('status-text').textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+</script>
+</body>
+</html>

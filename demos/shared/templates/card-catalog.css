@@ -1,0 +1,411 @@
+/*
+  Card Catalog -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: an old library card catalogue -- a
+  golden-oak drawer cabinet with brass label holders and pull rings, cream
+  3x5 index cards with a red top rule and faint blue lines, typewritten
+  entries, call numbers, a hole punched at the bottom and purple
+  DATE DUE stamps), deliberately distinct from every other pack in this
+  folder: Academic Paper, Aero Gadgets, Amber Terminal, Annual Report,
+  Arena, Art Nouveau, Atomic Motel, Audio Guide, Aurora Command, Blueprint,
+  Board Game, Bottom Sheet, Broadcast, Brutalist Guide, Case Board,
+  Celestial Tarot, Chalkboard, Chat Concierge, Chronicle, Clinic Finder,
+  Code Editor, Comic Panel, Constructivist, Data Notebook, Deco Voyage,
+  Dive Log, Drop Culture, E-Ink, Editorial Paper, Estate Luxe, Event
+  Invite, Field Journal, Film Noir, Fleet Ops, Frontier Poster, Grand
+  Hotel, Herbarium, Highway Sign, Illuminated, Isotype, Line Diagram,
+  Memphis, Moving Map, Museum Label, Neon HUD, Nordic Cabin, Orienteering,
+  Papel Picado, Papercraft, Pastel Bento, Pixel Quest, Postcards, Rally
+  Dash, Raw Web, Regatta, Retro OS, Riso Zine, Ski Piste, Slate Console,
+  Soft UI, Split Flap, Stage Profile, Stained Glass, Sticker Book,
+  Storefront, Story Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt,
+  Tiki Lagoon, Trailhead, Treasure Hunt, Trip Kanban, Truck Art, Ukiyo-e
+  Coast, Vapor Sunset, Vintage Chart, Vinyl Crate, Washi Seasons,
+  Watercolor, Weather Console, Whiteboard and Zellige; and also distinct
+  from the sibling packs built alongside it.
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/card-catalog.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Libre Baskerville for headings and
+  card titles, Syne Mono for typed card text and call numbers):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Syne+Mono&display=swap" rel="stylesheet" />
+
+  Signature touch: the open drawer is seen from above with a slight CSS
+  perspective (only the drawer is transformed, never the map); the active
+  card slides up out of the stack and a purple DATE DUE stamp thunks onto
+  it (scale animation). Reduced motion: no slide, no stamp animation.
+
+  Class/id contract (see card-catalog-template.html in this same folder):
+
+  - #map                    map container (demo-owned; desktop: right of the
+                            420px cabinet. Phone: in flow, 45dvh)
+  - body.cc-page            two-column grid on desktop, one scrolling
+                            column on phones
+  - .cabinet                left column; display:contents on phones
+    .cabinet-head h1 .sub     oak header plate: title + typed subtitle
+    .drawer-fronts            row of closed drawers (category filters)
+      button.drawer-front     [data-cat], aria-pressed true/false
+        .label-holder           brass frame holding a cream label slip
+        .count                  small typed count
+        .pull                   brass knob
+    .drawer-wrap > .drawer    the open drawer (perspective on the drawer)
+      .card-stack             scrolling stack of cards
+        article.index-card      [data-id]; .active = pulled up; .hidden
+          button.card-head        strip: .tab (letter), .call-short, .card-title
+          .card-body              shown only when active
+            .call-no              big typed call number
+            h2.card-title-big     Libre Baskerville title
+            dl.typed              dt/dd typed fields
+            .due-rows             ruled DATE DUE lines
+            .date-due             purple rotated stamp (thunk animation)
+      .drawer-lip             front of the drawer: .label-holder + .pull-ring
+  - .cc-marker              inner HTML-marker element (brass ring, cream
+                            face, typed call shorthand); .is-active
+  - .hidden                 utility: display: none !important
+*/
+
+:root {
+  --oak: #B07A3E;
+  --oak-deep: #8A5A2B;
+  --oak-dark: #5E3C1A;
+  --brass: #C9A45C;
+  --brass-hi: #EBCF8B;
+  --brass-lo: #8C6D2E;
+  --card: #FBF6E9;
+  --card-edge: #E4D9BC;
+  --rule-red: #C0392B;
+  --rule-blue: #7FA7D9;
+  --ink: #2A2A2A;
+  --ink-soft: #5C564A;
+  --stamp: #5B3E8C;
+
+  --font-head: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
+  --font-type: 'Syne Mono', 'Courier New', monospace;
+
+  --wood-grain:
+    repeating-linear-gradient(90deg, rgba(60,30,8,0) 0 5px, rgba(60,30,8,.07) 5px 6px, rgba(255,220,160,.05) 6px 9px, rgba(60,30,8,0) 9px 17px),
+    repeating-linear-gradient(88deg, rgba(60,30,8,0) 0 41px, rgba(60,30,8,.09) 41px 43px, rgba(60,30,8,0) 43px 97px),
+    linear-gradient(180deg, var(--oak), var(--oak-deep));
+}
+
+* { box-sizing: border-box; }
+
+body.cc-page {
+  margin: 0;
+  background: var(--oak-dark);
+  color: var(--ink);
+  font-family: var(--font-type);
+}
+
+button { font-family: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--brass-hi); outline-offset: 2px; }
+
+/* ---------- cabinet column ---------- */
+.cabinet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100dvh;
+  padding: 14px 14px 16px;
+  background: var(--wood-grain);
+  box-shadow: inset -8px 0 18px rgba(40,20,5,.35);
+  min-width: 0;
+}
+
+.cabinet-head {
+  padding: 8px 14px 9px;
+  background: linear-gradient(180deg, #FBF6E9, #EFE5C9);
+  border: 2px solid var(--brass-lo);
+  border-radius: 3px;
+  box-shadow: 0 2px 5px rgba(40,20,5,.45), inset 0 0 0 1px var(--brass-hi);
+}
+.cabinet-head h1 {
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--ink);
+}
+.cabinet-head .sub {
+  margin-top: 2px;
+  font-family: var(--font-type);
+  font-size: 11px;
+  letter-spacing: .06em;
+  color: var(--ink-soft);
+}
+
+/* ---------- closed drawers (filters) ---------- */
+.drawer-fronts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.drawer-front {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 9px 6px 12px;
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+  background: var(--wood-grain);
+  box-shadow: 0 0 0 2px var(--oak-dark), 0 3px 0 2px rgba(40,20,5,.55), inset 0 1px 0 rgba(255,225,170,.45), inset 0 -8px 12px rgba(60,30,8,.3);
+  transition: transform .15s ease, filter .15s ease;
+}
+.drawer-front:hover { transform: translateY(-1px); }
+.drawer-front[aria-pressed="false"] { filter: brightness(.62) saturate(.8); box-shadow: 0 0 0 2px var(--oak-dark), inset 0 6px 14px rgba(20,10,0,.55); }
+
+.label-holder {
+  display: block;
+  width: 100%;
+  padding: 3px;
+  background: linear-gradient(135deg, var(--brass-hi), var(--brass) 45%, var(--brass-lo));
+  border-radius: 2px;
+  box-shadow: 0 1px 2px rgba(30,15,0,.5);
+}
+.label-holder > span {
+  display: block;
+  padding: 3px 2px;
+  text-align: center;
+  background: var(--card);
+  box-shadow: inset 0 1px 3px rgba(60,40,10,.35);
+  font-family: var(--font-type);
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.drawer-front .count { font-size: 10px; color: #FBF6E9; text-shadow: 0 1px 1px rgba(30,15,0,.7); letter-spacing: .05em; }
+.pull {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--brass-hi), var(--brass) 50%, var(--brass-lo));
+  box-shadow: 0 2px 3px rgba(30,15,0,.6);
+}
+
+/* ---------- the open drawer ---------- */
+.drawer-wrap {
+  flex: 1;
+  min-height: 0;
+  perspective: 900px;
+  perspective-origin: 50% -10%;
+}
+.drawer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  transform: rotateX(5deg);
+  transform-origin: 50% 100%;
+  border-radius: 6px 6px 3px 3px;
+  background: var(--wood-grain);
+  box-shadow: 0 10px 22px rgba(30,15,0,.55), inset 0 0 0 3px rgba(255,225,170,.25);
+  padding: 10px 10px 0;
+}
+.card-stack {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 18px 8px 12px;
+  border-radius: 3px 3px 0 0;
+  background:
+    linear-gradient(90deg, rgba(0,0,0,.4), rgba(0,0,0,0) 8%, rgba(0,0,0,0) 92%, rgba(0,0,0,.4)),
+    linear-gradient(180deg, #3d2410, #6e4521 40%, #50300f);
+  box-shadow: inset 0 8px 14px rgba(0,0,0,.55);
+  scrollbar-width: thin;
+  scrollbar-color: var(--brass-lo) transparent;
+}
+.drawer-lip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 9px 18px 11px;
+  background: var(--wood-grain);
+  border-top: 2px solid rgba(40,20,5,.6);
+  box-shadow: inset 0 1px 0 rgba(255,225,170,.5);
+}
+.drawer-lip .label-holder { width: 62%; max-width: 230px; }
+.pull-ring {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 3px solid var(--brass);
+  border-top-color: var(--brass-hi);
+  border-bottom-color: var(--brass-lo);
+  box-shadow: 0 2px 3px rgba(30,15,0,.6), inset 0 1px 1px rgba(30,15,0,.4);
+}
+
+/* ---------- index cards ---------- */
+.index-card {
+  position: relative;
+  margin: 0 0 12px;
+  background: var(--card);
+  border-radius: 2px;
+  box-shadow: 0 1px 0 var(--card-edge), 0 3px 5px rgba(0,0,0,.45);
+}
+.index-card::before { /* red top rule under the heading line */
+  content: '';
+  position: absolute; left: 0; right: 0; top: 34px; height: 1px;
+  background: var(--rule-red);
+  opacity: .85;
+}
+.card-head {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  min-height: 35px;
+  padding: 8px 12px 4px;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.card-head .tab {
+  position: absolute;
+  top: -13px;
+  left: calc(14px + var(--slot, 0) * 54px);
+  min-width: 34px;
+  padding: 2px 8px 1px;
+  text-align: center;
+  font-family: var(--font-type);
+  font-size: 11px;
+  line-height: 13px;
+  background: var(--card);
+  border-radius: 4px 4px 0 0;
+  box-shadow: 0 -2px 2px rgba(0,0,0,.25);
+  color: var(--ink);
+}
+.card-head .call-short { flex: none; margin-left: 0; font-size: 11px; color: var(--ink-soft); padding-top: 3px; }
+.card-head .card-title {
+  font-family: var(--font-head);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ink);
+  min-width: 0;
+}
+.index-card:not(.active) .card-head:hover .card-title { text-decoration: underline; text-decoration-color: var(--rule-red); }
+.index-card.active .tab { background: var(--rule-red); color: #FBF6E9; }
+.index-card:not(.active) .card-head { padding-left: 12px; }
+.index-card:not(.active) .card-head { padding-top: 12px; }
+.index-card:not(.active) { padding-top: 0; }
+.index-card:not(.active) .card-head .call-short { padding-top: 3px; }
+
+.card-body {
+  display: none;
+  position: relative;
+  padding: 8px 16px 40px 34px;
+  background-image: repeating-linear-gradient(180deg, transparent 0 21px, rgba(127,167,217,.5) 21px 22px);
+  background-position: 0 6px;
+}
+.index-card.active .card-body { display: block; }
+.index-card.active { animation: cc-slide .45s cubic-bezier(.2,.9,.3,1.1) both; z-index: 2; }
+.card-body::after { /* punched hole */
+  content: '';
+  position: absolute; left: 50%; bottom: 12px;
+  width: 14px; height: 14px; margin-left: -7px; border-radius: 50%;
+  background: #4a2e14;
+  box-shadow: inset 0 2px 3px rgba(0,0,0,.7), 0 1px 0 rgba(255,255,255,.5);
+}
+.call-no {
+  font-family: var(--font-type);
+  font-size: 16px;
+  line-height: 22px;
+  letter-spacing: .04em;
+  color: var(--ink);
+}
+.card-title-big {
+  margin: 0 0 0 14px;
+  font-family: var(--font-head);
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 700;
+  color: var(--ink);
+  text-wrap: balance;
+}
+.typed { margin: 0; font-family: var(--font-type); font-size: 12.5px; line-height: 22px; color: var(--ink); }
+.typed > div { display: block; padding-left: 14px; }
+.typed dt { display: inline; color: var(--ink-soft); }
+.typed dt::after { content: ' '; }
+.typed dd { display: inline; margin: 0; }
+.typed .note { display: block; padding-left: 28px; }
+.due-rows { position: relative; margin: 6px 0 0 14px; padding-right: 96px; min-height: 66px; font-family: var(--font-type); font-size: 10px; letter-spacing: .12em; color: var(--ink-soft); line-height: 22px; }
+.due-rows span { display: block; }
+.date-due {
+  position: absolute;
+  right: 12px; bottom: 28px;
+  padding: 4px 10px 3px;
+  transform: rotate(-9deg);
+  font-family: var(--font-type);
+  font-size: 12px;
+  line-height: 1.25;
+  letter-spacing: .1em;
+  text-align: center;
+  color: var(--stamp);
+  border: 2px solid var(--stamp);
+  border-radius: 3px;
+  opacity: .88;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  animation: cc-thunk .35s .3s cubic-bezier(.3,1.6,.5,1) both;
+}
+.date-due b { display: block; font-size: 15px; font-weight: 400; }
+
+@keyframes cc-slide {
+  from { transform: translateY(46px); opacity: .55; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes cc-thunk {
+  0% { transform: rotate(-9deg) scale(2.4); opacity: 0; }
+  70% { transform: rotate(-9deg) scale(.94); opacity: .95; }
+  100% { transform: rotate(-9deg) scale(1); opacity: .88; }
+}
+
+/* ---------- map markers ---------- */
+.cc-marker {
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 4px solid var(--brass);
+  border-top-color: var(--brass-hi);
+  border-bottom-color: var(--brass-lo);
+  background: var(--card);
+  box-shadow: 0 3px 8px rgba(0,0,0,.55);
+  font-family: var(--font-type);
+  font-size: 10px;
+  letter-spacing: 0;
+  color: var(--ink);
+  transition: transform .2s ease, background .2s ease;
+}
+.cc-marker:hover { transform: scale(1.08); }
+.cc-marker.is-active { transform: scale(1.22); background: #fff; box-shadow: 0 0 0 3px var(--rule-red), 0 4px 12px rgba(0,0,0,.6); }
+
+.hidden { display: none !important; }
+
+/* ---------- phone ---------- */
+@media (max-width: 760px) {
+  body.cc-page { display: flex; flex-direction: column; min-height: 100dvh; background: var(--oak-deep); }
+  .cabinet { display: contents; }
+  .cabinet-head { order: 1; margin: 0; border-radius: 0; border-width: 0 0 2px; padding: 10px 16px 8px; }
+  .drawer-fronts { order: 2; padding: 12px 16px; background: var(--wood-grain); }
+  #map { order: 3; }
+  .drawer-wrap { order: 4; flex: none; padding: 14px 16px 24px; background: var(--wood-grain); perspective: none; width: 100%; max-width: 100%; }
+  .drawer { height: auto; transform: none; }
+  .cabinet-head, .drawer-fronts { width: 100%; max-width: 100%; }
+  .card-stack { overflow: visible; }
+  .drawer-lip .label-holder { width: 70%; }
+  .card-body { padding: 8px 12px 40px 26px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .index-card.active, .date-due { animation: none; }
+  .date-due { transform: rotate(-9deg); }
+  .cc-marker, .drawer-front { transition: none; }
+}

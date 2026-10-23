@@ -1,0 +1,617 @@
+/*
+  Periodic Table -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a classroom periodic-table wall chart in
+  which every element tile is a place to eat or drink -- chart-white paper,
+  ink-dark type, six category colour families, atomic numbers, two-letter
+  symbols, a legend that doubles as a filter), deliberately distinct from
+  every other style pack in this folder: Academic Paper, Aero Gadgets, Amber
+  Terminal, Annual Report, Arena, Art Nouveau, Atomic Motel, Audio Guide,
+  Aurora Command, Blueprint, Board Game, Bottom Sheet, Broadcast, Brutalist
+  Guide, Case Board, Celestial Tarot, Chalkboard, Chat Concierge, Chronicle,
+  Clinic Finder, Code Editor, Comic Panel, Constructivist, Data Notebook,
+  Deco Voyage, Dive Log, Drop Culture, E-Ink, Editorial Paper, Estate Luxe,
+  Event Invite, Field Journal, Film Noir, Fleet Ops, Frontier Poster, Grand
+  Hotel, Herbarium, Highway Sign, Illuminated, Isotype, Line Diagram,
+  Memphis, Moving Map, Museum Label, Neon HUD, Nordic Cabin, Orienteering,
+  Papel Picado, Papercraft, Pastel Bento, Pixel Quest, Postcards, Rally
+  Dash, Raw Web, Regatta, Retro OS, Riso Zine, Ski Piste, Slate Console,
+  Soft UI, Split Flap, Stage Profile, Stained Glass, Sticker Book,
+  Storefront, Story Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt, Tiki
+  Lagoon, Trailhead, Treasure Hunt, Trip Kanban, Truck Art, Ukiyo-e Coast,
+  Vapor Sunset, Vintage Chart, Vinyl Crate, Washi Seasons, Watercolor,
+  Weather Console, Whiteboard and Zellige; and also distinct from the 24
+  sibling packs being built in parallel at the same time (Kintsugi,
+  Cyanotype, Crossword, Metal Tour, Cross Stitch, Card Catalog, Seed Packet,
+  Trading Card, Science Fair, Modular Synth, Recipe Card, LCD Watch, Clay
+  Toy, Solarpunk, De Stijl, Block Print, Copacabana, Amphora, Dancheong,
+  Spreadsheet, Pinball, Crayon, Darkroom, Mission Patch).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/periodic-table.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Gantari for headings and element
+  symbols, Ubuntu Mono for atomic numbers and data):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Gantari:wght@500;700;800&family=Ubuntu+Mono:wght@400;700&display=swap" rel="stylesheet" />
+
+  Signature touch: the TABLE SHAPE. Tiles sit on an 18-column chart grid and
+  leave the same hole in the middle that the real table has -- and the hole
+  is put to work: the title and the category key live inside it. Every tile
+  is a filled colour block with a mono atomic number top-left, a mono price
+  ("atomic weight") top-right, a big two-letter symbol and a tiny name.
+
+  Layout archetype: TABLE GRID. Desktop (> 1000px): the top ~45% of the
+  viewport is the periodic table (4 rows, irregular: tall edge columns and a
+  gap in the middle holding title + legend), the bottom ~55% is the map with
+  a small "selected element" card floating at its top-left. Tablet / phone
+  (<= 1000px): map first (45dvh), then the title, the table as a
+  horizontally scrollable grid INSIDE its own container (the page never
+  scrolls sideways), the legend chips and finally the card. The page scrolls
+  vertically there.
+
+  Class/id contract (see periodic-table-template.html in this same folder
+  for a full working example). The demo owns every grid-area placement of
+  tiles (inline grid-column / grid-row) and its own #map.
+
+  - .pt-app                   the page: CSS grid with named areas
+                               (stage / map on desktop; map / head / stage /
+                               legend / card on phone). 100dvh on desktop.
+  - .pt-head                  title block (grid-area: head, or in the table's
+                               gap on desktop)
+    .pt-title                   h1, big Gantari
+    .pt-sub                     small mono caption line
+  - .pt-stage                 the scroll container that holds the table
+                               (overflow-x:auto, grid-area: stage)
+    .pt-grid                    18-column tile grid (4 rows)
+  - .tile                     one element tile (a <button>)
+    .tile.cat-pastry | .cat-seafood | .cat-cafe | .cat-tasca | .cat-wine |
+    .cat-market                 category colour family
+    .tile.is-hover              linked hover (map <-> table)
+    .tile.is-selected           the selected element (ink outline + lift)
+    .tile.is-dim                filtered out by the legend (greyed)
+    .t-no                       atomic number (mono)
+    .t-price                    "weight" = average price in euros (mono)
+    .t-sym                      two-letter symbol (Gantari 800)
+    .t-name                     venue name, one line, ellipsis
+  - .pt-legend                category key + filter (grid-area: legend; in
+                               the table gap on desktop)
+    .legend-title               small-caps heading
+    .legend-chips               wrapper of the chips
+    .legend-chip                a <button> filter chip ([aria-pressed])
+      .chip-sw                    the colour swatch (a tiny tile)
+      .chip-count                 mono count
+  - .pt-map                   map frame (grid-area: map; position:relative).
+                               The demo puts #map inside (absolute, inset 0).
+  - .element-card             the "selected element" card (grid-area: card
+                               on phone; overlaid top-left of the map on
+                               desktop)
+    .big-tile                   large element tile (+ .cat-* class)
+      .bt-no / .bt-sym / .bt-name / .bt-price  its four parts
+    .card-body                  text column
+    .card-kicker                small-caps line (category / neighbourhood)
+    .card-title                 venue name
+    .card-facts                 <dl> of mono facts (dt / dd pairs)
+    .card-note                  one-line description
+  - .status-note              status line (+ .loading / .success / .error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --chart: #F7F8F6;
+  --chart-2: #EDEFEA;
+  --ink: #1E2328;
+  --ink-soft: #454D55;
+  --rule: #C8CDC5;
+
+  --pastry: #F28B6C;
+  --seafood: #3BA6A0;
+  --cafe: #C98B3A;
+  --tasca: #7DB462;
+  --wine: #8E5B9E;
+  --market: #5B9BD5;
+  /* Text colour on each category fill (all >= 4.5:1): ink on five of
+     them, white on plum. */
+  --on-pastry: #1E2328;
+  --on-seafood: #1E2328;
+  --on-cafe: #1E2328;
+  --on-tasca: #1E2328;
+  --on-wine: #FFFFFF;
+  --on-market: #1E2328;
+
+  --success: #2F6B3A;
+  --error: #A3261D;
+
+  --font-head: 'Gantari', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'Ubuntu Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  --pad-x: 24px;
+  --pad-y: 12px;
+  --gap: 6px;
+  --legend-top: 78px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--chart);
+  color: var(--ink);
+  font-family: var(--font-head);
+}
+
+button { font-family: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* ---------- Page grid ---------- */
+
+.pt-app {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 45dvh minmax(0, 1fr);
+  grid-template-areas: "stage" "map";
+  height: 100dvh;
+  overflow: hidden;
+  background:
+    /* faint graph-paper rules, like a printed wall chart */
+    linear-gradient(var(--chart-2) 1px, transparent 1px) 0 0 / 100% 24px,
+    var(--chart);
+}
+
+.pt-stage {
+  grid-area: stage;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: var(--pad-y) var(--pad-x) calc(var(--pad-y) + 2px);
+  border-bottom: 3px solid var(--ink);
+}
+
+.pt-grid {
+  display: grid;
+  grid-template-columns: repeat(18, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  gap: var(--gap);
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ---------- Title + legend live in the table's gap (desktop) ---------- */
+
+.pt-head,
+.pt-legend {
+  grid-area: stage;
+  align-self: start;
+  min-width: 0;
+  /* gap = columns 3..12 of 18 */
+  margin-left: calc(var(--pad-x) + (100% - 2 * var(--pad-x) - 17 * var(--gap)) * 2 / 18 + 2 * var(--gap));
+  width: calc((100% - 2 * var(--pad-x) - 17 * var(--gap)) * 10 / 18 + 9 * var(--gap));
+  margin-top: var(--pad-y);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.pt-head > *, .pt-legend > * { pointer-events: auto; }
+
+.pt-title {
+  margin: 0;
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: clamp(22px, 3.4dvh, 34px);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.pt-title::after {
+  content: '';
+  display: block;
+  width: 64px;
+  height: 4px;
+  margin-top: 6px;
+  background: linear-gradient(90deg,
+    var(--pastry) 0 16.66%, var(--seafood) 0 33.33%, var(--cafe) 0 50%,
+    var(--tasca) 0 66.66%, var(--wine) 0 83.33%, var(--market) 0);
+}
+
+.pt-sub {
+  margin: 6px 0 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink-soft);
+  letter-spacing: 0.02em;
+}
+
+.pt-legend {
+  margin-top: calc(var(--pad-y) + var(--legend-top));
+  /* fill the rest of the 3-row gap, never intrude on row 4 */
+  max-height: calc(((100% - 2 * var(--pad-y) - 2px - 3 * var(--gap)) * 3 / 4) + 2 * var(--gap) - var(--legend-top));
+  overflow: hidden;
+}
+
+.legend-title {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.legend-chips {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--gap);
+}
+
+.legend-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 8px;
+  background: var(--chart);
+  border: 1.5px solid var(--ink);
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.legend-chip .chip-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legend-chip:hover { background: var(--chart-2); }
+
+.legend-chip[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--chart);
+}
+
+.chip-sw {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 3px;
+  border: 1.5px solid var(--ink);
+  font-weight: 800;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.legend-chip[aria-pressed="true"] .chip-sw { border-color: var(--chart); }
+
+.chip-count {
+  flex: none;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  opacity: 1;
+}
+
+/* ---------- Tiles ---------- */
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 4px 5px 4px;
+  border: 1.5px solid var(--ink);
+  border-radius: 4px;
+  background: var(--tile-c, var(--chart-2));
+  color: var(--tile-on, var(--ink));
+  text-align: center;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.2s ease;
+}
+
+.cat-pastry { --tile-c: var(--pastry); --tile-on: var(--on-pastry); }
+.cat-seafood { --tile-c: var(--seafood); --tile-on: var(--on-seafood); }
+.cat-cafe { --tile-c: var(--cafe); --tile-on: var(--on-cafe); }
+.cat-tasca { --tile-c: var(--tasca); --tile-on: var(--on-tasca); }
+.cat-wine { --tile-c: var(--wine); --tile-on: var(--on-wine); }
+.cat-market { --tile-c: var(--market); --tile-on: var(--on-market); }
+
+.t-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.t-sym {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: clamp(20px, 3.5dvh, 30px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.t-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.tile:hover,
+.tile.is-hover {
+  transform: translateY(-2px);
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+.tile.is-selected {
+  box-shadow: 0 0 0 3px var(--chart), 0 0 0 6px var(--ink);
+  z-index: 2;
+  transform: none;
+}
+
+.tile.is-dim {
+  --tile-c: #E3E6E0;
+  --tile-on: #4F575F;
+  border-style: dashed;
+  border-color: #8D959C;
+}
+
+/* ---------- Map + card ---------- */
+
+.pt-map {
+  grid-area: map;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.element-card {
+  grid-area: map;
+  align-self: start;
+  justify-self: start;
+  z-index: 3;
+  margin: 12px 0 0 12px;
+  width: min(340px, calc(100% - 24px));
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px;
+  background: var(--chart);
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.big-tile {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
+  width: 104px;
+  height: 120px;
+  padding: 6px 7px;
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  background: var(--tile-c, var(--chart-2));
+  color: var(--tile-on, var(--ink));
+  text-align: center;
+}
+
+.bt-top {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.bt-sym {
+  font-weight: 800;
+  font-size: 44px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.bt-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.card-body { flex: 1; min-width: 0; }
+
+.card-kicker {
+  margin: 0 0 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.card-title {
+  margin: 0 0 6px;
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.card-facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1px 10px;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.card-facts dt { color: var(--ink-soft); }
+.card-facts dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+
+.card-note {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+
+/* Phone-only map chip (flies to the off-screen Belem cluster) */
+.map-chip {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  padding: 7px 12px;
+  background: var(--chart);
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  box-shadow: 2px 2px 0 var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* ---------- Status ---------- */
+
+.status-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.status-note.loading::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--ink);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: pt-spin 0.8s linear infinite;
+}
+
+.status-note.success { color: var(--success); }
+.status-note.error { color: var(--error); }
+
+@keyframes pt-spin { to { transform: rotate(360deg); } }
+
+.hidden { display: none !important; }
+
+/* Short desktop windows: drop tile names, keep number / symbol / price */
+@media (min-width: 1001px) and (max-height: 760px) {
+  .t-name { display: none; }
+  :root { --legend-top: 66px; }
+  .pt-sub { display: none; }
+}
+
+/* ---------- Tablet / phone ---------- */
+
+@media (max-width: 1000px) {
+  :root { --pad-x: 16px; }
+
+  .pt-app {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+    grid-template-rows: auto;
+    grid-template-areas: "map" "head" "stage" "legend" "card";
+  }
+
+  .pt-map { height: 45dvh; min-height: 300px; border-bottom: 3px solid var(--ink); }
+
+  .pt-head { grid-area: head; }
+  .pt-legend { grid-area: legend; }
+
+  .pt-head,
+  .pt-legend {
+    align-self: stretch;
+    margin: 0;
+    width: auto;
+    max-height: none;
+    overflow: visible;
+    padding: 0 var(--pad-x);
+    pointer-events: auto;
+  }
+
+  .pt-head { padding-top: 14px; padding-bottom: 10px; }
+  .pt-sub { display: block; }
+
+  .pt-stage {
+    padding: 0 var(--pad-x) 12px;
+    border-bottom: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pt-grid {
+    grid-template-columns: repeat(18, 64px);
+    grid-template-rows: repeat(4, 84px);
+    width: max-content;
+    height: auto;
+  }
+
+  .t-sym { font-size: 25px; }
+  .t-name { font-size: 9.5px; }
+  .t-row { font-size: 11px; }
+  .tile { padding: 3px 4px; }
+
+  .pt-legend { padding-top: 4px; padding-bottom: 14px; }
+  .legend-chips { display: flex; flex-wrap: wrap; }
+  .legend-chip { padding: 5px 10px 5px 6px; }
+  .legend-chip .chip-label { flex: none; }
+
+  .element-card {
+    grid-area: card;
+    align-self: stretch;
+    justify-self: stretch;
+    width: auto;
+    margin: 0 var(--pad-x) 20px;
+  }
+}
+
+@media (max-width: 420px) {
+  .element-card { gap: 10px; padding: 10px; }
+  .big-tile { width: 88px; height: 108px; }
+  .bt-sym { font-size: 36px; }
+  .card-title { font-size: 17px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile, .legend-chip { transition: none; }
+  .status-note.loading::before { animation: none; }
+}

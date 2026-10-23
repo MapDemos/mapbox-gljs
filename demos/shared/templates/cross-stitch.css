@@ -1,0 +1,447 @@
+/*
+  Cross Stitch -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a needlework sampler -- off-white Aida
+  cloth with its tiny hole grid, X-stitched pixel motifs, embroidery-floss
+  colours, a stitched alphabet strip and a wooden hoop), deliberately
+  distinct from every other pack in this folder: Academic Paper, Aero
+  Gadgets, Amber Terminal, Annual Report, Arena, Art Nouveau, Atomic Motel,
+  Audio Guide, Aurora Command, Blueprint, Board Game, Bottom Sheet,
+  Broadcast, Brutalist Guide, Case Board, Celestial Tarot, Chalkboard,
+  Chat Concierge, Chronicle, Clinic Finder, Code Editor, Comic Panel,
+  Constructivist, Data Notebook, Deco Voyage, Dive Log, Drop Culture,
+  E-Ink, Editorial Paper, Estate Luxe, Event Invite, Field Journal, Film
+  Noir, Fleet Ops, Frontier Poster, Grand Hotel, Herbarium, Highway Sign,
+  Illuminated, Isotype, Line Diagram, Memphis, Moving Map, Museum Label,
+  Neon HUD, Nordic Cabin, Orienteering, Papel Picado, Papercraft, Pastel
+  Bento, Pixel Quest, Postcards, Rally Dash, Raw Web, Regatta, Retro OS,
+  Riso Zine, Ski Piste, Slate Console, Soft UI, Split Flap, Stage Profile,
+  Stained Glass, Sticker Book, Storefront, Story Scroll, Swiss Grid,
+  Tarmac Glass, Thermal Receipt, Tiki Lagoon, Trailhead, Treasure Hunt,
+  Trip Kanban, Truck Art, Ukiyo-e Coast, Vapor Sunset, Vintage Chart,
+  Vinyl Crate, Washi Seasons, Watercolor, Weather Console, Whiteboard,
+  Zellige; and also distinct from the 25 sibling packs built in parallel
+  (Kintsugi, Cyanotype, Crossword, Metal Tour, Periodic Table, Card
+  Catalog, Seed Packet, Trading Card, Science Fair, Modular Synth, Recipe
+  Card, LCD Watch, Clay Toy, Solarpunk, De Stijl, Block Print, Copacabana,
+  Amphora, Dancheong, Spreadsheet, Pinball, Crayon, Darkroom, Mission
+  Patch).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/cross-stitch.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Jacquard 24 for headings, Livvic
+  for body):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Jacquard+24&family=Livvic:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  Signature touch: the map is framed by a border of real X stitches (a
+  36px SVG tile used as a border-image, red edges, navy corners) drawn
+  OUTSIDE the map, on a cloth whose Aida hole grid is a CSS radial-gradient
+  tiled every 8px. Motifs (and the alphabet strip) are SVG X-stitches that
+  the demo builds from small text pixel grids.
+
+  Class/id contract (see cross-stitch-template.html in this same folder
+  for a full working example):
+
+  - #map                      map container (every demo defines its own
+                               positioning: absolute, inset 0, inside
+                               .map-well)
+  - .sampler                  the page grid: "head hoop" / "map side" on
+                               desktop, stacked on phones. Framed with a
+                               solid navy border + dashed rose outline.
+    .sampler-head               header cell (area: head)
+      .title                      h1, Jacquard 24
+      .tagline                    one-line subtitle
+      .alphabet-strip             inline SVG strip of X-stitched letters
+    .map-frame                  stitched X border (border-image), cloth gap
+      .map-well                   relative box that holds #map
+    .side-panel                 right column (area: side); scrolls if tall
+      .controls                   button row
+      .patches                    grid/list of shop patches
+        .patch (+.active)           a <button>; contains
+          .patch-motif                SVG motif box
+          .patch-name                 shop name
+          .patch-meta                 street / area line
+          .floss-chip                 coloured skein chip (+ label text)
+    .hoop-card                  card (area: hoop) holding the hoop
+      .hoop                       round wooden hoop, .hoop-motif inside
+      .hoop-name / .hoop-floss    selected shop name + floss colour
+  - .btn, .btn-primary,       stitched buttons (dashed inner border)
+    .btn-secondary
+  - .stitch-pin               inner element of a mapboxgl.Marker (numbered
+                               floss-colour disc with a dashed ring);
+                               .stitch-pin.active is the selected one
+  - .status-note (+.loading/  one-line status text
+    .error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --cloth: #F5F0E3;
+  --cloth-deep: #EAE2CE;
+  --hole: rgba(120, 98, 66, 0.30);
+  --red: #C0392B;
+  --navy: #2C3E70;
+  --sage: #7FA36B;
+  --mustard: #D9A441;
+  --rose: #E58FA0;
+  --sky: #8FA8C8;
+  --wood: #C79A5B;
+  --wood-dark: #8E6733;
+  --wood-light: #E2BE86;
+  --ink: #2C3E70;
+  --ink-muted: #5B6585;
+  --thread-shadow: rgba(60, 40, 20, 0.22);
+  --error: #C0392B;
+
+  --font-heading: 'Jacquard 24', 'Georgia', serif;
+  --font-body: 'Livvic', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* tile used as the map's stitched border-image */
+  --x-border: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 36 36' fill='none' stroke-width='2.6' stroke-linecap='round'%3E%3Cpath stroke='%232C3E70' d='M2 2L10 10M10 2L2 10M26 2L34 10M34 2L26 10M2 26L10 34M10 26L2 34M26 26L34 34M34 26L26 34'/%3E%3Cpath stroke='%23C0392B' d='M14 2L22 10M22 2L14 10M2 14L10 22M10 14L2 22M26 14L34 22M34 14L26 22M14 26L22 34M22 26L14 34'/%3E%3C/svg%3E");
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 16px;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.4;
+  /* Aida cloth: tiny holes every 8px over a faint weave */
+  background-color: var(--cloth);
+  background-image:
+    radial-gradient(circle at 50% 50%, var(--hole) 0 1px, transparent 1.6px),
+    repeating-linear-gradient(0deg, rgba(160, 135, 95, 0.07) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(90deg, rgba(160, 135, 95, 0.07) 0 1px, transparent 1px 8px);
+  background-size: 8px 8px, 8px 8px, 8px 8px;
+}
+
+button { font-family: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 3px dashed var(--red);
+  outline-offset: 2px;
+}
+
+/* ---- Sampler frame ---- */
+.sampler {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "head hoop" "map side";
+  gap: 14px 20px;
+  height: calc(100dvh - 32px);
+  padding: 26px 30px 28px;
+  border: 3px solid var(--navy);
+  outline: 2px dashed var(--rose);
+  outline-offset: -12px;
+  background: rgba(245, 240, 227, 0.55);
+  box-shadow: 0 2px 0 var(--cloth-deep), 0 8px 22px var(--thread-shadow);
+}
+
+.sampler-head {
+  grid-area: head;
+  min-width: 0;
+  align-self: center;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: clamp(34px, 4.6vw, 58px);
+  line-height: 1;
+  color: var(--navy);
+  text-shadow: 1px 1px 0 var(--thread-shadow);
+}
+
+.tagline {
+  margin: 6px 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+}
+
+.alphabet-strip {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* ---- Map in a stitched X border ---- */
+.map-frame {
+  grid-area: map;
+  position: relative;
+  min-height: 0;
+  padding: 6px;
+  border: 12px solid transparent;
+  border-image: var(--x-border) 12 round;
+  background: var(--cloth);
+}
+
+.map-well {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--cloth-deep);
+}
+
+/* ---- Side panel + patches ---- */
+.side-panel {
+  grid-area: side;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 2px 4px 4px 2px;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn {
+  position: relative;
+  padding: 10px 16px;
+  border: 2px solid var(--navy);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  background: var(--cloth);
+  color: var(--navy);
+  box-shadow: 0 3px 0 var(--thread-shadow);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1.5px dashed currentColor;
+  border-radius: 3px;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.btn:hover { transform: translateY(-1px); box-shadow: 0 4px 0 var(--thread-shadow); }
+.btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--thread-shadow); }
+.btn:disabled { opacity: 0.6; cursor: default; transform: none; }
+
+.btn-primary { background: var(--red); border-color: #8E2A20; color: #FFF8EC; }
+.btn-secondary { background: var(--cloth); }
+
+.patches {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.patch {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-areas: "motif name" "motif meta" "motif chip";
+  column-gap: 12px;
+  row-gap: 1px;
+  align-items: center;
+  width: 100%;
+  padding: 9px 12px;
+  text-align: left;
+  cursor: pointer;
+  background: #FBF8EE;
+  border: 2px solid #D8CDB0;
+  border-radius: 4px;
+  /* stitched edge on the patch */
+  outline: 1.5px dashed rgba(44, 62, 112, 0.35);
+  outline-offset: -6px;
+  box-shadow: 0 2px 0 var(--thread-shadow);
+  transition: border-color 0.15s ease, transform 0.12s ease;
+}
+
+.patch:hover { border-color: var(--wood); transform: translateY(-1px); }
+.patch.active { border-color: var(--red); background: #FFF6E4; outline-color: var(--red); }
+
+.patch-motif { grid-area: motif; display: block; }
+.patch-motif svg { display: block; width: 100%; height: 56px; }
+.patch-name { grid-area: name; font-weight: 700; font-size: 15px; line-height: 1.2; color: var(--navy); }
+.patch-meta { grid-area: meta; font-size: 12px; color: var(--ink-muted); }
+
+.floss-chip {
+  grid-area: chip;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.floss-chip::before {
+  content: '';
+  flex: none;
+  width: 22px;
+  height: 9px;
+  border-radius: 5px;
+  background:
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.35) 0 2px, transparent 2px 4px),
+    var(--chip, var(--red));
+  box-shadow: 0 1px 0 var(--thread-shadow);
+}
+
+/* ---- Hoop ---- */
+.hoop-card {
+  grid-area: hoop;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding: 4px 4px 0;
+}
+
+.hoop {
+  position: relative;
+  flex: none;
+  width: 118px;
+  height: 118px;
+  margin-top: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, var(--wood-light), var(--wood) 55%, var(--wood-dark));
+  box-shadow: 0 6px 0 var(--thread-shadow), inset 0 0 0 2px rgba(90, 60, 25, 0.35);
+}
+
+/* tightening screw block */
+.hoop::before {
+  content: '';
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  width: 26px;
+  height: 14px;
+  margin-left: -13px;
+  border-radius: 3px;
+  background: linear-gradient(var(--wood-light), var(--wood-dark));
+  box-shadow: inset 0 0 0 1.5px rgba(90, 60, 25, 0.5);
+}
+
+.hoop-cloth {
+  position: absolute;
+  inset: 11px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background-color: var(--cloth);
+  background-image: radial-gradient(circle at 50% 50%, var(--hole) 0 1px, transparent 1.6px);
+  background-size: 8px 8px;
+  box-shadow: inset 0 0 0 3px #A97C3F, inset 0 4px 8px rgba(60, 40, 20, 0.25);
+}
+
+.hoop-motif { display: block; width: 66px; height: 66px; }
+
+.hoop-name {
+  font-family: var(--font-heading);
+  font-size: 26px;
+  line-height: 1.05;
+  color: var(--navy);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.hoop-floss {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+/* ---- Map markers (inner element only; never style the Marker root) ---- */
+.stitch-pin {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  border: 3px solid #FFF8EC;
+  background: var(--pin, var(--red));
+  color: #FFF8EC;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px var(--navy), 0 3px 6px var(--thread-shadow);
+  transition: transform 0.15s ease;
+}
+
+.stitch-pin.active { transform: scale(1.25); box-shadow: 0 0 0 3px var(--navy), 0 0 0 6px rgba(255, 248, 236, 0.9), 0 3px 8px var(--thread-shadow); }
+
+/* ---- Status ---- */
+.status-note {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.status-note.error { color: var(--error); }
+
+.status-note.loading::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  background: var(--red);
+  animation: stitch-blink 1.1s steps(2, end) infinite;
+}
+
+@keyframes stitch-blink { 50% { opacity: 0.15; } }
+
+.hidden { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn, .patch, .stitch-pin { transition: none; }
+  .status-note.loading::after { animation: none; }
+}
+
+/* ---- Phone: header, map ~45dvh, patches 2-col, hoop card ---- */
+@media (max-width: 760px) {
+  body { padding: 10px; }
+  .sampler {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-template-areas: "head" "map" "side" "hoop";
+    height: auto;
+    padding: 22px 16px 22px;
+    gap: 14px;
+    outline-offset: -8px;
+  }
+  .map-frame { height: 45dvh; min-height: 300px; }
+  .side-panel { overflow: visible; padding: 0; }
+  .patches { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .patch {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "motif" "name" "meta" "chip";
+    justify-items: start;
+    padding: 10px;
+  }
+  .patch-motif { width: 100%; }
+  .patch-motif svg { height: 48px; }
+  .hoop-card { justify-content: center; padding-bottom: 6px; }
+}

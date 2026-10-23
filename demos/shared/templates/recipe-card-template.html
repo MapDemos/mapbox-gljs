@@ -1,0 +1,204 @@
+<!--
+  Working EXAMPLE of the Recipe Card style pack (recipe-card.css, in this same
+  folder). Open this file directly to see the pattern working with a seven-stop
+  food walk through the historic centre of Bologna on Mapbox Standard (faded
+  theme, day preset). The map is taped to a red gingham tablecloth like a
+  polaroid; beside it sits a lined recipe card whose "ingredients" are the
+  stops. Tick a stop (or click its pen-drawn marker): the line is struck
+  through, a basil leaf lands on the marker, the camera flies to the next
+  untasted stop and the note counts "3 of 7 tasted". "Start over" resets
+  (reduced motion: instant jumps). The walking route is a one-time Mapbox
+  Directions (walking) result, simplified and embedded below.
+  Copy the markup into your own demo and link recipe-card.css from its <head>
+  -- see the class/id contract documented at the top of that CSS file.
+
+  This is a brand-new style, not extracted from an existing demo -- built from
+  a design brief (grandma's handwritten recipe card on a gingham tablecloth) at
+  the user's request. Streets and the market are real; shop names, the cook and
+  the recipe copy are fictional placeholders -- swap in your own.
+
+  What's NOT included: search/geocoding, live routing, popups, or a hard-coded
+  access token (demo-kit.js sets that).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>A Bologna Food Walk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&family=Merriweather:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet" />
+<link href="recipe-card.css" rel="stylesheet" />
+<script src="../demo-kit.js"></script>
+<style>
+  /* Demo-owned: every demo positions its own #map (inside the photo window). */
+  #map { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<main class="table">
+  <section class="photo" aria-label="Map of the walk">
+    <span class="tape tape-photo" aria-hidden="true"></span>
+    <div class="photo-well">
+      <div id="map"></div>
+      <p class="status-note" id="status-note">Setting the table&hellip;</p>
+    </div>
+    <p class="photo-caption">Bologna, the long way round</p>
+  </section>
+
+  <article class="card" aria-label="Recipe card">
+    <span class="tape tape-card" aria-hidden="true"></span>
+    <span class="stain" aria-hidden="true"></span>
+    <p class="card-from">From the kitchen of <b>Nonna Adriana</b></p>
+    <h1 class="card-title">A Bologna Food Walk</h1>
+    <p class="card-meta">Serves: 2 hungry walkers &middot; Time: 3 hrs</p>
+
+    <h2 class="card-h">Ingredients</h2>
+    <ul class="ingredients" id="ingredients"></ul>
+
+    <h2 class="card-h">Method</h2>
+    <ol class="method">
+      <li class="step">Start early, before the arcades fill up.</li>
+      <li class="step">Walk slowly. Never pass a shop without looking in.</li>
+      <li class="step">Taste one thing at each stop, no more.</li>
+      <li class="step">Keep to the shade of the porticoes if it is hot.</li>
+      <li class="step">Finish in the piazza and sit a while.</li>
+    </ol>
+
+    <p class="progress" id="progress" aria-live="polite">0 of 7 tasted</p>
+    <div class="card-actions"><button class="btn" id="reset" type="button">Start over</button></div>
+  </article>
+</main>
+
+<script>
+// Seven stops, snapped to the walking network by the Directions API.
+// Shop names are fictional; streets are real. [lng, lat]
+const STOPS = [
+  { name: 'Mercato di Mezzo', note: 'Via Pescherie Vecchie', coord: [11.343969, 44.49371], nudge: [14, 12] },
+  { name: 'A bag of figs in the Quadrilatero', note: 'Via Sampieri', coord: [11.346787, 44.493036] },
+  { name: 'Sfoglina Rosa, tortellini lab', note: 'off Via Farini', coord: [11.348729, 44.491239] },
+  { name: 'Salumeria Gallina, mortadella', note: 'Via Farini', coord: [11.343608, 44.491428] },
+  { name: 'Gelateria Dolcezza', note: 'Via Marsala', coord: [11.344298, 44.497491] },
+  { name: "Osteria dell'Orto", note: "Via dell'Abbadia", coord: [11.334239, 44.497333] },
+  { name: 'Piazza Maggiore', note: 'sit down, finally', coord: [11.343236, 44.493913], nudge: [-18, -14] },
+];
+
+// Simplified one-time Directions (walking) result through the seven stops.
+const ROUTE = [[11.34397,44.49371],[11.34435,44.49365],[11.34515,44.49348],[11.34527,44.49388],[11.34644,44.49371],[11.34642,44.49316],[11.34639,44.49297],[11.34679,44.49304],[11.34711,44.49315],[11.34716,44.49312],[11.34772,44.49256],[11.3481,44.49208],[11.34862,44.49151],[11.34849,44.4914],[11.34847,44.49131],[11.34873,44.49124],[11.34847,44.49131],[11.34849,44.4914],[11.34826,44.49143],[11.34741,44.49152],[11.34648,44.49155],[11.34519,44.49155],[11.34503,44.4915],[11.34488,44.49149],[11.34175,44.49136],[11.34186,44.49211],[11.34196,44.49242],[11.34206,44.49287],[11.34234,44.49363],[11.34259,44.49359],[11.34292,44.49472],[11.34267,44.49477],[11.34292,44.49556],[11.34285,44.49557],[11.34286,44.49564],[11.34285,44.49564],[11.34294,44.49597],[11.34295,44.49597],[11.34299,44.49608],[11.34305,44.49607],[11.34346,44.49754],[11.34347,44.49757],[11.3443,44.49749],[11.34196,44.49774],[11.34226,44.49883],[11.34181,44.49877],[11.34136,44.49876],[11.33936,44.49895],[11.33849,44.499],[11.33829,44.49892],[11.33588,44.49848],[11.3353,44.49828],[11.33508,44.49827],[11.33472,44.49821],[11.33435,44.49828],[11.33401,44.49748],[11.33403,44.49745],[11.33424,44.49733],[11.33426,44.49731],[11.33427,44.49725],[11.33424,44.49721],[11.33508,44.49706],[11.33548,44.49703],[11.33657,44.49716],[11.33705,44.49619],[11.33697,44.49602],[11.33725,44.49595],[11.33724,44.49592],[11.3377,44.49582],[11.33767,44.49576],[11.33782,44.49574],[11.33778,44.49559],[11.33774,44.49559],[11.33773,44.49555],[11.33974,44.49528],[11.34084,44.4951],[11.34103,44.49508],[11.34107,44.49511],[11.34248,44.49486],[11.34252,44.4948],[11.34292,44.49472],[11.34279,44.49425],[11.34325,44.49418],[11.34317,44.49392],[11.34324,44.49391]];
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+const phone = () => window.matchMedia('(max-width: 760px)').matches;
+let activeIdx = -1;
+const items = [];   // { li, input, doodle }
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/standard',
+  config: {
+    basemap: {
+      lightPreset: 'day',
+      theme: 'faded',
+      showPointOfInterestLabels: false,
+      showTransitLabels: false,
+    },
+  },
+  bounds: boundsOf(ROUTE),
+  fitBoundsOptions: { padding: pad() },
+  attributionControl: true,
+});
+
+function boundsOf(coords) {
+  return coords.reduce((b, c) => b.extend(c), new mapboxgl.LngLatBounds(coords[0], coords[0]));
+}
+function pad() { return phone() ? { top: 40, bottom: 64, left: 30, right: 30 } : { top: 50, bottom: 70, left: 50, right: 50 }; }
+
+function moveTo(opts) {
+  if (reduce) map.jumpTo(opts.fit ? map.cameraForBounds(opts.fit, { padding: pad() }) : opts);
+  else if (opts.fit) map.fitBounds(opts.fit, { padding: pad(), duration: 1800 });
+  else map.flyTo({ ...opts, duration: 2200, essential: false });
+}
+
+function flyToStop(i) {
+  moveTo({ center: STOPS[i].coord, zoom: 16.2, padding: pad() });
+}
+
+/* ---- Ingredients + markers ---- */
+STOPS.forEach((s, i) => {
+  const li = document.createElement('li');
+  li.className = 'ing';
+  li.innerHTML = `<label class="ing-tick"><input type="checkbox" /><span class="ing-box"></span>` +
+    `<span class="ing-name">${s.name} <span class="ing-note">${s.note}</span></span></label>`;
+  const input = li.querySelector('input');
+  input.addEventListener('change', () => onTick(i, input.checked));
+  $('ingredients').appendChild(li);
+
+  // Marker root stays untouched; only the inner child is styled.
+  const root = document.createElement('div');
+  root.innerHTML = `<button class="doodle" type="button" aria-label="Stop ${i + 1}: ${s.name}">${i + 1}<span class="leaf"></span></button>`;
+  const doodle = root.firstElementChild;
+  doodle.addEventListener('click', () => { input.checked = !input.checked; onTick(i, input.checked); });
+  // nudge pushes 1 and 7 (about 60 m apart) away from each other at overview zoom
+  new mapboxgl.Marker({ element: root, offset: s.nudge || [0, 0] }).setLngLat(s.coord).addTo(map);
+  items.push({ li, input, doodle });
+});
+
+function setActive(i) {
+  activeIdx = i;
+  items.forEach((it, k) => {
+    it.li.classList.toggle('active', k === i);
+    it.doodle.classList.toggle('active', k === i);
+  });
+}
+
+function onTick(i, on) {
+  items[i].li.classList.toggle('done', on);
+  items[i].doodle.classList.toggle('done', on);
+  const n = items.filter((it) => it.input.checked).length;
+  if (on) {
+    const next = items.findIndex((it) => !it.input.checked);
+    if (next >= 0) { setActive(next); flyToStop(next); }
+    else { setActive(-1); moveTo({ fit: boundsOf(ROUTE) }); }
+  } else {
+    setActive(i);
+    flyToStop(i);
+  }
+  $('progress').textContent = n === STOPS.length ? 'All 7 tasted. Buon appetito!' : `${n} of ${STOPS.length} tasted`;
+}
+
+$('reset').addEventListener('click', () => {
+  items.forEach((it) => { it.input.checked = false; it.li.classList.remove('done'); it.doodle.classList.remove('done'); });
+  setActive(0);
+  $('progress').textContent = `0 of ${STOPS.length} tasted`;
+  moveTo({ fit: boundsOf(ROUTE) });
+});
+
+/* ---- Map lifecycle ---- */
+map.on('style.load', () => {
+  map.addSource('walk', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE } } });
+  // Pale "chalk" under-stroke so the pen line reads on any basemap colour.
+  map.addLayer({ id: 'walk-halo', type: 'line', source: 'walk', slot: 'middle',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#FFFDF5', 'line-width': 7, 'line-opacity': 0.8, 'line-emissive-strength': 1 } });
+  map.addLayer({ id: 'walk-pen', type: 'line', source: 'walk', slot: 'middle',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#23395B', 'line-width': 3.5, 'line-dasharray': [7, 1.2], 'line-emissive-strength': 1 } });
+  $('status-note').classList.add('hidden');
+  setActive(0);
+});
+
+map.on('error', (e) => {
+  const n = $('status-note');
+  n.classList.remove('hidden');
+  n.classList.add('error');
+  n.textContent = 'Map error: ' + ((e.error && e.error.message) || 'unknown');
+});
+
+// The photo window is sized by CSS grid / dvh: keep the canvas in step with it.
+new ResizeObserver(() => map.resize()).observe($('map').parentElement);
+</script>
+</body>
+</html>

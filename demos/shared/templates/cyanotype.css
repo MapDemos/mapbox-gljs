@@ -1,0 +1,488 @@
+/*
+  Cyanotype -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: a 19th-century sun print -- deep Prussian
+  blue paper with ghostly white photogram silhouettes of seaweed and ferns,
+  a brushed, irregular emulsion edge, and pencilled captions on cream
+  watercolour paper), deliberately distinct from every other style pack in
+  this folder: Academic Paper, Aero Gadgets, Amber Terminal, Annual Report,
+  Arena, Art Nouveau, Atomic Motel, Audio Guide, Aurora Command, Blueprint,
+  Board Game, Bottom Sheet, Broadcast, Brutalist Guide, Case Board, Celestial
+  Tarot, Chalkboard, Chat Concierge, Chronicle, Clinic Finder, Code Editor,
+  Comic Panel, Constructivist, Data Notebook, Deco Voyage, Dive Log, Drop
+  Culture, E-Ink, Editorial Paper, Estate Luxe, Event Invite, Field Journal,
+  Film Noir, Fleet Ops, Frontier Poster, Grand Hotel, Herbarium, Highway
+  Sign, Illuminated, Isotype, Line Diagram, Memphis, Moving Map, Museum
+  Label, Neon HUD, Nordic Cabin, Orienteering, Papel Picado, Papercraft,
+  Pastel Bento, Pixel Quest, Postcards, Rally Dash, Raw Web, Regatta, Retro
+  OS, Riso Zine, Ski Piste, Slate Console, Soft UI, Split Flap, Stage
+  Profile, Stained Glass, Sticker Book, Storefront, Story Scroll, Swiss
+  Grid, Tarmac Glass, Thermal Receipt, Tiki Lagoon, Trailhead, Treasure Hunt,
+  Trip Kanban, Truck Art, Ukiyo-e Coast, Vapor Sunset, Vintage Chart, Vinyl
+  Crate, Washi Seasons, Watercolor, Weather Console, Whiteboard and Zellige;
+  and also distinct from the 24 sibling packs being built in parallel at the
+  same time (Kintsugi, Crossword, Metal Tour, Periodic Table, Cross Stitch,
+  Card Catalog, Seed Packet, Trading Card, Science Fair, Modular Synth,
+  Recipe Card, LCD Watch, Clay Toy, Solarpunk, De Stijl, Block Print,
+  Copacabana, Amphora, Dancheong, Spreadsheet, Pinball, Crayon, Darkroom and
+  Mission Patch).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/cyanotype.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Bellefair for headings, Petrona for
+  body copy and pencilled captions):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bellefair&family=Petrona:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
+
+  Signature touch: the map is the big "print" and its blue emulsion border
+  is brushed and irregular -- a decorative layer (.print-frame::before)
+  distorted by an inline SVG turbulence filter (#cy-brush, defined once in
+  the page markup), drawn OUTSIDE the map rectangle so it can never cover the
+  Mapbox logo or attribution. Beside it, small square prints carry white
+  photogram silhouettes on blue, each with a pencilled caption underneath.
+  Sun-print white is used for ink on blue; foxing (#C9B98F) appears only as a
+  few tiny specks on the paper and the pencil underline of the active caption.
+
+  Layout archetype: CONTACT PRINT SHEET. Desktop: the page is a sheet of
+  watercolour paper; the main print (map) on the left, a right column with
+  the Expose control, five small square prints (2 columns) and a caption
+  card. Phone (<= 720px): main print on top, the five small prints as a
+  horizontal scroll strip below, then the caption card; the page scrolls.
+
+  Class/id contract (see cyanotype-template.html in this same folder for a
+  full working example):
+
+  - .sheet                    the page: watercolour paper, CSS grid
+    .sheet-head                title block across the top
+      .sheet-title               Bellefair title
+      .sheet-sub                 pencilled sub line (italic Petrona)
+  - .print-main               left column: frame + legend line
+    .print-frame                brushed blue emulsion border (::before is the
+                                 filtered decorative layer, ::after a pale
+                                 inner rule); padding leaves the map clear
+    .print-well                 the window that holds the map; the demo owns
+                                 #map inside it (position:absolute; inset:0)
+    .print-legend               pencilled line under the print (current
+                                 station / figure caption)
+  - .side                     right column wrapper
+    .controls                   row holding the Expose / Overview buttons
+    .meter                      exposure meter -- .meter-label + .meter-bar
+                                 > .meter-fill (set width from JS)
+  - .contact                  the five small prints (3-col grid on desktop,
+                               horizontal scroll strip on phone)
+    .tile                       a button: .tile-img (blue square, holds the
+                                 inline <svg> silhouette) + .tile-cap
+      .tile-no                    small roman numeral / number
+      .tile-name                  pencilled station name
+    .tile.active                active print: pale ring + foxed underline
+  - .caption-card             station card: .cap-no, .cap-title, .cap-place,
+                               .cap-text
+  - .btn, .btn-primary,       buttons: thin Prussian edge, uppercase small
+    .btn-secondary              Bellefair; primary is filled blue
+  - .stn-dot                  (optional) HTML marker inner child styling
+  - .status-note              one-line pencilled status (+ .loading / .error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --prussian: #1D3F73;
+  --prussian-deep: #12294D;
+  --prussian-pale: #8FB3DD;
+  --sunprint: #F1F5FA;
+  --foxing: #C9B98F;
+
+  --paper: #F4F1E8;
+  --paper-edge: #E6E1D2;
+  --graphite: #4B5566;
+  --graphite-soft: #7A8394;
+  --rule: rgba(29, 63, 115, 0.22);
+  --error: #9E3A2E;
+
+  --font-head: 'Bellefair', 'Cormorant Garamond', Georgia, serif;
+  --font-body: 'Petrona', Georgia, 'Times New Roman', serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  color: var(--prussian-deep);
+  font-family: var(--font-body);
+  background-color: var(--paper);
+  /* Watercolour-paper tooth (faint noise) plus four tiny foxing specks. */
+  background-image:
+    radial-gradient(circle at 8% 14%, rgba(201, 185, 143, 0.55) 0 2px, transparent 3px),
+    radial-gradient(circle at 93% 62%, rgba(201, 185, 143, 0.45) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 41% 96%, rgba(201, 185, 143, 0.5) 0 2px, transparent 3px),
+    radial-gradient(circle at 64% 5%, rgba(201, 185, 143, 0.4) 0 1.5px, transparent 2.5px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--prussian);
+  outline-offset: 3px;
+}
+
+/* ---------- Page ---------- */
+.sheet {
+  max-width: 1400px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 20px 28px 28px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-rows: auto 1fr;
+  gap: 12px 28px;
+  align-items: start;
+}
+
+.sheet-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px 22px;
+  flex-wrap: wrap;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.sheet-title {
+  margin: 0;
+  font-family: var(--font-head);
+  font-weight: 400;
+  font-size: 34px;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  color: var(--prussian);
+}
+
+.sheet-sub {
+  margin: 0;
+  font-style: italic;
+  font-size: 15px;
+  color: var(--graphite);
+}
+
+/* ---------- Main print ---------- */
+.print-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.print-frame {
+  position: relative;
+  isolation: isolate;
+  padding: 22px;
+}
+
+/* Brushed, irregular emulsion edge: a blue layer distorted by the SVG
+   filter. It sits behind (z-index -1) and entirely around the map well. */
+.print-frame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(100deg, rgba(143, 179, 221, 0.22), transparent 30%, rgba(18, 41, 77, 0.35) 100%),
+    var(--prussian);
+  border-radius: 3px;
+  filter: url(#cy-brush);
+  box-shadow: 0 8px 22px rgba(18, 41, 77, 0.18);
+}
+
+/* Pale inner rule, in the frame margin only (the map well is above it). */
+.print-frame::after {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  border: 1px solid rgba(143, 179, 221, 0.55);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.print-well {
+  position: relative;
+  height: clamp(440px, calc(100dvh - 194px), 760px);
+  background: var(--prussian-deep);
+  outline: 1px solid rgba(241, 245, 250, 0.45);
+}
+
+.print-legend {
+  margin: 0;
+  min-height: 1.4em;
+  font-style: italic;
+  font-size: 15px;
+  color: var(--graphite);
+  padding-left: 6px;
+}
+
+/* ---------- Side column ---------- */
+.side {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  flex: 1 1 auto;
+  padding: 10px 16px;
+  border: 1px solid var(--prussian);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--prussian);
+  font-family: var(--font-head);
+  font-size: 17px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.btn:hover { background: rgba(29, 63, 115, 0.09); }
+
+.btn-primary {
+  background: var(--prussian);
+  color: var(--sunprint);
+}
+
+.btn-primary:hover { background: var(--prussian-deep); }
+
+.btn-secondary { border-color: var(--rule); color: var(--graphite); }
+
+.btn:disabled { opacity: 0.5; cursor: default; }
+
+.meter {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.meter-label {
+  font-style: italic;
+  font-size: 13px;
+  color: var(--graphite);
+}
+
+.meter-bar {
+  position: relative;
+  height: 8px;
+  border: 1px solid var(--prussian);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 calc(12.5% - 1px), rgba(29, 63, 115, 0.35) calc(12.5% - 1px) 12.5%);
+}
+
+.meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: linear-gradient(90deg, var(--prussian-pale), var(--prussian));
+  opacity: 0.85;
+}
+
+/* ---------- Small prints ---------- */
+.contact {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tile {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.tile-img {
+  display: block;
+  width: 100%;
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 2px 3px 2px 4px;
+  background:
+    radial-gradient(circle at 50% 42%, #2D5A9A 0%, var(--prussian) 55%, var(--prussian-deep) 100%);
+  box-shadow: 0 0 0 3px var(--paper), 0 0 0 4px rgba(29, 63, 115, 0.3), 0 4px 10px rgba(18, 41, 77, 0.2);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.tile-img svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 3px rgba(241, 245, 250, 0.5));
+}
+
+.tile:hover .tile-img { transform: translateY(-2px); }
+
+.tile.active .tile-img {
+  box-shadow: 0 0 0 3px var(--paper), 0 0 0 5px var(--prussian-pale), 0 6px 14px rgba(18, 41, 77, 0.28);
+}
+
+.tile-cap {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  line-height: 1.25;
+}
+
+.tile-no {
+  display: block;
+  font-family: var(--font-head);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--graphite-soft);
+}
+
+.tile-name {
+  display: inline;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--graphite);
+  background-image: linear-gradient(var(--foxing), var(--foxing));
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0 1.5px;
+  transition: background-size 0.3s ease;
+}
+
+.tile.active .tile-name { background-size: 100% 1.5px; }
+
+/* ---------- Caption card ---------- */
+.caption-card {
+  padding: 14px 16px 16px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: rgba(251, 249, 243, 0.8);
+  box-shadow: 0 6px 16px rgba(18, 41, 77, 0.08);
+}
+
+.cap-no {
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--graphite-soft);
+}
+
+.cap-title {
+  margin: 2px 0 0;
+  font-family: var(--font-head);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.15;
+  color: var(--prussian);
+}
+
+.cap-place {
+  margin: 2px 0 8px;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--graphite);
+}
+
+.cap-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--prussian-deep);
+}
+
+/* ---------- Map markers / status ---------- */
+.stn-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--sunprint);
+  border: 3px solid var(--prussian);
+  box-shadow: 0 0 0 2px rgba(241, 245, 250, 0.6);
+  cursor: pointer;
+}
+
+.status-note {
+  margin: 0;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--graphite);
+}
+
+.status-note.loading::after {
+  content: '';
+  display: inline-block;
+  width: 0.9em;
+  animation: cy-dots 1.2s steps(4, end) infinite;
+  overflow: hidden;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+@keyframes cy-dots {
+  0% { content: ''; }
+  34% { content: '.'; }
+  67% { content: '..'; }
+  100% { content: '...'; }
+}
+
+.status-note.error { color: var(--error); }
+
+.hidden { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tile-img, .tile-name, .btn { transition: none; }
+  .status-note.loading::after { animation: none; content: '...'; }
+}
+
+/* ---------- Phone ---------- */
+@media (max-width: 720px) {
+  .sheet {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    padding: 16px;
+    gap: 14px;
+  }
+
+  .sheet-title { font-size: 28px; }
+
+  .print-frame { padding: 14px; }
+  .print-frame::after { inset: 6px; }
+
+  .print-well { height: min(50dvh, 440px); min-height: 320px; }
+
+  .side { display: contents; }
+  .controls { order: 2; }
+  .meter { order: 3; }
+  .contact {
+    order: 4;
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    padding: 6px 6px 10px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+  .contact > li { flex: 0 0 118px; scroll-snap-align: start; }
+  .caption-card { order: 5; }
+  .status-note { order: 6; }
+}

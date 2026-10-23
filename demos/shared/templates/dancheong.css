@@ -1,0 +1,559 @@
+/*
+  Dancheong -- a new style pack, not extracted from an existing demo
+  (built from a fresh design brief: the vivid painted decoration on Korean
+  palace eaves and beams -- five-direction colours of green, red, yellow,
+  blue, white and black in lotus, cloud and banded geometric motifs, set on
+  dark timber under a curved roof-tile silhouette), deliberately distinct
+  from every other pack in this folder: Academic Paper, Aero Gadgets, Amber
+  Terminal, Annual Report, Arena, Art Nouveau, Atomic Motel, Audio Guide,
+  Aurora Command, Blueprint, Board Game, Bottom Sheet, Broadcast, Brutalist
+  Guide, Case Board, Celestial Tarot, Chalkboard, Chat Concierge, Chronicle,
+  Clinic Finder, Code Editor, Comic Panel, Constructivist, Data Notebook,
+  Deco Voyage, Dive Log, Drop Culture, E-Ink, Editorial Paper, Estate Luxe,
+  Event Invite, Field Journal, Film Noir, Fleet Ops, Frontier Poster, Grand
+  Hotel, Herbarium, Highway Sign, Illuminated, Isotype, Line Diagram,
+  Memphis, Moving Map, Museum Label, Neon HUD, Nordic Cabin, Orienteering,
+  Papel Picado, Papercraft, Pastel Bento, Pixel Quest, Postcards, Rally
+  Dash, Raw Web, Regatta, Retro OS, Riso Zine, Ski Piste, Slate Console,
+  Soft UI, Split Flap, Stage Profile, Stained Glass, Sticker Book,
+  Storefront, Story Scroll, Swiss Grid, Tarmac Glass, Thermal Receipt, Tiki
+  Lagoon, Trailhead, Treasure Hunt, Trip Kanban, Truck Art, Ukiyo-e Coast,
+  Vapor Sunset, Vintage Chart, Vinyl Crate, Washi Seasons, Watercolor,
+  Weather Console, Whiteboard, Zellige; and also distinct from the 24
+  sibling packs built in parallel (Kintsugi, Cyanotype, Crossword, Metal
+  Tour, Periodic Table, Cross Stitch, Card Catalog, Seed Packet, Trading
+  Card, Science Fair, Modular Synth, Recipe Card, LCD Watch, Clay Toy,
+  Solarpunk, De Stijl, Block Print, Copacabana, Amphora, Spreadsheet,
+  Pinball, Crayon, Darkroom, Mission Patch).
+
+  Usage: link this file from a new demo's <head> --
+    <link href="shared/templates/dancheong.css" rel="stylesheet" />
+  plus the two Google Fonts it expects (Gowun Batang for headings, a
+  Korean-friendly serif; Gothic A1 for body text):
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gothic+A1:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  Signature touch: the painted "eave" -- a curved roof-tile silhouette over
+  an inline-SVG band of lotus rosettes, cloud scrolls and banded strips.
+  The top stripe of the band (.hl-rect) reads the CSS variable --hl, so a
+  demo can repaint it in the five-direction colour of whatever is selected
+  (document.documentElement.style.setProperty('--hl', '#C8372D')).
+
+  Class/id contract (see dancheong-template.html in this same folder for a
+  full working example):
+
+  - .hall                     page wrapper: 100dvh grid on desktop (eave
+                               row + stage row), scrolling column on phone
+  - .eave                     the painted header: dark beam backdrop
+    .eave-roof                  curved roof-tile silhouette (CSS only)
+    .eave-band                  holds the explicit-height inline <svg>
+                                 band; the SVG uses viewBox 0 0 2400 76
+                                 with preserveAspectRatio xMidYMin slice
+      .hl-rect                    SVG rect in the band that follows --hl
+    .eave-bar                   overlay row on the band: title + toggle
+    .eave-title                 hanji-paper title plaque (h1 + .sub)
+    .lang-toggle > .lang-btn    EN / Korean segmented toggle
+                                 ([aria-pressed="true"] = active)
+  - .stage                    grid under the eave: pillar | main
+  - .pillar                   dark-wood vertical panel (palace list)
+    .pillar-head                small label with painted rule
+    .palace-list > li > .palace-item
+                                one button per palace; set --c on the
+                                button to the palace colour; .active
+                                marks the selection
+      .bracket                  tiny painted bracket SVG inside the item
+      .pi-name / .pi-sub        primary and secondary name lines
+  - .main                     column holding the map frame and the plaque
+    .frame                    hanji-paper frame around the map
+      .map-well                 positioned box holding #map (demo-owned)
+    .plaque                   hyeonpan: green painted name board
+      .plaque-seal              coloured square (--c) with the lotus
+      .plaque-name / .plaque-ko   heading and its secondary-language line
+      .plaque-meta > div > dt/dd  year + main gate pairs
+      .plaque-note              one-line description
+  - .dc-marker > .dc-pin      round HTML marker (style the inner .dc-pin,
+                               set --c; .active enlarges it)
+  - .btn, .btn-primary,       lacquered buttons; .btn-secondary is the
+    .btn-secondary              quiet variant
+  - .status-note (+.loading/  small italic status line
+    .success/.error)
+  - .hidden                   utility: display: none !important
+*/
+
+:root {
+  --green: #1E8C6E;
+  --green-deep: #146650;
+  --red: #C8372D;
+  --yellow: #E8B23A;
+  --blue: #2E5C9A;
+  --white: #F7F3EA;
+  --ink: #1B1B1B;
+  --wood: #5A3B28;
+  --wood-deep: #2E1D13;
+  --hanji: #F3ECDD;
+  --hanji-shade: #E4D9C0;
+  --hl: #E8B23A;
+  --error: #C8372D;
+  --success: #146650;
+
+  --font-heading: 'Gowun Batang', 'Noto Serif KR', 'Batang', Georgia, serif;
+  --font-body: 'Gothic A1', 'Noto Sans KR', 'Malgun Gothic', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background-color: var(--hanji);
+  color: var(--ink);
+  font-family: var(--font-body);
+  /* faint hanji fibres */
+  background-image: repeating-linear-gradient(100deg, rgba(90, 59, 40, 0.035) 0 1px, transparent 1px 7px);
+}
+
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: 3px solid var(--yellow);
+  outline-offset: 2px;
+}
+
+.hall {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* ---------- Eave ---------- */
+.eave {
+  position: relative;
+  background: var(--wood-deep);
+  border-bottom: 4px solid var(--ink);
+  box-shadow: 0 6px 16px rgba(46, 29, 19, 0.35);
+}
+
+.eave-roof {
+  height: 34px;
+  background:
+    repeating-linear-gradient(90deg, rgba(247, 243, 234, 0.13) 0 2px, transparent 2px 15px),
+    linear-gradient(#3a3a3a, var(--ink));
+  clip-path: ellipse(82% 100% at 50% 0);
+}
+
+.eave-band {
+  position: relative;
+  height: 76px;
+  overflow: hidden;
+}
+
+.eave-band > svg {
+  display: block;
+  width: 100%;
+  height: 76px;
+}
+
+.hl-rect {
+  fill: var(--hl);
+  transition: fill 0.45s ease;
+}
+
+.eave-bar {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 24px;
+  pointer-events: none;
+}
+
+.eave-bar > * { pointer-events: auto; }
+
+.eave-title {
+  min-width: 0;
+  background: var(--hanji);
+  border: 3px solid var(--wood);
+  outline: 2px solid var(--yellow);
+  outline-offset: -6px;
+  padding: 6px 22px 7px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+}
+
+.eave-title h1 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.eave-title .sub {
+  margin-top: 1px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--wood);
+}
+
+.lang-toggle {
+  display: inline-flex;
+  border: 3px solid var(--wood);
+  background: var(--hanji);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+}
+
+.lang-btn {
+  border: 0;
+  background: transparent;
+  padding: 7px 14px;
+  min-height: 36px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--wood);
+  cursor: pointer;
+}
+
+.lang-btn + .lang-btn { border-left: 2px solid var(--wood); }
+
+.lang-btn[aria-pressed="true"] {
+  background: var(--red);
+  color: var(--white);
+}
+
+/* ---------- Stage ---------- */
+.stage {
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  gap: 22px;
+  padding: 20px 24px 22px;
+  min-height: 0;
+}
+
+/* ---------- Pillar ---------- */
+.pillar {
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 14px 18px;
+  color: var(--white);
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.14) 0 2px, transparent 2px 9px),
+    linear-gradient(90deg, var(--wood-deep), var(--wood) 14%, var(--wood) 86%, var(--wood-deep));
+  border-top: 10px solid var(--red);
+  border-bottom: 10px solid var(--blue);
+  box-shadow: inset 0 0 0 2px var(--ink), 0 8px 18px rgba(46, 29, 19, 0.3);
+  align-self: start;
+  max-height: 100%;
+}
+
+.pillar-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--yellow);
+}
+
+.pillar-head::after {
+  content: '';
+  flex: 1;
+  height: 6px;
+  background: repeating-linear-gradient(90deg, var(--green) 0 10px, var(--white) 10px 14px, var(--red) 14px 24px, var(--yellow) 24px 28px);
+}
+
+.palace-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.palace-item {
+  --c: var(--green);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 6px 10px 6px 6px;
+  text-align: left;
+  color: var(--ink);
+  background: var(--hanji);
+  border: 3px solid var(--c);
+  box-shadow: 3px 3px 0 var(--ink);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.palace-item:hover { transform: translate(-1px, -1px); background: var(--white); }
+
+.palace-item.active {
+  background: var(--white);
+  box-shadow: 3px 3px 0 var(--ink), inset 0 0 0 3px var(--c);
+}
+
+.bracket {
+  flex: none;
+  width: 34px;
+  height: 34px;
+}
+
+.pi-name {
+  display: block;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.pi-sub {
+  display: block;
+  margin-top: 1px;
+  font-size: 12px;
+  color: var(--wood);
+}
+
+/* ---------- Main column ---------- */
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.frame {
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+  background: var(--hanji);
+  border: 4px solid var(--wood);
+  box-shadow: 0 0 0 2px var(--ink), 0 0 0 7px var(--green), 0 0 0 9px var(--ink), 0 10px 22px rgba(46, 29, 19, 0.3);
+  margin: 0 9px 0 9px;
+}
+
+.map-well {
+  position: relative;
+  height: 100%;
+  min-height: 240px;
+  border: 2px solid var(--ink);
+  background: var(--hanji-shade);
+}
+
+/* ---------- Plaque (hyeonpan) ---------- */
+.plaque {
+  --c: var(--yellow);
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 14px 20px;
+  margin: 0 9px 9px;
+  color: var(--white);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.12)),
+    var(--green);
+  border: 5px solid var(--ink);
+  outline: 3px solid var(--c);
+  outline-offset: -11px;
+  box-shadow: 0 0 0 3px var(--yellow), 0 8px 18px rgba(46, 29, 19, 0.35);
+  min-height: 118px;
+  transition: outline-color 0.45s ease;
+}
+
+.plaque-seal {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin-top: 4px;
+  background: var(--c);
+  border: 3px solid var(--white);
+  border-radius: 50%;
+  transition: background 0.45s ease;
+}
+
+.plaque-seal svg { width: 32px; height: 32px; }
+
+.plaque-title { min-width: 180px; }
+
+.plaque-name {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.plaque-ko {
+  margin: 4px 0 0;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  color: var(--yellow);
+}
+
+.plaque-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  border-left: 2px dashed rgba(247, 243, 234, 0.55);
+  min-width: 190px;
+}
+
+.plaque-meta dt {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--yellow);
+}
+
+.plaque-meta dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.plaque-note {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding-left: 18px;
+  border-left: 2px dashed rgba(247, 243, 234, 0.55);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ---------- Markers ---------- */
+.dc-pin {
+  --c: var(--green);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: var(--c);
+  border: 3px solid var(--white);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--ink), 0 3px 6px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.dc-pin svg { width: 16px; height: 16px; }
+.dc-pin.light { border-color: var(--ink); }
+.dc-pin.active { transform: scale(1.35); }
+
+/* ---------- Buttons / status ---------- */
+.btn {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 3px solid var(--ink);
+  background: var(--hanji);
+  color: var(--ink);
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--ink);
+  transition: transform 0.12s ease, background 0.15s ease;
+}
+
+.btn:hover { transform: translate(-1px, -1px); }
+.btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+
+.btn-primary {
+  background: var(--red);
+  color: var(--white);
+}
+
+.btn-primary:hover { background: #b02e25; }
+
+.btn-secondary {
+  background: var(--yellow);
+}
+
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.status-note {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 12px 0 0;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--hanji);
+}
+
+.status-note.loading::before {
+  content: '';
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--yellow);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: dc-spin 0.9s linear infinite;
+}
+
+.status-note.success { color: #bfe9d8; }
+.status-note.error { color: #ffb4ad; }
+
+@keyframes dc-spin { to { transform: rotate(360deg); } }
+
+.hidden { display: none !important; }
+
+/* ---------- Narrow desktops ---------- */
+@media (max-width: 1100px) {
+  .stage { grid-template-columns: 250px minmax(0, 1fr); gap: 16px; }
+  .plaque { flex-wrap: wrap; }
+  .plaque-note { flex-basis: 100%; padding-left: 0; border-left: 0; }
+}
+
+/* ---------- Phone: the page scrolls ---------- */
+@media (max-width: 760px) {
+  .hall { display: block; height: auto; overflow: visible; }
+  .eave-roof { height: 20px; }
+  .eave-band { height: 62px; }
+  .eave-band > svg { height: 62px; }
+  .eave-bar { padding: 0 10px; gap: 8px; }
+  .eave-title { padding: 4px 10px 5px; outline-offset: -4px; border-width: 2px; }
+  .eave-title h1 { font-size: 14px; }
+  .eave-title .sub { display: none; }
+  .lang-btn { padding: 4px 9px; min-height: 36px; font-size: 12px; }
+
+  .stage {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    padding: 18px 16px 24px;
+  }
+  .main { display: contents; }
+  .frame { order: 1; flex: none; height: 45dvh; min-height: 280px; margin: 0 7px; padding: 8px; }
+  .pillar { order: 2; align-self: stretch; width: 100%; min-width: 0; max-height: none; overflow: visible; }
+  .plaque { order: 3; flex-direction: column; gap: 12px; margin: 0 7px 7px; padding: 16px 16px; }
+  .plaque-title { min-width: 0; }
+  .plaque-name { font-size: 26px; }
+  .plaque-meta, .plaque-note { padding-left: 0; border-left: 0; min-width: 0; }
+  .plaque-meta { padding-top: 10px; border-top: 2px dashed rgba(247, 243, 234, 0.55); }
+  .plaque-note { padding-top: 10px; border-top: 2px dashed rgba(247, 243, 234, 0.55); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .palace-item, .btn, .dc-pin, .hl-rect, .plaque, .plaque-seal { transition: none; }
+  .status-note.loading::before { animation: none; }
+}
