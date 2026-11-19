@@ -824,5 +824,20 @@
     "description": "Compares a standard driving route against a heavy-vehicle route across Australia, highlighting height, width and weight restrictions the truck route must avoid, with presets, custom points and multiple vehicle types to try.",
     "tagsVerified": false,
     "source": "demo-generator"
+  },
+  {
+    "slug": "indoor-airports-draw-polylines",
+    "title": "Indoor Airports - Draw and Export Polylines",
+    "type": "local",
+    "url": "indoor-airports-draw-polylines.html",
+    "tags": [
+      "Indoor Map Tiles",
+      "Turf",
+      "3D",
+      "Data visualization"
+    ],
+    "description": "Search for an airport worldwide to fly into its indoor floor plan, then draw custom route polylines by clicking the map, reshape or smooth them, and export the drawing as downloadable data.",
+    "tagsVerified": false,
+    "source": "demo-generator"
   }
 ]
