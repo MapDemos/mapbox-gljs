@@ -82,8 +82,10 @@
 
     <script>
         // Terminal centre (GRU). Each step flies to a point on the matching floor.
+        const MIN_INDOOR_ZOOM = 17;
         const FOOT = 36;   // px, matches --foot in the CSS
-        const START = [-46.4749, -23.4247];
+        const START = [-46.4745191, -23.4256542];   // start of the first route (gate 309), on level 2
+        const START_LEVEL = 2;
         const STEPS = [
             { icon: '🧳', title: 'Follow signs to Baggage claim', text: 'Walk along the arrivals corridor.', level: 2, pt: [-46.47437, -23.42503] },
             { startVertex: 5, icon: '🚪', title: 'Exit the terminal', text: 'Once you find the terminal exit, go to the external area.', level: 0, pt: [-46.47490, -23.42458] },
@@ -95,7 +97,7 @@
         const map = new mapboxgl.Map({
             container: 'map',
             style: 'mapbox://styles/mapbox/standard',
-            center: START, zoom: 18.2, pitch: 0,
+            center: START, zoom: 18, pitch: 0,
             config: { basemap: { showIndoor: true, lightPreset: 'night' } }
         });
         map.addControl(new mapboxgl.IndoorControl(), 'top-right');
@@ -118,7 +120,11 @@
             const b = coords.reduce((bb, c) => bb.extend(c), new mapboxgl.LngLatBounds(coords[0], coords[0]));
             const view = map.getBounds();
             if (view.contains(b.getSouthWest()) && view.contains(b.getNorthEast())) return;   // whole route already in view
-            map.fitBounds(b, { padding: { top: 80, left: 40, right: 40, bottom: document.getElementById('sheet').offsetHeight + FOOT + 40 }, maxZoom: 18.5, duration: 1200 });
+            // Fit the route, but never zoom out below MIN_INDOOR_ZOOM: the floor selector disappears
+            // once the zoom drops under ~16, and a small screen with a tall panel would otherwise get there.
+            const padding = { top: 80, left: 40, right: 40, bottom: document.getElementById('sheet').offsetHeight + FOOT + 40 };
+            const cam = map.cameraForBounds(b, { padding, maxZoom: 18.5 });
+            if (cam) map.easeTo({ center: cam.center, zoom: Math.max(cam.zoom, MIN_INDOOR_ZOOM), padding, duration: 1200 });
         }
         // Meet-your-driver flag: placed at the end of the last route, shown on that route's floor.
         let flag = null, flagLevel = null;
@@ -133,14 +139,17 @@
             flag = new mapboxgl.Marker({ element: el, anchor: 'bottom', offset: [9.5, 0] }).setLngLat(end).addTo(map);
             updateFlag();
         }
+        // Before/after a walk the puck shows only on its own floor; during a walk it is always shown.
+        function updatePuck() { if (typeof puckEl !== 'undefined') puckEl.style.display = (running || puckFloor === currentLevel) ? 'block' : 'none'; }
         function updateFlag() { if (flag) flag.getElement().style.display = currentLevel === flagLevel ? 'block' : 'none'; }
         function applyLevel(level) {
             if (level === currentLevel) return;
             const first = currentLevel === null || currentLevel === undefined;
             currentLevel = level;
-            if (!first && !running) revealRoute(level);
+            if (!first && !running && userPickedFloor) revealRoute(level);   // not for the automatic start-floor selection
             document.getElementById('level-badge').textContent = level === null ? 'Level –' : `Level ${level}`;
             updateFlag();
+            updatePuck();
             showFloorRoutes();
         }
         // The source only ever holds the current floor's routes, and is given fresh data on every
@@ -180,6 +189,8 @@
                 paint: { 'line-pattern': 'pattern-dot', 'line-emissive-strength': 2,
                          'line-width': ['interpolate', ['exponential', 2], ['zoom'], ...widthStops] } });
             addFlag();
+            placeStartPuck();
+            selectStartFloor();
             currentLevel = undefined;
             applyLevel(readLevel());
             showFloorRoutes();
@@ -229,6 +240,31 @@
             return { c: [a.c[0] + (b.c[0] - a.c[0]) * t, a.c[1] + (b.c[1] - a.c[1]) * t], level: a.level, heading: headingOf(a.c, b.c) };
         }
 
+        // Show the puck at the beginning of the route (gate 309) before any walk starts.
+        function placeStartPuck() {
+            if (!path) buildPath();
+            const p = poseAt(0);
+            routeHeading = moveHeading = shownHeading = p.heading;
+            puckFloor = p.level;
+            fitPadding();
+            map.jumpTo({ center: p.c });   // centre it in the part of the map the panel doesn't cover
+            puck.setLngLat(p.c).setRotation(p.heading).addTo(map);
+            puckOnMap = true;
+            updatePuck();
+        }
+        // Open on the puck's floor. The floor control only fills in once the building is detected, so
+        // retry for a few seconds, and stop as soon as the user picks a floor themselves.
+        let userPickedFloor = false;
+        document.addEventListener('pointerdown', e => { if (e.target.closest('.mapboxgl-ctrl-top-right')) userPickedFloor = true; }, true);
+        function selectStartFloor() {
+            let tries = 0;
+            const t = setInterval(() => {
+                if (userPickedFloor || running || ++tries > 30) return clearInterval(t);
+                if (readLevel() === START_LEVEL) return;
+                document.querySelector(`.mapboxgl-ctrl-level-button[aria-label="${START_LEVEL}"]`)?.click();
+            }, 300);
+        }
+
         function setActiveStep(i) {
             const items = ol.querySelectorAll('li');
             items.forEach((x, k) => x.classList.toggle('active', k === i));
@@ -265,7 +301,7 @@
         let puckOnMap = false;
 
         const simBtn = document.getElementById('sim-btn');
-        let lastRouteCheck = 0, lastRouteRepair = 0, prevFrame = 0, moveHeading = null, lastFloorClick = 0, running = false, simDist = 0, lastT = 0, shownHeading = null, puckLevel = null, activeStep = -1, raf = 0;
+        let puckFloor = null, lastRouteCheck = 0, lastRouteRepair = 0, prevFrame = 0, moveHeading = null, lastFloorClick = 0, running = false, simDist = 0, lastT = 0, shownHeading = null, puckLevel = null, activeStep = -1, raf = 0;
 
         function frame(now) {
             if (!running) return;
@@ -302,7 +338,7 @@
             // Follow the user to their floor. The route and puck follow the puck's floor;
             // the floor selector can lag or reset (e.g. when the camera enters another
             // building), so keep asking for the right floor until it takes.
-            puckLevel = p.level;
+            puckLevel = puckFloor = p.level;
             applyLevel(p.level);
             if (readLevel() !== p.level && now - lastFloorClick > 400) {
                 lastFloorClick = now;
@@ -327,7 +363,7 @@
         // Publish the sheet's height to CSS (floor selector position) and keep the map padded by it.
         new ResizeObserver(() => {
             document.documentElement.style.setProperty('--sheet-h', document.getElementById('sheet').offsetHeight + 'px');
-            if (running) fitPadding();
+            fitPadding();
         }).observe(document.getElementById('sheet'));
         // Keep the map centre (and so the puck) in the part not covered by the sheet.
         function fitPadding() { map.setPadding({ bottom: document.getElementById('sheet').offsetHeight + FOOT }); }
@@ -339,17 +375,18 @@
             simBtn.textContent = '■ Stop'; simBtn.classList.add('running');
             document.getElementById('sheet').classList.remove('collapsed');
             fitPadding();
-            map.jumpTo({ center: poseAt(simDist).c, zoom: 19 });
+            map.jumpTo({ center: poseAt(simDist).c, zoom: 17 });
             raf = requestAnimationFrame(frame);
         }
         function stopSim() {
             if (!running) return;
             running = false; cancelAnimationFrame(raf);
+            updatePuck();
             simBtn.textContent = simDist >= path.total ? '↺ Replay' : '▶ Resume';
             simBtn.classList.remove('running');
         }
         simBtn.addEventListener('click', () => running ? stopSim() : startSim());
-        document.getElementById('sheet-head').addEventListener('click', () => { document.getElementById('sheet').classList.toggle('collapsed'); if (running) fitPadding(); });
+        document.getElementById('sheet-head').addEventListener('click', () => { document.getElementById('sheet').classList.toggle('collapsed'); });
     </script>
 </body>
 </html>
