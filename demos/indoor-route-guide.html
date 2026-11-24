@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Indoor Route Guide</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="shortcut icon" href="https://static-assets.mapbox.com/branding/favicon/v1/favicon.ico" />
+    <!-- Indoor maps require Mapbox GL JS v3.21+ -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.21.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.21.0/mapbox-gl.css" rel="stylesheet" />
+    <script src="shared/demo-kit.js"></script>
+    <style>
+        html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #15171c; }
+        #map { position: absolute; inset: 0; }
+        .back { position: absolute; top: 16px; left: 16px; width: 44px; height: 44px; border-radius: 50%; border: 0;
+                background: #23262d; color: #fff; font-size: 20px; cursor: pointer; box-shadow: 0 2px 8px #0006; }
+        .level-badge { position: absolute; top: 24px; left: 76px; background: #23262d; color: #fff; padding: 6px 12px;
+                       border-radius: 16px; font-size: 13px; box-shadow: 0 2px 8px #0006; }
+        /* Floor selector rides just above the bottom sheet, whatever height the sheet is */
+        .mapboxgl-ctrl-top-right { top: auto; bottom: calc(var(--sheet-h, 0px) + 12px); transition: bottom .2s; }
+        .sheet { position: absolute; left: 0; right: 0; bottom: 0; max-width: 480px; margin: 0 auto; background: #1b1d22; color: #fff;
+                 border-radius: 16px 16px 0 0; box-shadow: 0 -4px 16px #0008; max-height: 55vh; display: flex; flex-direction: column; }
+        .sheet header { padding: 14px 20px 10px; text-align: center; cursor: pointer; border-bottom: 1px solid #2c2f36; }
+        .sheet header::before { content: ""; display: block; width: 40px; height: 4px; border-radius: 2px; background: #555; margin: 0 auto 10px; }
+        .sheet h1 { margin: 0; font-size: 17px; }
+        .sheet header small { color: #9aa0aa; }
+        ol { list-style: none; margin: 0; padding: 0; overflow: auto; }
+        .sheet.collapsed ol { display: none; }
+        li { display: flex; gap: 16px; padding: 14px 20px; border-bottom: 1px solid #2c2f36; cursor: pointer; align-items: flex-start; }
+        li.active { background: #262a33; }
+        li .ico { font-size: 22px; width: 28px; text-align: center; }
+        li b { display: block; font-size: 15px; margin-bottom: 2px; }
+        li span { color: #9aa0aa; font-size: 13px; line-height: 1.35; }
+        .mapboxgl-ctrl-group { background: #23262d; border-radius: 22px; }
+        /* Flag at the end of the route: where the user meets the driver */
+        .flag { display: none; pointer-events: none; text-align: center; }
+        .flag svg { display: block; margin: 0 auto; filter: drop-shadow(0 2px 3px #0008); }
+        .flag span { display: inline-block; margin-bottom: 4px; padding: 3px 9px; border-radius: 10px; background: #fff; color: #111; font-size: 12px; font-weight: 600; white-space: nowrap; box-shadow: 0 1px 4px #0006; }
+        .gps-seg { position: absolute; top: 68px; right: 16px; display: flex; background: #23262d; border-radius: 16px; padding: 3px; box-shadow: 0 2px 8px #0006; }
+        .gps-seg[hidden] { display: none; }
+        .gps-seg button { border: 0; background: none; color: #9aa0aa; font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 13px; cursor: pointer; }
+        .gps-seg button.on { background: #3b82f6; color: #fff; }
+        .sim-btn { position: absolute; top: 16px; right: 16px; height: 44px; padding: 0 16px; border: 0; border-radius: 22px;
+                   background: #2563eb; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px #0006; }
+        .sim-btn.running { background: #23262d; }
+        /* User position puck: blue dot + view cone that points along the heading */
+        .puck { width: 110px; height: 110px; position: relative; pointer-events: none; }
+        .puck-cone { position: absolute; inset: 0; border-radius: 50%;
+                     background: conic-gradient(from -35deg, rgba(96,165,250,.95) 0deg 70deg, transparent 70deg);
+                     -webkit-mask-image: radial-gradient(circle closest-side, #000 15%, transparent 100%); mask-image: radial-gradient(circle closest-side, #000 15%, transparent 100%); }
+        /* Same look as the GPS demo's user-location puck */
+        .puck-accuracy { position: absolute; left: 50%; top: 50%; width: var(--acc, 44px); height: var(--acc, 44px); transform: translate(-50%, -50%); border-radius: 50%; box-sizing: border-box;
+                         background: rgba(59, 130, 246, 0.15); border: 2px solid rgba(59, 130, 246, 0.3); }
+        .puck-dot { position: absolute; left: 50%; top: 50%; width: 15px; height: 15px; margin: -10.5px 0 0 -10.5px; border-radius: 50%; box-sizing: content-box;
+                    border: 3px solid #fff; background-color: #3b82f6; box-shadow: 0 0 10px rgba(59, 130, 246, 0.4); animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <button class="back" aria-label="Back">←</button>
+    <div class="level-badge" id="level-badge">Level –</div>
+    <button class="sim-btn" id="sim-btn">▶ Simulate walk</button>
+    <div class="gps-seg" id="gps-seg" title="Simulated GPS quality" hidden><button data-q="good">Good GPS</button><button data-q="fair">Fair</button><button data-q="poor" class="on">Poor</button></div>
+
+    <div class="sheet" id="sheet">
+        <header id="sheet-head">
+            <h1>Walk 9 min to pickup point</h1>
+            <small>Terminal exit → pickup zone · Level <span id="route-levels"></span></small>
+        </header>
+        <ol id="steps"></ol>
+    </div>
+
+    <script>
+        // Terminal centre (GRU). Each step flies to a point on the matching floor.
+        const START = [-46.4749, -23.4247];
+        const STEPS = [
+            { icon: '🧳', title: 'Follow signs to Baggage claim', text: 'Walk along the arrivals corridor.', level: 2, pt: [-46.47437, -23.42503] },
+            { startVertex: 5, icon: '🚪', title: 'Exit the terminal', text: 'Once you find the terminal exit, go to the external area.', level: 0, pt: [-46.47490, -23.42458] },
+            { icon: '🚶', title: 'Cross the street', text: 'Once in the external area, cross the street to the second curb and turn right.', level: 0, pt: [-46.47564, -23.42425] },
+            { icon: '📍', title: 'Head to your designated zone to meet your driver', text: 'Head to the zone shown in the app.', level: 0, pt: [-46.47655, -23.42376] }
+        ];
+
+        // Each step is one drawn route (in drawing order); its pt/level are read from the data.
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/standard',
+            center: START, zoom: 18.2, pitch: 0,
+            config: { basemap: { showIndoor: true, lightPreset: 'night' } }
+        });
+        map.addControl(new mapboxgl.IndoorControl(), 'top-right');
+
+        let routeData = null;
+        let currentLevel = null;
+
+        // The floor control exposes no public API/event in v3.21, so read the
+        // selected button's label from its DOM and re-filter on every change.
+        function readLevel() {
+            const sel = document.querySelector('.mapboxgl-ctrl-level-button-selected[aria-label]');
+            const n = sel ? parseInt(sel.getAttribute('aria-label'), 10) : NaN;
+            return Number.isNaN(n) ? null : n;
+        }
+        // After a manual floor switch, bring that floor's route into view unless all of it is already on screen.
+        function revealRoute(level) {
+            if (!routeData || level === null) return;
+            const coords = routeData.features.filter(f => f.properties.level === level).flatMap(f => f.geometry.coordinates);
+            if (!coords.length) return;
+            const b = coords.reduce((bb, c) => bb.extend(c), new mapboxgl.LngLatBounds(coords[0], coords[0]));
+            const view = map.getBounds();
+            if (view.contains(b.getSouthWest()) && view.contains(b.getNorthEast())) return;   // whole route already in view
+            map.fitBounds(b, { padding: { top: 80, left: 40, right: 40, bottom: document.getElementById('sheet').offsetHeight + 40 }, maxZoom: 18.5, duration: 1200 });
+        }
+        // Meet-your-driver flag: placed at the end of the last route, shown on that route's floor.
+        let flag = null, flagLevel = null;
+        function addFlag() {
+            const last = routeData.features[routeData.features.length - 1];
+            const end = last.geometry.coordinates[last.geometry.coordinates.length - 1];
+            flagLevel = last.properties.level;
+            const el = document.createElement('div');
+            el.className = 'flag';
+            el.innerHTML = '<span>Meet your driver</span><svg width="34" height="44" viewBox="0 0 34 44"><rect x="6" y="4" width="3" height="40" rx="1.5" fill="#fff"/><path d="M9 5 H30 L24 13 L30 21 H9 Z" fill="#ef4444" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+            // anchor 'bottom-left' would sit the pole's foot on the point; shift so the pole (x=7.5) is on it.
+            flag = new mapboxgl.Marker({ element: el, anchor: 'bottom', offset: [9.5, 0] }).setLngLat(end).addTo(map);
+            updateFlag();
+        }
+        function updateFlag() { if (flag) flag.getElement().style.display = currentLevel === flagLevel ? 'block' : 'none'; }
+        function applyLevel(level) {
+            if (level === currentLevel) return;
+            const first = currentLevel === null || currentLevel === undefined;
+            currentLevel = level;
+            if (!first && !running) revealRoute(level);
+            document.getElementById('level-badge').textContent = level === null ? 'Level –' : `Level ${level}`;
+            updateFlag();
+            showFloorRoutes();
+        }
+        // The source only ever holds the current floor's routes, and is given fresh data on every
+        // floor change. (A layer filter was left drawing nothing after a floor switch + camera jump
+        // in real Chrome, even with the right value; new data can't go stale like that.)
+        const EMPTY = { type: 'FeatureCollection', features: [] };
+        function showFloorRoutes() {
+            const src = map.getSource('routes');
+            if (!src || !routeData) return;
+            src.setData(currentLevel === null || currentLevel === undefined ? EMPTY
+                : { type: 'FeatureCollection', features: routeData.features.filter(f => f.properties.level === currentLevel) });
+        }
+        new MutationObserver(() => applyLevel(running && puckLevel !== null ? puckLevel : readLevel())).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+
+        map.on('style.load', async () => {
+            // Two files: routes for steps 1-2, then routes for steps 3-4. Merged in drawing order.
+            const parts = await Promise.all(['data/indoor-airport-routes.geojson', 'data/indoor-airport-routes-2.geojson'].map(u => fetch(u).then(r => r.json())));
+            routeData = { type: 'FeatureCollection', features: parts.flatMap(d => d.features)
+                .sort((a, b) => new Date(a.properties.created) - new Date(b.properties.created)) };
+            // Point each step at the start of its route, on that route's floor.
+            STEPS.forEach((st, i) => { const f = routeData.features[i]; if (f) { st.pt = f.geometry.coordinates[st.startVertex || 0]; st.level = f.properties.level; } });
+            const levels = [...new Set(routeData.features.map(f => f.properties.level))].sort((a, b) => b - a);
+            document.getElementById('route-levels').textContent = levels.join(' / ');
+
+            map.addSource('routes', { type: 'geojson', lineMetrics: true, data: EMPTY });
+            // slot 'top' keeps the route above the indoor floor plan.
+            // Mapbox "Add a patterned line" example: line-pattern + line-join 'none',
+            // with a line-width that doubles within each zoom level so the width
+            // stays constant in tile space and the dots keep their aspect ratio.
+            const baseWidth = 14, widthStops = [];
+            for (let z = 0; z <= 21; z++) widthStops.push(z, baseWidth, z + 0.9999, baseWidth * 2);
+            widthStops.push(22, baseWidth * 2);
+            const dot = await new Promise((res, rej) => map.loadImage('assets/pattern-dot.png', (e, img) => e ? rej(e) : res(img)));
+            map.addImage('pattern-dot', dot);
+            map.addLayer({ id: 'route-dots', type: 'line', source: 'routes', slot: 'top',
+                layout: { 'line-join': 'none' },
+                paint: { 'line-pattern': 'pattern-dot', 'line-emissive-strength': 2,
+                         'line-width': ['interpolate', ['exponential', 2], ['zoom'], ...widthStops] } });
+            addFlag();
+            currentLevel = undefined;
+            applyLevel(readLevel());
+            showFloorRoutes();
+        });
+
+        // Steps list: tap to fly to the step and switch the floor.
+        const ol = document.getElementById('steps');
+        STEPS.forEach((s, i) => {
+            const li = document.createElement('li');
+            li.innerHTML = `<div class="ico">${s.icon}</div><div><b>${s.title}</b><span>${s.text}</span></div>`;
+            li.addEventListener('click', () => {
+                stopSim();
+                setActiveStep(i);
+                map.flyTo({ center: s.pt, zoom: 19, duration: 1500 });
+                // Click the matching floor button (aria-label = floor name).
+                document.querySelector(`.mapboxgl-ctrl-level-button[aria-label="${s.level}"]`)?.click();
+            });
+            ol.appendChild(li);
+        });
+
+        // ---- Simulated user position ------------------------------------------
+        const SPEED_MPS = 12;   // sped up so the whole walk takes about half a minute
+        const meters = (a, b) => Math.hypot((b[0] - a[0]) * Math.cos(a[1] * Math.PI / 180) * 111320, (b[1] - a[1]) * 110540);
+        const headingOf = (a, b) => (Math.atan2((b[0] - a[0]) * Math.cos(a[1] * Math.PI / 180), b[1] - a[1]) * 180 / Math.PI + 360) % 360;
+
+        // Join the routes in the order they were drawn into one path; each vertex
+        // keeps its floor and its distance from the start.
+        let path = null;
+        function buildPath() {
+            // Feature i is step i: each step starts where its route begins (or at its startVertex).
+            const feats = routeData.features;
+            const pts = []; let d = 0;
+            feats.forEach((f, fi) => f.geometry.coordinates.forEach((c, ci) => {
+                const prev = pts[pts.length - 1];
+                if (prev) d += meters(prev.c, c);
+                pts.push({ c, level: f.properties.level, d });
+                if (STEPS[fi] && ci === (STEPS[fi].startVertex || 0)) STEPS[fi].startD = d;
+            }));
+            path = { pts, total: d };
+        }
+        function poseAt(dist) {
+            const pts = path.pts;
+            let i = 0;
+            while (i < pts.length - 2 && pts[i + 1].d <= dist) i++;
+            const a = pts[i], b = pts[i + 1];
+            const t = b.d === a.d ? 0 : Math.min(1, Math.max(0, (dist - a.d) / (b.d - a.d)));
+            return { c: [a.c[0] + (b.c[0] - a.c[0]) * t, a.c[1] + (b.c[1] - a.c[1]) * t], level: a.level, heading: headingOf(a.c, b.c) };
+        }
+
+        function setActiveStep(i) {
+            const items = ol.querySelectorAll('li');
+            items.forEach((x, k) => x.classList.toggle('active', k === i));
+            items[i]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+
+        // ---- GPS error model --------------------------------------------------
+        // The true position (on the route) drives steps and floors. The puck is drawn at a
+        // smooth, repeatable offset from it: mostly sideways, a little along the route, with
+        // occasional "drift episodes" where the error grows for a few seconds.
+        const GPS = { good: { amp: 0.8, drift: 0.5 }, fair: { amp: 2, drift: 1 }, poor: { amp: 4, drift: 1.5 } };
+        let gps = GPS.poor, dispPos = null, dispOff = null, dispLevel = null, routeHeading = null, simT = 0;
+        // Noise is a function of elapsed seconds (not distance), so it stays gentle however fast the walk is simulated.
+        const wave = (t, s) => 0.55 * Math.sin(t * 0.8 + s) + 0.3 * Math.sin(t * 1.9 + 2.1 * s + 1) + 0.15 * Math.sin(t * 4.3 + 3.3 * s);
+        const ease = (dt, tau) => 1 - Math.exp(-dt / tau);
+        const turn = (from, to, f) => (from + (((to - from + 540) % 360) - 180) * f + 360) % 360;
+        function noisyPos(p, t) {
+            const episode = Math.pow(Math.max(0, Math.sin(t * 0.5 + 2)), 8);   // a drift episode roughly every 12 s
+            const k = gps.amp * (1 + gps.drift * 1.5 * episode);
+            const side = k * wave(t, 0), along = 0.4 * k * wave(t, 5);
+            const h = routeHeading * Math.PI / 180;
+            const east = Math.sin(h) * along + Math.cos(h) * side, north = Math.cos(h) * along - Math.sin(h) * side;
+            return { c: [p.c[0] + east / (111320 * Math.cos(p.c[1] * Math.PI / 180)), p.c[1] + north / 110540], err: Math.hypot(east, north) };
+        }
+        document.querySelectorAll('#gps-seg button').forEach(b => b.addEventListener('click', () => {
+            gps = GPS[b.dataset.q];
+            document.querySelectorAll('#gps-seg button').forEach(x => x.classList.toggle('on', x === b));
+        }));
+
+        const puckEl = document.createElement('div');
+        puckEl.className = 'puck';
+        puckEl.innerHTML = '<div class="puck-cone"></div><div class="puck-accuracy"></div><div class="puck-dot"></div>';
+        const puck = new mapboxgl.Marker({ element: puckEl, rotationAlignment: 'map', pitchAlignment: 'map' });
+        let puckOnMap = false;
+
+        const simBtn = document.getElementById('sim-btn');
+        let lastRouteCheck = 0, lastRouteRepair = 0, prevFrame = 0, moveHeading = null, lastFloorClick = 0, running = false, simDist = 0, lastT = 0, shownHeading = null, puckLevel = null, activeStep = -1, raf = 0;
+
+        function frame(now) {
+            if (!running) return;
+            simDist = Math.min(path.total, simDist + (now - lastT) / 1000 * SPEED_MPS);
+            lastT = now;
+            const p = poseAt(simDist);
+            const dt = Math.min(0.25, Math.max(0.001, (now - prevFrame) / 1000)); prevFrame = now;
+
+            // Offset direction follows a smoothed route heading so it doesn't flip at corners.
+            routeHeading = routeHeading === null ? p.heading : turn(routeHeading, p.heading, ease(dt, 0.4));
+            simT += dt;
+            const noisy = noisyPos(p, simT);
+            // Smooth the offset only (smoothing the position itself would make the puck lag behind the route).
+            const off = [noisy.c[0] - p.c[0], noisy.c[1] - p.c[1]];
+            if (dispOff === null || p.level !== dispLevel) { dispOff = off; dispLevel = p.level; }   // no sweep across a floor change
+            const before = dispPos || [p.c[0] + dispOff[0], p.c[1] + dispOff[1]];
+            const f = ease(dt, 0.25);
+            dispOff = [dispOff[0] + (off[0] - dispOff[0]) * f, dispOff[1] + (off[1] - dispOff[1]) * f];
+            dispPos = [p.c[0] + dispOff[0], p.c[1] + dispOff[1]];
+
+            // Heading comes from the puck's own movement (plus a little compass error).
+            if (meters(before, dispPos) > 0.02) moveHeading = turn(moveHeading ?? p.heading, headingOf(before, dispPos), ease(dt, 0.35));
+            shownHeading = (moveHeading ?? p.heading) + 4 * Math.sin(simDist * 0.2);
+
+            // Accuracy ring: the current error plus a margin, in metres converted to pixels.
+            const accM = Math.max(1.5, gps.amp * 1.2, noisy.err * 1.3 + 1);
+            const mpp = 78271.517 * Math.cos(dispPos[1] * Math.PI / 180) / Math.pow(2, map.getZoom());
+            puckEl.style.setProperty('--acc', Math.max(24, 2 * accM / mpp) + 'px');
+
+            puck.setLngLat(dispPos).setRotation(shownHeading);
+            if (!puckOnMap) { puck.addTo(map); puckOnMap = true; }
+            map.jumpTo({ center: dispPos });
+
+            // Follow the user to their floor. The route and puck follow the puck's floor;
+            // the floor selector can lag or reset (e.g. when the camera enters another
+            // building), so keep asking for the right floor until it takes.
+            puckLevel = p.level;
+            applyLevel(p.level);
+            if (readLevel() !== p.level && now - lastFloorClick > 400) {
+                lastFloorClick = now;
+                document.querySelector(`.mapboxgl-ctrl-level-button[aria-label="${p.level}"]`)?.click();
+            }
+            puckEl.style.display = 'block';
+
+            // Safety net: if nothing of the route is drawn on screen (it always passes under the puck),
+            // hand the source fresh data again.
+            if (now - lastRouteCheck > 600) {
+                lastRouteCheck = now;
+                if (map.queryRenderedFeatures({ layers: ['route-dots'] }).length === 0 && now - lastRouteRepair > 1500) { lastRouteRepair = now; showFloorRoutes(); }
+            }
+
+            let idx = 0;
+            STEPS.forEach((st, k) => { if (simDist >= st.startD) idx = k; });
+            if (idx !== activeStep) { activeStep = idx; setActiveStep(idx); }
+
+            if (simDist >= path.total) { stopSim(); simBtn.textContent = '↺ Replay'; return; }
+            raf = requestAnimationFrame(frame);
+        }
+        // Publish the sheet's height to CSS (floor selector position) and keep the map padded by it.
+        new ResizeObserver(() => {
+            document.documentElement.style.setProperty('--sheet-h', document.getElementById('sheet').offsetHeight + 'px');
+            if (running) fitPadding();
+        }).observe(document.getElementById('sheet'));
+        // Keep the map centre (and so the puck) in the part not covered by the sheet.
+        function fitPadding() { map.setPadding({ bottom: document.getElementById('sheet').offsetHeight }); }
+        function startSim() {
+            if (!routeData) return;
+            if (!path) buildPath();
+            if (simDist >= path.total) simDist = 0;
+            running = true; lastT = prevFrame = performance.now(); puckLevel = null; shownHeading = null; moveHeading = null; routeHeading = null; dispPos = null; dispOff = null; if (simDist === 0) simT = 0; activeStep = -1;
+            simBtn.textContent = '■ Stop'; simBtn.classList.add('running');
+            document.getElementById('sheet').classList.remove('collapsed');
+            fitPadding();
+            map.jumpTo({ center: poseAt(simDist).c, zoom: 19 });
+            raf = requestAnimationFrame(frame);
+        }
+        function stopSim() {
+            if (!running) return;
+            running = false; cancelAnimationFrame(raf);
+            simBtn.textContent = simDist >= path.total ? '↺ Replay' : '▶ Resume';
+            simBtn.classList.remove('running');
+        }
+        simBtn.addEventListener('click', () => running ? stopSim() : startSim());
+        document.getElementById('sheet-head').addEventListener('click', () => { document.getElementById('sheet').classList.toggle('collapsed'); if (running) fitPadding(); });
+    </script>
+</body>
+</html>

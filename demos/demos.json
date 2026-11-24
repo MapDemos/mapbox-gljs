@@ -205,6 +205,17 @@
     "description": "An auto-playing camera tour through 11 Brazilian airports, showing indoor floor plans using Mapbox's Indoor Map Tiles, with a day/night lighting picker."
   },
   {
+    "slug": "indoor-route-guide",
+    "title": "Indoor Route Guide",
+    "type": "local",
+    "url": "indoor-route-guide.html",
+    "tags": [
+      "Indoor Map Tiles",
+      "Aviation"
+    ],
+    "description": "Draws pre-authored walking routes over an airport's indoor floor plan, showing only the route for the selected floor, with a step-by-step sheet to jump between floors."
+  },
+  {
     "slug": "indoor-airport-gps",
     "title": "Indoor Airport Navigation",
     "type": "local",
