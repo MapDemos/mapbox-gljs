@@ -17,8 +17,12 @@
         .level-badge { position: absolute; top: 24px; left: 76px; background: #23262d; color: #fff; padding: 6px 12px;
                        border-radius: 16px; font-size: 13px; box-shadow: 0 2px 8px #0006; }
         /* Floor selector rides just above the bottom sheet, whatever height the sheet is */
-        .mapboxgl-ctrl-top-right { top: auto; bottom: calc(var(--sheet-h, 0px) + 12px); transition: bottom .2s; }
-        .sheet { position: absolute; left: 0; right: 0; bottom: 0; max-width: 480px; margin: 0 auto; background: #1b1d22; color: #fff;
+        .mapboxgl-ctrl-top-right { top: auto; bottom: calc(var(--sheet-h, 0px) + var(--foot) + 12px); transition: bottom .2s; }
+        /* Strip under the panel that holds the Mapbox logo and attribution, so the panel never covers them */
+        :root { --foot: 36px; }
+        .mapboxgl-ctrl-bottom-left, .mapboxgl-ctrl-bottom-right { z-index: 2; }
+        .foot-strip { position: absolute; left: 0; right: 0; bottom: 0; height: var(--foot); background: #15171c; z-index: 1; pointer-events: none; }
+        .sheet { position: absolute; left: 0; right: 0; bottom: var(--foot); max-width: 480px; margin: 0 auto; background: #1b1d22; color: #fff;
                  border-radius: 16px 16px 0 0; box-shadow: 0 -4px 16px #0008; max-height: 55vh; display: flex; flex-direction: column; }
         .sheet header { padding: 14px 20px 10px; text-align: center; cursor: pointer; border-bottom: 1px solid #2c2f36; }
         .sheet header::before { content: ""; display: block; width: 40px; height: 4px; border-radius: 2px; background: #555; margin: 0 auto 10px; }
@@ -67,6 +71,7 @@
     <button class="sim-btn" id="sim-btn">▶ Simulate walk</button>
     <div class="gps-seg" id="gps-seg" title="Simulated GPS quality" hidden><button data-q="good">Good GPS</button><button data-q="fair">Fair</button><button data-q="poor" class="on">Poor</button></div>
 
+    <div class="foot-strip"></div>
     <div class="sheet" id="sheet">
         <header id="sheet-head">
             <h1>Walk 9 min to pickup point</h1>
@@ -77,6 +82,7 @@
 
     <script>
         // Terminal centre (GRU). Each step flies to a point on the matching floor.
+        const FOOT = 36;   // px, matches --foot in the CSS
         const START = [-46.4749, -23.4247];
         const STEPS = [
             { icon: '🧳', title: 'Follow signs to Baggage claim', text: 'Walk along the arrivals corridor.', level: 2, pt: [-46.47437, -23.42503] },
@@ -112,7 +118,7 @@
             const b = coords.reduce((bb, c) => bb.extend(c), new mapboxgl.LngLatBounds(coords[0], coords[0]));
             const view = map.getBounds();
             if (view.contains(b.getSouthWest()) && view.contains(b.getNorthEast())) return;   // whole route already in view
-            map.fitBounds(b, { padding: { top: 80, left: 40, right: 40, bottom: document.getElementById('sheet').offsetHeight + 40 }, maxZoom: 18.5, duration: 1200 });
+            map.fitBounds(b, { padding: { top: 80, left: 40, right: 40, bottom: document.getElementById('sheet').offsetHeight + FOOT + 40 }, maxZoom: 18.5, duration: 1200 });
         }
         // Meet-your-driver flag: placed at the end of the last route, shown on that route's floor.
         let flag = null, flagLevel = null;
@@ -324,7 +330,7 @@
             if (running) fitPadding();
         }).observe(document.getElementById('sheet'));
         // Keep the map centre (and so the puck) in the part not covered by the sheet.
-        function fitPadding() { map.setPadding({ bottom: document.getElementById('sheet').offsetHeight }); }
+        function fitPadding() { map.setPadding({ bottom: document.getElementById('sheet').offsetHeight + FOOT }); }
         function startSim() {
             if (!routeData) return;
             if (!path) buildPath();
