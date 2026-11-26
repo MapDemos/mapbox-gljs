@@ -123,9 +123,44 @@
         let realMode = false, geoActive = false;
         geolocate.on('trackuserlocationstart', () => { geoActive = true; });
         geolocate.on('trackuserlocationend', () => { geoActive = false; });
+
+        // Real mode: the leg nearest to the user's fix (among legs on the floor they selected) becomes the
+        // active step and the only route drawn. The floor stays manual: a browser fix carries no floor.
+        const NEAR_LEG_M = 40;
+        let lastFix = null, lastNearest = null, pausedAt = undefined;   // pausedAt: nearest leg when the user tapped a step
+        function distToLine(pt, line) {
+            const kx = Math.cos(pt[1] * Math.PI / 180) * 111320, ky = 110540;
+            let best = Infinity;
+            for (let i = 0; i < line.length - 1; i++) {
+                const ax = (line[i][0] - pt[0]) * kx, ay = (line[i][1] - pt[1]) * ky;
+                const bx = (line[i + 1][0] - pt[0]) * kx, by = (line[i + 1][1] - pt[1]) * ky;
+                const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+                const t = len2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0;
+                best = Math.min(best, Math.hypot(ax + t * dx, ay + t * dy));
+            }
+            return best;
+        }
+        function autoSelectLeg() {
+            if (!realMode || !lastFix || !routeData) return;
+            let nearest = null, nd = NEAR_LEG_M;
+            routeData.features.forEach((f, i) => {
+                if (f.properties.level !== currentLevel) return;
+                const d = distToLine(lastFix, f.geometry.coordinates);
+                if (d < nd) { nd = d; nearest = i; }
+            });
+            lastNearest = nearest;
+            if (pausedAt !== undefined) { if (nearest === pausedAt) return; pausedAt = undefined; }   // a tapped step stays until the user reaches another leg
+            if (nearest === selectedLeg) return;
+            selectedLeg = nearest;
+            showFloorRoutes();
+            if (nearest === null) document.querySelectorAll('#steps li').forEach(li => li.classList.remove('active'));
+            else setActiveStep(nearest);
+        }
+        geolocate.on('geolocate', e => { lastFix = [e.coords.longitude, e.coords.latitude]; autoSelectLeg(); });
         geolocate.on('error', err => {
             console.error('Geolocation error:', err);
-            alert(err.code === 1 ? 'Location permission denied. Please allow location access for this site.' : 'Unable to get your location.');
+            if (err.code !== 1) return;   // unavailable/timeout: transient, keep watching
+            alert('Location permission denied. Please allow location access for this site.');
             setMode('sim');
         });
         function setMode(mode) {
@@ -137,10 +172,12 @@
             document.getElementById('gps-seg').hidden = true;
             if (real) {
                 stopSim();
+                selectedLeg = null; pausedAt = undefined; lastFix = null; lastNearest = null; showFloorRoutes();
                 puck.remove(); puckOnMap = false;
                 if (!geoActive) geolocate.trigger();
             } else {
                 for (let i = 0; i < 3 && geoActive; i++) geolocate.trigger();   // active-lock -> off
+                selectedLeg = null; lastFix = null; showFloorRoutes();
                 puck.addTo(map); puckOnMap = true;
             }
             updatePuck();
@@ -195,6 +232,7 @@
             updateFlag();
             updatePuck();
             showFloorRoutes();
+            autoSelectLeg();   // real mode: a new floor may have a different nearest leg
         }
         // The source only ever holds the current floor's routes, and is given fresh data on every
         // floor change. (A layer filter was left drawing nothing after a floor switch + camera jump
@@ -251,6 +289,7 @@
             li.addEventListener('click', () => {
                 stopSim();
                 selectedLeg = i;
+                if (realMode) pausedAt = lastNearest;
                 showFloorRoutes();
                 setActiveStep(i);
                 map.flyTo({ center: s.pt, zoom: 19, duration: 1500 });
