@@ -12,10 +12,6 @@
     <style>
         html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #15171c; }
         #map { position: absolute; inset: 0; }
-        .back { position: absolute; top: 16px; left: 16px; width: 44px; height: 44px; border-radius: 50%; border: 0;
-                background: #23262d; color: #fff; font-size: 20px; cursor: pointer; box-shadow: 0 2px 8px #0006; }
-        .level-badge { position: absolute; top: 24px; left: 76px; background: #23262d; color: #fff; padding: 6px 12px;
-                       border-radius: 16px; font-size: 13px; box-shadow: 0 2px 8px #0006; }
         /* Floor selector rides just above the bottom sheet, whatever height the sheet is */
         .mapboxgl-ctrl-top-right { top: auto; bottom: calc(var(--sheet-h, 0px) + var(--foot) + 12px); transition: bottom .2s; }
         /* Strip under the panel that holds the Mapbox logo and attribution, so the panel never covers them */
@@ -23,11 +19,13 @@
         .mapboxgl-ctrl-bottom-left, .mapboxgl-ctrl-bottom-right { z-index: 2; }
         .foot-strip { position: absolute; left: 0; right: 0; bottom: 0; height: var(--foot); background: #15171c; z-index: 1; pointer-events: none; }
         .sheet { position: absolute; left: 0; right: 0; bottom: var(--foot); max-width: 480px; margin: 0 auto; background: #1b1d22; color: #fff;
-                 border-radius: 16px 16px 0 0; box-shadow: 0 -4px 16px #0008; max-height: 55vh; display: flex; flex-direction: column; }
-        .sheet header { padding: 14px 20px 10px; text-align: center; cursor: pointer; border-bottom: 1px solid #2c2f36; }
+                 border-radius: 16px 16px 0 0; box-shadow: 0 -4px 16px #0008; max-height: 75vh; display: flex; flex-direction: column; }
+        .sheet header { padding: 14px 20px 10px; text-align: center; cursor: grab; touch-action: none; user-select: none; border-bottom: 1px solid #2c2f36; flex: none; }
         .sheet header::before { content: ""; display: block; width: 40px; height: 4px; border-radius: 2px; background: #555; margin: 0 auto 10px; }
         .sheet h1 { margin: 0; font-size: 17px; }
         .sheet header small { color: #9aa0aa; }
+        .sheet.dragging { transition: none; }
+        .sheet.dragging header { cursor: grabbing; }
         ol { list-style: none; margin: 0; padding: 0; overflow: auto; }
         .sheet.collapsed ol { display: none; }
         li { display: flex; gap: 16px; padding: 14px 20px; border-bottom: 1px solid #2c2f36; cursor: pointer; align-items: flex-start; }
@@ -40,8 +38,8 @@
         .flag { display: none; pointer-events: none; text-align: center; }
         .flag svg { display: block; margin: 0 auto; filter: drop-shadow(0 2px 3px #0008); }
         .flag span { display: inline-block; margin-bottom: 4px; padding: 3px 9px; border-radius: 10px; background: #fff; color: #111; font-size: 12px; font-weight: 600; white-space: nowrap; box-shadow: 0 1px 4px #0006; }
-        .route-pick { position: absolute; top: 76px; left: 16px; background: #23262d; color: #fff; border: 0; border-radius: 16px; padding: 6px 10px; font-size: 13px; box-shadow: 0 2px 8px #0006; }
-        .mode-seg { position: absolute; top: 68px; right: 16px; display: flex; background: #23262d; border-radius: 16px; padding: 3px; box-shadow: 0 2px 8px #0006; }
+        .route-pick { position: absolute; top: 16px; left: 16px; background: #23262d; color: #fff; border: 0; border-radius: 16px; padding: 6px 10px; font-size: 13px; box-shadow: 0 2px 8px #0006; }
+        .mode-seg { position: absolute; top: 60px; left: 16px; display: flex; background: #23262d; border-radius: 16px; padding: 3px; box-shadow: 0 2px 8px #0006; }
         .mode-seg button { border: 0; background: none; color: #9aa0aa; font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 13px; cursor: pointer; }
         .mode-seg button.on { background: #3b82f6; color: #fff; }
         /* The geolocate control is driven by the Simulated/Real toggle, so its own button stays hidden */
@@ -73,8 +71,6 @@
 </head>
 <body>
     <div id="map"></div>
-    <button class="back" aria-label="Back">←</button>
-    <div class="level-badge" id="level-badge">Level –</div>
     <select class="route-pick" id="route-pick" aria-label="Route">
         <option value="GRU-T3-gate305">T3 · gate 305</option>
         <option value="GRU-T3-gate319">T3 · gate 319</option>
@@ -196,7 +192,6 @@
             const first = currentLevel === null || currentLevel === undefined;
             currentLevel = level;
             if (!first && !running && userPickedFloor) revealRoute(level);   // not for the automatic start-floor selection
-            document.getElementById('level-badge').textContent = level === null ? 'Level –' : `Level ${level}`;
             updateFlag();
             updatePuck();
             showFloorRoutes();
@@ -441,7 +436,40 @@
             simBtn.classList.remove('running');
         }
         simBtn.addEventListener('click', () => running ? stopSim() : startSim());
-        document.getElementById('sheet-head').addEventListener('click', () => { document.getElementById('sheet').classList.toggle('collapsed'); });
+        // The sheet's header is a drag handle: drag up/down to resize it (what users do on a phone);
+        // dragging it nearly shut collapses it, and a plain tap still toggles it.
+        (() => {
+            const sheet = document.getElementById('sheet'), head = document.getElementById('sheet-head');
+            let startY = 0, startH = 0, moved = false, dragging = false, suppressClick = false;
+            head.addEventListener('pointerdown', e => {
+                dragging = true; moved = false; startY = e.clientY; startH = sheet.offsetHeight;
+                head.setPointerCapture(e.pointerId);
+            });
+            head.addEventListener('pointermove', e => {
+                if (!dragging) return;
+                const dy = startY - e.clientY;
+                if (!moved && Math.abs(dy) < 5) return;
+                if (!moved) { moved = true; sheet.classList.add('dragging'); sheet.classList.remove('collapsed'); }
+                const min = head.offsetHeight, max = window.innerHeight * 0.75;
+                sheet.style.height = Math.min(max, Math.max(min, startH + dy)) + 'px';
+            });
+            const end = () => {
+                if (!dragging) return;
+                dragging = false;
+                sheet.classList.remove('dragging');
+                if (moved) {
+                    suppressClick = true;
+                    if (sheet.offsetHeight < head.offsetHeight + 60) { sheet.classList.add('collapsed'); sheet.style.height = ''; }
+                }
+            };
+            head.addEventListener('pointerup', end);
+            head.addEventListener('pointercancel', end);
+            head.addEventListener('click', () => {
+                if (suppressClick) { suppressClick = false; return; }
+                sheet.classList.toggle('collapsed');
+                sheet.style.height = '';
+            });
+        })();
     </script>
 </body>
 </html>
