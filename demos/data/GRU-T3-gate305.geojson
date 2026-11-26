@@ -1,0 +1,102 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -46.47478006295461,
+            -23.42494087501497
+          ],
+          [
+            -46.474538402184294,
+            -23.424864291297183
+          ],
+          [
+            -46.47463836529073,
+            -23.424431996142303
+          ],
+          [
+            -46.475171125439715,
+            -23.42458718426488
+          ],
+          [
+            -46.4751391169267,
+            -23.42468612662529
+          ]
+        ]
+      },
+      "properties": {
+        "name": "Route 1",
+        "points": 5,
+		"level": 2,
+		"instructions": "Head to immigration",
+        "created": "2026-11-26T05:26:53.537Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -46.47488398272915,
+            -23.42460674141097
+          ],
+          [
+            -46.474825902795914,
+            -23.42459062343235
+          ],
+          [
+            -46.47491632885837,
+            -23.42431289601174
+          ],
+          [
+            -46.47499469123946,
+            -23.42406191049237
+          ],
+          [
+            -46.4763430294644,
+            -23.424454996244066
+          ],
+          [
+            -46.476549503842364,
+            -23.42374636497874
+          ]
+        ]
+      },
+      "properties": {
+        "name": "Route 2",
+        "points": 6,
+		"level": 0,
+		"instructions": "Follow signs to Baggage claim",
+        "created": "2026-11-26T05:27:54.087Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -46.47655688791633,
+            -23.423714442132905
+          ],
+          [
+            -46.477033093895926,
+            -23.423835446163395
+          ]
+        ]
+      },
+      "properties": {
+        "name": "Route 3",
+        "points": 2,
+		"level": 0,
+		"instructions": "Head to your designated zone to meet your driver",
+        "created": "2026-11-26T05:28:13.987Z"
+      }
+    }
+  ]
+}

@@ -40,7 +40,14 @@
         .flag { display: none; pointer-events: none; text-align: center; }
         .flag svg { display: block; margin: 0 auto; filter: drop-shadow(0 2px 3px #0008); }
         .flag span { display: inline-block; margin-bottom: 4px; padding: 3px 9px; border-radius: 10px; background: #fff; color: #111; font-size: 12px; font-weight: 600; white-space: nowrap; box-shadow: 0 1px 4px #0006; }
-        .gps-seg { position: absolute; top: 68px; right: 16px; display: flex; background: #23262d; border-radius: 16px; padding: 3px; box-shadow: 0 2px 8px #0006; }
+        .route-pick { position: absolute; top: 76px; left: 16px; background: #23262d; color: #fff; border: 0; border-radius: 16px; padding: 6px 10px; font-size: 13px; box-shadow: 0 2px 8px #0006; }
+        .mode-seg { position: absolute; top: 68px; right: 16px; display: flex; background: #23262d; border-radius: 16px; padding: 3px; box-shadow: 0 2px 8px #0006; }
+        .mode-seg button { border: 0; background: none; color: #9aa0aa; font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 13px; cursor: pointer; }
+        .mode-seg button.on { background: #3b82f6; color: #fff; }
+        /* The geolocate control is driven by the Simulated/Real toggle, so its own button stays hidden */
+        .mapboxgl-ctrl-geolocate { display: none; }
+        .mapboxgl-ctrl-group:has(> .mapboxgl-ctrl-geolocate:only-child) { display: none; }
+        .gps-seg { position: absolute; top: 112px; right: 16px; display: flex; background: #23262d; border-radius: 16px; padding: 3px; box-shadow: 0 2px 8px #0006; }
         .gps-seg[hidden] { display: none; }
         .gps-seg button { border: 0; background: none; color: #9aa0aa; font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 13px; cursor: pointer; }
         .gps-seg button.on { background: #3b82f6; color: #fff; }
@@ -68,13 +75,19 @@
     <div id="map"></div>
     <button class="back" aria-label="Back">←</button>
     <div class="level-badge" id="level-badge">Level –</div>
+    <select class="route-pick" id="route-pick" aria-label="Route">
+        <option value="GRU-T3-gate305">T3 · gate 305</option>
+        <option value="GRU-T3-gate319">T3 · gate 319</option>
+        <option value="GRU-T2-gate105">T2 · gate 105</option>
+    </select>
     <button class="sim-btn" id="sim-btn">▶ Simulate walk</button>
+    <div class="mode-seg" id="mode-seg" title="Where the blue dot comes from"><button data-m="sim" class="on">Simulated</button><button data-m="real">My location</button></div>
     <div class="gps-seg" id="gps-seg" title="Simulated GPS quality" hidden><button data-q="good">Good GPS</button><button data-q="fair">Fair</button><button data-q="poor" class="on">Poor</button></div>
 
     <div class="foot-strip"></div>
     <div class="sheet" id="sheet">
         <header id="sheet-head">
-            <h1>Walk 9 min to pickup point</h1>
+            <h1>Walk to pickup point</h1>
             <small>Terminal exit → pickup zone · Level <span id="route-levels"></span></small>
         </header>
         <ol id="steps"></ol>
@@ -84,14 +97,16 @@
         // Terminal centre (GRU). Each step flies to a point on the matching floor.
         const MIN_INDOOR_ZOOM = 17;
         const FOOT = 36;   // px, matches --foot in the CSS
-        const START = [-46.4745191, -23.4256542];   // start of the first route (gate 309), on level 2
-        const START_LEVEL = 2;
-        const STEPS = [
-            { icon: '🧳', title: 'Follow signs to Baggage claim', text: 'Walk along the arrivals corridor.', level: 2, pt: [-46.47437, -23.42503] },
-            { startVertex: 5, icon: '🚪', title: 'Exit the terminal', text: 'Once you find the terminal exit, go to the external area.', level: 0, pt: [-46.47490, -23.42458] },
-            { icon: '🚶', title: 'Cross the street', text: 'Once in the external area, cross the street to the second curb and turn right.', level: 0, pt: [-46.47564, -23.42425] },
-            { icon: '📍', title: 'Head to your designated zone to meet your driver', text: 'Head to the zone shown in the app.', level: 0, pt: [-46.47655, -23.42376] }
-        ];
+        // Route file (data/<name>.geojson): chosen with ?route=, default T3 gate 305. Each feature is one
+        // step; its instructions, level and line come from the file itself.
+        const ROUTE_NAMES = [...document.querySelectorAll('#route-pick option')].map(o => o.value);
+        const ROUTE = ROUTE_NAMES.includes(new URLSearchParams(location.search).get('route')) ? new URLSearchParams(location.search).get('route') : ROUTE_NAMES[0];
+        document.getElementById('route-pick').value = ROUTE;
+        document.getElementById('route-pick').addEventListener('change', e => { location.search = '?route=' + e.target.value; });
+        let START = [-46.4745, -23.4256];   // replaced by the first vertex of the first route once loaded
+        let START_LEVEL = 0;
+        const STEPS = [];
+        const iconFor = t => /immigration/i.test(t) ? '🛂' : /baggage/i.test(t) ? '🧳' : /driver|zone/i.test(t) ? '📍' : '🚶';
 
         // Each step is one drawn route (in drawing order); its pt/level are read from the data.
         const map = new mapboxgl.Map({
@@ -101,6 +116,40 @@
             config: { basemap: { showIndoor: true, lightPreset: 'night' } }
         });
         map.addControl(new mapboxgl.IndoorControl(), 'top-right');
+
+        // Real location: same GeolocateControl setup as the indoor GPS demo (blue dot, heading, accuracy circle).
+        const geolocate = new mapboxgl.GeolocateControl({
+            positionOptions: { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+            trackUserLocation: true, showUserHeading: true, showUserLocation: true, showAccuracyCircle: true,
+            fitBoundsOptions: { maxZoom: 18 }
+        });
+        map.addControl(geolocate, 'bottom-left');
+        let realMode = false, geoActive = false;
+        geolocate.on('trackuserlocationstart', () => { geoActive = true; });
+        geolocate.on('trackuserlocationend', () => { geoActive = false; });
+        geolocate.on('error', err => {
+            console.error('Geolocation error:', err);
+            alert(err.code === 1 ? 'Location permission denied. Please allow location access for this site.' : 'Unable to get your location.');
+            setMode('sim');
+        });
+        function setMode(mode) {
+            const real = mode === 'real';
+            if (real === realMode) return;
+            realMode = real;
+            document.querySelectorAll('#mode-seg button').forEach(b => b.classList.toggle('on', b.dataset.m === mode));
+            document.getElementById('sim-btn').style.display = real ? 'none' : '';
+            document.getElementById('gps-seg').hidden = true;
+            if (real) {
+                stopSim();
+                puck.remove(); puckOnMap = false;
+                if (!geoActive) geolocate.trigger();
+            } else {
+                for (let i = 0; i < 3 && geoActive; i++) geolocate.trigger();   // active-lock -> off
+                puck.addTo(map); puckOnMap = true;
+            }
+            updatePuck();
+        }
+        document.querySelectorAll('#mode-seg button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.m)));
 
         let routeData = null;
         let currentLevel = null;
@@ -140,7 +189,7 @@
             updateFlag();
         }
         // Before/after a walk the puck shows only on its own floor; during a walk it is always shown.
-        function updatePuck() { if (typeof puckEl !== 'undefined') puckEl.style.display = (running || puckFloor === currentLevel) ? 'block' : 'none'; }
+        function updatePuck() { if (typeof puckEl !== 'undefined') puckEl.style.display = !realMode && (running || puckFloor === currentLevel) ? 'block' : 'none'; }
         function updateFlag() { if (flag) flag.getElement().style.display = currentLevel === flagLevel ? 'block' : 'none'; }
         function applyLevel(level) {
             if (level === currentLevel) return;
@@ -155,22 +204,25 @@
         // The source only ever holds the current floor's routes, and is given fresh data on every
         // floor change. (A layer filter was left drawing nothing after a floor switch + camera jump
         // in real Chrome, even with the right value; new data can't go stale like that.)
+        let selectedLeg = null;   // step picked from the list: only that route is drawn (null = all routes on the floor)
         const EMPTY = { type: 'FeatureCollection', features: [] };
         function showFloorRoutes() {
             const src = map.getSource('routes');
             if (!src || !routeData) return;
             src.setData(currentLevel === null || currentLevel === undefined ? EMPTY
-                : { type: 'FeatureCollection', features: routeData.features.filter(f => f.properties.level === currentLevel) });
+                : { type: 'FeatureCollection', features: routeData.features.filter((f, i) => f.properties.level === currentLevel && (selectedLeg === null || i === selectedLeg)) });
         }
         new MutationObserver(() => applyLevel(running && puckLevel !== null ? puckLevel : readLevel())).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
 
         map.on('style.load', async () => {
-            // Two files: routes for steps 1-2, then routes for steps 3-4. Merged in drawing order.
-            const parts = await Promise.all(['data/indoor-airport-routes.geojson', 'data/indoor-airport-routes-2.geojson'].map(u => fetch(u).then(r => r.json())));
-            routeData = { type: 'FeatureCollection', features: parts.flatMap(d => d.features)
-                .sort((a, b) => new Date(a.properties.created) - new Date(b.properties.created)) };
-            // Point each step at the start of its route, on that route's floor.
-            STEPS.forEach((st, i) => { const f = routeData.features[i]; if (f) { st.pt = f.geometry.coordinates[st.startVertex || 0]; st.level = f.properties.level; } });
+            routeData = await fetch(`data/${ROUTE}.geojson`).then(r => r.json());
+            routeData.features.sort((a, b) => new Date(a.properties.created) - new Date(b.properties.created));
+            // One step per route, starting at the route's first vertex, on that route's floor.
+            routeData.features.forEach(f => STEPS.push({ icon: iconFor(f.properties.instructions), title: f.properties.instructions, text: `Level ${f.properties.level}`, level: f.properties.level, pt: f.geometry.coordinates[0] }));
+            START = routeData.features[0].geometry.coordinates[0];
+            START_LEVEL = routeData.features[0].properties.level;
+            buildSteps();
+            buildPath();
             const levels = [...new Set(routeData.features.map(f => f.properties.level))].sort((a, b) => b - a);
             document.getElementById('route-levels').textContent = levels.join(' / ');
 
@@ -198,18 +250,20 @@
 
         // Steps list: tap to fly to the step and switch the floor.
         const ol = document.getElementById('steps');
-        STEPS.forEach((s, i) => {
+        function buildSteps() { STEPS.forEach((s, i) => {
             const li = document.createElement('li');
             li.innerHTML = `<div class="ico">${s.icon}</div><div><b>${s.title}</b><span>${s.text}</span></div>`;
             li.addEventListener('click', () => {
                 stopSim();
+                selectedLeg = i;
+                showFloorRoutes();
                 setActiveStep(i);
                 map.flyTo({ center: s.pt, zoom: 19, duration: 1500 });
                 // Click the matching floor button (aria-label = floor name).
                 document.querySelector(`.mapboxgl-ctrl-level-button[aria-label="${s.level}"]`)?.click();
             });
             ol.appendChild(li);
-        });
+        }); }
 
         // ---- Simulated user position ------------------------------------------
         const SPEED_MPS = 12;   // sped up so the whole walk takes about half a minute
@@ -220,14 +274,14 @@
         // keeps its floor and its distance from the start.
         let path = null;
         function buildPath() {
-            // Feature i is step i: each step starts where its route begins (or at its startVertex).
+            // Feature i is step i: each step starts where its route begins.
             const feats = routeData.features;
             const pts = []; let d = 0;
             feats.forEach((f, fi) => f.geometry.coordinates.forEach((c, ci) => {
                 const prev = pts[pts.length - 1];
                 if (prev) d += meters(prev.c, c);
                 pts.push({ c, level: f.properties.level, d });
-                if (STEPS[fi] && ci === (STEPS[fi].startVertex || 0)) STEPS[fi].startD = d;
+                if (STEPS[fi] && ci === 0) STEPS[fi].startD = d;
             }));
             path = { pts, total: d };
         }
@@ -368,9 +422,10 @@
         // Keep the map centre (and so the puck) in the part not covered by the sheet.
         function fitPadding() { map.setPadding({ bottom: document.getElementById('sheet').offsetHeight + FOOT }); }
         function startSim() {
-            if (!routeData) return;
+            if (!routeData || realMode) return;
             if (!path) buildPath();
             if (simDist >= path.total) simDist = 0;
+            selectedLeg = null; showFloorRoutes();
             running = true; lastT = prevFrame = performance.now(); puckLevel = null; shownHeading = null; moveHeading = null; routeHeading = null; dispPos = null; dispOff = null; if (simDist === 0) simT = 0; activeStep = -1;
             simBtn.textContent = '■ Stop'; simBtn.classList.add('running');
             document.getElementById('sheet').classList.remove('collapsed');
