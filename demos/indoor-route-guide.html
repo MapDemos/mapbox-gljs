@@ -19,7 +19,7 @@
         .mapboxgl-ctrl-bottom-left, .mapboxgl-ctrl-bottom-right { z-index: 2; }
         .foot-strip { position: absolute; left: 0; right: 0; bottom: 0; height: var(--foot); background: #15171c; z-index: 1; pointer-events: none; }
         .sheet { position: absolute; left: 0; right: 0; bottom: var(--foot); max-width: 480px; margin: 0 auto; background: #1b1d22; color: #fff;
-                 border-radius: 16px 16px 0 0; box-shadow: 0 -4px 16px #0008; max-height: 75vh; display: flex; flex-direction: column; }
+                 border-radius: 16px 16px 0 0; box-shadow: 0 -4px 16px #0008; max-height: 40vh; display: flex; flex-direction: column; }
         .sheet header { padding: 14px 20px 10px; text-align: center; cursor: grab; touch-action: none; user-select: none; border-bottom: 1px solid #2c2f36; flex: none; }
         .sheet header::before { content: ""; display: block; width: 40px; height: 4px; border-radius: 2px; background: #555; margin: 0 auto 10px; }
         .sheet h1 { margin: 0; font-size: 17px; }
@@ -479,6 +479,11 @@
         // dragging it nearly shut collapses it, and a plain tap still toggles it.
         (() => {
             const sheet = document.getElementById('sheet'), head = document.getElementById('sheet-head');
+            // Tallest the panel may get: it must leave room under the top buttons for the floor selector that rides above it.
+            const sheetMax = () => {
+                const sel = document.querySelector('.mapboxgl-ctrl-top-right');
+                return Math.max(head.offsetHeight, Math.min(window.innerHeight * 0.75, window.innerHeight - FOOT - 12 - (sel ? sel.offsetHeight : 0) - 68));
+            };
             let startY = 0, startH = 0, moved = false, dragging = false, suppressClick = false;
             head.addEventListener('pointerdown', e => {
                 dragging = true; moved = false; startY = e.clientY; startH = sheet.offsetHeight;
@@ -489,7 +494,8 @@
                 const dy = startY - e.clientY;
                 if (!moved && Math.abs(dy) < 5) return;
                 if (!moved) { moved = true; sheet.classList.add('dragging'); sheet.classList.remove('collapsed'); }
-                const min = head.offsetHeight, max = window.innerHeight * 0.75;
+                const min = head.offsetHeight, max = sheetMax();
+                sheet.style.maxHeight = max + 'px';
                 sheet.style.height = Math.min(max, Math.max(min, startH + dy)) + 'px';
             });
             const end = () => {
@@ -498,7 +504,7 @@
                 sheet.classList.remove('dragging');
                 if (moved) {
                     suppressClick = true;
-                    if (sheet.offsetHeight < head.offsetHeight + 60) { sheet.classList.add('collapsed'); sheet.style.height = ''; }
+                    if (sheet.offsetHeight < head.offsetHeight + 60) { sheet.classList.add('collapsed'); sheet.style.height = ''; sheet.style.maxHeight = ''; }
                 }
             };
             head.addEventListener('pointerup', end);
@@ -506,7 +512,7 @@
             head.addEventListener('click', () => {
                 if (suppressClick) { suppressClick = false; return; }
                 sheet.classList.toggle('collapsed');
-                sheet.style.height = '';
+                sheet.style.height = ''; sheet.style.maxHeight = '';
             });
         })();
     </script>
